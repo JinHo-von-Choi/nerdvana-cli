@@ -1,0 +1,57 @@
+# NerdVana CLI Configuration
+# Copy to ~/.config/nerdvana-cli/config.yml or ./nerdvana.yml
+
+model:
+  # Provider: anthropic, openai, gemini, groq, openrouter, xai, ollama, vllm, deepseek, mistral, cohere, together
+  # Leave empty to auto-detect from model name
+  provider: ""
+
+  # Model name — provider auto-detected from prefix
+  # Anthropic: claude-sonnet-4-20250514, claude-opus-4-20250514
+  # OpenAI: gpt-4.1, gpt-4o, o3
+  # Gemini: gemini-2.5-flash, gemini-2.5-pro
+  # Groq: llama-3.3-70b-versatile, mixtral-8x7b-32768
+  # DeepSeek: deepseek-chat, deepseek-reasoner
+  # Mistral: mistral-medium-latest, codestral-latest
+  model: claude-sonnet-4-20250514
+
+  # Leave empty to use provider's env var
+  # Anthropic: ANTHROPIC_API_KEY
+  # OpenAI: OPENAI_API_KEY
+  # Gemini: GEMINI_API_KEY
+  # Groq: GROQ_API_KEY
+  # etc.
+  api_key: ""
+
+  # Override API endpoint (for custom proxies, local servers)
+  base_url: ""
+
+  # Max tokens per response
+  max_tokens: 8192
+
+  # Temperature (0.0 = deterministic, 1.0 = creative)
+  temperature: 1.0
+
+permissions:
+  mode: default
+  always_allow:
+    - "FileRead"
+    - "Glob"
+    - "Grep"
+  always_deny: []
+
+session:
+  persist: true
+  max_turns: 200
+  max_context_tokens: 180000
+  compact_threshold: 0.8
+
+parism:
+  # Use Parism for structured shell output (requires Node.js)
+  enabled: true
+  # Custom prism.config.json path (empty = default whitelist)
+  config_path: ""
+  # Default output format: "json" (structured) or "compact" (token-efficient)
+  format: json
+  # Fallback to raw Bash when Parism is unavailable
+  fallback_to_bash: true
