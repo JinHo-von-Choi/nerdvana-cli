@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from nerdvana_cli.core.tool import ToolRegistry
+from typing import Any
+
+from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
 from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
 from nerdvana_cli.tools.parism_tool import ParismTool
@@ -10,19 +12,19 @@ from nerdvana_cli.tools.search_tools import GlobTool, GrepTool
 
 
 def create_tool_registry(
-    parism_client  = None,
-    mcp_tools      = None,
-    settings       = None,
-    task_registry  = None,
-    team_registry  = None,
+    parism_client:  Any    = None,
+    mcp_tools:      Any    = None,
+    settings:       Any    = None,
+    task_registry:  Any    = None,
+    team_registry:  Any    = None,
 ) -> ToolRegistry:
     """Create and populate the tool registry with all built-in tools."""
     from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team       import TeamRegistry as TR
+    from nerdvana_cli.core.team import TeamRegistry
 
     registry  = ToolRegistry()
     _task_reg = task_registry or TaskRegistry()
-    _team_reg = team_registry or TR()
+    _team_reg = team_registry or TeamRegistry()
 
     if mcp_tools:
         for tool in mcp_tools:
@@ -70,9 +72,9 @@ def create_tool_registry(
 
 
 def create_subagent_registry(
-    settings      = None,
-    mcp_tools     = None,
-    allowed_tools: list[str] | None = None,
+    settings:       Any                = None,
+    mcp_tools:      Any                = None,
+    allowed_tools:  list[str] | None   = None,
 ) -> ToolRegistry:
     """Create a restricted tool registry for subagent use.
 
@@ -82,7 +84,7 @@ def create_subagent_registry(
     If allowed_tools is None or ["*"], all standard tools are included.
     Otherwise only tools whose name appears in allowed_tools are registered.
     """
-    _all: dict[str, object] = {}
+    _all: dict[str, BaseTool[Any]] = {}
 
     bash_tool = create_bash_tool()
     _all[bash_tool.name] = bash_tool
@@ -101,7 +103,7 @@ def create_subagent_registry(
         for tool in _all.values():
             registry.register(tool)
     else:
-        allowed_set = set(allowed_tools)
+        allowed_set = set(allowed_tools or [])
         for name, tool in _all.items():
             if name in allowed_set:
                 registry.register(tool)

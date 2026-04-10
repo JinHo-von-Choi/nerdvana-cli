@@ -1,6 +1,8 @@
 """TaskPanel — real-time subagent status widget for the NerdVana TUI."""
 from __future__ import annotations
 
+from typing import Any
+
 from textual.reactive import reactive
 from textual.widget import Widget
 
@@ -50,7 +52,7 @@ class TaskPanel(Widget):
 
     _rows: reactive[str] = reactive("")
 
-    def __init__(self, task_registry: TaskRegistry, **kwargs: object) -> None:
+    def __init__(self, task_registry: TaskRegistry, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._registry = task_registry
 
@@ -70,5 +72,5 @@ class TaskPanel(Widget):
         self._rows = "\n".join(rows)
         self.refresh()
 
-    def render(self) -> str:  # type: ignore[override]
+    def render(self) -> str:
         return self._rows or ""

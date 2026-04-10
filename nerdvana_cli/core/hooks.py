@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,21 +40,19 @@ class HookResult:
     """Result from a hook handler.
 
     Fields:
-        allow: False이면 해당 작업을 차단한다.
-        message: 사용자에게 표시할 메시지.
-        inject_messages: 대화 스트림(메시지 배열)에 삽입할 dict 목록.
-            role="user" / "assistant" 등 표준 메시지 형식을 따른다.
-            system_prompt에 들어갈 sticky 정보는 inject_messages 대신
-            system_prompt_append를 사용한다.
-        modified_input: BEFORE_TOOL hook에서 도구 입력을 수정할 때 사용한다.
-        system_prompt_append: SESSION_START hook 전용 통로.
-            반환된 문자열은 매 턴 system_prompt 끝에 누적 append되어
-            세션 전체에 걸쳐 모델에게 유지된다.
+        allow: If False, block the associated action.
+        message: Message to display to the user.
+        inject_messages: List of dicts to insert into the conversation stream.
+            Must follow standard message format (role="user"/"assistant"/etc.).
+            For sticky information that belongs in the system_prompt, use
+            system_prompt_append instead of inject_messages.
+        system_prompt_append: Channel exclusive to SESSION_START hooks.
+            The returned string is cumulatively appended to the system_prompt
+            on every turn, persisting for the model across the entire session.
     """
     allow: bool = True
     message: str = ""
     inject_messages: list[dict[str, Any]] = field(default_factory=list)
-    modified_input: dict[str, Any] | None = None
     system_prompt_append: str = ""
 
 

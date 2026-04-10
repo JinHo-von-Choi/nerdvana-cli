@@ -13,7 +13,6 @@ from nerdvana_cli.providers.base import (
     DEFAULT_MODELS,
     PROVIDER_CAPABILITIES,
     PROVIDER_KEY_ENVVARS,
-    BaseProvider,
     ProviderConfig,
     ProviderName,
     detect_provider,
@@ -23,7 +22,7 @@ from nerdvana_cli.providers.openai_provider import OpenAIProvider
 
 console = Console()
 
-_PROVIDER_CLASSES: dict[ProviderName, type[BaseProvider]] = {
+_PROVIDER_CLASSES: dict[ProviderName, type[AnthropicProvider] | type[OpenAIProvider] | type[GeminiProvider]] = {
     ProviderName.ANTHROPIC: AnthropicProvider,
     ProviderName.OPENAI: OpenAIProvider,
     ProviderName.GEMINI: GeminiProvider,

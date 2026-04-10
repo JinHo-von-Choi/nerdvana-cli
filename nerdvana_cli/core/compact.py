@@ -1,8 +1,8 @@
 # nerdvana_cli/core/compact.py
 """AI-powered context compression.
 
-compress-context.skill의 body를 프롬프트로 사용하여 대화를 요약한다.
-스킬 파일이 없으면 FALLBACK_PROMPT를 사용한다.
+Uses the body of compress-context.skill as the prompt to summarize conversations.
+Falls back to FALLBACK_PROMPT when the skill file is not found.
 """
 from __future__ import annotations
 
@@ -73,16 +73,23 @@ async def ai_compact(
     *,
     prompt: str,
 ) -> Message | None:
-    """compress-context.skill body를 프롬프트로 AI 요약 수행.
+    """Perform AI summarization using compress-context.skill body as prompt.
 
     Returns:
-        요약 Message — 실패 또는 circuit open이면 None.
+        Summary Message — None on failure or when circuit is open.
     """
     if state.is_circuit_open:
         logger.info("ai_compact skipped — circuit open (%d failures)", state.consecutive_failures)
         return None
 
     history_text = _messages_to_text(messages)
+
+    # Truncate to avoid exceeding provider context window.
+    # Rough heuristic: 1 token ≈ 4 chars; keep at most 50% of a 128k window.
+    max_chars = 128_000
+    if len(history_text) > max_chars:
+        history_text = history_text[-max_chars:]
+
     full_content = f"{prompt}\n\n---\n\nCONVERSATION HISTORY:\n\n{history_text}"
 
     try:

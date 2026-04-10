@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
 from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+
+try:
+    from google.genai import Client as _GenaiClient
+except ImportError:  # pragma: no cover – runtime guard in _get_client
+    _GenaiClient = None  # type: ignore[assignment,misc]
 
 
 class GeminiProvider:
@@ -18,9 +24,9 @@ class GeminiProvider:
 
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._client = None
+        self._client: _GenaiClient | None = None
 
-    def _get_client(self):
+    def _get_client(self) -> _GenaiClient:
         """Return cached genai.Client (lazy-init)."""
         if self._client is None:
             from google import genai
@@ -32,7 +38,7 @@ class GeminiProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> AsyncIterator[ProviderEvent]:
         """Stream completion from Gemini API."""
         try:
@@ -60,7 +66,7 @@ class GeminiProvider:
                 types.FunctionDeclaration(
                     name=t.name,
                     description=t.description_text,
-                    parameters=self._convert_schema(t.input_schema),
+                    parameters=self._convert_schema(t.input_schema),  # type: ignore[arg-type]
                 )
                 for t in tools
             ]
@@ -73,7 +79,7 @@ class GeminiProvider:
             system_instruction=system_prompt,
             max_output_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
-            tools=gemini_tools,
+            tools=gemini_tools,  # type: ignore[arg-type]
         )
 
         try:
@@ -94,7 +100,7 @@ class GeminiProvider:
                                     args = dict(part.function_call.args) if part.function_call.args else {}
                                     yield ProviderEvent(
                                         type="tool_use_complete",
-                                        tool_name=part.function_call.name,
+                                    tool_name=part.function_call.name or "",
                                         tool_input_complete=args,
                                     )
 
@@ -107,7 +113,7 @@ class GeminiProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> dict[str, Any]:
         """Non-streaming completion."""
         try:
@@ -122,7 +128,7 @@ class GeminiProvider:
                 types.FunctionDeclaration(
                     name=t.name,
                     description=t.description_text,
-                    parameters=self._convert_schema(t.input_schema),
+                    parameters=self._convert_schema(t.input_schema),  # type: ignore[arg-type]
                 )
                 for t in tools
             ]
@@ -133,7 +139,7 @@ class GeminiProvider:
             system_instruction=system_prompt,
             max_output_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
-            tools=gemini_tools,
+            tools=gemini_tools,  # type: ignore[arg-type]
         )
 
         try:
@@ -156,7 +162,7 @@ class GeminiProvider:
                                 args = dict(part.function_call.args) if part.function_call.args else {}
                                 tool_uses.append(
                                     {
-                                        "id": f"call_{part.function_call.name}",
+                                        "id": f"call_{part.function_call.name}_{uuid.uuid4().hex[:8]}",
                                         "name": part.function_call.name,
                                         "input": args,
                                     }
@@ -179,17 +185,18 @@ class GeminiProvider:
         except Exception as e:
             return {"content": str(e), "tool_uses": [], "usage": {}, "is_error": True}
 
-    async def list_models(self) -> list:
+    async def list_models(self) -> list[Any]:
         """Fetch available models from Gemini API."""
         from nerdvana_cli.providers.base import ModelInfo
         try:
             client = self._get_client()
-            models = []
+            models: list[Any] = []
             for m in client.models.list():
-                model_id = m.name.replace("models/", "") if m.name.startswith("models/") else m.name
+                m_name: str = m.name or ""
+                model_id = m_name.replace("models/", "") if m_name.startswith("models/") else m_name
                 models.append(ModelInfo(
                     id=model_id,
-                    name=getattr(m, 'display_name', model_id),
+                    name=getattr(m, 'display_name', model_id) or model_id,
                     provider="gemini",
                 ))
             models.sort(key=lambda x: x.id)
@@ -222,7 +229,7 @@ class GeminiProvider:
                     }
                 )
             elif role == "assistant":
-                parts = []
+                parts: list[dict[str, Any]] = []
                 if isinstance(content, str) and content:
                     parts.append({"text": content})
                 if isinstance(content, list):
@@ -242,10 +249,10 @@ class GeminiProvider:
                 contents.append({"role": "model", "parts": parts if parts else [{"text": ""}]})
             elif role == "user":
                 if isinstance(content, list):
-                    parts = []
+                    parts_u: list[dict[str, Any]] = []
                     for item in content:
                         if item.get("type") == "tool_result":
-                            parts.append(
+                            parts_u.append(
                                 {
                                     "functionResponse": {
                                         "name": item.get("name", "unknown"),
@@ -254,8 +261,8 @@ class GeminiProvider:
                                 }
                             )
                         elif item.get("type") == "text":
-                            parts.append({"text": item["text"]})
-                    contents.append({"role": "user", "parts": parts})
+                            parts_u.append({"text": item["text"]})
+                    contents.append({"role": "user", "parts": parts_u})
                 else:
                     contents.append({"role": "user", "parts": [{"text": str(content)}]})
             else:
@@ -264,34 +271,23 @@ class GeminiProvider:
         return contents
 
     def _convert_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        """Convert OpenAI-style JSON schema to Gemini format."""
+        """Convert OpenAI-style JSON schema to Gemini format (recursive)."""
         if not schema:
             return {}
-        result: dict[str, Any] = {"type": schema.get("type", "OBJECT").upper()}
+        raw_type = schema.get("type", "OBJECT")
+        type_map = {"integer": "INTEGER", "number": "NUMBER", "boolean": "BOOLEAN",
+                     "array": "ARRAY", "object": "OBJECT", "string": "STRING"}
+        result: dict[str, Any] = {"type": type_map.get(raw_type.lower(), "STRING")}
         if "properties" in schema:
-            props = {}
-            for name, prop in schema["properties"].items():
-                p: dict[str, Any] = {}
-                t = prop.get("type", "string").upper()
-                if t == "INTEGER":
-                    t = "INTEGER"
-                elif t == "NUMBER":
-                    t = "NUMBER"
-                elif t == "BOOLEAN":
-                    t = "BOOLEAN"
-                elif t == "ARRAY":
-                    t = "ARRAY"
-                elif t == "OBJECT":
-                    t = "OBJECT"
-                else:
-                    t = "STRING"
-                p["type"] = t
-                if "description" in prop:
-                    p["description"] = prop["description"]
-                props[name] = p
-            result["properties"] = props
+            result["properties"] = {
+                name: self._convert_schema(prop) for name, prop in schema["properties"].items()
+            }
+        if "items" in schema:
+            result["items"] = self._convert_schema(schema["items"])
         if "required" in schema:
             result["required"] = schema["required"]
+        if "description" in schema:
+            result["description"] = schema["description"]
         if "enum" in schema:
             result["enum"] = schema["enum"]
         return result

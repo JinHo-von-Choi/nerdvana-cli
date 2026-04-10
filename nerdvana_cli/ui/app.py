@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 from typing import Any
 
 from rich.text import Text
@@ -48,7 +47,7 @@ class MultilineAwareInput(Input):
             return
 
         self._pending_multiline = text
-        summary = f"[{len(lines)}줄 · {len(text)}자]"
+        summary = f"[{len(lines)} lines · {len(text)} chars]"
 
         def _apply_summary() -> None:
             self._setting_summary = True
@@ -159,7 +158,7 @@ class ChatMessage(Static):
     }
     """
 
-    def __init__(self, content: str, raw_text: str = "", **kwargs):
+    def __init__(self, content: str, raw_text: str = "", **kwargs: Any) -> None:
         super().__init__(content, **kwargs)
         self._raw_text = raw_text or self._strip_markup(content)
 
@@ -243,7 +242,7 @@ class StatusBar(Static):
         self.update(" | ".join(parts) if parts else "Ready")
 
 
-class NerdvanaApp(App):
+class NerdvanaApp(App[object]):
     """Main TUI application."""
 
     TITLE = "NerdVana CLI"
@@ -325,7 +324,7 @@ class NerdvanaApp(App):
         self.settings       = settings
         self.parism_client  = parism_client
         self.mcp_manager    = mcp_manager
-        self._loop: AgentLoop | None = None
+        self._agent_loop: AgentLoop | None = None
         self._is_generating = False
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
@@ -363,7 +362,7 @@ class NerdvanaApp(App):
             team_registry = team_registry,
         )
         session  = SessionStorage()
-        self._loop = AgentLoop(
+        self._agent_loop = AgentLoop(
             settings      = self.settings,
             registry      = registry,
             session       = session,
@@ -375,7 +374,7 @@ class NerdvanaApp(App):
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
-        for skill in self._loop.skill_loader.list_skills():
+        for skill in self._agent_loop.skill_loader.list_skills():
             if skill.trigger not in _seen_triggers:
                 menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
                 _seen_triggers.add(skill.trigger)
@@ -401,14 +400,12 @@ class NerdvanaApp(App):
 
         result = await check_for_update(__version__)
         if result:
-            try:
+            with contextlib.suppress(Exception):
                 self._add_chat_message(
                     f"[bold yellow]Update available: {result['version']}[/bold yellow] "
                     f"[dim](current: v{__version__})[/dim]\n"
                     f"[dim]Run /update to install[/dim]"
                 )
-            except Exception:
-                pass
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
@@ -438,7 +435,7 @@ class NerdvanaApp(App):
             return
 
         self._add_chat_message(f"\n[bold green]> {user_text}[/bold green]", raw_text=user_text)
-        self._add_chat_message("[bold cyan]에스텔 :[/bold cyan]")
+        self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
 
         self._generate_response(user_text)
 
@@ -462,13 +459,13 @@ class NerdvanaApp(App):
             """Periodically update status bar with elapsed time."""
             while timer_running:
                 elapsed = time.monotonic() - start_time
-                usage = self._loop.state.usage if self._loop else None
+                usage = self._agent_loop.state.usage if self._agent_loop else None
                 status_bar.update_status(
                     model=self.settings.model.model,
                     provider=self.settings.model.provider,
                     tokens_in=usage.input_tokens if usage else 0,
                     tokens_out=usage.output_tokens if usage else 0,
-                    tools=len(self._loop.registry.all_tools()) if self._loop else 0,
+                    tools=len(self._agent_loop.registry.all_tools()) if self._agent_loop else 0,
                     parism=self.parism_client is not None,
                     thinking=True,
                     elapsed_s=elapsed,
@@ -488,7 +485,8 @@ class NerdvanaApp(App):
                 TOOL_STATUS_PREFIX,
             )
 
-            async for chunk in self._loop.run(prompt):
+            assert self._agent_loop is not None
+            async for chunk in self._agent_loop.run(prompt):
                 if chunk.startswith(CONTEXT_USAGE_PREFIX):
                     pct = int(chunk[len(CONTEXT_USAGE_PREFIX):])
                     self._update_context_usage(pct)
@@ -539,7 +537,7 @@ class NerdvanaApp(App):
 
             # Final status with total elapsed
             elapsed = time.monotonic() - start_time
-            usage = self._loop.state.usage
+            usage = self._agent_loop.state.usage
             self._add_chat_message(
                 f"[dim]({elapsed:.1f}s | {usage.input_tokens} in / {usage.output_tokens} out)[/dim]"
             )
@@ -549,7 +547,7 @@ class NerdvanaApp(App):
                 provider=self.settings.model.provider,
                 tokens_in=usage.input_tokens,
                 tokens_out=usage.output_tokens,
-                tools=len(self._loop.registry.all_tools()),
+                tools=len(self._agent_loop.registry.all_tools()),
                 parism=self.parism_client is not None,
             )
         except Exception as e:
@@ -564,140 +562,18 @@ class NerdvanaApp(App):
 
     async def _handle_api_key_input(self, api_key: str) -> None:
         """Handle API key input for /provider flow."""
-        provider_name = self._pending_provider
-        self._pending_provider = ""
-        input_widget = self.query_one("#user-input", Input)
-        input_widget.placeholder = "Message..."
-        input_widget.password = False
-
-        if not api_key.strip():
-            self._add_chat_message("[yellow]Cancelled.[/yellow]")
-            return
-
-        await self._switch_provider(provider_name, api_key)
+        from nerdvana_cli.commands.model_commands import handle_api_key_input
+        await handle_api_key_input(self, api_key)
 
     async def _switch_provider(self, provider_name: str, api_key: str) -> None:
-        """Switch to a provider with the given API key. Saves config and refreshes UI.
-
-        Note: API key validity is NOT verified here. Empty list_models() result
-        means the provider does not expose model enumeration — not that the key
-        is invalid. Real key failures surface as 401/403 on the first stream call.
-        """
-        self._add_chat_message(f"[dim]Switching to {provider_name}...[/dim]")
-
-        from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, DEFAULT_MODELS, ProviderName
-        from nerdvana_cli.providers.factory import create_provider
-
-        try:
-            prov = ProviderName(provider_name)
-        except ValueError:
-            self._add_chat_message(f"[red]Unknown provider: {provider_name}[/red]")
-            return
-
-        base_url = DEFAULT_BASE_URLS.get(prov, "")
-        default_model = DEFAULT_MODELS.get(prov, "")
-
-        # Apply settings unconditionally — key verification is the caller's job.
-        self.settings.model.provider = provider_name
-        self.settings.model.api_key = api_key
-        self.settings.model.base_url = base_url
-        self.settings.model.model = default_model
-        self._loop.provider = self._loop.create_provider_from_settings()
-
-        self._add_chat_message(f"[dim]Switched to {provider_name}/{default_model}[/dim]")
-
-        # Best-effort model enumeration for the selector. Empty result is fine.
-        test_provider = create_provider(
-            provider=prov, model=default_model, api_key=api_key, base_url=base_url,
-        )
-        models: list = []
-        try:
-            models = await test_provider.list_models()
-        except Exception as exc:
-            # Surface the reason instead of silently swallowing it.
-            self._add_chat_message(
-                f"[dim]list_models unavailable for {provider_name}: {type(exc).__name__}: {exc}[/dim]"
-            )
-
-        if models:
-            selector = self.query_one("#model-selector", ModelSelector)
-            selector.clear_options()
-            for m in models:
-                current = " [current]" if m.id == default_model else ""
-                selector.add_option(Option(f"{m.id}{current}", id=m.id))
-            self._add_chat_message(f"[dim]{len(models)} models. Select one:[/dim]")
-            selector.add_class("visible")
-            selector.focus()
-        else:
-            self._add_chat_message(
-                f"[dim]Model enumeration unavailable. Using default: {default_model}[/dim]"
-            )
-
-        self._update_banner()
-        self.query_one("#status-bar", StatusBar).update_status(
-            model=self.settings.model.model,
-            provider=self.settings.model.provider,
-            tools=len(self._loop.registry.all_tools()),
-            parism=self.parism_client is not None,
-        )
-
-        # Save config + API key per provider
-        from nerdvana_cli.core.setup import load_config, save_config
-        existing = load_config()
-        existing["model"] = {
-            "provider": self.settings.model.provider,
-            "model": self.settings.model.model,
-            "api_key": self.settings.model.api_key,
-            "base_url": self.settings.model.base_url,
-            "max_tokens": self.settings.model.max_tokens,
-            "temperature": self.settings.model.temperature,
-        }
-        if "api_keys" not in existing:
-            existing["api_keys"] = {}
-        existing["api_keys"][provider_name] = api_key
-        save_config(existing)
-        self._add_chat_message("[dim]Config saved.[/dim]")
+        """Switch to a provider with the given API key."""
+        from nerdvana_cli.commands.model_commands import switch_provider
+        await switch_provider(self, provider_name, api_key)
 
     def _show_session_context(self, registry: Any) -> None:
         """Show session startup context summary."""
-        from nerdvana_cli.core.nirnamd import load_nirna_files
-
-        parts = []
-
-        # Working directory
-        parts.append(f"  cwd: {self.settings.cwd}")
-
-        # NIRNA.md status
-        nirna_files = load_nirna_files(cwd=self.settings.cwd)
-        if nirna_files:
-            for nf in nirna_files:
-                parts.append(f"  NIRNA.md ({nf.type}): {nf.path}")
-        else:
-            parts.append("  NIRNA.md: not found")
-
-        # Tools summary
-        tools = registry.all_tools()
-        from nerdvana_cli.mcp.tools import McpToolAdapter
-        mcp = [t for t in tools if isinstance(t, McpToolAdapter)]
-        builtin = [t for t in tools if not isinstance(t, McpToolAdapter)]
-        parts.append(f"  Tools: {len(builtin)} built-in, {len(mcp)} MCP")
-
-        # Skills
-        if self._loop:
-            skills = self._loop.skill_loader.list_skills()
-            if skills:
-                triggers = ", ".join(s.trigger for s in skills)
-                parts.append(f"  Skills: {triggers}")
-
-        # Context window
-        ctx_k = self.settings.session.max_context_tokens // 1000
-        parts.append(f"  Context: {ctx_k}K tokens")
-
-        summary = "\n".join(parts)
-        self._add_chat_message(
-            f"[dim]Session initialized:\n{summary}[/dim]",
-            raw_text=f"Session initialized:\n{summary}",
-        )
+        from nerdvana_cli.commands.session_commands import show_session_context
+        show_session_context(self, registry)
 
     def _add_chat_message(self, markup: str, raw_text: str = "") -> None:
         """Add a clickable chat message to the chat frame."""
@@ -728,7 +604,7 @@ class NerdvanaApp(App):
     def _update_banner(self) -> None:
         """Update the logo banner with current provider/model info."""
         banner = self.query_one("#logo-banner", Static)
-        registry_count = len(self._loop.registry.all_tools()) if self._loop else 0
+        registry_count = len(self._agent_loop.registry.all_tools()) if self._agent_loop else 0
         ctx_k = self.settings.session.max_context_tokens // 1000
         ctx_display = f"{ctx_k}K" if ctx_k < 1000 else f"{ctx_k // 1000}M"
         banner.update(Text.from_markup(
@@ -748,174 +624,58 @@ class NerdvanaApp(App):
         ))
 
     async def _handle_command(self, cmd: str) -> None:
-        """Handle slash commands."""
-        parts   = cmd.split(maxsplit=1)
+        """Handle slash commands via dispatching to command modules."""
+        from nerdvana_cli.commands import model_commands, session_commands, system_commands
+
+        parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
+        args = parts[1] if len(parts) > 1 else ""
+
+        handlers = {
+            "/model": model_commands.handle_model,
+            "/models": model_commands.handle_models,
+            "/provider": model_commands.handle_provider,
+            "/clear": session_commands.handle_clear,
+            "/tokens": session_commands.handle_tokens,
+            "/tools": session_commands.handle_tools,
+            "/mcp": session_commands.handle_mcp,
+            "/skills": session_commands.handle_skills,
+            "/help": system_commands.handle_help,
+            "/update": system_commands.handle_update,
+            "/init": system_commands.handle_init,
+            "/setup": system_commands.handle_init,
+        }
 
         if command in ("/quit", "/exit", "/q"):
             self.exit()
-        elif command == "/clear":
-            if self._loop:
-                self._loop.state.messages.clear()
-                self._loop.state.turn_count = 1
-                self._loop.reset_session()
-            self._clear_chat_messages()
-            self._add_chat_message("[dim]Conversation cleared.[/dim]")
-        elif command == "/init":
-            nirna_path = os.path.join(self.settings.cwd, "NIRNA.md")
-            exists = os.path.exists(nirna_path)
-            self._add_chat_message(
-                f"[dim]{'Analyzing existing' if exists else 'Generating'} NIRNA.md...[/dim]"
-            )
-            init_prompt = (
-                f"Analyze this project directory ({self.settings.cwd}) and "
-                f"{'suggest improvements to the existing' if exists else 'create a new'} NIRNA.md file.\n\n"
-                "NIRNA.md is loaded into every NerdVana CLI session as project instructions. "
-                "It must be concise — only include what the AI would get wrong without it.\n\n"
-                "What to include:\n"
-                "1. Build, test, lint commands (especially non-standard ones)\n"
-                "2. High-level architecture (only what requires reading multiple files to understand)\n"
-                "3. Code style rules that differ from language defaults\n"
-                "4. Required env vars or setup steps\n"
-                "5. Non-obvious gotchas\n\n"
-                "What NOT to include:\n"
-                "- Obvious instructions derivable from the codebase\n"
-                "- Generic development practices\n"
-                "- Every component or file structure listing\n"
-                "- Sensitive information (API keys, tokens)\n\n"
-                "Read the key project files first (manifest, README, config), then write the NIRNA.md content.\n"
-                + ("Read the existing NIRNA.md first and suggest specific improvements.\n" if exists else "")
-                + "Prefix the file with: # NIRNA.md\n"
-                "Write the file using FileWrite tool."
-            )
-            self._generate_response(init_prompt)
-        elif command == "/model":
-            args_text = parts[1] if len(parts) > 1 else ""
-            if args_text:
-                from nerdvana_cli.providers.base import detect_provider
-                self.settings.model.model = args_text
-                self.settings.model.provider = detect_provider(args_text).value
-                self._loop.provider = self._loop.create_provider_from_settings()
+            return
+
+        handler = handlers.get(command)
+        if handler:
+            await handler(self, args)
+            return
+
+        # Skill trigger fallback
+        if self._agent_loop:
+            skill = self._agent_loop.skill_loader.get_by_trigger(command)
+            if skill:
+                self._agent_loop.activate_skill(skill.body)
                 self._add_chat_message(
-                    f"[dim]Switched to {self.settings.model.provider}/{args_text}[/dim]"
+                    f"[dim]Skill activated: {skill.name}[/dim]",
+                    raw_text=f"Skill activated: {skill.name}",
                 )
-                self.query_one("#status-bar", StatusBar).update_status(
-                    model=self.settings.model.model,
-                    provider=self.settings.model.provider,
-                    tools=len(self._loop.registry.all_tools()),
-                    parism=self.parism_client is not None,
-                )
-                self._update_banner()
-            else:
-                self._add_chat_message(
-                    f"[dim]Model: {self.settings.model.provider}/{self.settings.model.model}[/dim]"
-                )
-        elif command == "/models":
-            self._add_chat_message("[dim]Fetching models...[/dim]")
-            try:
-                models = await self._loop.provider.list_models()
-                if not models:
-                    self._add_chat_message("[yellow]No models found or API error.[/yellow]")
-                else:
-                    selector = self.query_one("#model-selector", ModelSelector)
-                    selector.clear_options()
-                    for m in models:
-                        label = m.id
-                        if m.id == self.settings.model.model:
-                            label += "  [current]"
-                        selector.add_option(Option(label, id=m.id))
-                    selector.add_class("visible")
-                    selector.focus()
-            except Exception as e:
-                self._add_chat_message(f"[red]Error listing models: {e}[/red]")
-        elif command == "/provider":
-            from nerdvana_cli.providers.base import DEFAULT_MODELS, ProviderName
-            selector = self.query_one("#provider-selector", ProviderSelector)
-            selector.clear_options()
-            for prov in ProviderName:
-                default_model = DEFAULT_MODELS.get(prov, "")
-                current = " [current]" if prov.value == self.settings.model.provider else ""
-                selector.add_option(Option(
-                    f"{prov.value}  ({default_model}){current}",
-                    id=prov.value,
-                ))
-            selector.add_class("visible")
-            selector.focus()
-        elif command == "/mcp":
-            if self.mcp_manager:
-                status = self.mcp_manager.get_status()
-                if not status:
-                    self._add_chat_message("[dim]No MCP servers configured.[/dim]")
-                else:
-                    self._add_chat_message("[bold]MCP Servers:[/bold]")
-                    for name, connected in status.items():
-                        icon = "[green]ON[/green]" if connected else "[red]OFF[/red]"
-                        self._add_chat_message(f"  {icon} {name}")
-            else:
-                self._add_chat_message("[dim]No .mcp.json found.[/dim]")
-        elif command == "/tokens":
-            if self._loop:
-                u = self._loop.state.usage
-                self._add_chat_message(
-                    f"[dim]Tokens: {u.input_tokens} in / {u.output_tokens} out / {u.total_tokens} total[/dim]"
-                )
-        elif command == "/tools":
-            if self._loop:
-                for t in self._loop.registry.all_tools():
-                    safe = "R" if t.is_read_only else "W"
-                    self._add_chat_message(f"  [{safe}] [bold]{t.name}[/bold]")
-        elif command == "/skills":
-            if self._loop:
-                skills = self._loop.skill_loader.list_skills()
-                if skills:
-                    for s in skills:
-                        self._add_chat_message(f"  [bold]{s.trigger}[/bold] -- {s.description}", raw_text=f"{s.trigger} -- {s.description}")
-                else:
-                    self._add_chat_message("[dim]No skills found. Add .md files to .nerdvana/skills/[/dim]")
-        elif command == "/update":
-            from nerdvana_cli.core.updater import run_self_update
-            self._add_chat_message("[dim]Checking for updates...[/dim]")
-            success, message = run_self_update()
-            safe_msg = message.replace("[", "\\[")
-            if success:
-                self._add_chat_message(f"[green]{safe_msg}[/green]")
-            else:
-                self._add_chat_message(f"[red]{safe_msg}[/red]")
-        elif command == "/help":
-            self._add_chat_message(
-                "[bold]Commands[/bold]\n"
-                "/help    -- Show help\n"
-                "/quit    -- Exit\n"
-                "/clear   -- Clear chat\n"
-                "/init    -- Generate NIRNA.md\n"
-                "/model   -- Show/change model\n"
-                "/models     -- List available models\n"
-                "/provider   -- Add/switch provider\n"
-                "/mcp     -- MCP server status\n"
-                "/skills  -- List available skills\n"
-                "/tokens  -- Show usage\n"
-                "/tools   -- List tools\n"
-                "/update  -- Check and install updates\n"
-                "Ctrl+C   -- Quit\n"
-                "Ctrl+L   -- Clear chat"
-            )
-        else:
-            if self._loop:
-                skill = self._loop.skill_loader.get_by_trigger(command)
-                if skill:
-                    self._loop.activate_skill(skill.body)
-                    self._add_chat_message(f"[dim]Skill activated: {skill.name}[/dim]", raw_text=f"Skill activated: {skill.name}")
-                    if len(parts) > 1:
-                        input_widget = self.query_one("#user-input", Input)
-                        input_widget.value = parts[1]
-                        self.call_later(input_widget.action_submit)
-                    return
-            self._add_chat_message(f"[red]Unknown command: {command}[/red]")
+                if args:
+                    input_widget = self.query_one("#user-input", Input)
+                    input_widget.value = args
+                    self.call_later(input_widget.action_submit)
+                return
+
+        self._add_chat_message(f"[red]Unknown command: {command}[/red]")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Show/hide command menu based on input."""
-        # 사용자가 요약을 직접 편집하면 멀티라인 원본을 버린다.
-        # call_after_refresh 콜백이 아직 실행되지 않은 동안은 보존한다.
+        # Discard multiline original when the user manually edits the summary.
+        # Preserve it while the call_after_refresh callback has not yet run.
         input_widget = self.query_one("#user-input", MultilineAwareInput)
         if (
             input_widget._pending_multiline is not None
@@ -931,9 +691,9 @@ class NerdvanaApp(App):
             for cmd, desc in SLASH_COMMANDS:
                 if query == "/" or cmd.startswith(query):
                     menu.add_option(Option(f"{cmd}  {desc}", id=cmd))
-            if self._loop:
+            if self._agent_loop:
                 _seen: set[str] = {cmd for cmd, _ in SLASH_COMMANDS}
-                for skill in self._loop.skill_loader.list_skills():
+                for skill in self._agent_loop.skill_loader.list_skills():
                     if skill.trigger not in _seen and (query == "/" or skill.trigger.startswith(query)):
                         menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
                         _seen.add(skill.trigger)
@@ -952,42 +712,14 @@ class NerdvanaApp(App):
             selector.remove_class("visible")
             provider_name = event.option.id
             if provider_name:
-                # Check for saved API key
-                from nerdvana_cli.core.setup import load_config
-                existing = load_config()
-                saved_keys = existing.get("api_keys", {})
-                saved_key = saved_keys.get(provider_name, "")
-
-                # Also check env vars
-                if not saved_key:
-                    from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS, ProviderName
-                    try:
-                        for var in PROVIDER_KEY_ENVVARS.get(ProviderName(provider_name), []):
-                            saved_key = os.environ.get(var, "")
-                            if saved_key:
-                                break
-                    except ValueError:
-                        pass
-
-                if saved_key:
-                    # Key exists — switch directly
-                    asyncio.create_task(self._switch_provider(provider_name, saved_key))
-                else:
-                    # No key — ask for input
-                    self._pending_provider = provider_name
-                    self._add_chat_message(
-                        f"[dim]Enter API key for {provider_name}:[/dim]"
-                    )
-                    input_widget = self.query_one("#user-input", Input)
-                    input_widget.placeholder = f"API key for {provider_name}..."
-                    input_widget.password = True
-                    input_widget.focus()
+                from nerdvana_cli.commands.model_commands import handle_provider_selection
+                asyncio.create_task(handle_provider_selection(self, provider_name))
             return
 
         # Model selector
         if isinstance(event.option_list, ModelSelector):
-            selector = self.query_one("#model-selector", ModelSelector)
-            selector.remove_class("visible")
+            model_selector = self.query_one("#model-selector", ModelSelector)
+            model_selector.remove_class("visible")
             model_id = event.option.id
             if model_id:
                 input_widget = self.query_one("#user-input", Input)

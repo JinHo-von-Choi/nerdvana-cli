@@ -99,12 +99,12 @@ fi
 
 # Write wrapper scripts
 for cmd in nerdvana nc; do
-    echo "$WRAPPER" | sed "s/nerdvana/$cmd/g" > "$USER_BIN/$cmd"
+    cat > "$USER_BIN/$cmd" <<WRAPPER_SCRIPT
+#!/usr/bin/env bash
+exec "\$HOME/.nerdvana-cli/.venv/bin/$cmd" "\$@"
+WRAPPER_SCRIPT
     chmod +x "$USER_BIN/$cmd"
 done
-# Fix: nerdvana wrapper should call nerdvana, not itself
-echo "$WRAPPER" > "$USER_BIN/nerdvana"
-chmod +x "$USER_BIN/nerdvana"
 
 # PATH check
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$USER_BIN"; then

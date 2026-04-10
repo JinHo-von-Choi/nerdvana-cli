@@ -11,6 +11,11 @@ from rich.console import Console
 from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
 
+try:
+    from openai import AsyncOpenAI
+except ImportError:  # pragma: no cover – runtime guard in _get_client
+    AsyncOpenAI = None  # type: ignore[assignment,misc]
+
 console = Console()
 
 
@@ -33,22 +38,22 @@ class OpenAIProvider:
 
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._client = None
+        self._client: AsyncOpenAI | None = None
 
-    def _get_client(self):
+    def _get_client(self) -> AsyncOpenAI:
         """Return cached AsyncOpenAI client (lazy-init)."""
         if self._client is None:
-            from openai import AsyncOpenAI
+            from openai import AsyncOpenAI as _AsyncOpenAI
 
             kwargs: dict[str, Any] = {}
             if self.config.api_key:
                 kwargs["api_key"] = self.config.api_key
             if self.config.base_url:
                 kwargs["base_url"] = self.config.base_url
-            self._client = AsyncOpenAI(**kwargs)
+            self._client = _AsyncOpenAI(**kwargs)
         return self._client
 
-    async def list_models(self) -> list:
+    async def list_models(self) -> list[Any]:
         """Fetch available models from the API."""
         from nerdvana_cli.providers.base import ModelInfo
 
@@ -73,7 +78,7 @@ class OpenAIProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> AsyncIterator[ProviderEvent]:
         """Stream completion from OpenAI-compatible API with UTF-8 safety."""
         try:
@@ -200,7 +205,7 @@ class OpenAIProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> dict[str, Any]:
         """Non-streaming completion."""
         try:
@@ -216,8 +221,8 @@ class OpenAIProvider:
                 model=self.config.model,
                 max_tokens=self.config.max_tokens,
                 temperature=self.config.temperature,
-                messages=api_messages,
-                tools=api_tools,
+                messages=api_messages,  # type: ignore[arg-type]
+                tools=api_tools,  # type: ignore[arg-type]
             )
 
             content = ""
@@ -230,14 +235,14 @@ class OpenAIProvider:
                 if choice.message.tool_calls:
                     for tc in choice.message.tool_calls:
                         try:
-                            input_data = json.loads(tc.function.arguments) if tc.function.arguments else {}
+                            input_data = json.loads(tc.function.arguments) if tc.function.arguments else {}  # type: ignore[union-attr]
                         except (json.JSONDecodeError, UnicodeDecodeError):
                             input_data = {}
 
                         tool_uses.append(
                             {
                                 "id": tc.id,
-                                "name": tc.function.name,
+                                "name": tc.function.name,  # type: ignore[union-attr]
                                 "input": input_data,
                             }
                         )
@@ -261,7 +266,7 @@ class OpenAIProvider:
         except Exception as e:
             return {"content": str(e), "is_error": True}
 
-    def _build_tools(self, tools: list[BaseTool]) -> list[dict[str, Any]]:
+    def _build_tools(self, tools: list[BaseTool[Any]]) -> list[dict[str, Any]]:
         """Build tool definitions for API call."""
         return [
             {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -33,7 +33,7 @@ class SessionConfig(BaseModel):
     max_turns: int = 200
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
-    compact_max_failures: int = 3  # circuit breaker 연속 실패 허용 횟수
+    compact_max_failures: int = 3  # circuit breaker max consecutive failures
     planning_gate: bool = False  # enable complexity-triggered Plan agent before execution
 
 

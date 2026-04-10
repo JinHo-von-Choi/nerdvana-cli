@@ -8,7 +8,8 @@ from typing import Any
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry
-from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolResult
+from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.types import ToolResult
 
 
 @dataclass

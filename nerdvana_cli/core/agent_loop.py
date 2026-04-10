@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import re
 from collections.abc import AsyncGenerator
@@ -16,12 +17,15 @@ from typing import Any
 
 from rich.console import Console
 
-from nerdvana_cli.core.compact import CompactionState, ai_compact, FALLBACK_PROMPT
+from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
+from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider
+from nerdvana_cli.providers.gemini_provider import GeminiProvider
+from nerdvana_cli.providers.openai_provider import OpenAIProvider
 from nerdvana_cli.types import (
     Message,
     PermissionBehavior,
@@ -31,6 +35,7 @@ from nerdvana_cli.types import (
 )
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 TOOL_STATUS_PREFIX   = "\x00TOOL:"
 TOOL_DONE_PREFIX     = "\x00TOOL_DONE:"
@@ -40,9 +45,9 @@ COMPACT_STATUS_PREFIX = "\x00COMPACT:"
 
 _COMPLEXITY_SIGNALS: list[str] = [
     r"리팩터링|refactor",
-    r"새로운\s+(기능|모듈|서비스|시스템)",
+    r"새로운\s+(기능|모듈|서비스|시스템)|new\s+(feature|module|service|system)",
     r"마이그레이션|migration",
-    r"\d+개\s+(파일|클래스|모듈)",
+    r"\d+개\s+(파일|클래스|모듈)|\d+\s+(files?|classes?|modules?)",
     r"아키텍처|architecture|전면\s+개편",
     r"처음부터|from\s+scratch",
 ]
@@ -79,7 +84,7 @@ def estimate_tokens(text: str) -> int:
     return math.ceil(len(text) / 4)
 
 
-def estimate_messages_tokens(messages: list) -> int:
+def estimate_messages_tokens(messages: list[Any]) -> int:
     total = 0
     for msg in messages:
         content = msg.content if isinstance(msg.content, str) else json.dumps(msg.content)
@@ -89,7 +94,7 @@ def estimate_messages_tokens(messages: list) -> int:
     return total
 
 
-def compact_messages(messages: list, max_tokens: int) -> list:
+def compact_messages(messages: list[Any], max_tokens: int) -> list[Any]:
     if not messages:
         return messages
     current = estimate_messages_tokens(messages)
@@ -134,13 +139,13 @@ class AgentLoop:
         self._team_registry = team_registry
         self.console = Console()
 
-        from nerdvana_cli.core.hooks import HookEngine, HookEvent
         from nerdvana_cli.core.builtin_hooks import (
             context_limit_recovery,
             json_parse_recovery,
             ralph_loop_check,
             session_start_context_injection,
         )
+        from nerdvana_cli.core.hooks import HookEngine, HookEvent
 
         self.hooks = HookEngine()
         self.hooks.register(HookEvent.SESSION_START, session_start_context_injection)
@@ -157,7 +162,7 @@ class AgentLoop:
         self.skill_loader.load_all()
         self._active_skill: str | None = None
 
-        # compress-context.skill을 압축 프롬프트로 로드
+        # Load compress-context.skill as compaction prompt
         _compact_skill = self.skill_loader.get_by_name("compress-context")
         self._compact_prompt: str = _compact_skill.body if _compact_skill else FALLBACK_PROMPT
 
@@ -169,7 +174,7 @@ class AgentLoop:
         self._sticky_session_context: str = ""
         self.provider = self.create_provider_from_settings()
 
-    def create_provider_from_settings(self):
+    def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
         """Create provider from current settings."""
         provider_name = None
         if self.settings.model.provider:
@@ -217,14 +222,13 @@ class AgentLoop:
                     d["tool_uses"] = msg.tool_uses
                 messages.append(d)
             elif msg.role == Role.TOOL:
-                messages.append(
-                    {
-                        "role": "tool",
-                        "content": msg.content,
-                        "tool_use_id": msg.tool_use_id or "",
-                        "is_error": msg.is_error,
-                    }
-                )
+                tool_msg: dict[str, Any] = {
+                    "role": "tool",
+                    "content": msg.content,
+                    "tool_use_id": msg.tool_use_id or "",
+                    "is_error": msg.is_error,
+                }
+                messages.append(tool_msg)
         return messages
 
     async def run(self, prompt: str) -> AsyncGenerator[str, None]:
@@ -243,6 +247,7 @@ class AgentLoop:
         # ────────────────────────────────────────────────────────────────
 
         # ── Ultrawork mode (extended thinking on trigger keyword) ───────
+        original_extended_thinking = self.settings.model.extended_thinking
         if _is_ultrawork(prompt):
             self.settings.model.extended_thinking = True
             yield "[dim cyan][Ultrawork mode: extended thinking ON][/dim cyan]\n"
@@ -260,9 +265,9 @@ class AgentLoop:
         # to avoid double injection.
         if not self._session_started:
             self._session_started = True
-            from nerdvana_cli.core.hooks import HookEvent, HookContext as HC
+            from nerdvana_cli.core.hooks import HookContext, HookEvent
 
-            hook_ctx = HC(
+            hook_ctx = HookContext(
                 event=HookEvent.SESSION_START,
                 settings=self.settings,
                 tools=tools,
@@ -288,8 +293,11 @@ class AgentLoop:
             system_prompt += f"\n\n# Active Skill\n{self._active_skill}"
             self._active_skill = None
 
-        async for event in self._loop(system_prompt, tools):
-            yield event
+        try:
+            async for event in self._loop(system_prompt, tools):
+                yield event
+        finally:
+            self.settings.model.extended_thinking = original_extended_thinking
 
     def activate_skill(self, skill_body: str) -> None:
         self._active_skill = skill_body
@@ -333,7 +341,7 @@ class AgentLoop:
         config = SubagentConfig(
             agent_id  = "plan_agent",
             name      = "Plan",
-            prompt    = f"다음 작업의 구현 계획을 작성하세요:\n\n{prompt}",
+            prompt    = f"Create an implementation plan for the following task:\n\n{prompt}",
             settings  = child_settings,
             registry  = registry,
             max_turns = 20,
@@ -355,207 +363,219 @@ class AgentLoop:
             team_registry = self._team_registry,
         )
         turn = 0
+        original_model = self.settings.model.model
 
-        while True:
-            turn += 1
-            if turn > self.settings.session.max_turns:
-                yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
-                return
+        try:
+            while True:
+                turn += 1
+                if turn > self.settings.session.max_turns:
+                    yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
+                    return
 
-            max_ctx = self.settings.session.max_context_tokens
-            threshold = int(max_ctx * self.settings.session.compact_threshold)
-            current_tokens = estimate_messages_tokens(self.state.messages)
-            if current_tokens > threshold:
-                if not self._compaction_state.is_circuit_open:
-                    yield f"{COMPACT_STATUS_PREFIX}compressing ({current_tokens} tokens)..."
-                    msg_count_before = len(self.state.messages)
-                    summary_msg = await ai_compact(
-                        self.state.messages,
-                        self.provider,
-                        self._compaction_state,
-                        prompt=self._compact_prompt,
-                    )
-                    if summary_msg is not None:
-                        recent = self.state.messages[-4:]
-                        # TOOL role 메시지는 provider 변환 후 user가 되어
-                        # summary_msg(user) 바로 뒤에 오면 consecutive user 발생
-                        # ASSISTANT 메시지부터 시작하도록 recent를 정렬
-                        while recent and recent[0].role == Role.TOOL:
-                            recent = recent[1:]
-                        self.state.messages = [summary_msg] + recent
-                        self.session.record_compaction(
-                            tokens_before=current_tokens,
-                            messages_before=msg_count_before,
-                            strategy="ai",
+                max_ctx = self.settings.session.max_context_tokens
+                threshold = int(max_ctx * self.settings.session.compact_threshold)
+                current_tokens = estimate_messages_tokens(self.state.messages)
+                if current_tokens > threshold:
+                    if not self._compaction_state.is_circuit_open:
+                        yield f"{COMPACT_STATUS_PREFIX}compressing ({current_tokens} tokens)..."
+                        msg_count_before = len(self.state.messages)
+                        summary_msg = await ai_compact(
+                            self.state.messages,
+                            self.provider,
+                            self._compaction_state,
+                            prompt=self._compact_prompt,
                         )
-                        yield f"{COMPACT_STATUS_PREFIX}done"
-                    else:
+                        if summary_msg is not None:
+                            recent = self.state.messages[-4:]
+                            # TOOL role messages become user after provider conversion,
+                            # causing consecutive user messages if placed right after
+                            # summary_msg(user). Trim so recent starts with ASSISTANT.
+                            while recent and recent[0].role == Role.TOOL:
+                                recent = recent[1:]
+                            self.state.messages = [summary_msg] + recent
+                            self.session.record_compaction(
+                                tokens_before=current_tokens,
+                                messages_before=msg_count_before,
+                                strategy="ai",
+                            )
+                            yield f"{COMPACT_STATUS_PREFIX}done"
+                        else:
+                            self.state.messages = compact_messages(self.state.messages, threshold)
+                            self.session.record_compaction(
+                                tokens_before=current_tokens,
+                                messages_before=msg_count_before,
+                                strategy="naive",
+                            )
+                    else:  # circuit open
+                        msg_count_before = len(self.state.messages)
                         self.state.messages = compact_messages(self.state.messages, threshold)
                         self.session.record_compaction(
                             tokens_before=current_tokens,
                             messages_before=msg_count_before,
                             strategy="naive",
                         )
-                else:  # circuit open
-                    msg_count_before = len(self.state.messages)
-                    self.state.messages = compact_messages(self.state.messages, threshold)
-                    self.session.record_compaction(
-                        tokens_before=current_tokens,
-                        messages_before=msg_count_before,
-                        strategy="naive",
-                    )
 
-            usage_pct = min(100, int(current_tokens / max_ctx * 100)) if max_ctx > 0 else 0
-            yield f"{CONTEXT_USAGE_PREFIX}{usage_pct}"
+                usage_pct = min(100, int(current_tokens / max_ctx * 100)) if max_ctx > 0 else 0
+                yield f"{CONTEXT_USAGE_PREFIX}{usage_pct}"
 
-            if self.settings.verbose:
-                self.console.print(f"[dim]Turn {turn} — {len(self.state.messages)} messages[/dim]")
+                if self.settings.verbose:
+                    self.console.print(f"[dim]Turn {turn} — {len(self.state.messages)} messages[/dim]")
 
-            messages = self._to_provider_messages()
+                messages = self._to_provider_messages()
 
-            try:
-                assistant_text = ""
-                tool_uses: list[dict[str, Any]] = []
-                current_tool_input = ""
+                try:
+                    assistant_text = ""
+                    tool_uses: list[dict[str, Any]] = []
+                    current_tool_input = ""
 
-                async for event in self.provider.stream(system_prompt, messages, tools):
-                    if event.type == "content_delta":
-                        assistant_text += event.content
-                        yield event.content
+                    async for event in self.provider.stream(system_prompt, messages, tools):
+                        if event.type == "content_delta":
+                            assistant_text += event.content
+                            yield event.content
 
-                    elif event.type == "tool_use_start":
-                        current_tool_input = ""
+                        elif event.type == "tool_use_start":
+                            current_tool_input = ""
 
-                    elif event.type == "tool_use_delta":
-                        current_tool_input += event.tool_input_delta
+                        elif event.type == "tool_use_delta":
+                            current_tool_input += event.tool_input_delta
 
-                    elif event.type == "tool_use_complete":
-                        tool_uses.append(
-                            {
-                                "id": event.tool_use_id or f"call_{len(tool_uses)}",
-                                "name": event.tool_name,
-                                "input": event.tool_input_complete or {},
-                            }
-                        )
-
-                    elif event.type == "usage":
-                        if event.usage:
-                            self.state.usage.input_tokens = event.usage.get("input_tokens", 0)
-                            self.state.usage.output_tokens = event.usage.get("output_tokens", 0)
-
-                    elif event.type == "done":
-                        stop_reason = event.stop_reason
-                        if stop_reason == "max_tokens":
-                            from nerdvana_cli.core.hooks import HookContext as HC
-                            from nerdvana_cli.core.hooks import HookEvent
-
-                            recovery_ctx = HC(
-                                event       = HookEvent.AFTER_API_CALL,
-                                settings    = self.settings,
-                                tools       = self.registry.all_tools(),
-                                messages    = self.state.messages,
-                                stop_reason = "max_tokens",
-                                extra       = {"agent_loop": self},
+                        elif event.type == "tool_use_complete":
+                            tool_uses.append(
+                                {
+                                    "id": event.tool_use_id or f"call_{len(tool_uses)}",
+                                    "name": event.tool_name,
+                                    "input": event.tool_input_complete or {},
+                                }
                             )
-                            recovery_results = self.hooks.fire(recovery_ctx)
-                            recovered = False
-                            for hr in recovery_results:
-                                for msg in hr.inject_messages:
+
+                        elif event.type == "usage":
+                            if event.usage:
+                                self.state.usage.input_tokens = event.usage.get("input_tokens", 0)
+                                self.state.usage.output_tokens = event.usage.get("output_tokens", 0)
+
+                        elif event.type == "done":
+                            stop_reason = event.stop_reason
+                            if stop_reason == "max_tokens":
+                                from nerdvana_cli.core.hooks import HookContext, HookEvent
+
+                                recovery_ctx = HookContext(
+                                    event       = HookEvent.AFTER_API_CALL,
+                                    settings    = self.settings,
+                                    tools       = self.registry.all_tools(),
+                                    messages    = self.state.messages,
+                                    stop_reason = "max_tokens",
+                                    extra       = {"agent_loop": self},
+                                )
+                                recovery_results = self.hooks.fire(recovery_ctx)
+                                recovered = False
+                                for hr in recovery_results:
+                                    for msg in hr.inject_messages:
+                                        self.state.messages.append(
+                                            Message(
+                                                role    = Role.USER,
+                                                content = msg["content"],
+                                            )
+                                        )
+                                        recovered = True
+                                if not recovered:
+                                    yield "\n\n[bold red]Max tokens reached.[/bold red]"
+                                    return
+                                break  # exit stream loop, retry from top of while
+
+                            elif stop_reason == "end_turn":
+                                if assistant_text:
+                                    self.state.messages.append(Message(role=Role.ASSISTANT, content=assistant_text))
+                                    self.session.record_assistant_message(assistant_text)
+                                return
+
+                            elif stop_reason == "tool_use" and tool_uses:
+                                if assistant_text:
+                                    self.session.record_assistant_message(assistant_text, tool_uses)
+
+                                # Yield tool execution start markers
+                                for tu in tool_uses:
+                                    input_preview = json.dumps(tu["input"], ensure_ascii=False)[:80]
+                                    yield f"{TOOL_STATUS_PREFIX}{tu['name']} {input_preview}"
+
+                                tool_results = await self._execute_tools(tool_uses, tool_context)
+
+                                # Yield tool execution done markers
+                                for i, tr in enumerate(tool_results):
+                                    tool_name = tool_uses[i]["name"] if i < len(tool_uses) else "unknown"
+                                    status = "error" if tr.is_error else "done"
+                                    yield f"{TOOL_DONE_PREFIX}{tool_name} [{status}]"
+
+                                assistant_msg = Message(
+                                    role=Role.ASSISTANT,
+                                    content=assistant_text if assistant_text else "[tool execution]",
+                                    tool_uses=tool_uses,
+                                )
+                                self.state.messages.append(assistant_msg)
+
+                                for tr in tool_results:
                                     self.state.messages.append(
                                         Message(
-                                            role    = Role.USER,
-                                            content = msg["content"],
+                                            role=Role.TOOL,
+                                            content=tr.content,
+                                            tool_use_id=tr.tool_use_id,
+                                            is_error=tr.is_error,
                                         )
                                     )
-                                    recovered = True
-                            if not recovered:
-                                yield "\n\n[bold red]Max tokens reached.[/bold red]"
-                                return
-                            break  # exit stream loop, retry from top of while
-
-                        if stop_reason == "end_turn":
-                            if assistant_text:
-                                self.state.messages.append(Message(role=Role.ASSISTANT, content=assistant_text))
-                                self.session.record_assistant_message(assistant_text)
-                            return
-
-                        if stop_reason == "tool_use" and tool_uses:
-                            if assistant_text:
-                                self.session.record_assistant_message(assistant_text, tool_uses)
-
-                            # Yield tool execution start markers
-                            for tu in tool_uses:
-                                input_preview = json.dumps(tu["input"], ensure_ascii=False)[:80]
-                                yield f"{TOOL_STATUS_PREFIX}{tu['name']} {input_preview}"
-
-                            tool_results = await self._execute_tools(tool_uses, tool_context)
-
-                            # Yield tool execution done markers
-                            for i, tr in enumerate(tool_results):
-                                tool_name = tool_uses[i]["name"] if i < len(tool_uses) else "unknown"
-                                status = "error" if tr.is_error else "done"
-                                yield f"{TOOL_DONE_PREFIX}{tool_name} [{status}]"
-
-                            assistant_msg = Message(
-                                role=Role.ASSISTANT,
-                                content=assistant_text if assistant_text else "[tool execution]",
-                                tool_uses=tool_uses,
-                            )
-                            self.state.messages.append(assistant_msg)
-
-                            for tr in tool_results:
-                                self.state.messages.append(
-                                    Message(
-                                        role=Role.TOOL,
-                                        content=tr.content,
+                                    self.session.record_tool_result(
+                                        tool_name=tr.tool_use_id.split(":")[0] if ":" in tr.tool_use_id else "unknown",
                                         tool_use_id=tr.tool_use_id,
+                                        content=tr.content,
                                         is_error=tr.is_error,
                                     )
-                                )
-                                self.session.record_tool_result(
-                                    tool_name=tr.tool_use_id.split(":")[0] if ":" in tr.tool_use_id else "unknown",
-                                    tool_use_id=tr.tool_use_id,
-                                    content=tr.content,
-                                    is_error=tr.is_error,
-                                )
 
-                    elif event.type == "error":
-                        error_msg = event.error or "Unknown error"
-                        if (
-                            "utf-8" in error_msg.lower()
-                            or "decode" in error_msg.lower()
-                            or "encoding" in error_msg.lower()
-                        ):
-                            yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
-                            async for fallback_event in self._fallback_to_send(
-                                system_prompt, messages, tools, tool_context
+                            else:
+                                # Unknown stop_reason (e.g. stop_sequence) — preserve assistant text
+                                logger.warning("Unhandled stop_reason: %s", stop_reason)
+                                if assistant_text:
+                                    self.state.messages.append(Message(role=Role.ASSISTANT, content=assistant_text))
+                                    self.session.record_assistant_message(assistant_text)
+                                return
+
+                        elif event.type == "error":
+                            error_msg = event.error or "Unknown error"
+                            if (
+                                "utf-8" in error_msg.lower()
+                                or "decode" in error_msg.lower()
+                                or "encoding" in error_msg.lower()
                             ):
-                                yield fallback_event
+                                yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
+                                async for fallback_event in self._fallback_to_send(
+                                    system_prompt, messages, tools, tool_context
+                                ):
+                                    yield fallback_event
+                                return
+                            yield f"\n[bold red]Provider error: {error_msg}[/bold red]"
                             return
-                        yield f"\n[bold red]Provider error: {error_msg}[/bold red]"
-                        return
 
-            except UnicodeDecodeError:
-                yield "\n[dim yellow]Encoding error, retrying without streaming...[/dim yellow]\n"
-                try:
-                    async for event in self._fallback_to_send(system_prompt, messages, tools, tool_context):
-                        yield event
-                except Exception as fallback_err:
-                    yield f"\n[bold red]Fallback also failed: {fallback_err}[/bold red]"
-                return
+                except UnicodeDecodeError:
+                    yield "\n[dim yellow]Encoding error, retrying without streaming...[/dim yellow]\n"
+                    try:
+                        async for fallback_chunk in self._fallback_to_send(system_prompt, messages, tools, tool_context):
+                            yield fallback_chunk
+                    except Exception as fallback_err:
+                        yield f"\n[bold red]Fallback also failed: {fallback_err}[/bold red]"
+                    return
 
-            except Exception as e:
-                error_str = str(e)
-                if _is_retryable_error(error_str):
-                    fallback = self._next_fallback_model()
-                    if fallback:
-                        yield f"\n[dim yellow][Fallback: {fallback}][/dim yellow]\n"
-                        self.settings.model.model = fallback
-                        self.provider = self.create_provider_from_settings()
-                        continue
-                yield f"\n[bold red]Error: {e}[/bold red]"
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {e}"))
-                return
+                except Exception as e:
+                    error_str = str(e)
+                    if _is_retryable_error(error_str):
+                        fallback = self._next_fallback_model()
+                        if fallback:
+                            yield f"\n[dim yellow][Fallback: {fallback}][/dim yellow]\n"
+                            self.settings.model.model = fallback
+                            self.provider = self.create_provider_from_settings()
+                            continue
+                    yield f"\n[bold red]Error: {e}[/bold red]"
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {e}"))
+                    return
+        finally:
+            self.settings.model.model = original_model
+            self.provider = self.create_provider_from_settings()
 
     async def _fallback_to_send(
         self,
@@ -670,9 +690,9 @@ class AgentLoop:
                 is_error=True,
             )
 
-        from nerdvana_cli.core.hooks import HookEvent, HookContext as HC
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
         tool_name = tool_use["name"]
-        hook_ctx = HC(event=HookEvent.BEFORE_TOOL, tool_name=tool_name, tool_input=tool_input, settings=self.settings)
+        hook_ctx = HookContext(event=HookEvent.BEFORE_TOOL, tool_name=tool_name, tool_input=tool_input, settings=self.settings)
         for hr in self.hooks.fire(hook_ctx):
             if not hr.allow:
                 return ToolResult(tool_use_id=tool_id, content=f"Blocked by hook: {hr.message}", is_error=True)
@@ -682,7 +702,7 @@ class AgentLoop:
             return ToolResult(tool_use_id=tool_id, content=f"Validation error: {validation_error}", is_error=True)
 
         try:
-            result = await tool.call(parsed_args, context, can_use_tool=None)
+            result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
             result.content = tool.truncate_result(result.content)
             return result

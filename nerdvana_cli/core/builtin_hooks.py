@@ -59,8 +59,8 @@ def context_limit_recovery(ctx: HookContext) -> HookResult:
                     break
 
     continuation = (
-        "컨텍스트 한도에 도달했습니다. 이전 작업을 이어서 계속 진행하세요. "
-        + (f"마지막 요청: {last_user_content[:200]}" if last_user_content else "")
+        "Context limit reached. Continue from where you left off. "
+        + (f"Last request: {last_user_content[:200]}" if last_user_content else "")
     )
     return HookResult(
         inject_messages=[{"role": "user", "content": continuation}]
@@ -78,9 +78,9 @@ def json_parse_recovery(ctx: HookContext) -> HookResult:
         return HookResult()
 
     msg = (
-        f"JSON 파싱 실패 (도구: {ctx.tool_name or 'unknown'}). "
-        f"오류: {json_error}\n"
-        "올바른 JSON 형식으로 재시도하세요."
+        f"JSON parse failure (tool: {ctx.tool_name or 'unknown'}). "
+        f"Error: {json_error}\n"
+        "Please retry with valid JSON format."
     )
     return HookResult(
         inject_messages=[{"role": "user", "content": msg}]
@@ -88,7 +88,7 @@ def json_parse_recovery(ctx: HookContext) -> HookResult:
 
 
 _INCOMPLETE_PATTERNS = re.compile(
-    r"(TODO|FIXME|#\s*구현\s*필요|#\s*미구현|NotImplemented|raise\s+NotImplementedError)",
+    r"(TODO|FIXME|#\s*구현\s*필요|#\s*미구현|#\s*needs?\s*implementation|NotImplemented|raise\s+NotImplementedError)",
     re.IGNORECASE,
 )
 
@@ -118,8 +118,8 @@ def ralph_loop_check(ctx: HookContext) -> HookResult:
 
     unique = list(dict.fromkeys(matches))[:5]
     msg = (
-        f"미완성 항목이 발견되었습니다: {', '.join(unique)}\n"
-        "모든 TODO와 미구현 항목을 완성한 후 응답하세요."
+        f"Incomplete items found: {', '.join(unique)}\n"
+        "Complete all TODOs and unimplemented items before responding."
     )
     return HookResult(
         inject_messages=[{"role": "user", "content": msg}]
