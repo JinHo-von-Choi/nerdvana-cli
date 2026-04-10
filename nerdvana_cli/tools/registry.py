@@ -1,0 +1,121 @@
+"""Tool registry assembly — collects all built-in tools."""
+
+from __future__ import annotations
+
+from nerdvana_cli.core.tool import ToolRegistry
+from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
+from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
+from nerdvana_cli.tools.parism_tool import ParismTool
+from nerdvana_cli.tools.search_tools import GlobTool, GrepTool
+
+
+def create_tool_registry(
+    parism_client  = None,
+    mcp_tools      = None,
+    settings       = None,
+    task_registry  = None,
+    team_registry  = None,
+) -> ToolRegistry:
+    """Create and populate the tool registry with all built-in tools."""
+    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.team       import TeamRegistry as TR
+
+    registry  = ToolRegistry()
+    _task_reg = task_registry or TaskRegistry()
+    _team_reg = team_registry or TR()
+
+    if mcp_tools:
+        for tool in mcp_tools:
+            registry.register(tool)
+
+    if parism_client is not None:
+        parism_tool = ParismTool()
+        parism_tool.set_client(parism_client)
+        registry.register(parism_tool)
+
+    registry.register(create_bash_tool())
+    registry.register(FileReadTool())
+    registry.register(FileWriteTool())
+    registry.register(FileEditTool())
+    registry.register(GlobTool())
+    registry.register(GrepTool())
+
+    if settings is not None:
+        from nerdvana_cli.tools.agent_tool import AgentTool
+        registry.register(AgentTool(settings=settings, task_registry=_task_reg))
+
+    from nerdvana_cli.tools.team_tools import (
+        SendMessageTool,
+        TaskGetTool,
+        TaskStopTool,
+        TeamCreateTool,
+    )
+    registry.register(TeamCreateTool(team_registry=_team_reg))
+    registry.register(SendMessageTool(team_registry=_team_reg))
+    registry.register(TaskGetTool(task_registry=_task_reg))
+    registry.register(TaskStopTool(task_registry=_task_reg))
+
+    if settings is not None:
+        from nerdvana_cli.tools.swarm_tool import SwarmTool
+        registry.register(SwarmTool(settings=settings, task_registry=_task_reg))
+
+    # LSP tools — registered only when a language server binary is installed
+    from nerdvana_cli.core.lsp_client import LspClient
+    lsp = LspClient()
+    if lsp.has_any_server():
+        for lsp_tool in lsp.available_tools():
+            registry.register(lsp_tool)
+
+    return registry
+
+
+def create_subagent_registry(
+    settings      = None,
+    mcp_tools     = None,
+    allowed_tools: list[str] | None = None,
+) -> ToolRegistry:
+    """Create a restricted tool registry for subagent use.
+
+    Subagents get standard tools filtered by allowed_tools but NOT AgentTool or
+    team tools (no recursive spawning, no team management from subagents).
+
+    If allowed_tools is None or ["*"], all standard tools are included.
+    Otherwise only tools whose name appears in allowed_tools are registered.
+    """
+    _all: dict[str, object] = {}
+
+    bash_tool = create_bash_tool()
+    _all[bash_tool.name] = bash_tool
+    for cls in (FileReadTool, FileWriteTool, FileEditTool, GlobTool, GrepTool):
+        t = cls()
+        _all[t.name] = t
+
+    if mcp_tools:
+        for tool in mcp_tools:
+            _all[tool.name] = tool
+
+    wildcard = allowed_tools is None or allowed_tools == ["*"]
+    registry = ToolRegistry()
+
+    if wildcard:
+        for tool in _all.values():
+            registry.register(tool)
+    else:
+        allowed_set = set(allowed_tools)
+        for name, tool in _all.items():
+            if name in allowed_set:
+                registry.register(tool)
+
+    return registry
+
+
+__all__ = [
+    "create_tool_registry",
+    "create_subagent_registry",
+    "BashTool",
+    "FileReadTool",
+    "FileWriteTool",
+    "FileEditTool",
+    "GlobTool",
+    "GrepTool",
+]

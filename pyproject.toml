@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nerdvana-cli"
+version = "0.3.0"
+description = "AI-powered CLI development tool — supports 13 AI platforms"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "최진호", email = "jinho@nerdvana.kr"},
+]
+keywords = ["ai", "cli", "agent", "coding", "nerdvana", "openai", "anthropic", "gemini", "groq", "ollama"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+]
+
+dependencies = [
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "aiohttp>=3.9.0",
+    "pyyaml>=6.0.1",
+    "httpx>=0.27.0",
+    "textual>=0.80.0",
+]
+
+[project.optional-dependencies]
+# All providers — installs everything
+all = [
+    "anthropic>=0.39.0",
+    "openai>=1.50.0",
+    "google-genai>=0.4.0",
+    "mcp>=1.0.0",
+]
+# Individual providers
+anthropic = ["anthropic>=0.39.0"]
+openai = ["openai>=1.50.0"]
+gemini = ["google-genai>=0.4.0"]
+mcp = ["mcp>=1.0.0"]
+# Development
+dev = [
+    "anthropic>=0.39.0",
+    "openai>=1.50.0",
+    "google-genai>=0.4.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+nerdvana = "nerdvana_cli.main:app"
+nc = "nerdvana_cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nerdvana_cli"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "ARG"]
+ignore = ["E501", "A003", "ARG001", "ARG002", "ARG005"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["nerdvana_cli"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

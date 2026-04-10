@@ -1,0 +1,55 @@
+/* NerdVana CLI — Textual TUI Styles */
+
+Screen {
+    background: $surface;
+}
+
+#main-container {
+    height: 1fr;
+}
+
+ChatMessage {
+    padding: 0 1;
+    width: 100%;
+}
+
+ChatMessage:hover {
+    background: #1e293b;
+}
+
+ChatMessage.-copied {
+    background: #064e3b;
+}
+
+#user-input {
+    dock: bottom;
+    height: 3;
+    margin: 0 0;
+    border: tall $primary;
+    background: $panel;
+}
+
+#user-input:focus {
+    border: tall $accent;
+}
+
+#status-bar {
+    dock: bottom;
+    height: 1;
+    background: $primary-background;
+    color: $text-muted;
+    padding: 0 1;
+    text-style: dim;
+}
+
+Header {
+    background: $primary-background;
+    color: $text;
+    text-style: bold;
+    height: 1;
+    dock: top;
+}
+
+Footer {
+    background: $primary-background;
+}
