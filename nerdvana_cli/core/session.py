@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 
 class SessionStorage:
@@ -17,7 +18,7 @@ class SessionStorage:
         os.makedirs(base_dir, exist_ok=True)
         self.file_path = os.path.join(base_dir, f"{self.session_id}.jsonl")
 
-    def record(self, event_type: str, data: dict) -> None:
+    def record(self, event_type: str, data: dict[str, Any]) -> None:
         entry = {
             "ts": datetime.now(UTC).isoformat(),
             "type": event_type,
@@ -29,7 +30,7 @@ class SessionStorage:
     def record_user_message(self, content: str) -> None:
         self.record("user", {"content": content})
 
-    def record_assistant_message(self, content: str, tool_uses: list[dict] | None = None) -> None:
+    def record_assistant_message(self, content: str, tool_uses: list[dict[str, Any]] | None = None) -> None:
         self.record("assistant", {"content": content, "tool_uses": tool_uses or []})
 
     def record_tool_result(self, tool_name: str, tool_use_id: str, content: str, is_error: bool = False) -> None:
@@ -58,10 +59,10 @@ class SessionStorage:
             },
         )
 
-    def record_system(self, subtype: str, data: dict) -> None:
+    def record_system(self, subtype: str, data: dict[str, Any]) -> None:
         self.record("system", {"subtype": subtype, **data})
 
-    def replay(self) -> list[dict]:
+    def replay(self) -> list[dict[str, Any]]:
         if not os.path.exists(self.file_path):
             return []
         messages = []

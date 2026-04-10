@@ -15,7 +15,7 @@ def _normalize_server_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]", "_", name)
 
 
-class McpToolAdapter(BaseTool[dict]):
+class McpToolAdapter(BaseTool[dict[str, Any]]):
     """Wraps a single MCP server tool as a BaseTool for the registry."""
 
     def __init__(
@@ -39,7 +39,7 @@ class McpToolAdapter(BaseTool[dict]):
 
     async def call(
         self,
-        args: dict,
+        args: dict[str, Any],
         context: ToolContext,
         can_use_tool: Any,
         on_progress: Any = None,

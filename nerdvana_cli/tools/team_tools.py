@@ -12,7 +12,8 @@ from nerdvana_cli.core.team import (
     get_inbox_path,
     write_to_inbox,
 )
-from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolResult
+from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.types import ToolResult
 
 # ---------------------------------------------------------------------------
 # TeamCreate

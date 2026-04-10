@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderName(StrEnum):
@@ -262,7 +265,7 @@ def resolve_context_window(provider: ProviderName, model: str) -> int:
     if best_match:
         return best_value
     caps = PROVIDER_CAPABILITIES.get(provider, {})
-    return caps.get("max_context", 180_000)
+    return int(caps.get("max_context", 180_000))
 
 
 # Default base URLs per provider
@@ -358,6 +361,7 @@ def detect_provider(model: str) -> ProviderName:
         return ProviderName.ZAI
 
     # Default to Anthropic
+    logger.warning("Unknown model prefix '%s' — defaulting to Anthropic", model)
     return ProviderName.ANTHROPIC
 
 

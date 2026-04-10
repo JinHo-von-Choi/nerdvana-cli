@@ -44,7 +44,7 @@ class AgentTypeRegistry:
             return
 
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
         except ImportError:
             return
 

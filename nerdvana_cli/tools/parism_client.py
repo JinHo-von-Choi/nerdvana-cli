@@ -16,8 +16,8 @@ class ParismClient:
         self._connected = False
         self._cwd = cwd
         self._request_id = 0
-        self._pending: dict[int, asyncio.Future] = {}
-        self._reader_task: asyncio.Task | None = None
+        self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self._reader_task: asyncio.Task[None] | None = None
 
     @property
     def is_connected(self) -> bool:
@@ -94,7 +94,7 @@ class ParismClient:
             "page_size": page_size,
         })
 
-    async def _call_tool(self, tool_name: str, arguments: dict) -> dict[str, Any]:
+    async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Send MCP tools/call request and await response."""
         result = await self._send_request("tools/call", {
             "name": tool_name,
@@ -103,28 +103,32 @@ class ParismClient:
         # MCP tool result has content array; parism returns JSON in first text block
         content = result.get("content", [])
         if content and content[0].get("type") == "text":
-            return json.loads(content[0]["text"])
+            return dict(json.loads(content[0]["text"]))
         return result
 
-    async def _send_request(self, method: str, params: dict) -> dict:
+    async def _send_request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Send JSON-RPC request and await response."""
         self._request_id += 1
         req_id = self._request_id
         msg = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
 
-        future: asyncio.Future = asyncio.get_event_loop().create_future()
+        future: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
         self._pending[req_id] = future
 
         raw = json.dumps(msg) + "\n"
+        assert self._process is not None
+        assert self._process.stdin is not None
         self._process.stdin.write(raw.encode())
         await self._process.stdin.drain()
 
         return await asyncio.wait_for(future, timeout=30)
 
-    async def _send_notification(self, method: str, params: dict) -> None:
+    async def _send_notification(self, method: str, params: dict[str, Any]) -> None:
         """Send JSON-RPC notification (no response expected)."""
         msg = {"jsonrpc": "2.0", "method": method, "params": params}
         raw = json.dumps(msg) + "\n"
+        assert self._process is not None
+        assert self._process.stdin is not None
         self._process.stdin.write(raw.encode())
         await self._process.stdin.drain()
 
@@ -132,6 +136,8 @@ class ParismClient:
         """Read JSON-RPC responses from parism stdout."""
         while True:
             try:
+                assert self._process is not None
+                assert self._process.stdout is not None
                 line = await self._process.stdout.readline()
                 if not line:
                     break

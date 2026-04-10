@@ -40,7 +40,7 @@ def _project_hook_dir(cwd: str) -> Path:
     return Path(cwd) / ".nerdvana" / "hooks"
 
 
-def _load_module_from_path(path: Path):
+def _load_module_from_path(path: Path) -> Any:
     """Import a single .py file as an isolated module."""
     spec = importlib.util.spec_from_file_location(
         f"nerdvana_user_hook_{path.stem}", str(path)

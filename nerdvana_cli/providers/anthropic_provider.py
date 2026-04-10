@@ -11,6 +11,11 @@ from rich.console import Console
 from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
 
+try:
+    from anthropic import AsyncAnthropic
+except ImportError:  # pragma: no cover – runtime guard in _get_client
+    AsyncAnthropic = None  # type: ignore[assignment,misc]
+
 console = Console()
 
 
@@ -23,26 +28,26 @@ class AnthropicProvider:
 
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._client = None
+        self._client: AsyncAnthropic | None = None
 
-    def _get_client(self):
+    def _get_client(self) -> AsyncAnthropic:
         """Return cached AsyncAnthropic client (lazy-init)."""
         if self._client is None:
-            from anthropic import AsyncAnthropic
+            from anthropic import AsyncAnthropic as _AsyncAnthropic
 
             client_kwargs: dict[str, Any] = {}
             if self.config.api_key:
                 client_kwargs["api_key"] = self.config.api_key
             if self.config.base_url and self.config.base_url != "https://api.anthropic.com":
                 client_kwargs["base_url"] = self.config.base_url
-            self._client = AsyncAnthropic(**client_kwargs)
+            self._client = _AsyncAnthropic(**client_kwargs)
         return self._client
 
     async def stream(
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> AsyncIterator[ProviderEvent]:
         """Stream completion from Anthropic API."""
         try:
@@ -147,7 +152,7 @@ class AnthropicProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool],
+        tools: list[BaseTool[Any]],
     ) -> dict[str, Any]:
         """Non-streaming completion."""
         try:
@@ -172,8 +177,8 @@ class AnthropicProvider:
                 max_tokens=self.config.max_tokens,
                 temperature=self.config.temperature,
                 system=system_prompt,
-                messages=api_messages,
-                tools=api_tools,
+                messages=api_messages,  # type: ignore[arg-type]
+                tools=api_tools,  # type: ignore[arg-type]
             )
 
             content = ""
@@ -204,7 +209,7 @@ class AnthropicProvider:
         except Exception as e:
             return {"content": str(e), "is_error": True}
 
-    async def list_models(self) -> list:
+    async def list_models(self) -> list[Any]:
         """Fetch available models from Anthropic API."""
         from nerdvana_cli.providers.base import ModelInfo
         try:

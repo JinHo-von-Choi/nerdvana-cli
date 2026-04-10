@@ -163,6 +163,7 @@ class LspClient:
         msg = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
         body = json.dumps(msg)
         header = f"Content-Length: {len(body)}\r\n\r\n"
+        assert proc.stdin is not None
         proc.stdin.write((header + body).encode())
         await proc.stdin.drain()
 
@@ -175,6 +176,7 @@ class LspClient:
         self, proc: asyncio.subprocess.Process, req_id: int
     ) -> dict[str, Any]:
         """Read next LSP message from stdout, skipping notifications."""
+        assert proc.stdout is not None
         while True:
             header_line = await asyncio.wait_for(proc.stdout.readline(), timeout=10.0)
             if not header_line:
@@ -188,7 +190,7 @@ class LspClient:
             if msg.get("method"):
                 continue  # notification, skip
             if msg.get("id") == req_id:
-                return msg
+                return dict(msg)
 
     async def _get_proc(self, ext: str) -> asyncio.subprocess.Process:
         """Return running process for ext, starting one if needed."""
@@ -235,6 +237,7 @@ class LspClient:
         }
         body = json.dumps(req)
         header = f"Content-Length: {len(body)}\r\n\r\n"
+        assert proc.stdin is not None
         proc.stdin.write((header + body).encode())
         await proc.stdin.drain()
         await self._read_response(proc, self._req_id)

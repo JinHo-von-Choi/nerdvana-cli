@@ -8,6 +8,7 @@ from typing import Any
 
 from nerdvana_cli.core.tool import BaseTool, ToolContext
 from nerdvana_cli.types import ToolResult
+from nerdvana_cli.utils.path import validate_path
 
 
 def _hash4(line: str) -> str:
@@ -63,17 +64,6 @@ def _format_with_hashes(lines: list[str], start_lineno: int = 1) -> str:
     return "\n".join(result_parts)
 
 
-def _validate_path(path: str, cwd: str) -> str | None:
-    """Validate that resolved path stays within cwd. Returns error message or None."""
-    if os.path.isabs(path):
-        return f"Absolute paths are not allowed: {path}"
-    resolved     = os.path.realpath(os.path.join(cwd, path))
-    cwd_resolved = os.path.realpath(cwd)
-    if not resolved.startswith(cwd_resolved + os.sep) and resolved != cwd_resolved:
-        return f"Path traversal blocked: {path} resolves outside working directory"
-    return None
-
-
 class FileReadArgs:
     def __init__(self, path: str, offset: int = 0, limit: int = 0):
         self.path = path
@@ -113,7 +103,7 @@ Examples:
         on_progress: Any = None,
     ) -> ToolResult:
         try:
-            path_error = _validate_path(args.path, context.cwd)
+            path_error = validate_path(args.path, context.cwd)
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
             full_path = os.path.join(context.cwd, args.path)
@@ -183,7 +173,7 @@ WARNING: This replaces the entire file content."""
         on_progress: Any = None,
     ) -> ToolResult:
         try:
-            path_error = _validate_path(args.path, context.cwd)
+            path_error = validate_path(args.path, context.cwd)
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
             full_path = os.path.join(context.cwd, args.path)
@@ -275,7 +265,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
         on_progress: Any = None,
     ) -> ToolResult:
         try:
-            path_error = _validate_path(args.path, context.cwd)
+            path_error = validate_path(args.path, context.cwd)
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
             full_path = os.path.join(context.cwd, args.path)
@@ -315,6 +305,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                     content=f"Replaced anchor line {target_idx + 1} in {args.path}",
                 )
             # ── old_string path (backward-compatible) ─────────────────────
+            assert args.old_string is not None
             if args.old_string not in content:
                 return ToolResult(
                     tool_use_id="",

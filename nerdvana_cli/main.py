@@ -8,7 +8,6 @@ import sys
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Prompt
 
 from nerdvana_cli import __version__
@@ -36,7 +35,7 @@ def main(
     model: str = typer.Option("", "--model", "-m", help="Model name"),
     provider: str = typer.Option("", "--provider", "-p", help="AI provider"),
     max_tokens: int = typer.Option(0, "--max-tokens", help="Max tokens per response"),
-):
+) -> None:
     """NerdVana CLI — AI-powered development tool.
 
     Supports 12 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
@@ -49,6 +48,7 @@ def main(
         console.print(f"[bold]NerdVana CLI[/bold] v{__version__}")
         try:
             import asyncio as _asyncio
+
             from nerdvana_cli.core.updater import check_for_update
             result = _asyncio.run(check_for_update(__version__))
             if result:
@@ -87,7 +87,7 @@ async def repl_loop(
     model: str | None = None,
     provider: str | None = None,
     max_tokens: int | None = None,
-):
+) -> None:
     """Interactive REPL loop."""
     settings = NerdvanaSettings.load(config_path)
     settings.cwd = cwd
@@ -176,116 +176,6 @@ async def repl_loop(
             await parism_client.disconnect()
 
 
-async def handle_command(
-    cmd: str,
-    loop: AgentLoop,
-    settings: NerdvanaSettings,
-    session: SessionStorage,
-    registry,
-) -> bool:
-    """Handle slash commands. Returns False to exit REPL."""
-    parts = cmd.split(maxsplit=1)
-    command = parts[0].lower()
-    args = parts[1] if len(parts) > 1 else ""
-
-    if command in ("/quit", "/exit", "/q"):
-        console.print("[dim]Goodbye![/dim]")
-        return False
-
-    elif command == "/help":
-        console.print(
-            Panel(
-                "[bold]Commands[/bold]\n"
-                "/help          — Show this help\n"
-                "/quit          — Exit REPL\n"
-                "/setup         — Run setup wizard\n"
-                "/model         — Show current model\n"
-                "/model <name>  — Change model\n"
-                "/provider      — Show current provider\n"
-                "/provider <p>  — Change provider\n"
-                "/tokens        — Show token usage\n"
-                "/clear         — Clear conversation\n"
-                "/session       — Show session info\n"
-                "/tools         — List available tools\n"
-                "/providers     — List all supported providers\n"
-                "/verbose       — Toggle verbose mode",
-                title="Help",
-            )
-        )
-
-    elif command == "/setup":
-        from nerdvana_cli.core.setup import run_setup
-
-        run_setup(force=True)
-
-    elif command == "/model":
-        if args:
-            from nerdvana_cli.providers import detect_provider
-
-            settings.model.model = args
-            settings.model.provider = detect_provider(args).value
-            loop.provider = loop.create_provider_from_settings()
-            console.print(f"[dim]Model: {args} (provider: {settings.model.provider})[/dim]")
-        else:
-            console.print(f"[dim]Model: {settings.model.model} (provider: {settings.model.provider})[/dim]")
-
-    elif command == "/provider":
-        if args:
-            from nerdvana_cli.providers import ProviderName
-
-            try:
-                settings.model.provider = args
-                prov = ProviderName(args)
-                from nerdvana_cli.providers.base import DEFAULT_MODELS
-
-                settings.model.model = DEFAULT_MODELS.get(prov, settings.model.model)
-                loop.provider = loop.create_provider_from_settings()
-                console.print(f"[dim]Provider: {args} — model: {settings.model.model}[/dim]")
-            except ValueError:
-                console.print(f"[red]Unknown provider: {args}[/red]")
-                console.print("[dim]Use /providers to see available providers.[/dim]")
-        else:
-            console.print(f"[dim]Provider: {settings.model.provider}[/dim]")
-
-    elif command == "/tokens":
-        usage = loop.state.usage
-        console.print(
-            f"[dim]Input: {usage.input_tokens} | Output: {usage.output_tokens} | Total: {usage.total_tokens}[/dim]"
-        )
-
-    elif command == "/clear":
-        loop.state.messages.clear()
-        loop.state.turn_count = 1
-        console.print("[dim]Conversation cleared.[/dim]")
-
-    elif command == "/session":
-        console.print(f"[dim]Session ID: {session.session_id}[/dim]")
-        console.print(f"[dim]Messages: {len(loop.state.messages)}[/dim]")
-        console.print(f"[dim]Turns: {loop.state.turn_count}[/dim]")
-
-    elif command == "/tools":
-        tools = registry.all_tools()
-        console.print("[bold]Available Tools:[/bold]")
-        for t in tools:
-            safe = "[green]R[/green]" if t.is_read_only else "[yellow]W[/yellow]"
-            concurrent = "[green]||[/green]" if t.is_concurrency_safe else "[dim]|[/dim]"
-            console.print(f"  {safe} {concurrent} [bold]{t.name}[/bold] — {t.description_text[:60]}...")
-
-    elif command == "/providers":
-        from nerdvana_cli.providers import print_providers_table
-
-        print_providers_table()
-
-    elif command == "/verbose":
-        settings.verbose = not settings.verbose
-        console.print(f"[dim]Verbose: {settings.verbose}[/dim]")
-
-    else:
-        console.print(f"[red]Unknown command: {command}[/red]")
-
-    return True
-
-
 @app.command()
 def run(
     prompt: str = typer.Argument(..., help="Prompt to run"),
@@ -295,7 +185,7 @@ def run(
     model: str = typer.Option("", "--model", "-m", help="Model name"),
     provider: str = typer.Option("", "--provider", "-p", help="AI provider"),
     max_tokens: int = typer.Option(0, "--max-tokens", help="Max tokens"),
-):
+) -> None:
     """Run a single prompt non-interactively."""
     settings = NerdvanaSettings.load(config or None)
     settings.cwd = cwd or os.getcwd()
@@ -324,7 +214,7 @@ def run(
         raise typer.Exit(1)
 
     from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team       import TeamRegistry
+    from nerdvana_cli.core.team import TeamRegistry
 
     task_registry = TaskRegistry()
     team_registry = TeamRegistry()
@@ -342,7 +232,7 @@ def run(
         team_registry = team_registry,
     )
 
-    async def _run():
+    async def _run() -> None:
         async for chunk in loop.run(prompt):
             console.print(chunk, end="")
         console.print()
@@ -353,7 +243,7 @@ def run(
 @app.command()
 def setup(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
-):
+) -> None:
     """Interactive setup — choose provider, enter API key, select model."""
     from nerdvana_cli.core.setup import run_setup
 
@@ -361,7 +251,7 @@ def setup(
 
 
 @app.command()
-def providers():
+def providers() -> None:
     """List all supported AI providers."""
     from nerdvana_cli.providers import print_providers_table
 
@@ -369,7 +259,7 @@ def providers():
 
 
 @app.command()
-def version():
+def version() -> None:
     """Show version."""
     console.print(f"NerdVana CLI v{__version__}")
 

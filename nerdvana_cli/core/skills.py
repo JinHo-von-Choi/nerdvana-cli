@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class SkillLoader:
         return self._skills
 
     def _load_dir(self, directory: Path) -> list[Skill]:
-        skills = []
+        skills: list[Skill] = []
         if not directory.exists():
             return skills
         for path in sorted(directory.glob("*.md")):

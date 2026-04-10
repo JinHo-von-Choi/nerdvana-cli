@@ -22,9 +22,9 @@ class McpClient:
     def __init__(self, config: McpServerConfig) -> None:
         self._config    = config
         self._process: asyncio.subprocess.Process | None = None
-        self._reader_task: asyncio.Task | None = None
+        self._reader_task: asyncio.Task[None] | None = None
         self._request_id = 0
-        self._pending: dict[int, asyncio.Future[dict]] = {}
+        self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self._connected = False
         self._session_url: str | None = None  # HTTP: server may return session endpoint
         self._http_client: Any = None
@@ -129,7 +129,7 @@ class McpClient:
         """
         self._ensure_connected()
         result = await self._send_request("tools/list", {})
-        return result.get("tools", [])
+        return list(result.get("tools", []))
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any] | None = None
@@ -164,7 +164,7 @@ class McpClient:
         """
         self._ensure_connected()
         result = await self._send_request("resources/list", {})
-        return result.get("resources", [])
+        return list(result.get("resources", []))
 
     def _ensure_connected(self) -> None:
         if not self._connected:
@@ -191,13 +191,13 @@ class McpClient:
             return await self._http_send_request(message)
 
         loop   = asyncio.get_event_loop()
-        future = loop.create_future()
+        future: asyncio.Future[dict[str, Any]] = loop.create_future()
         self._pending[req_id] = future
 
-        self._write_message(message)
+        await self._write_message(message)
 
         try:
-            result = await asyncio.wait_for(future, timeout=_REQUEST_TIMEOUT)
+            result: dict[str, Any] = await asyncio.wait_for(future, timeout=_REQUEST_TIMEOUT)
         except TimeoutError as err:
             self._pending.pop(req_id, None)
             raise RuntimeError(
@@ -218,7 +218,7 @@ class McpClient:
         if self._http_client:
             await self._http_send_notification(message)
         else:
-            self._write_message(message)
+            await self._write_message(message)
 
     def _http_headers(self) -> dict[str, str]:
         """Build headers for MCP Streamable HTTP requests."""
@@ -256,7 +256,8 @@ class McpClient:
             raise RuntimeError(
                 f"MCP error {error.get('code', '?')}: {error.get('message', 'unknown')}"
             )
-        return data.get("result", {})
+        result: dict[str, Any] = data.get("result", {})
+        return result
 
     def _parse_sse_response(self, text: str) -> dict[str, Any]:
         """Extract last JSON-RPC result from SSE event stream."""
@@ -273,7 +274,8 @@ class McpClient:
                 raise RuntimeError(
                     f"MCP error {error.get('code', '?')}: {error.get('message', 'unknown')}"
                 )
-            return msg.get("result", {})
+            result: dict[str, Any] = msg.get("result", {})
+            return result
         except json.JSONDecodeError:
             return {}
 
@@ -286,13 +288,14 @@ class McpClient:
                 headers=self._http_headers(),
             )
 
-    def _write_message(self, message: dict[str, Any]) -> None:
-        """Write a JSON-RPC message to the subprocess stdin."""
+    async def _write_message(self, message: dict[str, Any]) -> None:
+        """Write a JSON-RPC message to the subprocess stdin and drain."""
         if not self._process or not self._process.stdin:
             raise RuntimeError("No subprocess stdin available")
 
         data = json.dumps(message) + "\n"
         self._process.stdin.write(data.encode("utf-8"))
+        await self._process.stdin.drain()
 
     async def _read_loop(self) -> None:
         """Continuously read JSON-RPC responses from subprocess stdout."""

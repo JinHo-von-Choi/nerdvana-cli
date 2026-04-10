@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
@@ -36,7 +37,7 @@ def has_config_file() -> bool:
     return os.path.exists(get_config_path())
 
 
-def load_config() -> dict:
+def load_config() -> dict[str, Any]:
     """Load existing config or return empty dict."""
     path = get_config_path()
     if os.path.exists(path):
@@ -45,7 +46,7 @@ def load_config() -> dict:
     return {}
 
 
-def save_config(config: dict, path: str = "") -> str:
+def save_config(config: dict[str, Any], path: str = "") -> str:
     """Save config to file. Returns the path saved to."""
     if not path:
         path = get_config_path()
@@ -56,7 +57,7 @@ def save_config(config: dict, path: str = "") -> str:
     return path
 
 
-def run_setup(force: bool = False) -> dict | None:
+def run_setup(force: bool = False) -> dict[str, Any] | None:
     """Run interactive setup wizard. Returns config dict or None if skipped."""
 
     if not force and has_config_file() and has_valid_api_key():

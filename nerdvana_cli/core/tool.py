@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
@@ -46,7 +46,7 @@ class BaseTool(ABC, Generic[T]):
         if self.args_class is None:
             return raw
         import inspect
-        sig = inspect.signature(self.args_class.__init__)
+        sig = inspect.signature(self.args_class.__init__)  # type: ignore[misc]
         valid_keys = {p for p in sig.parameters if p != "self"}
         filtered = {k: v for k, v in raw.items() if k in valid_keys}
         return self.args_class(**filtered)
@@ -121,22 +121,22 @@ def build_tool(defn: ToolDef[T]) -> BaseTool[T]:
             can_use_tool: Any,
             on_progress: Any = None,
         ) -> ToolResult:
-            return await defn.call_fn(args, context, on_progress)
+            return cast(ToolResult, await defn.call_fn(args, context, on_progress))
 
         if defn.check_permissions_fn is not None:
 
-            def check_permissions(self, args, context):
-                return defn.check_permissions_fn(args, context)
+            def check_permissions(self: Any, args: T, context: ToolContext) -> PermissionResult:
+                return cast(PermissionResult, defn.check_permissions_fn(args, context))
 
         if defn.validate_input_fn is not None:
 
-            def validate_input(self, args, context):
-                return defn.validate_input_fn(args, context)
+            def validate_input(self: Any, args: T, context: ToolContext) -> str | None:
+                return cast("str | None", defn.validate_input_fn(args, context))
 
         if defn.prompt_fn is not None:
 
-            def prompt(self):
-                return defn.prompt_fn()
+            def prompt(self: Any) -> str:
+                return cast(str, defn.prompt_fn())
 
     return _Tool()
 
@@ -144,22 +144,22 @@ def build_tool(defn: ToolDef[T]) -> BaseTool[T]:
 class ToolRegistry:
     """Central registry of all available tools."""
 
-    def __init__(self):
-        self._tools: dict[str, BaseTool] = {}
+    def __init__(self) -> None:
+        self._tools: dict[str, BaseTool[Any]] = {}
 
-    def register(self, tool: BaseTool) -> None:
+    def register(self, tool: BaseTool[Any]) -> None:
         self._tools[tool.name] = tool
 
-    def get(self, name: str) -> BaseTool | None:
+    def get(self, name: str) -> BaseTool[Any] | None:
         return self._tools.get(name)
 
-    def all_tools(self) -> list[BaseTool]:
+    def all_tools(self) -> list[BaseTool[Any]]:
         return list(self._tools.values())
 
-    def concurrency_safe_tools(self) -> list[BaseTool]:
+    def concurrency_safe_tools(self) -> list[BaseTool[Any]]:
         return [t for t in self._tools.values() if t.is_concurrency_safe]
 
-    def serial_tools(self) -> list[BaseTool]:
+    def serial_tools(self) -> list[BaseTool[Any]]:
         return [t for t in self._tools.values() if not t.is_concurrency_safe]
 
     def tool_schemas(self) -> list[dict[str, Any]]:

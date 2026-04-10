@@ -11,7 +11,8 @@ from typing import Any
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolResult
+from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.types import ToolResult
 
 
 @dataclass
@@ -112,8 +113,17 @@ class AgentTool(BaseTool[AgentToolArgs]):
             os.path.join(os.getcwd(), ".nerdvana", "agents")
         )
 
-        defn          = _agent_type_reg.get(args.subagent_type)
-        allowed_tools = defn.allowed_tools if defn else ["*"]
+        agent_defn = _agent_type_reg.get(args.subagent_type)
+        if agent_defn is None:
+            available = ", ".join(sorted(_agent_type_reg._agents.keys()))
+            task.status = TaskStatus.FAILED
+            task.error = f"Unknown agent type: {args.subagent_type}"
+            return ToolResult(
+                tool_use_id="",
+                content=f"Unknown agent type: '{args.subagent_type}'. Available: {available}",
+                is_error=True,
+            )
+        allowed_tools = agent_defn.allowed_tools
         child_registry = create_subagent_registry(
             settings      = child_settings,
             allowed_tools = allowed_tools,

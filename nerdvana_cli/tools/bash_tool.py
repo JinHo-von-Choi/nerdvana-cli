@@ -61,9 +61,13 @@ Examples:
         re.compile(r"\|\s*(?:/(?:usr/)?(?:bin/)?)?zsh\b"),
         re.compile(r"base64\s+.*\|\s*(?:ba)?sh"),
         re.compile(r"(?:curl|wget)\s.*\|\s"),
-        re.compile(r"\bchmod\s+(?:-R\s+)?777\b"),
+        re.compile(r"\bchmod\s+(?:-R\s+|--recursive\s+)?(?:000|777)\b"),
         re.compile(r"\b(?:shutdown|reboot|halt|poweroff)\b"),
         re.compile(r"\bgit\s+push\s+(?:.*\s)?(?:--force|-f)\b"),
+        # Long-option variants for rm
+        re.compile(r"\brm\s+.*--no-preserve-root\b"),
+        re.compile(r"\brm\s+.*--recursive\s+.*--force\b"),
+        re.compile(r"\brm\s+.*--force\s+.*--recursive\b"),
     ]
 
     _ASK_PATTERNS: list[re.Pattern[str]] = [
