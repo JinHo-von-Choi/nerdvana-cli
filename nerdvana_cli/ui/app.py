@@ -336,6 +336,7 @@ class NerdvanaApp(App[object]):
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
         self._sidebar_user_visible: bool | None = None  # None = follow auto rule
+        self._session_topic: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -380,6 +381,10 @@ class NerdvanaApp(App[object]):
         )
 
         self._update_banner()
+
+        import os
+        sidebar = self.query_one("#sidebar", Sidebar)
+        sidebar.set_header(topic=self._session_topic, cwd=os.getcwd())
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
@@ -438,6 +443,14 @@ class NerdvanaApp(App[object]):
             return
 
         input_widget.value = ""
+
+        if not self._session_topic and not user_text.startswith("/"):
+            self._session_topic = user_text
+            import os
+            self.query_one("#sidebar", Sidebar).set_header(
+                topic=self._session_topic,
+                cwd=os.getcwd(),
+            )
 
         # API key input mode
         if self._pending_provider:
