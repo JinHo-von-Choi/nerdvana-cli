@@ -265,15 +265,27 @@ class AgentLoop:
         # to avoid double injection.
         if not self._session_started:
             self._session_started = True
+            from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
             from nerdvana_cli.core.hooks import HookContext, HookEvent
 
+            sticky_parts: list[str] = []
+
+            # 1. Project snapshot (once per session)
+            try:
+                snap = await collect_snapshot(self.settings.cwd or ".")
+                snap_text = format_snapshot(snap)
+                if snap_text.strip():
+                    sticky_parts.append(snap_text)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # 2. Existing hook fan-out
             hook_ctx = HookContext(
                 event=HookEvent.SESSION_START,
                 settings=self.settings,
                 tools=tools,
             )
             hook_results = self.hooks.fire(hook_ctx)
-            sticky_parts: list[str] = []
             for hr in hook_results:
                 if hr.system_prompt_append:
                     sticky_parts.append(hr.system_prompt_append)
