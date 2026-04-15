@@ -22,7 +22,7 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.ui.sidebar import Sidebar
-from nerdvana_cli.ui.task_panel import TaskPanel
+from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
 
 
 class MultilineAwareInput(Input):
@@ -396,6 +396,8 @@ class NerdvanaApp(App[object]):
 
         triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
         sidebar.set_skills(triggers)
+        sidebar.set_tasks_registry(self._task_registry)
+        self.set_interval(0.5, lambda: self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows())
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()

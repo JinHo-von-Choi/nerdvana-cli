@@ -6,11 +6,13 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 
+from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
     SidebarMcpSection,
     SidebarSkillsSection,
+    SidebarTasksSection,
     SidebarToolsSection,
 )
 
@@ -44,6 +46,7 @@ class Sidebar(VerticalScroll):
     def compose(self) -> ComposeResult:
         yield SidebarHeaderSection(id="sidebar-header")
         yield SidebarContextSection(id="sidebar-context")
+        yield SidebarTasksSection(id="sidebar-tasks")
         yield SidebarToolsSection(id="sidebar-tools")
         yield SidebarMcpSection(id="sidebar-mcp")
         yield SidebarSkillsSection(id="sidebar-skills")
@@ -62,3 +65,6 @@ class Sidebar(VerticalScroll):
 
     def set_skills(self, triggers: list[str]) -> None:
         self.query_one("#sidebar-skills", SidebarSkillsSection).set_state(triggers)
+
+    def set_tasks_registry(self, registry: TaskRegistry) -> None:
+        self.query_one("#sidebar-tasks", SidebarTasksSection).set_registry(registry)
