@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from nerdvana_cli.core import paths
+
 # ---------------------------------------------------------------------------
 # Mailbox types
 # ---------------------------------------------------------------------------
@@ -33,7 +35,7 @@ def get_inbox_path(
     Default base_dir: ~/.nerdvana/teams/
     """
     if not base_dir:
-        base_dir = os.path.join(os.path.expanduser("~"), ".nerdvana", "teams")
+        base_dir = str(paths.user_teams_dir())
     safe_team  = _sanitize(team_name)
     safe_agent = _sanitize(agent_name)
     return str(Path(base_dir) / safe_team / "inboxes" / f"{safe_agent}.json")
