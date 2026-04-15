@@ -6,6 +6,9 @@ and composed dynamically based on active tools and configuration.
 
 from __future__ import annotations
 
+import os
+import platform
+import subprocess
 from typing import Any
 
 from nerdvana_cli.core.nirnamd import format_nirna_for_prompt, load_nirna_files
@@ -203,6 +206,42 @@ def _output_efficiency_section() -> str:
     )
 
 
+def _git_info(cwd: str) -> dict[str, str]:
+    """Return git branch, status summary, main branch, recent commits.
+
+    All failures return empty strings. Never raise. Never block.
+    """
+    def _run(*args: str) -> str:
+        try:
+            result = subprocess.run(
+                ["git", "-C", cwd, *args],
+                capture_output=True, text=True, timeout=2.0, check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            return ""
+        return result.stdout.strip() if result.returncode == 0 else ""
+
+    is_repo = _run("rev-parse", "--is-inside-work-tree") == "true"
+    if not is_repo:
+        return {"is_repo": "false"}
+
+    branch      = _run("rev-parse", "--abbrev-ref", "HEAD")
+    status_raw  = _run("status", "--porcelain")
+    dirty_count = len([line for line in status_raw.splitlines() if line.strip()])
+    status      = "clean" if dirty_count == 0 else f"{dirty_count} files modified"
+    recent      = _run("log", "--oneline", "-5")
+    main_branch = _run("symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "main"
+    if main_branch.startswith("origin/"):
+        main_branch = main_branch[len("origin/"):]
+    return {
+        "is_repo":     "true",
+        "branch":      branch,
+        "status":      status,
+        "recent":      recent,
+        "main_branch": main_branch,
+    }
+
+
 def _environment_section(
     model: str = "",
     provider: str = "",
@@ -213,7 +252,24 @@ def _environment_section(
         parts.append(f"- Model: {provider}/{model}")
     if cwd and cwd != ".":
         parts.append(f"- Working directory: {cwd}")
-    parts.append("")
+    parts.append(f"- Platform: {platform.system().lower()}")
+    parts.append(f"- OS version: {platform.platform()}")
+    parts.append(f"- Shell: {os.environ.get('SHELL', 'unknown')}")
+
+    git = _git_info(cwd)
+    parts.append(f"- Is a git repository: {git.get('is_repo', 'false')}")
+    if git.get("is_repo") == "true":
+        if git.get("branch"):
+            parts.append(f"- Git branch: {git['branch']}")
+        if git.get("main_branch"):
+            parts.append(f"- Main branch: {git['main_branch']}")
+        if git.get("status"):
+            parts.append(f"- Git status: {git['status']}")
+        if git.get("recent"):
+            parts.append("- Recent commits:")
+            for line in git["recent"].splitlines():
+                parts.append(f"  {line}")
+
     parts.append("")
     parts.append("## NIRNA.md (Project Instructions) — CRITICAL")
     parts.append("NIRNA.md files are LOCAL FILES on the filesystem, NOT documents on any MCP server.")
