@@ -193,3 +193,24 @@ class SidebarHeaderSection(Widget):
         out.append(_truncate(self._topic) + "\n", style="bold")
         out.append("  " + _short_cwd(self._cwd), style="dim")
         return out
+
+
+class SidebarSkillsSection(_CollapsibleSection):
+    """Collapsible skills list showing count when collapsed."""
+
+    _label = "SKILLS"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._skills: list[str] = []
+
+    def set_state(self, triggers: list[str]) -> None:
+        self._skills = list(triggers)
+        self.refresh()
+
+    def render(self) -> Text:
+        out = self._header_text(len(self._skills))
+        if self._expanded:
+            for trig in self._skills:
+                out.append(f"\n  {_truncate(trig, 30)}", style="dim")
+        return out

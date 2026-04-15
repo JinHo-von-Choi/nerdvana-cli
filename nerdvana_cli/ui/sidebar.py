@@ -10,6 +10,7 @@ from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
     SidebarMcpSection,
+    SidebarSkillsSection,
     SidebarToolsSection,
 )
 
@@ -45,6 +46,7 @@ class Sidebar(VerticalScroll):
         yield SidebarContextSection(id="sidebar-context")
         yield SidebarToolsSection(id="sidebar-tools")
         yield SidebarMcpSection(id="sidebar-mcp")
+        yield SidebarSkillsSection(id="sidebar-skills")
 
     def set_header(self, topic: str, cwd: str) -> None:
         self.query_one("#sidebar-header", SidebarHeaderSection).set_state(topic, cwd)
@@ -57,3 +59,6 @@ class Sidebar(VerticalScroll):
 
     def set_mcp(self, servers: list[tuple[str, str]]) -> None:
         self.query_one("#sidebar-mcp", SidebarMcpSection).set_state(servers)
+
+    def set_skills(self, triggers: list[str]) -> None:
+        self.query_one("#sidebar-skills", SidebarSkillsSection).set_state(triggers)
