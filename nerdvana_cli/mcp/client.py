@@ -7,6 +7,7 @@ import contextlib
 import json
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from nerdvana_cli.mcp.config import McpServerConfig
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT = 30.0
 _MCP_PROTOCOL_VERSION = "2024-11-05"
+_MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10 MB
+_LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 class McpClient:
@@ -73,8 +76,9 @@ class McpClient:
     async def _connect_http(self) -> dict[str, Any]:
         import httpx
 
-        self._http_client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
+        self._http_client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, verify=True)
         self._session_url = self._config.url
+        self._warn_if_insecure_transport(self._config.url)
 
         result = await self._send_request("initialize", {
             "protocolVersion": _MCP_PROTOCOL_VERSION,
@@ -85,6 +89,23 @@ class McpClient:
         await self._send_notification("notifications/initialized", {})
         self._connected = True
         return result
+
+    def _warn_if_insecure_transport(self, url: str) -> None:
+        """Log a WARNING when the MCP server uses non-TLS HTTP to a non-local host.
+
+        Local development servers on localhost / 127.0.0.1 / ::1 are exempt
+        because plaintext loopback traffic is the common case for dev tooling.
+        """
+        parsed   = urlparse(url)
+        scheme   = (parsed.scheme or "").lower()
+        hostname = (parsed.hostname or "").lower()
+
+        if scheme == "http" and hostname not in _LOCAL_HOSTNAMES:
+            logger.warning(
+                "MCP server '%s' uses insecure http:// transport: %s",
+                self._config.name,
+                url,
+            )
 
     async def disconnect(self) -> None:
         """Gracefully shut down the MCP server connection."""
@@ -237,6 +258,13 @@ class McpClient:
         )
         resp.raise_for_status()
 
+        # Enforce response body size cap to prevent OOM from a hostile MCP server.
+        if len(resp.content) > _MAX_RESPONSE_BYTES:
+            raise RuntimeError(
+                f"MCP response exceeds {_MAX_RESPONSE_BYTES} bytes "
+                f"(got {len(resp.content)})"
+            )
+
         # Track session endpoint
         if "mcp-session-id" in resp.headers:
             session_id = resp.headers["mcp-session-id"]
@@ -261,6 +289,12 @@ class McpClient:
 
     def _parse_sse_response(self, text: str) -> dict[str, Any]:
         """Extract last JSON-RPC result from SSE event stream."""
+        if len(text) > _MAX_RESPONSE_BYTES:
+            raise RuntimeError(
+                f"MCP SSE response exceeds {_MAX_RESPONSE_BYTES} bytes "
+                f"(got {len(text)})"
+            )
+
         last_data = ""
         for line in text.split("\n"):
             if line.startswith("data: "):
@@ -306,6 +340,14 @@ class McpClient:
                 line = await self._process.stdout.readline()
                 if not line:
                     break
+
+                if len(line) > _MAX_RESPONSE_BYTES:
+                    logger.warning(
+                        "MCP server '%s' sent oversized stdio line (%d bytes); skipping",
+                        self._config.name,
+                        len(line),
+                    )
+                    continue
 
                 line_str = line.decode("utf-8").strip()
                 if not line_str:
