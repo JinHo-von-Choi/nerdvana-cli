@@ -97,7 +97,10 @@ class _CollapsibleSection(Widget):
 
     def toggle_expanded(self) -> None:
         self._expanded = not self._expanded
-        self.refresh()
+        # layout=True forces Textual to re-measure this widget so height: auto
+        # picks up the new line count from render(); plain refresh() only repaints
+        # at the cached height, leaving the body hidden after a toggle.
+        self.refresh(layout=True)
 
     def on_click(self) -> None:
         self.toggle_expanded()
