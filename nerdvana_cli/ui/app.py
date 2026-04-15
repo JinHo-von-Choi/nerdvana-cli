@@ -315,6 +315,7 @@ class NerdvanaApp(App[object]):
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", show=True),
+        Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=True),
         Binding("ctrl+l", "clear_chat", "Clear", show=True),
         Binding("escape", "focus_input", "Input", show=False),
     ]
@@ -760,3 +761,10 @@ class NerdvanaApp(App[object]):
     def action_focus_input(self) -> None:
         """Focus input widget (Escape)."""
         self.query_one("#user-input", Input).focus()
+
+    def action_toggle_sidebar(self) -> None:
+        """Toggle sidebar visibility. Sets a user-override that suppresses on_resize."""
+        sidebar = self.query_one("#sidebar", Sidebar)
+        currently_hidden = "hidden" in sidebar.classes
+        self._sidebar_user_visible = currently_hidden
+        sidebar.set_class(not currently_hidden, "hidden")
