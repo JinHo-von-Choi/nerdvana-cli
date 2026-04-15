@@ -1,6 +1,8 @@
 """Left sidebar container — opencode-style, breakpoint-aware."""
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 
@@ -32,7 +34,7 @@ class Sidebar(VerticalScroll):
     }
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.styles.width = 35
         self.add_class("hidden")
