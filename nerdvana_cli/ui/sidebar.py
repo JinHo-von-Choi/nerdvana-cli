@@ -1,7 +1,10 @@
 """Left sidebar container — opencode-style, breakpoint-aware."""
 from __future__ import annotations
 
+from textual.app import ComposeResult
 from textual.containers import VerticalScroll
+
+from nerdvana_cli.ui.sidebar_sections import SidebarHeaderSection
 
 
 class Sidebar(VerticalScroll):
@@ -29,3 +32,9 @@ class Sidebar(VerticalScroll):
         super().__init__(**kwargs)
         self.styles.width = 35
         self.add_class("hidden")
+
+    def compose(self) -> ComposeResult:
+        yield SidebarHeaderSection(id="sidebar-header")
+
+    def set_header(self, topic: str, cwd: str) -> None:
+        self.query_one("#sidebar-header", SidebarHeaderSection).set_state(topic, cwd)
