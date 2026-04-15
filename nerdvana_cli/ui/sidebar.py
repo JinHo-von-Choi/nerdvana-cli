@@ -4,7 +4,11 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 
-from nerdvana_cli.ui.sidebar_sections import SidebarContextSection, SidebarHeaderSection
+from nerdvana_cli.ui.sidebar_sections import (
+    SidebarContextSection,
+    SidebarHeaderSection,
+    SidebarToolsSection,
+)
 
 
 class Sidebar(VerticalScroll):
@@ -36,9 +40,13 @@ class Sidebar(VerticalScroll):
     def compose(self) -> ComposeResult:
         yield SidebarHeaderSection(id="sidebar-header")
         yield SidebarContextSection(id="sidebar-context")
+        yield SidebarToolsSection(id="sidebar-tools")
 
     def set_header(self, topic: str, cwd: str) -> None:
         self.query_one("#sidebar-header", SidebarHeaderSection).set_state(topic, cwd)
 
     def set_context(self, provider: str, model: str, pct: int) -> None:
         self.query_one("#sidebar-context", SidebarContextSection).set_state(provider, model, pct)
+
+    def set_tools(self, names: list[str]) -> None:
+        self.query_one("#sidebar-tools", SidebarToolsSection).set_state(names)

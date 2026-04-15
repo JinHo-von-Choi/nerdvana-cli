@@ -47,3 +47,23 @@ def test_context_section_renders_provider_model_pct() -> None:
     assert "anthropic" in text
     assert "claude-sonnet-4-6" in text
     assert "42" in text
+
+
+from nerdvana_cli.ui.sidebar_sections import SidebarToolsSection
+
+
+def test_tools_section_collapsed_shows_count() -> None:
+    section = SidebarToolsSection()
+    section.set_state(["Bash", "FileRead", "FileWrite"])
+    text = str(section.render())
+    assert "3" in text
+    assert "Bash" not in text
+
+
+def test_tools_section_expanded_lists_names() -> None:
+    section = SidebarToolsSection()
+    section.set_state(["Bash", "FileRead"])
+    section.toggle_expanded()
+    text = str(section.render())
+    assert "Bash" in text
+    assert "FileRead" in text
