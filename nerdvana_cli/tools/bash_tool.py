@@ -68,6 +68,24 @@ Examples:
         re.compile(r"\brm\s+.*--no-preserve-root\b"),
         re.compile(r"\brm\s+.*--recursive\s+.*--force\b"),
         re.compile(r"\brm\s+.*--force\s+.*--recursive\b"),
+        # Gap fixes — interpreter -c/-e/-r arbitrary code execution
+        re.compile(r"\b(?:python|python2|python3)(?:\d*(?:\.\d+)?)?(?:\s+-\w+)*\s+-c\b"),
+        re.compile(r"\b(?:perl|ruby|node|nodejs)(?:\s+-\w+)*\s+-e\b"),
+        re.compile(r"\bphp(?:\s+-\w+)*\s+-r\b"),
+        # Gap fixes — download+source/exec across commands
+        re.compile(r"(?:curl|wget)\s.*(?:&&|;|\|\||\n).*\b(?:ba)?sh\s+\S"),
+        re.compile(r"(?:curl|wget)\s.*(?:&&|;|\|\||\n).*\bzsh\s+\S"),
+        re.compile(r"(?:curl|wget)\s.*(?:&&|;|\|\||\n).*\bsource\s+\S"),
+        re.compile(r"(?:curl|wget)\s.*(?:&&|;|\|\||\n)\s*\.\s+\S"),
+        # Gap fixes — env-var home deletion
+        re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+[\"']?\$\{?(?:HOME|PWD|OLDPWD)\}?"),
+        re.compile(r"\brm\s+-r\s+-f\s+[\"']?\$\{?(?:HOME|PWD|OLDPWD)\}?"),
+        re.compile(r"\brm\s+-f\s+-r\s+[\"']?\$\{?(?:HOME|PWD|OLDPWD)\}?"),
+        # Gap fixes — block device writes via tee
+        re.compile(r"\btee\b.*/dev/(?:sd|nvme|vd|hd)"),
+        # Gap fixes — find -delete / find -exec rm combos
+        re.compile(r"\bfind\s+.*\s-delete\b"),
+        re.compile(r"\bfind\s+.*\s-exec\s+rm\b"),
     ]
 
     _ASK_PATTERNS: list[re.Pattern[str]] = [
