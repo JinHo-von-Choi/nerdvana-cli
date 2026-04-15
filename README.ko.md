@@ -89,6 +89,48 @@ nerdvana run "이 코드 리팩터링" --provider deepseek
 nerdvana providers
 ```
 
+## 디렉토리 구조
+
+NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니다:
+
+```
+~/.nerdvana-cli/     — 설치 루트 (git 저장소 + venv). install.sh가 관리합니다.
+                       런타임에서 읽기 전용 — 이 디렉토리를 직접 수정하지 마세요.
+
+~/.nerdvana/         — 사용자 데이터 루트 ($NERDVANA_DATA_HOME으로 변경 가능).
+  ├── config.yml     — 전역 설정
+  ├── NIRNA.md       — 전역 지침
+  ├── mcp.json       — 전역 MCP 서버
+  ├── sessions/      — 대화 기록 (JSONL)
+  ├── skills/        — 전역 사용자 스킬
+  ├── hooks/         — 전역 사용자 훅
+  ├── agents/        — 전역 에이전트 정의
+  ├── teams/         — 팀 상태
+  ├── cache/         — 런타임 캐시
+  └── logs/          — 로그 (예약됨)
+
+<프로젝트>/           — 현재 작업 디렉토리 (선택적 프로젝트 오버라이드)
+  ├── nerdvana.yml
+  ├── NIRNA.md
+  ├── .mcp.json
+  └── .nerdvana/
+      ├── skills/
+      ├── hooks/
+      └── agents/
+```
+
+### 환경 변수
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `NERDVANA_HOME` | 설치 루트 | `~/.nerdvana-cli` |
+| `NERDVANA_DATA_HOME` | 사용자 데이터 루트 | `~/.nerdvana` |
+| `NERDVANA_CONFIG` | 명시적 설정 파일 경로 | `~/.nerdvana/config.yml` |
+
+### 마이그레이션
+
+업그레이드 후 첫 실행 시 `~/.nerdvana-cli/sessions/` 및 `~/.config/nerdvana-cli/`의 데이터를 `~/.nerdvana/`로 이동합니다. `.migrated` 센티넬 파일이 재실행을 방지합니다.
+
 ## 명령어
 
 | 명령어 | 설명 |

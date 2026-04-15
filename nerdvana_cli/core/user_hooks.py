@@ -6,7 +6,7 @@ extension point for end-users who need to customize NerdVana CLI's
 session lifecycle without forking the package.
 
 Discovery order (later registrations win for ordering, but all run):
-    1. ~/.config/nerdvana-cli/hooks/*.py    — global user hooks
+    1. ~/.nerdvana/hooks/*.py               — global user hooks
     2. <cwd>/.nerdvana/hooks/*.py           — project-local hooks
 
 Each module must define:
@@ -23,17 +23,22 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
+from nerdvana_cli.core import paths
 from nerdvana_cli.core.hooks import HookEngine
 
 logger = logging.getLogger(__name__)
 
 
+def global_hooks_dir() -> Path:
+    """Return the global user hooks directory."""
+    return paths.user_hooks_dir()
+
+
 def _global_hook_dir() -> Path:
-    return Path(os.path.expanduser("~/.config/nerdvana-cli/hooks"))
+    return global_hooks_dir()
 
 
 def _project_hook_dir(cwd: str) -> Path:
