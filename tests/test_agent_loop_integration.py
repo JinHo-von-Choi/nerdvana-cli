@@ -262,3 +262,34 @@ async def test_unknown_tool_returns_error():
     assert tool_msg.role == Role.TOOL
     assert tool_msg.is_error is True
     assert "Unknown tool" in tool_msg.content
+
+
+@pytest.mark.asyncio
+async def test_sticky_session_context_includes_project_snapshot(tmp_path):
+    """After one run() cycle, _sticky_session_context must contain project snapshot."""
+    import subprocess
+    from pathlib import Path
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "myapp"\nversion = "0.1.0"\n'
+    )
+    (tmp_path / "src").mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
+
+    events = [
+        ProviderEvent(type="content_delta", content="ok"),
+        ProviderEvent(type="done", stop_reason="end_turn"),
+    ]
+    provider = _make_mock_provider([events])
+    settings = _make_settings()
+    settings.cwd = str(tmp_path)
+    registry = _make_registry()
+
+    with (
+        patch.object(AgentLoop, "create_provider_from_settings", return_value=provider),
+        patch.object(AgentLoop, "build_system_prompt", return_value="system"),
+    ):
+        loop = AgentLoop(settings=settings, registry=registry)
+        await _collect(loop, "hello")
+
+    assert "# Project Snapshot" in loop._sticky_session_context
