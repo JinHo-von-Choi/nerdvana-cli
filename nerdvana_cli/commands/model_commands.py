@@ -20,6 +20,21 @@ async def handle_model(app: NerdvanaApp, args: str) -> None:
         app.settings.model.model = args
         assert app._agent_loop is not None
         app._agent_loop.provider = app._agent_loop.create_provider_from_settings()
+
+        # Persist so the selection survives restart.
+        try:
+            from nerdvana_cli.core.setup import load_config, save_config
+            existing = load_config()
+            existing.setdefault("model", {})
+            existing["model"]["model"] = args
+            existing["model"]["provider"] = app.settings.model.provider
+            existing["model"]["base_url"] = app.settings.model.base_url
+            save_config(existing)
+        except Exception as save_err:
+            app._add_chat_message(
+                f"[yellow]Config save failed: {save_err}[/yellow]"
+            )
+
         app._add_chat_message(
             f"[dim]Switched to {app.settings.model.provider}/{args}[/dim]"
         )

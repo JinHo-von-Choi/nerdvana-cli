@@ -132,3 +132,63 @@ async def test_handle_model_preserves_anthropic_state_across_model_swap():
     assert app.settings.model.model == "claude-opus-4"
     assert app.settings.model.base_url == ""
     assert app._agent_loop.create_provider_from_settings.called is True
+
+
+@pytest.mark.asyncio
+async def test_handle_model_persists_selection_to_config(
+    tmp_path, monkeypatch
+):
+    """/model <id> must write the new model into config so it survives restart.
+
+    Regression: previously handle_model updated only the runtime settings, so
+    after quitting and restarting the CLI, NerdvanaSettings.load() would read
+    the stale model from disk and ignore the user's last choice.
+    """
+    import yaml
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("NERDVANA_DATA_HOME", raising=False)
+
+    app = _make_mock_app(
+        provider="ollama",
+        model="qwen3",
+        base_url="http://localhost:11434/v1",
+    )
+
+    await handle_model(app, "gemma4:31b-cloud")
+
+    cfg_path = tmp_path / ".nerdvana" / "config.yml"
+    assert cfg_path.exists(), f"config not written to {cfg_path}"
+    data = yaml.safe_load(cfg_path.read_text()) or {}
+    assert data["model"]["model"] == "gemma4:31b-cloud"
+    assert data["model"]["provider"] == "ollama"
+    assert data["model"]["base_url"] == "http://localhost:11434/v1"
+
+
+@pytest.mark.asyncio
+async def test_handle_model_merges_with_existing_config(tmp_path, monkeypatch):
+    """Persist must PRESERVE unrelated keys already in the config file."""
+    import yaml
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("NERDVANA_DATA_HOME", raising=False)
+
+    cfg_path = tmp_path / ".nerdvana" / "config.yml"
+    cfg_path.parent.mkdir(parents=True)
+    cfg_path.write_text(yaml.safe_dump({
+        "model": {"model": "old", "provider": "anthropic", "api_key": "secret-key"},
+        "session": {"max_turns": 42},
+    }))
+
+    app = _make_mock_app(
+        provider="anthropic",
+        model="old",
+        base_url="",
+    )
+
+    await handle_model(app, "claude-opus-4")
+
+    data = yaml.safe_load(cfg_path.read_text()) or {}
+    assert data["model"]["model"] == "claude-opus-4"
+    assert data["model"]["api_key"] == "secret-key", "api_key was clobbered"
+    assert data["session"]["max_turns"] == 42, "unrelated session keys lost"
