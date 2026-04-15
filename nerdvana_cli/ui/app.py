@@ -385,6 +385,11 @@ class NerdvanaApp(App[object]):
         import os
         sidebar = self.query_one("#sidebar", Sidebar)
         sidebar.set_header(topic=self._session_topic, cwd=os.getcwd())
+        sidebar.set_context(
+            provider=self.settings.model.provider,
+            model=self.settings.model.model,
+            pct=0,
+        )
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
@@ -630,6 +635,12 @@ class NerdvanaApp(App[object]):
         filled  = int(bar_w * pct / 100)
         bar_str = "\u2588" * filled + "\u2591" * (bar_w - filled)
         bar.update(Text.from_markup(f"[{color}]ctx [{bar_str}] {pct}%[/{color}]"))
+        with contextlib.suppress(Exception):
+            self.query_one("#sidebar", Sidebar).set_context(
+                provider=self.settings.model.provider,
+                model=self.settings.model.model,
+                pct=pct,
+            )
 
     def _update_banner(self) -> None:
         """Update the logo banner with current provider/model info."""
