@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
+from nerdvana_cli.core import paths
 from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS, ProviderName
 
 console = Console()
@@ -18,7 +19,7 @@ console = Console()
 
 def get_config_path() -> str:
     """Return the user-level config path."""
-    return os.path.expanduser("~/.config/nerdvana-cli/config.yml")
+    return str(paths.user_config_path())
 
 
 def has_valid_api_key() -> bool:
