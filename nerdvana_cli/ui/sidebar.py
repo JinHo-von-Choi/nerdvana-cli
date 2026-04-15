@@ -9,6 +9,7 @@ from textual.containers import VerticalScroll
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
+    SidebarFilesSection,
     SidebarHeaderSection,
     SidebarMcpSection,
     SidebarSkillsSection,
@@ -38,10 +39,12 @@ class Sidebar(VerticalScroll):
     }
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, cwd: str = "", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.styles.width = 35
         self.add_class("hidden")
+        import os
+        self._cwd = cwd or os.getcwd()
 
     def compose(self) -> ComposeResult:
         yield SidebarHeaderSection(id="sidebar-header")
@@ -50,6 +53,7 @@ class Sidebar(VerticalScroll):
         yield SidebarToolsSection(id="sidebar-tools")
         yield SidebarMcpSection(id="sidebar-mcp")
         yield SidebarSkillsSection(id="sidebar-skills")
+        yield SidebarFilesSection(cwd=self._cwd, id="sidebar-files")
 
     def set_header(self, topic: str, cwd: str) -> None:
         self.query_one("#sidebar-header", SidebarHeaderSection).set_state(topic, cwd)
@@ -68,3 +72,8 @@ class Sidebar(VerticalScroll):
 
     def set_tasks_registry(self, registry: TaskRegistry) -> None:
         self.query_one("#sidebar-tasks", SidebarTasksSection).set_registry(registry)
+
+    async def refresh_files(self) -> None:
+        """Delegate async git status refresh to SidebarFilesSection."""
+        with __import__("contextlib").suppress(Exception):
+            await self.query_one("#sidebar-files", SidebarFilesSection).refresh_async()

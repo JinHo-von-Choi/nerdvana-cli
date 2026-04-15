@@ -8,6 +8,7 @@ from rich.text import Text
 from textual.widget import Widget
 
 from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.ui.git_status import fetch_porcelain, parse_porcelain
 from nerdvana_cli.ui.task_panel import render_task_row
 
 _MAX_TOPIC_LEN = 30
@@ -257,4 +258,52 @@ class SidebarTasksSection(Widget):
             return out
         for row in self._rows:
             out.append(row + "\n", style="dim")
+        return out
+
+
+_FILE_STATUS_STYLE: dict[str, str] = {
+    "M": "yellow",
+    "A": "green",
+    "D": "red",
+    "R": "cyan",
+    "?": "dim",
+}
+
+
+class SidebarFilesSection(Widget):
+    """Modified files from git status, polled every 2 s."""
+
+    DEFAULT_CSS = """
+    SidebarFilesSection {
+        height: auto;
+        max-height: 12;
+        padding: 0 0 1 0;
+        border-top: dashed $accent 30%;
+    }
+    """
+
+    def __init__(self, cwd: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._cwd  = cwd
+        self._rows: list[tuple[str, str]] = []
+
+    async def refresh_async(self) -> None:
+        """Fetch porcelain output asynchronously and refresh."""
+        raw = await fetch_porcelain(self._cwd)
+        self._rows = parse_porcelain(raw)
+        self.refresh()
+
+    def render(self) -> Text:
+        out = Text("CHANGES ", style="bold")
+        out.append(f"({len(self._rows)})\n", style="cyan")
+        if not self._rows:
+            out.append("  (clean)", style="dim")
+            return out
+        visible = self._rows[:10]
+        for letter, path in visible:
+            style = _FILE_STATUS_STYLE.get(letter, "dim")
+            out.append(f"  {letter} ", style=f"bold {style}")
+            out.append(_truncate(path, 30) + "\n", style=style)
+        if len(self._rows) > 10:
+            out.append(f"  \u2026+{len(self._rows) - 10} more", style="dim")
         return out

@@ -398,6 +398,7 @@ class NerdvanaApp(App[object]):
         sidebar.set_skills(triggers)
         sidebar.set_tasks_registry(self._task_registry)
         self.set_interval(0.5, lambda: self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows())
+        self.set_interval(2.0, lambda: asyncio.create_task(sidebar.refresh_files()))
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
