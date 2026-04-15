@@ -11,11 +11,13 @@ if TYPE_CHECKING:
 async def handle_model(app: NerdvanaApp, args: str) -> None:
     """Handle /model command — show or switch the current model."""
     if args:
-        from nerdvana_cli.providers.base import detect_provider
         from nerdvana_cli.ui.app import StatusBar
 
+        # Invariant: /model is a model-only operation. Provider and base_url
+        # are owned by /provider; re-detecting here would corrupt state when
+        # switching to a model whose name does not match the active provider's
+        # prefix (e.g., Ollama's "gemma4:31b-cloud" on the Ollama endpoint).
         app.settings.model.model = args
-        app.settings.model.provider = detect_provider(args).value
         assert app._agent_loop is not None
         app._agent_loop.provider = app._agent_loop.create_provider_from_settings()
         app._add_chat_message(
