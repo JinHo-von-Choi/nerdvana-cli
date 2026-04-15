@@ -332,3 +332,38 @@ async def test_reminder_message_injected_on_each_turn():
     # Turn numbers must be sequential
     assert "turn=1" in reminder_msgs[0].content
     assert "turn=2" in reminder_msgs[1].content
+
+
+@pytest.mark.asyncio
+async def test_active_skill_persists_across_turns():
+    """activate_skill() body must appear in the system prompt of every subsequent turn."""
+    captured_prompts: list[str] = []
+
+    events = [
+        ProviderEvent(type="content_delta", content="ok"),
+        ProviderEvent(type="done", stop_reason="end_turn"),
+    ]
+    provider = _make_mock_provider([events, events])
+
+    async def _capturing_stream(system_prompt, messages, tools):
+        captured_prompts.append(system_prompt)
+        for evt in events:
+            yield evt
+
+    provider.stream = _capturing_stream
+
+    settings = _make_settings()
+    registry = _make_registry()
+
+    with (
+        patch.object(AgentLoop, "create_provider_from_settings", return_value=provider),
+        patch.object(AgentLoop, "build_system_prompt", return_value="base_system"),
+    ):
+        loop = AgentLoop(settings=settings, registry=registry)
+        loop.activate_skill("DEBUG MODE INSTRUCTIONS")
+        await _collect(loop, "first turn")
+        await _collect(loop, "second turn")
+
+    assert len(captured_prompts) == 2
+    assert "DEBUG MODE INSTRUCTIONS" in captured_prompts[0]
+    assert "DEBUG MODE INSTRUCTIONS" in captured_prompts[1]
