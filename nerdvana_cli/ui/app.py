@@ -391,6 +391,8 @@ class NerdvanaApp(App[object]):
             pct=0,
         )
         sidebar.set_tools([t.name for t in registry.all_tools()])
+        self._refresh_mcp_section()
+        self.set_interval(2.0, self._refresh_mcp_section)
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
@@ -413,6 +415,18 @@ class NerdvanaApp(App[object]):
         self.query_one("#user-input", Input).focus()
 
         self._check_update_task = asyncio.create_task(self._check_update())
+
+    def _refresh_mcp_section(self) -> None:
+        """Update sidebar MCP section from mcp_manager.get_status()."""
+        if not self.mcp_manager:
+            return
+        status_map = self.mcp_manager.get_status()
+        servers: list[tuple[str, str]] = [
+            (name, "connected" if ok else "error")
+            for name, ok in status_map.items()
+        ]
+        with contextlib.suppress(Exception):
+            self.query_one("#sidebar", Sidebar).set_mcp(servers)
 
     def on_resize(self, event: object) -> None:
         """Apply the 140-col breakpoint unless the user has explicitly toggled."""

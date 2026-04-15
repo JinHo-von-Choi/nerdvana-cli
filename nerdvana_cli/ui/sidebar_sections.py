@@ -127,6 +127,46 @@ class SidebarToolsSection(_CollapsibleSection):
         return out
 
 
+_MCP_ICONS: dict[str, tuple[str, str]] = {
+    "connected":    ("\u2713", "green"),
+    "disconnected": ("\u25cb", "dim"),
+    "error":        ("\u2717", "red"),
+    "connecting":   ("\u25d0", "yellow"),
+}
+
+
+class SidebarMcpSection(Widget):
+    """MCP server list with connection status icons."""
+
+    DEFAULT_CSS = """
+    SidebarMcpSection {
+        height: auto;
+        padding: 0 0 1 0;
+        border-top: dashed $accent 30%;
+    }
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._servers: list[tuple[str, str]] = []
+
+    def set_state(self, servers: list[tuple[str, str]]) -> None:
+        self._servers = list(servers)
+        self.refresh()
+
+    def render(self) -> Text:
+        out = Text("MCP ", style="bold")
+        out.append(f"({len(self._servers)})\n", style="cyan")
+        if not self._servers:
+            out.append("  (none)", style="dim")
+            return out
+        for name, status in self._servers:
+            icon, color = _MCP_ICONS.get(status, ("?", "dim"))
+            out.append(f"  {icon} ", style=color)
+            out.append(_truncate(name, 28) + "\n", style=color)
+        return out
+
+
 class SidebarHeaderSection(Widget):
     """Top of sidebar: current session topic + cwd."""
 

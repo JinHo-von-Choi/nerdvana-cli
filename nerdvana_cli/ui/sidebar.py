@@ -9,6 +9,7 @@ from textual.containers import VerticalScroll
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
+    SidebarMcpSection,
     SidebarToolsSection,
 )
 
@@ -43,6 +44,7 @@ class Sidebar(VerticalScroll):
         yield SidebarHeaderSection(id="sidebar-header")
         yield SidebarContextSection(id="sidebar-context")
         yield SidebarToolsSection(id="sidebar-tools")
+        yield SidebarMcpSection(id="sidebar-mcp")
 
     def set_header(self, topic: str, cwd: str) -> None:
         self.query_one("#sidebar-header", SidebarHeaderSection).set_state(topic, cwd)
@@ -52,3 +54,6 @@ class Sidebar(VerticalScroll):
 
     def set_tools(self, names: list[str]) -> None:
         self.query_one("#sidebar-tools", SidebarToolsSection).set_state(names)
+
+    def set_mcp(self, servers: list[tuple[str, str]]) -> None:
+        self.query_one("#sidebar-mcp", SidebarMcpSection).set_state(servers)

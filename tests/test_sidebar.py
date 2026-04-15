@@ -7,6 +7,7 @@ from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
+    SidebarMcpSection,
     SidebarToolsSection,
 )
 
@@ -61,3 +62,17 @@ def test_tools_section_expanded_lists_names() -> None:
     text = str(section.render())
     assert "Bash" in text
     assert "FileRead" in text
+
+
+def test_mcp_section_renders_servers_with_status() -> None:
+    section = SidebarMcpSection()
+    section.set_state([
+        ("nerdvana", "connected"),
+        ("context7", "connected"),
+        ("brave", "error"),
+    ])
+    text = str(section.render())
+    assert "nerdvana" in text
+    assert "brave" in text
+    for name in ["nerdvana", "context7", "brave"]:
+        assert name in text
