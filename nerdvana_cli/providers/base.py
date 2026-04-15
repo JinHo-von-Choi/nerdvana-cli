@@ -360,8 +360,12 @@ def detect_provider(model: str) -> ProviderName:
     if m.startswith("glm"):
         return ProviderName.ZAI
 
+    # Ollama — distinctive tag-separated naming (qwen3:latest, gemma4:31b-cloud, ...)
+    if ":" in m or m.endswith("-cloud"):
+        return ProviderName.OLLAMA
+
     # Default to Anthropic
-    logger.warning("Unknown model prefix '%s' — defaulting to Anthropic", model)
+    logger.error("Unknown model prefix '%s' — defaulting to Anthropic", model)
     return ProviderName.ANTHROPIC
 
 
