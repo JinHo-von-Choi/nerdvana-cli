@@ -1,7 +1,7 @@
 """NIRNA.md loader — project instructions for NerdVana CLI.
 
 Discovery order (ascending priority):
-1. ~/.config/nerdvana-cli/NIRNA.md  (global user instructions)
+1. ~/.nerdvana/NIRNA.md              (global user instructions)
 2. <cwd>/NIRNA.md                    (project instructions, checked in)
 3. <cwd>/NIRNA.local.md              (local instructions, gitignored)
 """
@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+
+from nerdvana_cli.core import paths
 
 
 @dataclass
@@ -28,12 +30,17 @@ class NirnaFile:
         return f"Contents of {self.path} {label}:\n\n{self.content}"
 
 
+def global_nirnamd_path() -> str:
+    """Return the global NIRNA.md path."""
+    return str(paths.user_nirnamd_path())
+
+
 def load_nirna_files(
     cwd: str = ".",
     global_path: str | None = None,
 ) -> list[NirnaFile]:
     if global_path is None:
-        global_path = os.path.expanduser("~/.config/nerdvana-cli/NIRNA.md")
+        global_path = global_nirnamd_path()
 
     files: list[NirnaFile] = []
 

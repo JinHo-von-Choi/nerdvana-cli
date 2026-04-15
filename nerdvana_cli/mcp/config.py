@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from nerdvana_cli.core import paths
+
 
 @dataclass
 class McpServerConfig:
@@ -60,14 +62,14 @@ def load_mcp_config(
 
     Args:
         cwd: Working directory to search for .mcp.json. Defaults to os.getcwd().
-        global_path: Path to global config. Defaults to ~/.config/nerdvana-cli/mcp.json.
+        global_path: Path to global config. Defaults to ~/.nerdvana/mcp.json.
 
     Search order: global then project (cwd/.mcp.json).
     Project settings override global settings.
     """
     configs: dict[str, McpServerConfig] = {}
 
-    gp = Path.home() / ".config" / "nerdvana-cli" / "mcp.json" if global_path is None else Path(global_path)
+    gp = paths.user_mcp_json() if global_path is None else Path(global_path)
     project = Path.cwd() / ".mcp.json" if cwd is None else Path(cwd) / ".mcp.json"
 
     for path in (gp, project):

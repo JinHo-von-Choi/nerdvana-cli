@@ -8,6 +8,8 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
+from nerdvana_cli.core import paths
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +40,7 @@ class Skill:
 class SkillLoader:
     def __init__(self, project_dir: str = ".", global_dir: str | None = None):
         self._project_dir = Path(project_dir)
-        self._global_dir = Path(global_dir) if global_dir else Path.home() / ".config" / "nerdvana-cli" / "skills"
+        self._global_dir  = Path(global_dir) if global_dir else paths.user_skills_dir()
         self._skills: list[Skill] = []
 
     def load_all(self) -> list[Skill]:
