@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # NerdVana CLI installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
+#
+# Install layout:
+#   $INSTALL_DIR (~/.nerdvana-cli by default)  — git repo + .venv. READ-ONLY at runtime.
+#   $NERDVANA_DATA_HOME (~/.nerdvana default)  — user data (sessions/config/skills/...).
+#
+# The runtime writes nothing inside $INSTALL_DIR, so `git pull --ff-only` is always
+# safe here. See docs/plans/2026-04-16-install-layout-hardening.md for history.
 set -euo pipefail
 
 REPO="JinHo-von-Choi/nerdvana-cli"

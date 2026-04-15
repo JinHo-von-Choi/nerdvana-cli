@@ -104,6 +104,48 @@ nerdvana run "refactor this code" --provider deepseek
 nerdvana providers
 ```
 
+## Directory Layout
+
+NerdVana CLI separates *install* from *user data*:
+
+```
+~/.nerdvana-cli/     — Install root (git repo + venv). Managed by install.sh.
+                       Read-only at runtime — never edit this directory by hand.
+
+~/.nerdvana/         — User data root ($NERDVANA_DATA_HOME overrides).
+  ├── config.yml     — Global settings
+  ├── NIRNA.md       — Global instructions
+  ├── mcp.json       — Global MCP servers
+  ├── sessions/      — Conversation transcripts
+  ├── skills/        — Global user skills
+  ├── hooks/         — Global user hooks
+  ├── agents/        — Global agent definitions
+  ├── teams/         — Team state
+  ├── cache/         — Runtime caches
+  └── logs/          — Logs (reserved)
+
+<project>/           — Your working directory (optional per-project overrides)
+  ├── nerdvana.yml
+  ├── NIRNA.md
+  ├── .mcp.json
+  └── .nerdvana/
+      ├── skills/
+      ├── hooks/
+      └── agents/
+```
+
+### Environment variables
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `NERDVANA_HOME` | Install root | `~/.nerdvana-cli` |
+| `NERDVANA_DATA_HOME` | User data root | `~/.nerdvana` |
+| `NERDVANA_CONFIG` | Explicit config file path | `~/.nerdvana/config.yml` |
+
+### Migration
+
+On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessions/` and `~/.config/nerdvana-cli/` into `~/.nerdvana/`. A `.migrated` sentinel prevents reruns.
+
 ## Commands
 
 | Command | Description |
