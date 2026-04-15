@@ -312,7 +312,6 @@ class AgentLoop:
 
         if self._active_skill:
             system_prompt += f"\n\n# Active Skill\n{self._active_skill}"
-            self._active_skill = None
 
         try:
             async for event in self._loop(system_prompt, tools):
@@ -322,6 +321,9 @@ class AgentLoop:
 
     def activate_skill(self, skill_body: str) -> None:
         self._active_skill = skill_body
+
+    def deactivate_skill(self) -> None:
+        self._active_skill = None
 
     def _next_fallback_model(self) -> str | None:
         """Return the next fallback model from the chain, or None if exhausted.
