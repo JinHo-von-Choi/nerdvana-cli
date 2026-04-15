@@ -8,6 +8,7 @@ from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
     SidebarMcpSection,
+    SidebarSkillsSection,
     SidebarToolsSection,
 )
 
@@ -76,3 +77,20 @@ def test_mcp_section_renders_servers_with_status() -> None:
     assert "brave" in text
     for name in ["nerdvana", "context7", "brave"]:
         assert name in text
+
+
+def test_skills_section_collapsed_by_default_shows_count() -> None:
+    section = SidebarSkillsSection()
+    section.set_state(["/debug", "/explain", "/review", "/compress"])
+    text = str(section.render())
+    assert "4" in text
+    assert "/debug" not in text
+
+
+def test_skills_section_expanded_lists_triggers() -> None:
+    section = SidebarSkillsSection()
+    section.set_state(["/debug", "/explain"])
+    section.toggle_expanded()
+    text = str(section.render())
+    assert "/debug" in text
+    assert "/explain" in text

@@ -394,6 +394,9 @@ class NerdvanaApp(App[object]):
         self._refresh_mcp_section()
         self.set_interval(2.0, self._refresh_mcp_section)
 
+        triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
+        sidebar.set_skills(triggers)
+
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
         for skill in self._agent_loop.skill_loader.list_skills():
