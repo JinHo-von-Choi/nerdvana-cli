@@ -34,6 +34,43 @@ def _short_cwd(cwd: str, limit: int = _MAX_CWD_LEN) -> str:
     return f"{prefix}\u2026/{name}"
 
 
+class SidebarContextSection(Widget):
+    """Provider/model label + context-usage progress bar."""
+
+    DEFAULT_CSS = """
+    SidebarContextSection {
+        height: auto;
+        padding: 0 0 1 0;
+        border-top: dashed $accent 30%;
+    }
+    """
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._provider = ""
+        self._model    = ""
+        self._pct      = 0
+
+    def set_state(self, provider: str, model: str, pct: int) -> None:
+        self._provider = provider
+        self._model    = model
+        self._pct      = max(0, min(100, pct))
+        self.refresh()
+
+    def render(self) -> Text:
+        out = Text()
+        out.append("MODEL\n", style="bold")
+        label = f"{self._provider}/{self._model}"
+        out.append(_truncate(label) + "\n", style="cyan")
+        bar_w  = 28
+        filled = int(bar_w * self._pct / 100)
+        color  = "green" if self._pct < 60 else "yellow" if self._pct < 80 else "red"
+        out.append("\u2588" * filled, style=color)
+        out.append("\u2591" * (bar_w - filled), style="dim")
+        out.append(f" {self._pct}%", style=color)
+        return out
+
+
 class SidebarHeaderSection(Widget):
     """Top of sidebar: current session topic + cwd."""
 

@@ -35,3 +35,15 @@ def test_header_section_truncates_long_topic() -> None:
     section.set_state(topic="x" * 80, cwd="/tmp")
     text = str(section.render())
     assert len(max(text.splitlines(), key=len)) <= 33
+
+
+from nerdvana_cli.ui.sidebar_sections import SidebarContextSection
+
+
+def test_context_section_renders_provider_model_pct() -> None:
+    section = SidebarContextSection()
+    section.set_state(provider="anthropic", model="claude-sonnet-4-6", pct=42)
+    text = str(section.render())
+    assert "anthropic" in text
+    assert "claude-sonnet-4-6" in text
+    assert "42" in text
