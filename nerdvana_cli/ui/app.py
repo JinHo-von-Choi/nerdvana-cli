@@ -249,6 +249,8 @@ class NerdvanaApp(App[object]):
     TITLE = "NerdVana CLI"
     CSS_PATH = "styles.tcss"
 
+    _SIDEBAR_BREAKPOINT = 140
+
     DEFAULT_CSS = """
     Screen {
         background: #1a1a2e;
@@ -332,6 +334,7 @@ class NerdvanaApp(App[object]):
         self._is_generating = False
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
+        self._sidebar_user_visible: bool | None = None  # None = follow auto rule
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -398,6 +401,14 @@ class NerdvanaApp(App[object]):
         self.query_one("#user-input", Input).focus()
 
         self._check_update_task = asyncio.create_task(self._check_update())
+
+    def on_resize(self, event: object) -> None:
+        """Apply the 140-col breakpoint unless the user has explicitly toggled."""
+        sidebar = self.query_one("#sidebar", Sidebar)
+        if self._sidebar_user_visible is not None:
+            return
+        auto_show = self.size.width >= self._SIDEBAR_BREAKPOINT
+        sidebar.set_class(not auto_show, "hidden")
 
     async def _check_update(self) -> None:
         from nerdvana_cli import __version__
