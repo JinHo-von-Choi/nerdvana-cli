@@ -157,10 +157,14 @@ class AgentLoop:
         from nerdvana_cli.core.user_hooks import load_user_hooks
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
 
+        from nerdvana_cli.core.context_reminder import ContextReminder
         from nerdvana_cli.core.skills import SkillLoader
+
         self.skill_loader = SkillLoader(project_dir=settings.cwd)
         self.skill_loader.load_all()
         self._active_skill: str | None = None
+        self._reminder = ContextReminder(cwd=settings.cwd or ".", max_recent=5)
+        self._turn = 0
 
         # Load compress-context.skill as compaction prompt
         _compact_skill = self.skill_loader.get_by_name("compress-context")
@@ -252,6 +256,11 @@ class AgentLoop:
             self.settings.model.extended_thinking = True
             yield "[dim cyan][Ultrawork mode: extended thinking ON][/dim cyan]\n"
         # ────────────────────────────────────────────────────────────────
+
+        self._turn += 1
+        reminder_text = self._reminder.build(turn=self._turn)
+        if reminder_text:
+            self.state.messages.append(Message(role=Role.USER, content=reminder_text))
 
         user_msg = Message(role=Role.USER, content=prompt)
         self.state.messages.append(user_msg)
@@ -668,11 +677,30 @@ class AgentLoop:
         for tu, tool in serial_tools:
             result = await self._run_single_tool(tu, tool, context)
             results.append(result)
+            from nerdvana_cli.core.context_reminder import RecentToolResult
+            self._reminder.record_tool(
+                RecentToolResult(
+                    name=tu["name"],
+                    args_summary=str(tu.get("input", ""))[:100],
+                    preview=(result.content or "")[:200],
+                    ok=not result.is_error,
+                )
+            )
 
         if concurrent_tools:
             tasks = [self._run_single_tool(tu, tool, context) for tu, tool in concurrent_tools]
             concurrent_results = await asyncio.gather(*tasks)
             results.extend(concurrent_results)
+            from nerdvana_cli.core.context_reminder import RecentToolResult
+            for (tu, _), result in zip(concurrent_tools, concurrent_results, strict=False):
+                self._reminder.record_tool(
+                    RecentToolResult(
+                        name=tu["name"],
+                        args_summary=str(tu.get("input", ""))[:100],
+                        preview=(result.content or "")[:200],
+                        ok=not result.is_error,
+                    )
+                )
 
         return results
 
