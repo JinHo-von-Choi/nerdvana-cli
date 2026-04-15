@@ -8,7 +8,6 @@ import pytest
 from nerdvana_cli.core import nirnamd, paths, setup, user_hooks
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import SkillLoader
-from nerdvana_cli.mcp.config import load_mcp_config
 
 
 def test_setup_config_path_uses_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
