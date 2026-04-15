@@ -10,7 +10,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Paste
 from textual.widgets import Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
@@ -21,6 +21,7 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
+from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.task_panel import TaskPanel
 
 
@@ -267,6 +268,9 @@ class NerdvanaApp(App[object]):
     Footer > .footer--description {
         color: #94a3b8;
     }
+    #body {
+        height: 1fr;
+    }
     #main-container {
         height: 1fr;
     }
@@ -331,19 +335,20 @@ class NerdvanaApp(App[object]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="main-container"):
-            yield Static(id="logo-banner")
-            with VerticalScroll(id="chat-frame"):
-                yield StreamingOutput(id="streaming-output")
-                yield ToolStatusLine(id="tool-status")
-            yield CommandMenu(id="command-menu")
-            yield ProviderSelector(id="provider-selector")
-            yield ModelSelector(id="model-selector")
-            yield MultilineAwareInput(
-                placeholder="Message...",
-                id="user-input",
-            )
-        yield TaskPanel(task_registry=self._task_registry, id="task-panel")
+        with Horizontal(id="body"):
+            yield Sidebar(id="sidebar")
+            with Vertical(id="main-container"):
+                yield Static(id="logo-banner")
+                with VerticalScroll(id="chat-frame"):
+                    yield StreamingOutput(id="streaming-output")
+                    yield ToolStatusLine(id="tool-status")
+                yield CommandMenu(id="command-menu")
+                yield ProviderSelector(id="provider-selector")
+                yield ModelSelector(id="model-selector")
+                yield MultilineAwareInput(
+                    placeholder="Message...",
+                    id="user-input",
+                )
         yield Static(id="context-bar")
         yield StatusBar(id="status-bar")
         yield Footer()
