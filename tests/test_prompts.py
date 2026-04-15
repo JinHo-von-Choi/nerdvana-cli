@@ -1,5 +1,7 @@
 """Tests for system prompt builder."""
 
+import subprocess
+
 from nerdvana_cli.core.prompts import build_system_prompt
 
 
@@ -47,3 +49,28 @@ class TestSystemPromptBuilder:
         prompt = build_system_prompt(tools=[], parism_active=False, model="deepseek-chat", provider="deepseek", cwd="/tmp")
         assert "deepseek" in prompt
         assert "/tmp" in prompt
+
+
+def test_environment_section_includes_platform_and_git(tmp_path):
+    """Environment block must expose platform info and git state for real repos."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
+    (tmp_path / "a.txt").write_text("hello")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "a.txt"], check=True)
+    subprocess.run(
+        [
+            "git", "-C", str(tmp_path),
+            "-c", "user.email=t@t", "-c", "user.name=t",
+            "commit", "-q", "-m", "init",
+        ],
+        check=True,
+    )
+
+    prompt = build_system_prompt(
+        tools=[], model="claude-sonnet-4-6", provider="anthropic", cwd=str(tmp_path)
+    )
+
+    assert "# Environment" in prompt
+    assert "Platform:" in prompt
+    assert "Is a git repository: true" in prompt
+    assert "Git branch: main" in prompt
+    assert "Recent commits:" in prompt
