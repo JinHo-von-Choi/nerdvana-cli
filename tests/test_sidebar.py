@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarHeaderSection,
     SidebarMcpSection,
     SidebarSkillsSection,
+    SidebarTasksSection,
     SidebarToolsSection,
 )
 
@@ -94,3 +96,16 @@ def test_skills_section_expanded_lists_triggers() -> None:
     text = str(section.render())
     assert "/debug" in text
     assert "/explain" in text
+
+
+def test_tasks_section_shows_running_count_and_rows() -> None:
+    reg = TaskRegistry()
+    task = TaskState(id="t1", description="plan refactor")
+    task.status = TaskStatus.RUNNING
+    reg.register(task)
+    section = SidebarTasksSection(registry=reg)
+    section.refresh_rows()
+    text = str(section.render())
+    assert "TASKS" in text
+    assert "1" in text
+    assert "plan refactor" in text

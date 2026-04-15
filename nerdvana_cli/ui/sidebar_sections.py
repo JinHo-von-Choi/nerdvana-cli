@@ -7,6 +7,9 @@ from typing import Any
 from rich.text import Text
 from textual.widget import Widget
 
+from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.ui.task_panel import render_task_row
+
 _MAX_TOPIC_LEN = 30
 _MAX_CWD_LEN   = 30
 
@@ -213,4 +216,45 @@ class SidebarSkillsSection(_CollapsibleSection):
         if self._expanded:
             for trig in self._skills:
                 out.append(f"\n  {_truncate(trig, 30)}", style="dim")
+        return out
+
+
+class SidebarTasksSection(Widget):
+    """Shows active task list migrated from the bottom TaskPanel."""
+
+    DEFAULT_CSS = """
+    SidebarTasksSection {
+        height: auto;
+        padding: 0 0 1 0;
+        border-top: dashed $accent 30%;
+    }
+    """
+
+    def __init__(self, registry: TaskRegistry | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._registry = registry
+        self._rows: list[str] = []
+
+    def set_registry(self, registry: TaskRegistry) -> None:
+        self._registry = registry
+        self.refresh_rows()
+
+    def refresh_rows(self) -> None:
+        if self._registry is None:
+            self._rows = []
+        else:
+            self._rows = [render_task_row(t) for t in self._registry.all()]
+        self.refresh()
+
+    def render(self) -> Text:
+        out = Text("TASKS ", style="bold")
+        running = 0
+        if self._registry:
+            running = sum(1 for t in self._registry.all() if t.status == TaskStatus.RUNNING)
+        out.append(f"({running} running)\n", style="cyan")
+        if not self._rows:
+            out.append("  (none)", style="dim")
+            return out
+        for row in self._rows:
+            out.append(row + "\n", style="dim")
         return out

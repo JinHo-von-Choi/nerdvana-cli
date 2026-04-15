@@ -21,12 +21,16 @@ def _status_icon(status: TaskStatus) -> str:
     }.get(status, "?")
 
 
-def _render_row(task: TaskState) -> str:
+def render_task_row(task: TaskState) -> str:
+    """Render a single task state as a display row string."""
     icon = _status_icon(task.status)
     name = task.description[:24].ljust(24)
     tool = (task.current_tool or "").ljust(10)
     tok  = str(task.tokens_used) if task.tokens_used else ""
     return f" {icon} {name}  {tool}  {tok} tok"
+
+
+_render_row = render_task_row  # backward-compat alias
 
 
 class TaskPanel(Widget):
