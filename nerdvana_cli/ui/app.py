@@ -390,6 +390,7 @@ class NerdvanaApp(App[object]):
             model=self.settings.model.model,
             pct=0,
         )
+        sidebar.set_tools([t.name for t in registry.all_tools()])
 
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()

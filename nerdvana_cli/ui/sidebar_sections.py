@@ -71,6 +71,62 @@ class SidebarContextSection(Widget):
         return out
 
 
+class _CollapsibleSection(Widget):
+    """Base class: a section with a header line the user can click/toggle to expand."""
+
+    DEFAULT_CSS = """
+    _CollapsibleSection {
+        height: auto;
+        padding: 0 0 1 0;
+        border-top: dashed $accent 30%;
+    }
+    _CollapsibleSection:hover {
+        background: #1e293b;
+    }
+    """
+
+    _label: str = "SECTION"
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._expanded = False
+
+    def toggle_expanded(self) -> None:
+        self._expanded = not self._expanded
+        self.refresh()
+
+    def on_click(self) -> None:
+        self.toggle_expanded()
+
+    def _header_text(self, count: int) -> Text:
+        arrow = "\u25be" if self._expanded else "\u25b8"
+        out = Text()
+        out.append(f"{arrow} {self._label} ", style="bold")
+        out.append(f"({count})", style="cyan")
+        return out
+
+
+class SidebarToolsSection(_CollapsibleSection):
+    """Collapsible tools list showing count when collapsed."""
+
+    _label = "TOOLS"
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._tools: list[str] = []
+
+    def set_state(self, tools: list[str]) -> None:
+        self._tools = list(tools)
+        self.refresh()
+
+    def render(self) -> Text:
+        out = self._header_text(len(self._tools))
+        if self._expanded:
+            for name in self._tools:
+                out.append(f"\n  {_truncate(name, 30)}", style="dim")
+        return out
+
+
 class SidebarHeaderSection(Widget):
     """Top of sidebar: current session topic + cwd."""
 
