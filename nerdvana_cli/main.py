@@ -12,6 +12,7 @@ from rich.prompt import Prompt
 
 from nerdvana_cli import __version__
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.tools.registry import create_tool_registry
@@ -23,6 +24,19 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 console = Console()
+
+
+def _run_migration_once() -> None:
+    """Run one-shot data migration from legacy locations to ~/.nerdvana/.
+
+    Called once on startup, right after settings are loaded. Any failure is
+    caught and logged — never blocks CLI startup.
+    """
+    try:
+        if _migrate_run():
+            console.print("[dim]Migrated user data to ~/.nerdvana/ (one-time)[/dim]")
+    except Exception as e:
+        console.print(f"[yellow]Migration warning: {e}[/yellow]")
 
 
 @app.callback(invoke_without_command=True)
@@ -90,6 +104,7 @@ async def repl_loop(
 ) -> None:
     """Interactive REPL loop."""
     settings = NerdvanaSettings.load(config_path)
+    _run_migration_once()
     settings.cwd = cwd
     settings.verbose = verbose
 
@@ -188,6 +203,7 @@ def run(
 ) -> None:
     """Run a single prompt non-interactively."""
     settings = NerdvanaSettings.load(config or None)
+    _run_migration_once()
     settings.cwd = cwd or os.getcwd()
     settings.verbose = verbose
     if model:
