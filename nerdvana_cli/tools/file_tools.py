@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 from typing import Any
 
 from nerdvana_cli.core.tool import BaseTool, ToolContext
 from nerdvana_cli.types import ToolResult
-from nerdvana_cli.utils.path import validate_path
+from nerdvana_cli.utils.path import safe_makedirs, safe_open_fd, validate_path
+
+
+def _is_symlink_block_error(exc: OSError) -> bool:
+    """Return True when an OSError indicates a blocked symlink traversal."""
+    return exc.errno in (errno.ELOOP, errno.EMLINK)
 
 
 def _hash4(line: str) -> str:
@@ -110,10 +116,23 @@ Examples:
             if not os.path.exists(full_path):
                 return ToolResult(tool_use_id="", content=f"File not found: {args.path}", is_error=True)
             if os.path.isdir(full_path):
+                # Directory listing path: no file open, so O_NOFOLLOW does
+                # not apply. validate_path() above already enforced
+                # containment for the listing case.
                 entries = sorted(os.listdir(full_path))
                 return ToolResult(tool_use_id="", content="Directory listing:\n" + "\n".join(entries))
 
-            with open(full_path, encoding="utf-8", errors="replace") as f:
+            try:
+                fd = safe_open_fd(args.path, context.cwd, os.O_RDONLY)
+            except OSError as exc:
+                if _is_symlink_block_error(exc):
+                    return ToolResult(
+                        tool_use_id="",
+                        content=f"Symbolic link blocked: {args.path}",
+                        is_error=True,
+                    )
+                raise
+            with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
                 if args.offset == 0 and args.limit == 0:
                     content = f.read()
                 else:
@@ -176,12 +195,24 @@ WARNING: This replaces the entire file content."""
             path_error = validate_path(args.path, context.cwd)
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
-            full_path = os.path.join(context.cwd, args.path)
-            parent = os.path.dirname(full_path)
-            if parent:
-                os.makedirs(parent, exist_ok=True)
-
-            with open(full_path, "w", encoding="utf-8") as f:
+            parent_rel = os.path.dirname(args.path)
+            try:
+                if parent_rel:
+                    safe_makedirs(parent_rel, context.cwd)
+                fd = safe_open_fd(
+                    args.path,
+                    context.cwd,
+                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                )
+            except OSError as exc:
+                if _is_symlink_block_error(exc):
+                    return ToolResult(
+                        tool_use_id="",
+                        content=f"Symbolic link blocked: {args.path}",
+                        is_error=True,
+                    )
+                raise
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(args.content)
 
             context.file_state[args.path] = args.content
@@ -272,7 +303,17 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
             if not os.path.exists(full_path):
                 return ToolResult(tool_use_id="", content=f"File not found: {args.path}", is_error=True)
 
-            with open(full_path, encoding="utf-8") as f:
+            try:
+                read_fd = safe_open_fd(args.path, context.cwd, os.O_RDONLY)
+            except OSError as exc:
+                if _is_symlink_block_error(exc):
+                    return ToolResult(
+                        tool_use_id="",
+                        content=f"Symbolic link blocked: {args.path}",
+                        is_error=True,
+                    )
+                raise
+            with os.fdopen(read_fd, encoding="utf-8") as f:
                 content = f.read()
 
             if args.anchor_hash is None and not args.old_string:
@@ -297,7 +338,21 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                     )
                 raw_lines[target_idx] = args.new_string
                 new_content = "".join(raw_lines)
-                with open(full_path, "w", encoding="utf-8") as f:
+                try:
+                    write_fd = safe_open_fd(
+                        args.path,
+                        context.cwd,
+                        os.O_WRONLY | os.O_TRUNC,
+                    )
+                except OSError as exc:
+                    if _is_symlink_block_error(exc):
+                        return ToolResult(
+                            tool_use_id="",
+                            content=f"Symbolic link blocked: {args.path}",
+                            is_error=True,
+                        )
+                    raise
+                with os.fdopen(write_fd, "w", encoding="utf-8") as f:
                     f.write(new_content)
                 context.file_state[args.path] = new_content
                 return ToolResult(
@@ -320,7 +375,21 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 new_content = content.replace(args.old_string, args.new_string, 1)
                 count = 1
 
-            with open(full_path, "w", encoding="utf-8") as f:
+            try:
+                write_fd = safe_open_fd(
+                    args.path,
+                    context.cwd,
+                    os.O_WRONLY | os.O_TRUNC,
+                )
+            except OSError as exc:
+                if _is_symlink_block_error(exc):
+                    return ToolResult(
+                        tool_use_id="",
+                        content=f"Symbolic link blocked: {args.path}",
+                        is_error=True,
+                    )
+                raise
+            with os.fdopen(write_fd, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
             context.file_state[args.path] = new_content
