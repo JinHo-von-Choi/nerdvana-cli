@@ -124,11 +124,14 @@ async def test_simple_text_response():
     assert "".join(chunks) == "Hello world!"
 
     msgs = loop.state.messages
-    assert len(msgs) == 2
+    # reminder (USER) + real user message (USER) + assistant = 3
+    assert len(msgs) == 3
     assert msgs[0].role == Role.USER
-    assert msgs[0].content == "Hi"
-    assert msgs[1].role == Role.ASSISTANT
-    assert msgs[1].content == "Hello world!"
+    assert "<system-reminder>" in msgs[0].content
+    assert msgs[1].role == Role.USER
+    assert msgs[1].content == "Hi"
+    assert msgs[2].role == Role.ASSISTANT
+    assert msgs[2].content == "Hello world!"
 
 
 @pytest.mark.asyncio
@@ -204,22 +207,24 @@ async def test_tool_execution_flow():
         await _collect(loop, "echo hi")
 
     msgs = loop.state.messages
-    # user -> assistant(tool_uses) -> tool -> assistant(end_turn)
-    assert len(msgs) == 4
-
+    # reminder(USER) -> user -> assistant(tool_uses) -> tool -> assistant(end_turn)
+    assert len(msgs) == 5
     assert msgs[0].role == Role.USER
-    assert msgs[0].content == "echo hi"
+    assert "<system-reminder>" in msgs[0].content
 
-    assert msgs[1].role == Role.ASSISTANT
-    assert len(msgs[1].tool_uses) == 1
-    assert msgs[1].tool_uses[0]["name"] == "Bash"
+    assert msgs[1].role == Role.USER
+    assert msgs[1].content == "echo hi"
 
-    assert msgs[2].role == Role.TOOL
-    assert "output of: echo hi" in msgs[2].content
-    assert msgs[2].is_error is False
+    assert msgs[2].role == Role.ASSISTANT
+    assert len(msgs[2].tool_uses) == 1
+    assert msgs[2].tool_uses[0]["name"] == "Bash"
 
-    assert msgs[3].role == Role.ASSISTANT
-    assert msgs[3].content == "Done."
+    assert msgs[3].role == Role.TOOL
+    assert "output of: echo hi" in msgs[3].content
+    assert msgs[3].is_error is False
+
+    assert msgs[4].role == Role.ASSISTANT
+    assert msgs[4].content == "Done."
 
 
 @pytest.mark.asyncio
@@ -255,10 +260,110 @@ async def test_unknown_tool_returns_error():
         await _collect(loop, "use NonExistent")
 
     msgs = loop.state.messages
-    # user -> assistant(tool_uses) -> tool(error) -> assistant(end_turn)
-    assert len(msgs) == 4
+    # reminder(USER) -> user -> assistant(tool_uses) -> tool(error) -> assistant(end_turn)
+    assert len(msgs) == 5
+    assert msgs[0].role == Role.USER
+    assert "<system-reminder>" in msgs[0].content
 
-    tool_msg = msgs[2]
+    tool_msg = msgs[3]
     assert tool_msg.role == Role.TOOL
     assert tool_msg.is_error is True
     assert "Unknown tool" in tool_msg.content
+
+
+@pytest.mark.asyncio
+async def test_sticky_session_context_includes_project_snapshot(tmp_path):
+    """After one run() cycle, _sticky_session_context must contain project snapshot."""
+    import subprocess
+    from pathlib import Path
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "myapp"\nversion = "0.1.0"\n'
+    )
+    (tmp_path / "src").mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
+
+    events = [
+        ProviderEvent(type="content_delta", content="ok"),
+        ProviderEvent(type="done", stop_reason="end_turn"),
+    ]
+    provider = _make_mock_provider([events])
+    settings = _make_settings()
+    settings.cwd = str(tmp_path)
+    registry = _make_registry()
+
+    with (
+        patch.object(AgentLoop, "create_provider_from_settings", return_value=provider),
+        patch.object(AgentLoop, "build_system_prompt", return_value="system"),
+    ):
+        loop = AgentLoop(settings=settings, registry=registry)
+        await _collect(loop, "hello")
+
+    assert "# Project Snapshot" in loop._sticky_session_context
+
+
+@pytest.mark.asyncio
+async def test_reminder_message_injected_on_each_turn():
+    """run() called twice must produce two <system-reminder> USER messages."""
+    events = [
+        ProviderEvent(type="content_delta", content="resp"),
+        ProviderEvent(type="done", stop_reason="end_turn"),
+    ]
+    # Each run() call consumes one event sequence
+    provider = _make_mock_provider([events, events])
+    settings = _make_settings()
+    registry = _make_registry()
+
+    with (
+        patch.object(AgentLoop, "create_provider_from_settings", return_value=provider),
+        patch.object(AgentLoop, "build_system_prompt", return_value="system"),
+    ):
+        loop = AgentLoop(settings=settings, registry=registry)
+        await _collect(loop, "first")
+        await _collect(loop, "second")
+
+    reminder_msgs = [
+        m for m in loop.state.messages
+        if m.role == Role.USER and "<system-reminder>" in m.content
+    ]
+    assert len(reminder_msgs) == 2, (
+        f"Expected 2 reminder messages, got {len(reminder_msgs)}"
+    )
+    # Turn numbers must be sequential
+    assert "turn=1" in reminder_msgs[0].content
+    assert "turn=2" in reminder_msgs[1].content
+
+
+@pytest.mark.asyncio
+async def test_active_skill_persists_across_turns():
+    """activate_skill() body must appear in the system prompt of every subsequent turn."""
+    captured_prompts: list[str] = []
+
+    events = [
+        ProviderEvent(type="content_delta", content="ok"),
+        ProviderEvent(type="done", stop_reason="end_turn"),
+    ]
+    provider = _make_mock_provider([events, events])
+
+    async def _capturing_stream(system_prompt, messages, tools):
+        captured_prompts.append(system_prompt)
+        for evt in events:
+            yield evt
+
+    provider.stream = _capturing_stream
+
+    settings = _make_settings()
+    registry = _make_registry()
+
+    with (
+        patch.object(AgentLoop, "create_provider_from_settings", return_value=provider),
+        patch.object(AgentLoop, "build_system_prompt", return_value="base_system"),
+    ):
+        loop = AgentLoop(settings=settings, registry=registry)
+        loop.activate_skill("DEBUG MODE INSTRUCTIONS")
+        await _collect(loop, "first turn")
+        await _collect(loop, "second turn")
+
+    assert len(captured_prompts) == 2
+    assert "DEBUG MODE INSTRUCTIONS" in captured_prompts[0]
+    assert "DEBUG MODE INSTRUCTIONS" in captured_prompts[1]

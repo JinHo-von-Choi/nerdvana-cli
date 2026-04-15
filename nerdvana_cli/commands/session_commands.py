@@ -14,6 +14,7 @@ async def handle_clear(app: NerdvanaApp, args: str) -> None:
         app._agent_loop.state.messages.clear()
         app._agent_loop.state.turn_count = 1
         app._agent_loop.reset_session()
+        app._agent_loop.deactivate_skill()
     app._clear_chat_messages()
     app._add_chat_message("[dim]Conversation cleared.[/dim]")
 

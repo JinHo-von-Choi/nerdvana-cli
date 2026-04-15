@@ -103,9 +103,10 @@ async def test_c1_unknown_stop_reason_preserves_text():
     assert "".join(chunks) == "Partial answer"
 
     msgs = loop.state.messages
-    assert len(msgs) == 2
-    assert msgs[1].role == Role.ASSISTANT
-    assert msgs[1].content == "Partial answer"
+    # reminder(USER) + real user(USER) + assistant = 3
+    assert len(msgs) == 3
+    assert msgs[-1].role == Role.ASSISTANT
+    assert msgs[-1].content == "Partial answer"
 
 
 @pytest.mark.asyncio
