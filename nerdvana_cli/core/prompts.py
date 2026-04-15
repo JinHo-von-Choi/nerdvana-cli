@@ -219,7 +219,7 @@ def _environment_section(
     parts.append("NIRNA.md files are LOCAL FILES on the filesystem, NOT documents on any MCP server.")
     parts.append("NEVER use list_docs, get_doc, or any MCP document tool to find NIRNA.md.")
     parts.append("Use FileRead tool to read them. Paths:")
-    parts.append("1. ~/.config/nerdvana-cli/NIRNA.md (global)")
+    parts.append("1. ~/.nerdvana/NIRNA.md (global)")
     parts.append("2. <cwd>/NIRNA.md (project)")
     parts.append("3. <cwd>/NIRNA.local.md (local, gitignored)")
     return "\n".join(parts)

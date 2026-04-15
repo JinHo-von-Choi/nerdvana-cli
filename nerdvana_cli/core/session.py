@@ -8,13 +8,15 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from nerdvana_cli.core import paths
+
 
 class SessionStorage:
     """Append-only JSONL session transcript."""
 
     def __init__(self, session_id: str | None = None, storage_dir: str = ""):
         self.session_id = session_id or str(uuid.uuid4())[:8]
-        base_dir = storage_dir or os.path.join(os.path.expanduser("~/.nerdvana-cli/sessions"))
+        base_dir = storage_dir or str(paths.user_sessions_dir())
         os.makedirs(base_dir, exist_ok=True)
         self.file_path = os.path.join(base_dir, f"{self.session_id}.jsonl")
 
@@ -37,10 +39,10 @@ class SessionStorage:
         self.record(
             "tool_result",
             {
-                "tool_name": tool_name,
+                "tool_name":  tool_name,
                 "tool_use_id": tool_use_id,
-                "content": content[:500],
-                "is_error": is_error,
+                "content":    content[:500],
+                "is_error":   is_error,
             },
         )
 
@@ -53,9 +55,9 @@ class SessionStorage:
         self.record(
             "compaction",
             {
-                "tokens_before": tokens_before,
-                "messages_before": messages_before,
-                "strategy": strategy,
+                "tokens_before":    tokens_before,
+                "messages_before":  messages_before,
+                "strategy":         strategy,
             },
         )
 
@@ -75,12 +77,27 @@ class SessionStorage:
 
     @classmethod
     def get_last_session(cls, storage_dir: str = "") -> str | None:
-        base_dir = storage_dir or os.path.join(os.path.expanduser("~/.nerdvana-cli/sessions"))
-        if not os.path.exists(base_dir):
-            return None
-        files = sorted(
-            [f for f in os.listdir(base_dir) if f.endswith(".jsonl")],
-            key=lambda f: os.path.getmtime(os.path.join(base_dir, f)),
-            reverse=True,
-        )
-        return files[0].replace(".jsonl", "") if files else None
+        """Return the session ID of the most recently modified session.
+
+        When called without storage_dir, checks both the canonical new location
+        (~/.nerdvana/sessions/) and the legacy install-dir location
+        (~/.nerdvana-cli/sessions/) so that upgrading users do not lose history.
+        """
+        bases: list[str] = []
+        if storage_dir:
+            bases.append(storage_dir)
+        else:
+            bases.append(str(paths.user_sessions_dir()))
+            bases.append(str(paths.legacy_sessions_dir()))
+
+        best: tuple[float, str] | None = None
+        for base in bases:
+            if not os.path.exists(base):
+                continue
+            for fname in os.listdir(base):
+                if not fname.endswith(".jsonl"):
+                    continue
+                mtime = os.path.getmtime(os.path.join(base, fname))
+                if best is None or mtime > best[0]:
+                    best = (mtime, fname.replace(".jsonl", ""))
+        return best[1] if best else None

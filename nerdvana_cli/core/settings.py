@@ -9,6 +9,8 @@ import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from nerdvana_cli.core import paths as core_paths
+
 
 class ModelConfig(BaseModel):
     provider: str = ""  # empty = auto-detect from model name
@@ -71,7 +73,8 @@ class NerdvanaSettings(BaseSettings):
             os.environ.get("NERDVANA_CONFIG", ""),
             os.path.join(os.getcwd(), "nerdvana.yml"),
             os.path.join(os.getcwd(), "nerdvana.yaml"),
-            os.path.expanduser("~/.config/nerdvana-cli/config.yml"),
+            str(core_paths.user_config_path()),
+            str(core_paths.legacy_config_path()),  # backwards compat
         ]
 
         for path in paths_to_check:
