@@ -10,7 +10,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Paste
 from textual.widgets import Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
@@ -21,7 +21,8 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
-from nerdvana_cli.ui.task_panel import TaskPanel
+from nerdvana_cli.ui.sidebar import Sidebar
+from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
 
 
 class MultilineAwareInput(Input):
@@ -248,6 +249,8 @@ class NerdvanaApp(App[object]):
     TITLE = "NerdVana CLI"
     CSS_PATH = "styles.tcss"
 
+    _SIDEBAR_BREAKPOINT = 140
+
     DEFAULT_CSS = """
     Screen {
         background: #1a1a2e;
@@ -266,6 +269,9 @@ class NerdvanaApp(App[object]):
     }
     Footer > .footer--description {
         color: #94a3b8;
+    }
+    #body {
+        height: 1fr;
     }
     #main-container {
         height: 1fr;
@@ -309,6 +315,7 @@ class NerdvanaApp(App[object]):
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", show=True),
+        Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=True),
         Binding("ctrl+l", "clear_chat", "Clear", show=True),
         Binding("escape", "focus_input", "Input", show=False),
     ]
@@ -328,22 +335,25 @@ class NerdvanaApp(App[object]):
         self._is_generating = False
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
+        self._sidebar_user_visible: bool | None = None  # None = follow auto rule
+        self._session_topic: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="main-container"):
-            yield Static(id="logo-banner")
-            with VerticalScroll(id="chat-frame"):
-                yield StreamingOutput(id="streaming-output")
-                yield ToolStatusLine(id="tool-status")
-            yield CommandMenu(id="command-menu")
-            yield ProviderSelector(id="provider-selector")
-            yield ModelSelector(id="model-selector")
-            yield MultilineAwareInput(
-                placeholder="Message...",
-                id="user-input",
-            )
-        yield TaskPanel(task_registry=self._task_registry, id="task-panel")
+        with Horizontal(id="body"):
+            yield Sidebar(id="sidebar")
+            with Vertical(id="main-container"):
+                yield Static(id="logo-banner")
+                with VerticalScroll(id="chat-frame"):
+                    yield StreamingOutput(id="streaming-output")
+                    yield ToolStatusLine(id="tool-status")
+                yield CommandMenu(id="command-menu")
+                yield ProviderSelector(id="provider-selector")
+                yield ModelSelector(id="model-selector")
+                yield MultilineAwareInput(
+                    placeholder="Message...",
+                    id="user-input",
+                )
         yield Static(id="context-bar")
         yield StatusBar(id="status-bar")
         yield Footer()
@@ -372,6 +382,24 @@ class NerdvanaApp(App[object]):
 
         self._update_banner()
 
+        import os
+        sidebar = self.query_one("#sidebar", Sidebar)
+        sidebar.set_header(topic=self._session_topic, cwd=os.getcwd())
+        sidebar.set_context(
+            provider=self.settings.model.provider,
+            model=self.settings.model.model,
+            pct=0,
+        )
+        sidebar.set_tools([t.name for t in registry.all_tools()])
+        self._refresh_mcp_section()
+        self.set_interval(2.0, self._refresh_mcp_section)
+
+        triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
+        sidebar.set_skills(triggers)
+        sidebar.set_tasks_registry(self._task_registry)
+        self.set_interval(0.5, lambda: self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows())
+        self.set_interval(2.0, lambda: asyncio.create_task(sidebar.refresh_files()))
+
         menu = self.query_one("#command-menu", CommandMenu)
         _seen_triggers: set[str] = set()
         for skill in self._agent_loop.skill_loader.list_skills():
@@ -393,6 +421,26 @@ class NerdvanaApp(App[object]):
         self.query_one("#user-input", Input).focus()
 
         self._check_update_task = asyncio.create_task(self._check_update())
+
+    def _refresh_mcp_section(self) -> None:
+        """Update sidebar MCP section from mcp_manager.get_status()."""
+        if not self.mcp_manager:
+            return
+        status_map = self.mcp_manager.get_status()
+        servers: list[tuple[str, str]] = [
+            (name, "connected" if ok else "error")
+            for name, ok in status_map.items()
+        ]
+        with contextlib.suppress(Exception):
+            self.query_one("#sidebar", Sidebar).set_mcp(servers)
+
+    def on_resize(self, event: object) -> None:
+        """Apply the 140-col breakpoint unless the user has explicitly toggled."""
+        sidebar = self.query_one("#sidebar", Sidebar)
+        if self._sidebar_user_visible is not None:
+            return
+        auto_show = self.size.width >= self._SIDEBAR_BREAKPOINT
+        sidebar.set_class(not auto_show, "hidden")
 
     async def _check_update(self) -> None:
         from nerdvana_cli import __version__
@@ -421,6 +469,14 @@ class NerdvanaApp(App[object]):
             return
 
         input_widget.value = ""
+
+        if not self._session_topic and not user_text.startswith("/"):
+            self._session_topic = user_text
+            import os
+            self.query_one("#sidebar", Sidebar).set_header(
+                topic=self._session_topic,
+                cwd=os.getcwd(),
+            )
 
         # API key input mode
         if self._pending_provider:
@@ -600,6 +656,12 @@ class NerdvanaApp(App[object]):
         filled  = int(bar_w * pct / 100)
         bar_str = "\u2588" * filled + "\u2591" * (bar_w - filled)
         bar.update(Text.from_markup(f"[{color}]ctx [{bar_str}] {pct}%[/{color}]"))
+        with contextlib.suppress(Exception):
+            self.query_one("#sidebar", Sidebar).set_context(
+                provider=self.settings.model.provider,
+                model=self.settings.model.model,
+                pct=pct,
+            )
 
     def _update_banner(self) -> None:
         """Update the logo banner with current provider/model info."""
@@ -744,3 +806,10 @@ class NerdvanaApp(App[object]):
     def action_focus_input(self) -> None:
         """Focus input widget (Escape)."""
         self.query_one("#user-input", Input).focus()
+
+    def action_toggle_sidebar(self) -> None:
+        """Toggle sidebar visibility. Sets a user-override that suppresses on_resize."""
+        sidebar = self.query_one("#sidebar", Sidebar)
+        currently_hidden = "hidden" in sidebar.classes
+        self._sidebar_user_visible = currently_hidden
+        sidebar.set_class(not currently_hidden, "hidden")
