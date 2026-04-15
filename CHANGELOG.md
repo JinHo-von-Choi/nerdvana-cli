@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-16
+
+A single-day release that lands four major workstreams on top of 0.3.0:
+security hardening, install-layout separation, a responsive opencode-style
+sidebar, and a context-injection overhaul. Test count grows from 316 to 463
+(+147 net new tests).
+
+### Added
+
+#### Security hardening (316 → 399 tests)
+
+- `bash_tool` denylist extended to block interpreter `-c`/`-e`/`-r`
+  execution (`python`, `perl`, `ruby`, `node`, `php`), download-then-exec
+  chains (`curl`/`wget` followed by `bash`/`source`/`.`), `rm -rf $HOME`
+  / `$PWD` / `$OLDPWD` in every flag permutation, `tee` to block devices,
+  `find -delete`, and `find -exec rm`.
+- `mcp/client.py` enforces explicit `verify=True` on the HTTP transport,
+  caps HTTP/SSE response bodies and stdio lines at 10 MB, and warns on
+  `http://` transports to non-loopback hosts.
+- `file_tools` routes every `FileRead`/`FileWrite`/`FileEdit` open
+  through a new `safe_open_fd` / `safe_makedirs` pair in
+  `utils/path.py` that passes `O_NOFOLLOW` on every path segment,
+  closing the pre-validation→open TOCTOU window.
+- New cross-tool `tests/test_security_integration.py` suite exercising
+  bash-created symlinks, disguised compound commands, and MCP response
+  path injection.
+
+#### Install layout hardening (399 → 428 tests)
+
+- New `nerdvana_cli/core/paths.py` is the single source of truth for
+  every runtime path. `NERDVANA_DATA_HOME` (default `~/.nerdvana`) is
+  now distinct from `NERDVANA_HOME` (install root).
+- `core/session.py` writes session JSONL files to `~/.nerdvana/sessions/`
+  instead of `~/.nerdvana-cli/sessions/`, which previously corrupted
+  `git pull --ff-only` in the install directory.
+- New `nerdvana_cli/core/migrate.py` runs once on startup, MOVES legacy
+  sessions out of the install dir, and COPIES legacy
+  `~/.config/nerdvana-cli/{config.yml, NIRNA.md, mcp.json, skills/,
+  hooks/, agents/}` into `~/.nerdvana/`. A `.migrated` sentinel prevents
+  reruns.
+- `core/settings.py`, `core/setup.py`, `core/user_hooks.py`,
+  `core/skills.py`, `core/nirnamd.py`, `core/team.py`, and
+  `mcp/config.py` now all resolve paths through `core/paths.py`.
+- README, README.ko, and `install.sh` document the new layout and the
+  `NERDVANA_DATA_HOME` / `NERDVANA_HOME` split.
+
+#### Responsive sidebar (428 → 452 tests)
+
+- New `nerdvana_cli/ui/sidebar.py` and `ui/sidebar_sections.py` add an
+  opencode-style left sidebar with an auto-show breakpoint at 140 cols,
+  35 cols fixed width, and `Ctrl+B` manual toggle with user-override
+  semantics.
+- Seven section widgets: session-topic+cwd header, provider/model +
+  context-usage bar, collapsible Tools, MCP servers with connection
+  status, collapsible Skills with count, migrated TaskPanel, and
+  `CHANGES` powered by `git status --porcelain` polled every 2 s via
+  `ui/git_status.py`.
+- `ui/app.py` wraps the chat stack in `Horizontal`, captures session
+  topic on first user prompt, and dispatches per-section refresh ticks.
+
+#### Context injection overhaul (452 → 463 tests)
+
+- `_environment_section` in `core/prompts.py` now emits platform, OS
+  version, shell, `Is a git repository`, git branch, main branch, git
+  status, and the last five commits. Git lookups use a 2 s subprocess
+  timeout and fail silently.
+- New `core/context_snapshot.py` runs once per session and collects
+  project type (python/node/rust/go), project name, top-level
+  directory tree, README headings, and entry points. Output is
+  formatted into a `# Project Snapshot` block and appended to the
+  sticky session context.
+- New `core/context_reminder.py` owns a bounded ring buffer of the last
+  five `RecentToolResult`s and builds a `<system-reminder>` block
+  containing `turn=N`, `cwd`, and per-tool `name(args) [ok|err] preview`.
+- `core/agent_loop.AgentLoop.run` injects the reminder as a synthetic
+  user message before the real user prompt on every turn and records
+  every `_execute_tools` outcome into the ring buffer.
+- `activate_skill` / `deactivate_skill` split — the active skill body
+  now persists across turns until `/clear` explicitly resets it (was
+  previously cleared after one turn).
+
+### Fixed
+
+- `/model <id>` no longer re-detects the provider from the model name
+  and no longer clobbers `base_url`. Selecting an Ollama Cloud model
+  like `gemma4:31b-cloud` after `/provider ollama` used to silently
+  fall back to Anthropic while keeping the Ollama `base_url`, routing
+  Anthropic SDK traffic at Ollama's local HTTP server and returning
+  `404 page not found`.
+- `detect_provider` now recognises distinctively-Ollama naming (`:` tag
+  suffix, `-cloud` suffix) before falling through to the Anthropic
+  default.
+- `/model <id>` selection is persisted to `~/.nerdvana/config.yml` so
+  it survives a CLI restart. Unrelated keys (`api_key`, `session.*`)
+  are preserved.
+- Collapsible sidebar sections (Tools, MCP, Skills) now re-layout on
+  toggle. Previously `self.refresh()` kept the cached `height: auto`
+  measurement, so the arrow glyph flipped but the body stayed hidden.
+  Fixed by passing `layout=True` to `refresh()`.
+
+### Changed
+
+- Baseline test count: 316 → 463 (+147).
+- mypy strict still clean (pre-existing `types-pyperclip` stub
+  warning unchanged).
+- `ruff check nerdvana_cli/ ...` remains clean on every touched source
+  file. Pre-existing `tests/` lint drift (52 rules across ~52 files)
+  is tracked separately.
+
 ## [0.3.0] - 2026-04-10
 
 This release lands three major workstreams (Phase A, Phase B, Phase C) on top of
@@ -87,5 +196,6 @@ the initial agent swarm foundation. Test coverage grows from 212 to 272 tests
   `self.create_provider_from_settings()` helper instead of the incorrect
   `create_provider(self.settings)` signature from the original plan.
 
-[Unreleased]: https://github.com/nirna/nerdvana-cli/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/nirna/nerdvana-cli/releases/tag/v0.3.0
+[Unreleased]: https://github.com/JinHo-von-Choi/nerdvana-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JinHo-von-Choi/nerdvana-cli/releases/tag/v0.4.0
+[0.3.0]: https://github.com/JinHo-von-Choi/nerdvana-cli/releases/tag/v0.3.0
