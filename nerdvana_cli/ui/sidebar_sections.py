@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from rich.text import Text
 from textual.widget import Widget
-
 
 _MAX_TOPIC_LEN = 30
 _MAX_CWD_LEN   = 30
@@ -45,7 +45,7 @@ class SidebarContextSection(Widget):
     }
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._provider = ""
         self._model    = ""
@@ -87,7 +87,7 @@ class _CollapsibleSection(Widget):
 
     _label: str = "SECTION"
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._expanded = False
 
@@ -111,7 +111,7 @@ class SidebarToolsSection(_CollapsibleSection):
 
     _label = "TOOLS"
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._tools: list[str] = []
 
@@ -137,7 +137,7 @@ class SidebarHeaderSection(Widget):
     }
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._topic: str = "(new session)"
         self._cwd: str = str(Path.cwd())
