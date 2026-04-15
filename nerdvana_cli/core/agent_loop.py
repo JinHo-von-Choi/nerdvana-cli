@@ -153,7 +153,7 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_API_CALL, ralph_loop_check)
         self.hooks.register(HookEvent.AFTER_TOOL, json_parse_recovery)
 
-        # Load user-defined hooks (~/.config/nerdvana-cli/hooks/, .nerdvana/hooks/)
+        # Load user-defined hooks (~/.nerdvana/hooks/, .nerdvana/hooks/)
         from nerdvana_cli.core.user_hooks import load_user_hooks
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
 

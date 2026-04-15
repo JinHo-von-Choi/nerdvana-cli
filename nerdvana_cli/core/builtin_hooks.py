@@ -15,7 +15,7 @@ def session_start_context_injection(ctx: HookContext) -> HookResult:
     loaded by build_system_prompt directly and is NOT duplicated here.
 
     User-specific instructions (memory systems, project conventions, etc.)
-    must be added via user hooks under ~/.config/nerdvana-cli/hooks/ or
+    must be added via user hooks under ~/.nerdvana/hooks/ or
     <cwd>/.nerdvana/hooks/. See docs/hooks.md.
     """
     parts: list[str] = []
