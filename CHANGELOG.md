@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-04-16
+
+### Added
+
+- Setup wizard now asks for Ollama mode (local vs cloud) when Ollama is
+  selected. Local keeps the default `http://localhost:11434/v1` endpoint
+  with no API key; cloud routes to `https://ollama.com/v1` with
+  `OLLAMA_API_KEY` and defaults the model to `gpt-oss:120b`.
+
 ## [0.4.0] - 2026-04-16
 
 A single-day release that lands four major workstreams on top of 0.3.0:
