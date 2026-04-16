@@ -114,13 +114,32 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
 
     provider_name, provider_label, default_model, key_env = providers_display[int(choice) - 1]
 
+    # Ollama sub-mode: local vs cloud
+    ollama_mode = ""
+    base_url_override = ""
+    if provider_name == "ollama":
+        console.print()
+        console.print("[dim]Ollama runs locally (http://localhost:11434) or via Ollama Cloud (https://ollama.com).[/dim]")
+        ollama_mode = Prompt.ask(
+            "Ollama mode",
+            choices=["local", "cloud"],
+            default="local",
+        )
+        if ollama_mode == "cloud":
+            provider_label = "Ollama (Cloud)"
+            key_env = "OLLAMA_API_KEY"
+            default_model = "gpt-oss:120b"
+            base_url_override = "https://ollama.com/v1"
+
     # Step 2: API key
     console.print()
     console.print(f"[bold]Step 2: API Key for {provider_label}[/bold]")
 
     api_key = ""
 
-    if provider_name in ("ollama", "vllm"):
+    local_no_key = provider_name == "vllm" or (provider_name == "ollama" and ollama_mode != "cloud")
+
+    if local_no_key:
         console.print(f"[dim]{provider_label} runs locally — no API key required.[/dim]")
     else:
         # Check if key already exists in env
@@ -163,7 +182,7 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
             "provider": provider_name,
             "model": model,
             "api_key": api_key,
-            "base_url": "",
+            "base_url": base_url_override,
             "max_tokens": max_tokens,
             "temperature": 1.0,
         },
