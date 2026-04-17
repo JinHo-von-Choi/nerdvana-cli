@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/providers-13-green?style=flat-square" alt="Providers">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/version-0.3.0-orange?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.4.1-orange?style=flat-square" alt="Version">
   <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
 </p>
 
