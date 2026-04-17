@@ -1,0 +1,26 @@
+[
+  {
+    "role": "user",
+    "content": "[CONTEXT SUMMARY]\n\nCompacted conversation summary."
+  },
+  {
+    "role": "user",
+    "content": "User message 4 User message 4 User message 4 User message 4 User message 4 User message 4 User message 4 User message 4 User message 4 User message 4 "
+  },
+  {
+    "role": "assistant",
+    "content": "Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 Assistant reply 4 "
+  },
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "Trigger compaction now."
+  },
+  {
+    "role": "assistant",
+    "content": "Response after compaction."
+  }
+]

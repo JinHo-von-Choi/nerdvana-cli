@@ -1,0 +1,32 @@
+[
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "Read the README file."
+  },
+  {
+    "role": "assistant",
+    "content": "[tool execution]",
+    "tool_uses": [
+      {
+        "id": "<TOOL_ID>",
+        "name": "FileRead",
+        "input": {
+          "path": "README.md"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "[File: README.md] (2 lines)\n1:d4ad    # Test Project\n2:a8a2    This is a test.",
+    "tool_use_id": "<TOOL_ID>"
+  },
+  {
+    "role": "assistant",
+    "content": "I have read the file."
+  }
+]

@@ -1,0 +1,69 @@
+[
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "Glob py files, read README, then grep for functions."
+  },
+  {
+    "role": "assistant",
+    "content": "[tool execution]",
+    "tool_uses": [
+      {
+        "id": "<TOOL_ID>",
+        "name": "Glob",
+        "input": {
+          "pattern": "*.py"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "Found 1 file(s):\nmain.py",
+    "tool_use_id": "<TOOL_ID>"
+  },
+  {
+    "role": "assistant",
+    "content": "[tool execution]",
+    "tool_uses": [
+      {
+        "id": "<TOOL_ID>",
+        "name": "FileRead",
+        "input": {
+          "path": "README.md"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "[File: README.md] (2 lines)\n1:aef2    # Project\n2:03bf    def my_function(): pass",
+    "tool_use_id": "<TOOL_ID>"
+  },
+  {
+    "role": "assistant",
+    "content": "[tool execution]",
+    "tool_uses": [
+      {
+        "id": "<TOOL_ID>",
+        "name": "Grep",
+        "input": {
+          "pattern": "def ",
+          "include": "*.py"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "Found 1 match(es) in 1 file(s):\nmain.py:1: def main():",
+    "tool_use_id": "<TOOL_ID>"
+  },
+  {
+    "role": "assistant",
+    "content": "Tool chain complete: Glob, FileRead, Grep executed."
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "Stream me 5 chunks."
+  },
+  {
+    "role": "assistant",
+    "content": "Chunk one. Chunk two. Chunk three. Chunk four. Chunk five."
+  }
+]
