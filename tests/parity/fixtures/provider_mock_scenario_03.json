@@ -1,0 +1,23 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "tool_use_start"},
+        {"type": "tool_use_delta", "tool_input_delta": "{\"path\": \"README.md\"}"},
+        {
+          "type": "tool_use_complete",
+          "tool_use_id": "tool_01",
+          "tool_name": "FileRead",
+          "tool_input_complete": {"path": "README.md"}
+        },
+        {"type": "done", "stop_reason": "tool_use"}
+      ]
+    },
+    {
+      "events": [
+        {"type": "content_delta", "content": "I have read the file."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}

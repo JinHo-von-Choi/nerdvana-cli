@@ -1,0 +1,15 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "Response after compaction."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ],
+  "send_responses": [
+    {
+      "content": "<summary>Compacted conversation summary.</summary>"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "Chunk one. "},
+        {"type": "content_delta", "content": "Chunk two. "},
+        {"type": "content_delta", "content": "Chunk three. "},
+        {"type": "content_delta", "content": "Chunk four. "},
+        {"type": "content_delta", "content": "Chunk five."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}
