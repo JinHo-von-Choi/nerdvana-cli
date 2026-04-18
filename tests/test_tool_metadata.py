@@ -122,16 +122,24 @@ def test_filter_read_only_matches_is_read_only_property() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 4: filter(tags_all={"lsp","symbol"}) returns exactly 2 tools
+# Test 4: filter(tags_all={"lsp","symbol"}) returns the three symbol-aware
+# LSP tools (goto_definition, find_references, and rename).
 # ---------------------------------------------------------------------------
 
 
-def test_filter_tags_all_lsp_symbol_returns_two_tools() -> None:
-    """Only lsp_goto_definition and lsp_find_references carry both lsp+symbol tags."""
+def test_filter_tags_all_lsp_symbol_returns_symbol_tools() -> None:
+    """lsp_goto_definition, lsp_find_references, and lsp_rename carry lsp+symbol tags.
+
+    lsp_rename gained the ``symbol`` tag in the T-debt-lsp-rename-symbol-tag
+    cleanup: it is a symbol-level refactoring tool and should surface in the
+    same filter as its read-only siblings. Phase F profiles still distinguish
+    read vs write via ``category``/``requires_confirmation``, so this does not
+    weaken any safety gate.
+    """
     registry = _make_lsp_registry()
     result   = registry.filter(tags_all={"lsp", "symbol"})
     names    = {t.name for t in result}
-    assert names == {"lsp_goto_definition", "lsp_find_references"}, (
+    assert names == {"lsp_goto_definition", "lsp_find_references", "lsp_rename"}, (
         f"Unexpected result: {names}"
     )
 
