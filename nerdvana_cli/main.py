@@ -24,7 +24,8 @@ app = typer.Typer(
     add_completion=False,
     rich_markup_mode="rich",
 )
-console = Console()
+console        = Console()
+console_stderr = Console(stderr=True)
 
 
 def _run_migration_once() -> None:
@@ -365,17 +366,15 @@ def serve(
     )
 
     if transport == "http":
-        console.print(
+        console_stderr.print(
             f"[bold]NerdVana MCP server[/bold] listening on "
             f"http://{host}:{port}/mcp  "
             f"[{'write' if allow_write else 'read-only'}]",
-            file=sys.stderr,
         )
     else:
-        console.print(
+        console_stderr.print(
             f"[bold]NerdVana MCP server[/bold] running on stdio  "
             f"[{'write' if allow_write else 'read-only'}]",
-            file=sys.stderr,
         )
 
     asyncio.run(server.run())

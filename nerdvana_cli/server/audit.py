@@ -104,15 +104,20 @@ class AuditLogger:
     # ------------------------------------------------------------------
 
     def open(self) -> None:
-        """Open (or create) the database and apply schema + WAL mode."""
+        """Open (or create) the database with 0600 permissions and apply schema + WAL mode.
+
+        The file is created with O_CREAT|O_EXCL under a restrictive umask so that
+        no race window exists between creation and chmod.  When the file already
+        exists (subsequent opens) we re-apply chmod defensively to correct any
+        external permission change.
+        """
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_db_file_permissions(self._db_path)
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.executescript(_DDL)
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.commit()
-        # Restrict file to owner-read-write only (0600)
-        os.chmod(self._db_path, 0o600)
 
     def close(self) -> None:
         """Close the database connection."""
@@ -254,3 +259,18 @@ def _hash_args(args: dict[str, Any]) -> str:
     """Return SHA-256 hex digest of the canonical JSON serialisation of *args*."""
     canonical = json.dumps(args, sort_keys=True, ensure_ascii=True)
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _ensure_db_file_permissions(db_path: Path) -> None:
+    """Create *db_path* with 0600 permissions atomically, or enforce them if it already exists.
+
+    Uses ``os.open`` with ``O_CREAT|O_EXCL`` so the file is never visible to
+    other users even briefly.  When the file already exists the ``O_EXCL`` open
+    fails silently and ``os.chmod`` is applied as a correction pass.
+    """
+    try:
+        fd = os.open(str(db_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+    except FileExistsError:
+        # File already exists — re-apply permissions defensively.
+        os.chmod(db_path, 0o600)
