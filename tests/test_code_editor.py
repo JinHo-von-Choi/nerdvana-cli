@@ -205,6 +205,219 @@ class TestCodeEditorLRU:
 
 
 # ---------------------------------------------------------------------------
+# Test: prepare_insert_before
+# ---------------------------------------------------------------------------
+
+
+class TestCodeEditorInsertBefore:
+    def test_insert_before_preview_returned(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ib.py"
+        _write(target, "def foo():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, diff = editor.prepare_insert_before(
+            name_path      = "foo",
+            relative_path  = "ib.py",
+            body           = "# inserted before foo\n",
+            abs_path       = str(target),
+            start_line     = 0,
+            original_lines = original_lines,
+        )
+
+        assert len(pid) == 12
+        assert "inserted before foo" in diff
+        assert editor.pending_count() == 1
+
+    def test_insert_before_apply_writes_file(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ib_apply.py"
+        _write(target, "def bar():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_insert_before(
+            name_path      = "bar",
+            relative_path  = "ib_apply.py",
+            body           = "X = 1\n",
+            abs_path       = str(target),
+            start_line     = 0,
+            original_lines = original_lines,
+        )
+        result = editor.apply(pid)
+        assert result["status"] == "applied"
+        content = target.read_text(encoding="utf-8")
+        assert content.startswith("X = 1\n")
+        assert "def bar" in content
+
+    def test_insert_before_kind_stored(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ib_kind.py"
+        _write(target, "pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_insert_before(
+            name_path      = "x",
+            relative_path  = "ib_kind.py",
+            body           = "# before\n",
+            abs_path       = str(target),
+            start_line     = 0,
+            original_lines = original_lines,
+        )
+        entry = editor.get(pid)
+        assert entry is not None
+        assert entry.kind == "insert_before"
+
+
+# ---------------------------------------------------------------------------
+# Test: prepare_insert_after
+# ---------------------------------------------------------------------------
+
+
+class TestCodeEditorInsertAfter:
+    def test_insert_after_preview_returned(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ia.py"
+        _write(target, "def foo():\n    pass\n\ndef bar():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, diff = editor.prepare_insert_after(
+            name_path      = "foo",
+            relative_path  = "ia.py",
+            body           = "# inserted after foo\n",
+            abs_path       = str(target),
+            end_line       = 2,   # line index of blank line after def foo block
+            original_lines = original_lines,
+        )
+
+        assert len(pid) == 12
+        assert "inserted after foo" in diff
+        assert editor.pending_count() == 1
+
+    def test_insert_after_apply_writes_file(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ia_apply.py"
+        _write(target, "def foo():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_insert_after(
+            name_path      = "foo",
+            relative_path  = "ia_apply.py",
+            body           = "def bar(): pass\n",
+            abs_path       = str(target),
+            end_line       = 2,   # end of file
+            original_lines = original_lines,
+        )
+        result = editor.apply(pid)
+        assert result["status"] == "applied"
+        content = target.read_text(encoding="utf-8")
+        assert "def foo" in content
+        assert "def bar" in content
+
+    def test_insert_after_kind_stored(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "ia_kind.py"
+        _write(target, "pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_insert_after(
+            name_path      = "x",
+            relative_path  = "ia_kind.py",
+            body           = "# after\n",
+            abs_path       = str(target),
+            end_line       = 1,
+            original_lines = original_lines,
+        )
+        entry = editor.get(pid)
+        assert entry is not None
+        assert entry.kind == "insert_after"
+
+
+# ---------------------------------------------------------------------------
+# Test: prepare_safe_delete
+# ---------------------------------------------------------------------------
+
+
+class TestCodeEditorSafeDelete:
+    def test_safe_delete_preview_returned(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "sd.py"
+        _write(target, "def dead():\n    pass\n\ndef live():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, diff = editor.prepare_safe_delete(
+            name_path      = "dead",
+            relative_path  = "sd.py",
+            abs_path       = str(target),
+            start_line     = 0,
+            end_line       = 2,
+            original_lines = original_lines,
+        )
+
+        assert len(pid) == 12
+        assert "dead" in diff
+        assert editor.pending_count() == 1
+
+    def test_safe_delete_apply_removes_lines(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "sd_apply.py"
+        _write(target, "def dead():\n    pass\n\ndef live():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_safe_delete(
+            name_path      = "dead",
+            relative_path  = "sd_apply.py",
+            abs_path       = str(target),
+            start_line     = 0,
+            end_line       = 2,
+            original_lines = original_lines,
+        )
+        result = editor.apply(pid)
+        assert result["status"] == "applied"
+        content = target.read_text(encoding="utf-8")
+        assert "def dead" not in content
+        assert "def live" in content
+
+    def test_safe_delete_kind_stored(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "sd_kind.py"
+        _write(target, "x = 1\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_safe_delete(
+            name_path      = "x",
+            relative_path  = "sd_kind.py",
+            abs_path       = str(target),
+            start_line     = 0,
+            end_line       = 1,
+            original_lines = original_lines,
+        )
+        entry = editor.get(pid)
+        assert entry is not None
+        assert entry.kind == "delete"
+
+    def test_safe_delete_stale_detection(self, tmp_path: Path) -> None:
+        editor = _make_editor(tmp_path)
+        target = tmp_path / "sd_stale.py"
+        _write(target, "def dead():\n    pass\n")
+        original_lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+
+        pid, _ = editor.prepare_safe_delete(
+            name_path      = "dead",
+            relative_path  = "sd_stale.py",
+            abs_path       = str(target),
+            start_line     = 0,
+            end_line       = 2,
+            original_lines = original_lines,
+        )
+        # mutate the file after preview
+        _write(target, "def dead():\n    return 99\n")
+
+        with pytest.raises(StalePreviewError) as exc_info:
+            editor.apply(pid)
+        assert str(target) in exc_info.value.changed_paths
+
+
+# ---------------------------------------------------------------------------
 # Misc: _sha256 helper
 # ---------------------------------------------------------------------------
 
