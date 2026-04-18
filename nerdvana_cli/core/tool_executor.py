@@ -176,9 +176,9 @@ class ToolExecutor:
                 self._checkpoint_manager.before_edit(tool_use["name"])
 
         import time
-        from datetime import datetime, timezone
+        from datetime import UTC, datetime
 
-        start_ts  = datetime.now(timezone.utc).isoformat()
+        start_ts  = datetime.now(UTC).isoformat()
         t0        = time.perf_counter()
         exc_class: str | None = None
         success   = True
