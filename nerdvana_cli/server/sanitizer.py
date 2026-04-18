@@ -226,8 +226,10 @@ class SanitizerAudit:
     # ------------------------------------------------------------------
 
     def open(self) -> None:
-        """Open the database and ensure the ``sanitizer_events`` table exists."""
+        """Open the database with 0600 permissions and ensure the sanitizer_events table exists."""
+        from nerdvana_cli.server.audit import _ensure_db_file_permissions
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_db_file_permissions(self._db_path)
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.executescript(_DDL_SANITIZER_EVENTS)
         self._conn.commit()
