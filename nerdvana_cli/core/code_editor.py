@@ -212,6 +212,163 @@ class CodeEditor:
 
         return {"status": "applied", "changed_files": result.get("changed_files", [])}
 
+    # -- new Phase D.1 prepare methods --
+
+    def prepare_insert_before(
+        self,
+        name_path:     str,
+        relative_path: str,
+        body:          str,
+        abs_path:      str,
+        start_line:    int,     # 0-based line of the symbol definition
+        original_lines: list[str],
+    ) -> tuple[str, str]:
+        """Build insert-before preview: insert *body* immediately before *start_line*.
+
+        Parameters
+        ----------
+        name_path, relative_path:
+            Used only for diff labelling (not for file I/O here).
+        body:
+            Text to insert.  A trailing newline is added if absent.
+        abs_path:
+            Absolute path to the target file.
+        start_line:
+            0-based line index of the symbol definition line.
+        original_lines:
+            Current file lines (with line endings).
+
+        Returns
+        -------
+        (preview_id, diff_text)
+        """
+        insert_lines = body.splitlines(keepends=True)
+        if insert_lines and not insert_lines[-1].endswith("\n"):
+            insert_lines[-1] += "\n"
+
+        uri = _path_to_uri(abs_path)
+        workspace_edit: dict[str, Any] = {
+            "documentChanges": [
+                {
+                    "textDocument": {"uri": uri, "version": None},
+                    "edits": [
+                        {
+                            "range": {
+                                "start": {"line": start_line, "character": 0},
+                                "end":   {"line": start_line, "character": 0},
+                            },
+                            "newText": "".join(insert_lines),
+                        }
+                    ],
+                }
+            ]
+        }
+
+        proposed = list(original_lines)
+        proposed[start_line:start_line] = insert_lines
+        new_content = "".join(proposed)
+
+        return self.create_preview(
+            kind           = "insert_before",
+            workspace_edit = workspace_edit,
+            new_contents   = {abs_path: new_content},
+        )
+
+    def prepare_insert_after(
+        self,
+        name_path:     str,
+        relative_path: str,
+        body:          str,
+        abs_path:      str,
+        end_line:      int,     # 0-based exclusive end line of the symbol body
+        original_lines: list[str],
+    ) -> tuple[str, str]:
+        """Build insert-after preview: insert *body* immediately after the symbol body.
+
+        Parameters
+        ----------
+        end_line:
+            0-based exclusive end index (i.e. the first line that is *not* part
+            of the symbol).  Insertion happens at this position.
+        """
+        insert_lines = body.splitlines(keepends=True)
+        if insert_lines and not insert_lines[-1].endswith("\n"):
+            insert_lines[-1] += "\n"
+
+        uri = _path_to_uri(abs_path)
+        workspace_edit: dict[str, Any] = {
+            "documentChanges": [
+                {
+                    "textDocument": {"uri": uri, "version": None},
+                    "edits": [
+                        {
+                            "range": {
+                                "start": {"line": end_line, "character": 0},
+                                "end":   {"line": end_line, "character": 0},
+                            },
+                            "newText": "".join(insert_lines),
+                        }
+                    ],
+                }
+            ]
+        }
+
+        proposed = list(original_lines)
+        proposed[end_line:end_line] = insert_lines
+        new_content = "".join(proposed)
+
+        return self.create_preview(
+            kind           = "insert_after",
+            workspace_edit = workspace_edit,
+            new_contents   = {abs_path: new_content},
+        )
+
+    def prepare_safe_delete(
+        self,
+        name_path:     str,
+        relative_path: str,
+        abs_path:      str,
+        start_line:    int,     # 0-based inclusive start of the symbol
+        end_line:      int,     # 0-based exclusive end of the symbol body
+        original_lines: list[str],
+    ) -> tuple[str, str]:
+        """Build delete preview: remove lines [start_line, end_line).
+
+        The caller is responsible for verifying that no references exist before
+        calling this method (safe-delete gate).
+
+        Returns
+        -------
+        (preview_id, diff_text)
+        """
+        uri = _path_to_uri(abs_path)
+        workspace_edit: dict[str, Any] = {
+            "documentChanges": [
+                {
+                    "textDocument": {"uri": uri, "version": None},
+                    "edits": [
+                        {
+                            "range": {
+                                "start": {"line": start_line, "character": 0},
+                                "end":   {"line": end_line,   "character": 0},
+                            },
+                            "newText": "",
+                        }
+                    ],
+                }
+            ]
+        }
+
+        proposed = list(original_lines)
+        del proposed[start_line:end_line]
+        new_content = "".join(proposed)
+
+        return self.create_preview(
+            kind           = "delete",
+            workspace_edit = workspace_edit,
+            new_contents   = {abs_path: new_content},
+        )
+
     def get(self, preview_id: str) -> PreviewEntry | None:
         """Return a preview entry and touch it (LRU refresh)."""
         entry = self._store.get(preview_id)
@@ -275,3 +432,8 @@ def _rel_path(abs_path: str, project_root: str) -> str:
         return os.path.relpath(abs_path, project_root)
     except ValueError:
         return Path(abs_path).name
+
+
+def _path_to_uri(abs_path: str) -> str:
+    """Convert an absolute filesystem path to a ``file://`` URI."""
+    return Path(abs_path).resolve().as_uri()
