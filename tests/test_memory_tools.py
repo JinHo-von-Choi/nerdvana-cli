@@ -32,6 +32,17 @@ from nerdvana_cli.tools.memory_tools import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _isolate_global_memories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Keep the user's real ~/.nerdvana/memories/global/ out of every test."""
+    fake_global = tmp_path / "_global_memories"
+    fake_global.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        lambda: fake_global,
+    )
+
+
 def _ctx(tmp_path: Path) -> ToolContext:
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)

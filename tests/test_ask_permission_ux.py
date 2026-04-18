@@ -166,7 +166,7 @@ async def test_run_batch_ask_non_tty_returns_error() -> None:
     state     = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     with patch.object(sys.stdin, "isatty", return_value=False):
-        results = await executor.run_batch([fake_call], state=state, context=context)
+        results = await executor.run_batch([fake_call], context=context)
 
     assert results[0].is_error is True
     assert "denied" in results[0].content.lower()
@@ -205,7 +205,7 @@ async def test_run_batch_ask_tty_yes_proceeds() -> None:
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", return_value="y"),
     ):
-        results = await executor.run_batch([fake_call], state=state, context=context)
+        results = await executor.run_batch([fake_call], context=context)
 
     assert results[0].is_error is False
     assert "executed successfully" in results[0].content
@@ -241,7 +241,7 @@ async def test_run_batch_deny_unchanged() -> None:
     state     = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     with patch.object(executor, "_ask_user_permission") as mock_ask:
-        results = await executor.run_batch([fake_call], state=state, context=context)
+        results = await executor.run_batch([fake_call], context=context)
 
     mock_ask.assert_not_called()
     assert results[0].is_error is True

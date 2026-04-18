@@ -119,7 +119,7 @@ async def test_executor_denies_ask_in_non_tty() -> None:
 
     # Ensure stdin.isatty() returns False (non-interactive).
     with patch.object(sys.stdin, "isatty", return_value=False):
-        results = await executor.run_batch([fake_call], state=state, context=context)
+        results = await executor.run_batch([fake_call], context=context)
 
     assert len(results) == 1
     result = results[0]
@@ -163,7 +163,7 @@ async def test_executor_allows_ask_when_user_confirms() -> None:
             patch.object(sys.stdin, "isatty", return_value=True),
             patch("builtins.input", return_value="y"),
         ):
-            results = await executor.run_batch([fake_call], state=state, context=context)
+            results = await executor.run_batch([fake_call], context=context)
 
     assert len(results) == 1
     assert results[0].is_error is False, results[0].content
