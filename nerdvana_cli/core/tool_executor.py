@@ -17,6 +17,7 @@ from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
 if TYPE_CHECKING:
+    from nerdvana_cli.core.analytics import AnalyticsWriter
     from nerdvana_cli.core.hooks import HookEngine
 
 logger = logging.getLogger(__name__)
@@ -48,12 +49,14 @@ class ToolExecutor:
         settings:           Any,
         reminder:           Any | None = None,
         checkpoint_manager: Any | None = None,
+        analytics_writer:   AnalyticsWriter | None = None,
     ) -> None:
         self._registry            = registry
         self._hooks               = hooks
         self._settings            = settings
         self._reminder            = reminder
         self._checkpoint_manager  = checkpoint_manager
+        self._analytics_writer    = analytics_writer
 
     async def run_batch(
         self,
@@ -174,17 +177,40 @@ class ToolExecutor:
             with contextlib.suppress(Exception):
                 self._checkpoint_manager.before_edit(tool_use["name"])
 
+        import time
+        from datetime import datetime, timezone
+
+        start_ts  = datetime.now(timezone.utc).isoformat()
+        t0        = time.perf_counter()
+        exc_class: str | None = None
+        success   = True
+
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
             result.content     = tool.truncate_result(result.content)
+            if result.is_error:
+                success = False
             return result
         except Exception as exc:  # noqa: BLE001
+            success   = False
+            exc_class = type(exc).__name__
             return ToolResult(
                 tool_use_id = tool_id,
                 content     = f"Tool execution error: {exc}",
                 is_error    = True,
             )
+        finally:
+            if self._analytics_writer is not None:
+                duration_ms = int((time.perf_counter() - t0) * 1000)
+                with contextlib.suppress(Exception):
+                    self._analytics_writer.record_tool_call(
+                        tool_name   = tool_use["name"],
+                        start_ts    = start_ts,
+                        duration_ms = duration_ms,
+                        success     = success,
+                        error_class = exc_class,
+                    )
 
     def _record_reminder(self, call: dict[str, Any], result: ToolResult) -> None:
         """Record a completed tool call into the context reminder, if present."""
