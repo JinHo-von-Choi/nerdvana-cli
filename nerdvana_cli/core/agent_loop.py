@@ -18,6 +18,7 @@ from typing import Any
 from rich.console import Console
 
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
+from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
@@ -385,19 +386,26 @@ class AgentLoop:
             task_registry = self._task_registry,
             team_registry = self._team_registry,
         )
-        turn = 0
+        state = LoopState(
+            iteration         = 0,
+            stop_reason       = "continue",
+            continuation_hint = None,
+            token_budget_used = 0,
+            session_id        = self.session.session_id,
+        )
         original_model = self.settings.model.model
 
         try:
             while True:
-                turn += 1
-                if turn > self.settings.session.max_turns:
+                state = state.evolve(iteration=state.iteration + 1)
+                if state.iteration > self.settings.session.max_turns:
                     yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
                     return
 
                 max_ctx = self.settings.session.max_context_tokens
                 threshold = int(max_ctx * self.settings.session.compact_threshold)
                 current_tokens = estimate_messages_tokens(self.state.messages)
+                state = state.evolve(token_budget_used=current_tokens)
                 if current_tokens > threshold:
                     if not self._compaction_state.is_circuit_open:
                         yield f"{COMPACT_STATUS_PREFIX}compressing ({current_tokens} tokens)..."
@@ -442,7 +450,7 @@ class AgentLoop:
                 yield f"{CONTEXT_USAGE_PREFIX}{usage_pct}"
 
                 if self.settings.verbose:
-                    self.console.print(f"[dim]Turn {turn} — {len(self.state.messages)} messages[/dim]")
+                    self.console.print(f"[dim]Turn {state.iteration} — {len(self.state.messages)} messages[/dim]")
 
                 messages = self._to_provider_messages()
 
