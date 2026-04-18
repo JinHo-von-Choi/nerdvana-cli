@@ -68,6 +68,18 @@ def create_tool_registry(
         for lsp_tool in lsp.available_tools():
             registry.register(lsp_tool)
 
+        # Phase D: semantic symbol tools
+        from nerdvana_cli.core.code_editor import CodeEditor
+        from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+        from nerdvana_cli.tools.symbol_tools import create_symbol_tools
+
+        retriever = LanguageServerSymbolRetriever(client=lsp)
+        editor    = CodeEditor(project_root=lsp._project_root)   # noqa: SLF001
+        for sym_tool in create_symbol_tools(
+            client=lsp, retriever=retriever, editor=editor,
+        ):
+            registry.register(sym_tool)
+
     return registry
 
 
