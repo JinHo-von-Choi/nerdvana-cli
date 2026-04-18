@@ -20,9 +20,9 @@ import logging
 import os
 import sqlite3
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from importlib import resources
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -131,7 +131,7 @@ class PricingTable:
 # ---------------------------------------------------------------------------
 
 @contextmanager
-def _connect(db_path: Path):  # type: ignore[return]
+def _connect(db_path: Path) -> Generator[sqlite3.Connection, None, None]:
     conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
@@ -207,7 +207,7 @@ class AnalyticsWriter:
         self._session_id = session_id
         if not self._enabled:
             return
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         try:
             with _connect(self._db_path) as conn:
                 conn.execute(
@@ -223,7 +223,7 @@ class AnalyticsWriter:
         """Record session end and update totals."""
         if not self._enabled or not self._session_id:
             return
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         try:
             with _connect(self._db_path) as conn:
                 conn.execute(
@@ -304,7 +304,7 @@ class AnalyticsReader:
         if not self._exists():
             return {"total_calls": 0, "total_tokens": 0, "total_cost_usd": 0.0, "top_failures": []}
 
-        since = datetime.now(timezone.utc).replace(
+        since = datetime.now(UTC).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         from datetime import timedelta

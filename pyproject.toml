@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerdvana-cli"
-version = "0.8.0"
+version = "0.8.5"
 description = "AI-powered CLI development tool — supports 13 AI platforms"
 readme = "README.md"
 license = {text = "MIT"}
@@ -54,6 +54,7 @@ dev = [
     "anthropic>=0.39.0",
     "openai>=1.50.0",
     "google-genai>=0.4.0",
+    "tiktoken>=0.7.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
