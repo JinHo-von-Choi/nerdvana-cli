@@ -130,9 +130,14 @@ def test_mtls_known_cn(auth):
     assert "read-only" in result.roles
 
 
-def test_mtls_unknown_cn_gets_read_only(auth):
-    """Unknown CN must still authenticate with read-only default (v3.1 §3.1)."""
+def test_mtls_unknown_cn_is_rejected(auth):
+    """Unknown CN must be rejected (fail-closed) — C-3 mTLS security fix.
+
+    Previous behaviour was fail-open (authenticated=True + roles=['read-only']),
+    which allowed CN-spoofing clients unrestricted read access.  After the
+    security fix unknown CNs must receive authenticated=False + reason='unknown_cn'.
+    """
     result = auth.authenticate_mtls("new-client-xyz")
-    assert result.authenticated
+    assert not result.authenticated
+    assert result.reason == "unknown_cn"
     assert result.client_identity == "new-client-xyz"
-    assert result.roles == ["read-only"]
