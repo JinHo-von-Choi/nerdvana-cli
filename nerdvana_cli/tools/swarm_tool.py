@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 
@@ -57,8 +57,12 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
         },
         "required": ["team_name", "tasks"],
     }
-    is_concurrency_safe = True
-    args_class          = SwarmToolArgs
+    is_concurrency_safe    = True
+    args_class             = SwarmToolArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"agent", "concurrent"})
+    requires_confirmation  = False
 
     def __init__(
         self,
