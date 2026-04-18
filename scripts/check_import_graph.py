@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import sys
 from pathlib import Path
 
 import networkx as nx
+
+BASELINE_FILE = Path(__file__).resolve().parent.parent / ".import_cycles_baseline.json"
 
 # ---------------------------------------------------------------------------
 # 모듈 경로 → 정규화된 모듈명 변환
@@ -179,11 +182,60 @@ def _parse_args() -> argparse.Namespace:
         metavar="DIR",
         help="분석 대상 패키지 루트 디렉토리 (기본값: nerdvana_cli)",
     )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="현재 순환을 새 baseline으로 저장 (기존 순환 허용값 갱신).",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="baseline 무시, 모든 순환을 실패로 처리.",
+    )
     return parser.parse_args()
 
 
+def _normalize_cycle(cycle: list[str]) -> tuple[str, ...]:
+    """동일 사이클의 회전 표현을 하나로 정규화 (집합 비교용)."""
+    if not cycle:
+        return ()
+    pivot_idx = min(range(len(cycle)), key=lambda i: cycle[i])
+    return tuple(cycle[pivot_idx:] + cycle[:pivot_idx])
+
+
+def _load_baseline() -> set[tuple[str, ...]]:
+    """baseline 파일에서 허용 사이클 집합을 로드."""
+    if not BASELINE_FILE.is_file():
+        return set()
+    try:
+        data = json.loads(BASELINE_FILE.read_text(encoding="utf-8"))
+        cycles_raw: list[list[str]] = data.get("cycles", [])
+        return {_normalize_cycle(c) for c in cycles_raw}
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"warning: baseline read failed: {exc}", file=sys.stderr)
+        return set()
+
+
+def _save_baseline(cycles: list[list[str]]) -> None:
+    """현재 사이클을 baseline 파일에 저장."""
+    payload = {
+        "description": "known circular imports allowed by Phase 0A baseline",
+        "count": len(cycles),
+        "cycles": cycles,
+    }
+    BASELINE_FILE.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
-    """CLI 진입점. 순환 발견 시 exit(1), 정상 시 exit(0)."""
+    """CLI 진입점.
+
+    baseline 모드: 저장된 순환 목록은 허용, 신규 순환만 실패.
+    --strict:      baseline 무시, 모든 순환 실패.
+    --update-baseline: 현재 순환을 새 baseline으로 저장.
+    """
     args = _parse_args()
     root = Path(args.root)
 
@@ -191,12 +243,38 @@ def main() -> None:
     cycles             = check_cycles(graph)
     n_modules          = graph.number_of_nodes()
 
-    if cycles:
+    if args.update_baseline:
+        _save_baseline(cycles)
+        print(f"baseline updated: {len(cycles)} cycle(s) recorded in {BASELINE_FILE.name}")
+        return
+
+    if not cycles:
+        print(f"import graph: {n_modules} modules, no cycles")
+        return
+
+    if args.strict:
         for cycle in cycles:
             print(f"cycle: {_format_cycle(cycle)}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"import graph: {n_modules} modules, no cycles")
+    baseline        = _load_baseline()
+    current_set     = {_normalize_cycle(c) for c in cycles}
+    new_cycles      = current_set - baseline
+    removed_cycles  = baseline - current_set
+
+    if new_cycles:
+        print(
+            f"import graph: {n_modules} modules, {len(new_cycles)} new cycle(s) beyond baseline",
+            file=sys.stderr,
+        )
+        for cycle_tuple in sorted(new_cycles):
+            print(f"new cycle: {_format_cycle(list(cycle_tuple))}", file=sys.stderr)
+        sys.exit(1)
+
+    removed_note = f", {len(removed_cycles)} baseline cycle(s) resolved" if removed_cycles else ""
+    print(
+        f"import graph: {n_modules} modules, {len(cycles)} cycle(s) (all in baseline){removed_note}"
+    )
 
 
 if __name__ == "__main__":
