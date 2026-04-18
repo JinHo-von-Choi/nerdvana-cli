@@ -1,44 +1,5 @@
 {
   "description": "known circular imports allowed by Phase 0A baseline",
-  "count": 8,
-  "cycles": [
-    [
-      "nerdvana_cli.commands.session_commands",
-      "nerdvana_cli.ui.app"
-    ],
-    [
-      "nerdvana_cli.ui.app",
-      "nerdvana_cli.commands.model_commands"
-    ],
-    [
-      "nerdvana_cli.core.agent_loop",
-      "nerdvana_cli.core.subagent"
-    ],
-    [
-      "nerdvana_cli.core.agent_loop",
-      "nerdvana_cli.tools.registry",
-      "nerdvana_cli.tools.agent_tool",
-      "nerdvana_cli.core.subagent"
-    ],
-    [
-      "nerdvana_cli.core.agent_loop",
-      "nerdvana_cli.tools.registry",
-      "nerdvana_cli.tools.swarm_tool",
-      "nerdvana_cli.core.swarm",
-      "nerdvana_cli.core.subagent"
-    ],
-    [
-      "nerdvana_cli.tools.agent_tool",
-      "nerdvana_cli.tools.registry"
-    ],
-    [
-      "nerdvana_cli.tools.swarm_tool",
-      "nerdvana_cli.core.swarm",
-      "nerdvana_cli.tools.registry"
-    ],
-    [
-      "nerdvana_cli.tools.lsp",
-      "nerdvana_cli.core.lsp_client"
-    ]
-  ]
+  "count": 0,
+  "cycles": []
 }

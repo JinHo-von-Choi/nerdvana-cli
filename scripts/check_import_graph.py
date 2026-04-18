@@ -3,9 +3,14 @@ nerdvana_cli 패키지 내 순환 import 감지 스크립트.
 
 작성자: 최진호
 작성일: 2026-04-18
+수정일: 2026-04-17 (TYPE_CHECKING 블록 및 함수 내 import 제외)
 
 nerdvana_cli/ 하위 모든 .py 파일을 AST로 파싱하여 import 관계를
 networkx.DiGraph에 구축하고, simple_cycles로 순환을 탐지한다.
+
+런타임에 실행되지 않는 import는 의존 엣지에서 제외한다:
+  - ``if TYPE_CHECKING:`` 블록 내 import
+  - 함수/메서드/클래스 body 내 지연 import
 
 사용법:
     python scripts/check_import_graph.py [--root nerdvana_cli]
@@ -49,13 +54,33 @@ def _path_to_module(py_file: Path, root: Path) -> str:
 # 단일 파일 파싱 → 내부 import 목록 추출
 # ---------------------------------------------------------------------------
 
+def _is_type_checking_guard(node: ast.If) -> bool:
+    """``if TYPE_CHECKING:`` 패턴 여부를 판정한다.
+
+    ``if TYPE_CHECKING:`` 과 ``if typing.TYPE_CHECKING:`` 두 형식을 모두 인식한다.
+    """
+    test = node.test
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return True
+    return (
+        isinstance(test, ast.Attribute)
+        and test.attr == "TYPE_CHECKING"
+        and isinstance(test.value, ast.Name)
+        and test.value.id == "typing"
+    )
+
+
 def _collect_imports(
     py_file: Path,
     root: Path,
     pkg_prefix: str,
 ) -> list[str]:
     """
-    단일 .py 파일에서 nerdvana_cli.* 범위의 import 대상 모듈명을 수집한다.
+    단일 .py 파일에서 nerdvana_cli.* 범위의 런타임 import 대상 모듈명을 수집한다.
+
+    아래 import는 런타임에 실행되지 않으므로 의존 엣지에서 제외한다:
+      - ``if TYPE_CHECKING:`` 블록 내 import
+      - 함수/메서드/클래스 body 내 지연 import
 
     외부 라이브러리(예: anthropic, networkx)는 결과에 포함하지 않는다.
     상대 import는 현재 파일의 패키지 경로를 기준으로 절대 모듈명으로 변환한다.
@@ -81,31 +106,47 @@ def _collect_imports(
 
     targets: list[str] = []
 
-    for node in ast.walk(tree):
+    def _resolve_import_node(node: ast.Import | ast.ImportFrom) -> None:
+        """단일 import 노드를 분석하여 targets에 추가한다."""
         if isinstance(node, ast.Import):
-            # import foo, import foo.bar
             for alias in node.names:
                 mod = alias.name
                 if mod == pkg_prefix or mod.startswith(pkg_prefix + "."):
                     targets.append(mod)
-
-        elif isinstance(node, ast.ImportFrom):
+        else:
             level  = node.level or 0
             module = node.module or ""
-
             if level == 0:
-                # 절대 import: from foo.bar import baz
                 if module == pkg_prefix or module.startswith(pkg_prefix + "."):
                     targets.append(module)
             else:
-                # 상대 import: from . import x  /  from ..bar import x
-                # level=1 → 현재 패키지, level=2 → 부모 패키지
                 base_parts = current_pkg_parts[: len(current_pkg_parts) - (level - 1)]
-                abs_mod = ".".join(base_parts + [module]) if module else ".".join(base_parts)
-
+                abs_mod = (
+                    ".".join(base_parts + [module]) if module else ".".join(base_parts)
+                )
                 if abs_mod == pkg_prefix or abs_mod.startswith(pkg_prefix + "."):
                     targets.append(abs_mod)
 
+    def _walk_module_level(stmts: list[ast.stmt]) -> None:
+        """모듈 최상위 문장만 순회한다.
+
+        함수/메서드/클래스 정의 내부는 재귀하지 않아 지연 import를 무시한다.
+        ``if TYPE_CHECKING:`` 블록은 건너뛴다.
+        다른 ``if`` 블록(예: ``if sys.version_info >= ...``)은 재귀하여
+        플랫폼 조건부 import를 런타임 의존으로 포함한다.
+        """
+        for stmt in stmts:
+            if isinstance(stmt, (ast.Import, ast.ImportFrom)):
+                _resolve_import_node(stmt)
+            elif isinstance(stmt, ast.If):
+                if _is_type_checking_guard(stmt):
+                    continue  # TYPE_CHECKING 블록 전체 건너뜀
+                # 기타 if 블록: body와 orelse 재귀
+                _walk_module_level(stmt.body)
+                _walk_module_level(stmt.orelse)
+            # ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef 등은 재귀 없음
+
+    _walk_module_level(tree.body)
     return targets
 
 
