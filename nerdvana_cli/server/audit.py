@@ -58,6 +58,17 @@ CREATE TABLE IF NOT EXISTS audit (
     error_class     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
+CREATE TABLE IF NOT EXISTS hooks (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts                      TEXT    NOT NULL,
+    hook_name               TEXT    NOT NULL,
+    tool_name               TEXT,
+    permission_decision     TEXT,
+    sanitizer_warnings      INTEGER DEFAULT 0,
+    sanitizer_rejections    INTEGER DEFAULT 0,
+    additional_context_len  INTEGER DEFAULT 0,
+    duration_ms             INTEGER
+);
 """
 
 _INSERT = """
