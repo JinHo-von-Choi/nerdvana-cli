@@ -22,6 +22,7 @@ from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
+from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider
@@ -178,6 +179,13 @@ class AgentLoop:
         self._session_started = False
         self._sticky_session_context: str = ""
         self.provider = self.create_provider_from_settings()
+
+        self.tool_executor = ToolExecutor(
+            registry = self.registry,
+            hooks    = self.hooks,
+            settings = self.settings,
+            reminder = self._reminder,
+        )
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
         """Create provider from current settings."""
@@ -528,7 +536,9 @@ class AgentLoop:
                                     input_preview = json.dumps(tu["input"], ensure_ascii=False)[:80]
                                     yield f"{TOOL_STATUS_PREFIX}{tu['name']} {input_preview}"
 
-                                tool_results = await self._execute_tools(tool_uses, tool_context)
+                                tool_results = await self.tool_executor.run_batch(
+                                    tool_uses, state, tool_context
+                                )
 
                                 # Yield tool execution done markers
                                 for i, tr in enumerate(tool_results):
@@ -645,7 +655,14 @@ class AgentLoop:
                 if content:
                     self.session.record_assistant_message(content, tool_uses)
 
-                tool_results = await self._execute_tools(tool_uses, context)
+                _fallback_state = LoopState(
+                    iteration         = 0,
+                    stop_reason       = "continue",
+                    continuation_hint = None,
+                    token_budget_used = 0,
+                    session_id        = self.session.session_id,
+                )
+                tool_results = await self.tool_executor.run_batch(tool_uses, _fallback_state, context)
                 for tr in tool_results:
                     self.state.messages.append(
                         Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error)
