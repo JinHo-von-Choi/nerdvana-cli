@@ -21,6 +21,7 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
+from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
 
@@ -82,6 +83,8 @@ SLASH_COMMANDS = [
     ("/redo", "Re-apply last undone checkpoint"),
     ("/checkpoints", "List session checkpoints"),
     ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
+    ("/dashboard", "Toggle observability dashboard"),
+    ("/health", "Show 7-day tool call health summary"),
     ("/quit", "Exit"),
 ]
 
@@ -321,10 +324,11 @@ class NerdvanaApp(App[object]):
     """
 
     BINDINGS = [
-        Binding("ctrl+c", "quit", "Quit", show=True),
-        Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=True),
-        Binding("ctrl+l", "clear_chat", "Clear", show=True),
-        Binding("escape", "focus_input", "Input", show=False),
+        Binding("ctrl+c", "quit",             "Quit",      show=True),
+        Binding("ctrl+b", "toggle_sidebar",   "Sidebar",   show=True),
+        Binding("ctrl+l", "clear_chat",       "Clear",     show=True),
+        Binding("ctrl+d", "toggle_dashboard", "Dashboard", show=True),
+        Binding("escape", "focus_input",      "Input",     show=False),
     ]
 
     def __init__(
@@ -354,6 +358,7 @@ class NerdvanaApp(App[object]):
                 with VerticalScroll(id="chat-frame"):
                     yield StreamingOutput(id="streaming-output")
                     yield ToolStatusLine(id="tool-status")
+                yield DashboardTab(id="dashboard-tab")
                 yield CommandMenu(id="command-menu")
                 yield ProviderSelector(id="provider-selector")
                 yield ModelSelector(id="model-selector")
@@ -408,7 +413,8 @@ class NerdvanaApp(App[object]):
         self.set_interval(2.0, lambda: asyncio.create_task(sidebar.refresh_files()))
 
         menu = self.query_one("#command-menu", CommandMenu)
-        _seen_triggers: set[str] = set()
+        # Pre-seed seen set with built-in slash command IDs to avoid DuplicateID
+        _seen_triggers: set[str] = {cmd for cmd, _ in SLASH_COMMANDS}
         for skill in self._agent_loop.skill_loader.list_skills():
             if skill.trigger not in _seen_triggers:
                 menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
@@ -694,7 +700,14 @@ class NerdvanaApp(App[object]):
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands via dispatching to command modules."""
-        from nerdvana_cli.commands import memory_commands, model_commands, profile_commands, session_commands, system_commands
+        from nerdvana_cli.commands import (
+            memory_commands,
+            model_commands,
+            observability_commands,
+            profile_commands,
+            session_commands,
+            system_commands,
+        )
 
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
@@ -720,6 +733,8 @@ class NerdvanaApp(App[object]):
             "/route-knowledge": memory_commands.handle_route_knowledge,
             "/mode":            profile_commands.handle_mode,
             "/context":         profile_commands.handle_context,
+            "/health":          observability_commands.handle_health,
+            "/dashboard":       observability_commands.handle_dashboard,
         }
 
         if command in ("/quit", "/exit", "/q"):
@@ -827,3 +842,10 @@ class NerdvanaApp(App[object]):
         currently_hidden = "hidden" in sidebar.classes
         self._sidebar_user_visible = currently_hidden
         sidebar.set_class(not currently_hidden, "hidden")
+
+    def action_toggle_dashboard(self) -> None:
+        """Toggle observability dashboard (Ctrl+D)."""
+        try:
+            self.query_one("#dashboard-tab", DashboardTab).toggle()
+        except Exception:  # noqa: BLE001
+            pass
