@@ -8,6 +8,7 @@ Extracted as part of Phase 0A (T-0A-04).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -30,17 +31,29 @@ class ToolExecutor:
     - BEFORE_TOOL / AFTER_TOOL hooks are fired via the provided HookEngine.
     """
 
+    # Edit-tool names that trigger a checkpoint before execution
+    _EDIT_TOOL_NAMES: frozenset[str] = frozenset({
+        "FileEdit",
+        "FileWrite",
+        "ReplaceSymbolBody",
+        "InsertBeforeSymbol",
+        "InsertAfterSymbol",
+        "SafeDeleteSymbol",
+    })
+
     def __init__(
         self,
-        registry: ToolRegistry,
-        hooks:    HookEngine,
-        settings: Any,
-        reminder: Any | None = None,
+        registry:           ToolRegistry,
+        hooks:              HookEngine,
+        settings:           Any,
+        reminder:           Any | None = None,
+        checkpoint_manager: Any | None = None,
     ) -> None:
-        self._registry = registry
-        self._hooks    = hooks
-        self._settings = settings
-        self._reminder = reminder
+        self._registry            = registry
+        self._hooks               = hooks
+        self._settings            = settings
+        self._reminder            = reminder
+        self._checkpoint_manager  = checkpoint_manager
 
     async def run_batch(
         self,
@@ -152,6 +165,14 @@ class ToolExecutor:
                 content     = f"Validation error: {validation_error}",
                 is_error    = True,
             )
+
+        # Pre-edit checkpoint (opt-in, silently skipped when unavailable)
+        if (
+            self._checkpoint_manager is not None
+            and tool_use["name"] in self._EDIT_TOOL_NAMES
+        ):
+            with contextlib.suppress(Exception):
+                self._checkpoint_manager.before_edit(tool_use["name"])
 
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
