@@ -201,7 +201,7 @@ def project_nirnamd_path(cwd: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Memory helpers
+# Memory helpers (Phase E)
 # ---------------------------------------------------------------------------
 
 def project_memories_dir(cwd: str) -> Path:
@@ -217,3 +217,27 @@ def project_onboarding_dir(cwd: str) -> Path:
 def global_memories_dir() -> Path:
     """User-global memories directory (~/.nerdvana/memories/global/)."""
     return user_data_home() / "memories" / "global"
+
+
+# ---------------------------------------------------------------------------
+# Phase F: runtime profile paths
+# ---------------------------------------------------------------------------
+
+def user_contexts_dir() -> Path:
+    """User-global context profile directory."""
+    return user_data_home() / "contexts"
+
+
+def user_modes_dir() -> Path:
+    """User-global mode profile directory."""
+    return user_data_home() / "modes"
+
+
+def project_contexts_dir(cwd: str) -> Path:
+    """Project-local context profile directory."""
+    return Path(cwd) / ".nerdvana" / "contexts"
+
+
+def project_modes_dir(cwd: str) -> Path:
+    """Project-local mode profile directory."""
+    return Path(cwd) / ".nerdvana" / "modes"

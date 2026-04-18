@@ -1,0 +1,8 @@
+description: "One-shot mode — autonomous execution without asking clarifying questions"
+prompt_override: null
+prompt_append: "Complete the task autonomously. Do not ask for clarification. Make reasonable assumptions and proceed."
+excluded_tools: []
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: yolo

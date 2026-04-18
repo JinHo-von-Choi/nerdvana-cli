@@ -1,0 +1,10 @@
+description: "No-onboarding mode — skips onboarding tools for experienced users"
+prompt_override: null
+prompt_append: null
+excluded_tools:
+  - CheckOnboardingPerformed
+  - Onboarding
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: balanced

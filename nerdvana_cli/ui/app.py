@@ -70,6 +70,8 @@ SLASH_COMMANDS = [
     ("/model", "Show/change model"),
     ("/models", "List available models"),
     ("/provider", "Add/switch provider"),
+    ("/mode", "Activate/deactivate mode profile"),
+    ("/context", "Set context profile"),
     ("/mcp", "MCP server status"),
     ("/tokens", "Show token usage"),
     ("/skills", "List available skills"),
@@ -692,7 +694,7 @@ class NerdvanaApp(App[object]):
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands via dispatching to command modules."""
-        from nerdvana_cli.commands import memory_commands, model_commands, session_commands, system_commands
+        from nerdvana_cli.commands import memory_commands, model_commands, profile_commands, session_commands, system_commands
 
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
@@ -716,6 +718,8 @@ class NerdvanaApp(App[object]):
             "/checkpoints":     memory_commands.handle_checkpoints,
             "/memories":        memory_commands.handle_memories,
             "/route-knowledge": memory_commands.handle_route_knowledge,
+            "/mode":            profile_commands.handle_mode,
+            "/context":         profile_commands.handle_context,
         }
 
         if command in ("/quit", "/exit", "/q"):
