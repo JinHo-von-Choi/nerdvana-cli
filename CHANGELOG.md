@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-18
+
+First stable release. The 0.9.x series shipped the full roadmap surface
+area but a post-release audit uncovered five runtime-breaking defects in
+the freshly landed server layer — the MCP server could not even boot,
+authentication was defined but not wired, and Phase H tools were not
+registered. 1.0.0 closes all five Critical issues, five Major drift
+items, and two test-isolation bugs that were hiding real regressions
+behind developer-machine pollution.
+
+### Fixed
+
+- **C-1** `nerdvana serve` boots. `rich.console.Console.print` does not
+  accept a `file=` keyword; replaced with a dedicated
+  `Console(stderr=True)` instance. Added a `serve` start-up regression
+  test so the whole G1 → H server stack never silently breaks again.
+- **C-2** `NerdvanaMcpServer._execute_tool` is now a real dispatcher:
+  it builds a per-server tool map at init time, runs the BaseTool
+  `parse_args → validate_input → call` chain, and serialises errors as
+  `{"error": "..."}`. Previously the MCP server accepted tool calls
+  but returned empty responses.
+- **C-3** Authentication and ACL enforcement are wired into the request
+  path. `_BearerAuthMiddleware` validates `Authorization: Bearer` for
+  every HTTP request and parks the `AuthResult` in a `ContextVar`;
+  stdio dispatch consults the uid check via `_verify_stdio_auth`;
+  mTLS no longer fails open for unknown CNs. `client_identity` is
+  now resolved per request instead of every caller being `anonymous`.
+- **C-4** `auth.py` uses `hmac.compare_digest` for hash comparisons,
+  closing a timing side-channel.
+- **C-5** Phase H tools override the correct `check_permissions`
+  signature (was `check_permission`, singular + wrong parameters) and
+  return proper `PermissionResult(behavior=PermissionBehavior.*)`
+  values. `ListQueryableProjects` is `ALLOW`; `RegisterExternalProject`
+  and `QueryExternalProject` are `ASK` (filesystem write / subprocess
+  spawn). Dead stubs deleted.
+- **M-1** `create_tool_registry` registers the three external-project
+  tools (`ListQueryableProjects`, `RegisterExternalProject`,
+  `QueryExternalProject`). Gated by
+  `settings.external_projects_enabled` so operators can disable the
+  subprocess surface.
+- **M-3** `BashTool` blacklist covers `$(…)`, `${…}`, and backtick
+  substitutions, plus `eval`/`exec`, env-prefixed `sudo`, and
+  `dd of=/dev/<block>`. A `_MAX_TIMEOUT = 600` ceiling is now enforced
+  in `check_permissions`.
+- **M-4** ASK permission has a concrete UX. TTY sessions prompt
+  `Allow? [y/N]`; pipes / CI / `EOFError` default to `DENY`.
+  Decisions are logged at `INFO`.
+- **M-7** Removed the dead `state: LoopState` parameter that
+  `ToolExecutor.run_batch` carried over from the Phase 0A split.
+- **M-8** `audit.sqlite` is created atomically with
+  `os.open(O_CREAT | O_EXCL, 0o600)`, eliminating the
+  connect → chmod race. Both `AuditLogger` and `SanitizerAudit` go
+  through the shared helper.
+- **Test isolation** `tests/test_memories.py` and
+  `tests/test_memory_tools.py` now monkeypatch
+  `core_paths.global_memories_dir` to a tmp path so the developer's
+  real `~/.nerdvana/memories/global/` contents never leak into the
+  test run. Four pre-existing false failures disappear.
+
+### Changed
+
+- **M-5** `/help` output is generated from `ui.app.SLASH_COMMANDS`
+  and the README REPL Slash Commands table is regenerated from the
+  same list (21 entries). Drift prevention script checks it on every
+  pre-commit.
+- **M-6** Provider count confirmed at 13 (`ProviderName` enum
+  includes ZAI/ZhipuAI). Lingering "12 platforms" copy fixed in
+  `main.py` help text and README prose.
+- **M-2** `AnchorMind` hook injection remains a placeholder for 1.0
+  and is documented in `docs/adr/0003-anchormind-deferred.md`. The
+  toggle stays `anchormind_inject: false`; setting it `true` returns
+  an empty string with a clear log warning.
+- **N-2** Production ruff violations cleared (F401 ×2, SIM105, UP017
+  → 0). `contextlib.suppress(Exception)` replaces silent
+  `try/except/pass`; `datetime.UTC` replaces `timezone.utc` in the
+  `tool_executor` path.
+
+### Added
+
+- 130+ new tests across `tests/server/`, `tests/test_bash_*`,
+  `tests/test_ask_permission_ux.py`,
+  `tests/test_external_tools_*`,
+  bringing the full suite to 1003 passed in `-m "not lsp_integration"`.
+
+### Notes
+
+- `docs/plans/2026-04-18-post-release-audit-plan.md` captures the
+  full Hot/Next/Deferred triage that drove this release.
+- The Deferred bucket (tests file lint, analytics connection pool,
+  CI lsp_integration job, lazy-import formalisation, sanitizer ReDoS
+  audit, retrospectives gitignore policy) is punted to post-1.0
+  point releases.
+
 ## [0.9.2] - 2026-04-18
 
 User-data preservation hardening for the self-update path.
