@@ -12,7 +12,6 @@ import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
-from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
@@ -61,7 +60,6 @@ class ToolExecutor:
     async def run_batch(
         self,
         calls: list[dict[str, Any]],
-        state: LoopState,  # noqa: ARG002 — reserved for future per-state routing
         context: ToolContext,
     ) -> list[ToolResult]:
         """Execute *calls* and return results in the same order as *calls*.
@@ -182,9 +180,9 @@ class ToolExecutor:
                 self._checkpoint_manager.before_edit(tool_use["name"])
 
         import time
-        from datetime import datetime, timezone
+        from datetime import UTC, datetime
 
-        start_ts  = datetime.now(timezone.utc).isoformat()
+        start_ts  = datetime.now(UTC).isoformat()
         t0        = time.perf_counter()
         exc_class: str | None = None
         success   = True
