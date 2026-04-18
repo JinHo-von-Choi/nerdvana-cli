@@ -10,26 +10,23 @@ if TYPE_CHECKING:
 
 
 async def handle_help(app: NerdvanaApp, args: str) -> None:
-    """Handle /help command — display available commands."""
-    app._add_chat_message(
-        "[bold]Commands[/bold]\n"
-        "/help    -- Show help\n"
-        "/quit    -- Exit\n"
-        "/clear   -- Clear chat\n"
-        "/init    -- Generate NIRNA.md\n"
-        "/model   -- Show/change model\n"
-        "/models     -- List available models\n"
-        "/provider   -- Add/switch provider\n"
-        "/mcp     -- MCP server status\n"
-        "/mode [<name>|list|off] -- Activate/deactivate a mode profile\n"
-        "/context [<name>|list]  -- Set context profile\n"
-        "/skills  -- List available skills\n"
-        "/tokens  -- Show usage\n"
-        "/tools   -- List tools\n"
-        "/update  -- Check and install updates\n"
-        "Ctrl+C   -- Quit\n"
-        "Ctrl+L   -- Clear chat"
-    )
+    """Handle /help command — display available commands.
+
+    Command list is derived from SLASH_COMMANDS in ``nerdvana_cli.ui.app``
+    (single source of truth).  Extra aliases and key bindings are appended.
+    """
+    from nerdvana_cli.ui.app import SLASH_COMMANDS
+
+    lines = ["[bold]Commands[/bold]"]
+    for cmd, desc in SLASH_COMMANDS:
+        lines.append(f"{cmd:<20} {desc}")
+    lines += [
+        "",
+        "/exit, /q              Aliases for /quit",
+        "Ctrl+C                 Quit",
+        "Ctrl+L                 Clear chat",
+    ]
+    app._add_chat_message("\n".join(lines))
 
 
 async def handle_update(app: NerdvanaApp, args: str) -> None:
