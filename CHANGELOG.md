@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-04-18
+
+Phase G3+G4: Textual TUI observability dashboard + analytics + cost tracking.
+
+### Added
+
+- `nerdvana_cli/core/token_estimator.py` — `TokenEstimator` ABC with
+  `TiktokenEstimator` (OpenAI), `AnthropicExactEstimator` (count_tokens API),
+  and `CharEstimator` (fallback). `TokenEstimatorRegistry.get_for(provider)`
+  auto-selects the best estimator.
+- `nerdvana_cli/core/analytics.py` — `AnalyticsWriter` records tool calls +
+  sessions into `~/.nerdvana/analytics.sqlite` (WAL mode, separate from
+  audit.sqlite). `AnalyticsReader` provides query helpers for /health and
+  dashboard. `PricingTable` loads pricing.yml and estimates USD cost.
+- `nerdvana_cli/providers/pricing.yml` — provider/model USD pricing table for
+  13 providers (Anthropic, OpenAI, Google, Groq, Mistral, DeepSeek, Fireworks,
+  Cohere, Together, Ollama, vLLM, LM Studio).
+- `nerdvana_cli/ui/dashboard_tab.py` — `DashboardTab` Textual widget: session
+  header, tool heatmap, failure rate panel, live log tail, token sparkline,
+  health footer. Toggle via `Ctrl+D` or `/dashboard`.
+- `nerdvana_cli/commands/observability_commands.py` — `/health [--days N]
+  [--json]` and `/dashboard` slash command handlers.
+- `ToolExecutor` analytics hook: timing and success/failure recorded per tool
+  call when `analytics_writer` is provided (opt-in, no impact on existing code).
+- `/tokens` extended with accumulated session cost from analytics DB.
+
+### Changed
+
+- `pyproject.toml`: version 0.8.0 → 0.8.5; `tiktoken>=0.7.0` added to
+  `[dev]` optional dependencies.
+- `app.py`: `Ctrl+D` binding for dashboard toggle; `/dashboard` and `/health`
+  slash commands; `DuplicateID` fix for skill triggers that clash with built-in
+  commands.
+
 ## [0.8.0] - 2026-04-18
 
 Phase G1: MCP server mode — external harnesses can call nerdvana tools over

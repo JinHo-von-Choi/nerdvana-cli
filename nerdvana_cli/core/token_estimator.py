@@ -68,7 +68,7 @@ class TiktokenEstimator(TokenEstimator):
         self._fallback = CharEstimator()
 
         try:
-            import tiktoken  # type: ignore[import-untyped]
+            import tiktoken
             try:
                 self._enc = tiktoken.encoding_for_model(model)
             except KeyError:
@@ -106,8 +106,9 @@ class AnthropicExactEstimator(TokenEstimator):
         self._fallback = CharEstimator()
 
         try:
-            import anthropic  # type: ignore[import-untyped]
             import os
+
+            import anthropic
             key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
             if key:
                 self._client = anthropic.Anthropic(api_key=key)
