@@ -111,13 +111,16 @@ class AgentLoop:
             json_parse_recovery,
             ralph_loop_check,
             session_start_context_injection,
+            session_start_memory_hint,
         )
+        from nerdvana_cli.core.checkpoint import CheckpointManager
         from nerdvana_cli.core.context_reminder import ContextReminder
         from nerdvana_cli.core.hooks import HookEngine, HookEvent
         from nerdvana_cli.core.skills import SkillLoader
         from nerdvana_cli.core.user_hooks import load_user_hooks
         self.hooks = HookEngine()
         self.hooks.register(HookEvent.SESSION_START, session_start_context_injection)
+        self.hooks.register(HookEvent.SESSION_START, session_start_memory_hint)
         self.hooks.register(HookEvent.AFTER_API_CALL, context_limit_recovery)
         self.hooks.register(HookEvent.AFTER_API_CALL, ralph_loop_check)
         self.hooks.register(HookEvent.AFTER_TOOL, json_parse_recovery)
@@ -132,7 +135,22 @@ class AgentLoop:
         self._compaction_state = CompactionState(max_failures=settings.session.compact_max_failures)
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
         self.provider         = self.create_provider_from_settings()
-        self.tool_executor    = ToolExecutor(registry=self.registry, hooks=self.hooks, settings=self.settings, reminder=self._reminder)
+        _cp_cfg = getattr(settings, "checkpoint", None)
+        _cp_enabled = _cp_cfg.enabled if _cp_cfg is not None else True
+        _cp_max     = _cp_cfg.per_session_max if _cp_cfg is not None else 50
+        self._checkpoint_manager = CheckpointManager(
+            cwd             = settings.cwd or ".",
+            session_id      = getattr(self.session, "session_id", "default"),
+            per_session_max = _cp_max,
+            enabled         = _cp_enabled,
+        )
+        self.tool_executor = ToolExecutor(
+            registry            = self.registry,
+            hooks               = self.hooks,
+            settings            = self.settings,
+            reminder            = self._reminder,
+            checkpoint_manager  = self._checkpoint_manager,
+        )
         self.loop_hook_engine = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
