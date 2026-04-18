@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-18
+
+Phase E: Project Memory + Onboarding + Git Checkpoints.
+Agents now manage project-local knowledge via a 4-scope memory system,
+perform guided onboarding, and can checkpoint/undo edits via git stash.
+
+### Added
+
+- `core/memories.py` — `MemoryScope` enum (project_rule / project_knowledge /
+  user_global / agent_experience), `MemoriesManager` (CRUD, slash namespaces,
+  fcntl.flock concurrency, stale-GC, onboarding stamp helpers,
+  session_start_hint).
+- `core/paths.py` — `project_memories_dir`, `project_onboarding_dir`,
+  `global_memories_dir` path helpers.
+- `core/checkpoint.py` — `CheckpointManager`: auto-stash before edit tools
+  (FileEdit, FileWrite, ReplaceSymbolBody, InsertBefore/AfterSymbol,
+  SafeDeleteSymbol), LRU eviction (per_session_max default 50),
+  undo() / redo() / list_checkpoints(). Silent no-op outside git repos.
+- `core/settings.py` — `CheckpointConfig` (enabled, per_session_max);
+  `NerdvanaSettings.checkpoint` field.
+- `tools/memory_tools.py` — 9 tools:
+  - Memory CRUD: WriteMemory (scope enum + secrets scanner), ReadMemory,
+    ListMemories, DeleteMemory, RenameMemory, EditMemory.
+  - Onboarding: CheckOnboardingPerformed, Onboarding, InitialInstructions.
+- `commands/memory_commands.py` — 5 slash command handlers:
+  /undo, /redo, /checkpoints, /memories (--stale --days N), /route-knowledge.
+- `core/builtin_hooks.py` — `session_start_memory_hint` hook: injects
+  memory count into system prompt at session start (content never auto-injected).
+
+### Security
+
+- WriteMemory runs secrets scanner before storing: blocks OpenAI/Anthropic keys,
+  AWS Access Key IDs, GitHub PATs, API_KEY env vars, Authorization Bearer tokens.
+
 ## [0.5.1] - 2026-04-18
 
 Phase D.1: Edit symbol tools — insert before/after and safe delete.

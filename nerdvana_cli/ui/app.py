@@ -75,6 +75,11 @@ SLASH_COMMANDS = [
     ("/skills", "List available skills"),
     ("/tools", "List tools"),
     ("/update", "Check and install updates"),
+    ("/memories", "List project memories"),
+    ("/undo", "Restore pre-edit git checkpoint"),
+    ("/redo", "Re-apply last undone checkpoint"),
+    ("/checkpoints", "List session checkpoints"),
+    ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
     ("/quit", "Exit"),
 ]
 
@@ -687,25 +692,30 @@ class NerdvanaApp(App[object]):
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands via dispatching to command modules."""
-        from nerdvana_cli.commands import model_commands, session_commands, system_commands
+        from nerdvana_cli.commands import memory_commands, model_commands, session_commands, system_commands
 
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
 
         handlers = {
-            "/model": model_commands.handle_model,
-            "/models": model_commands.handle_models,
-            "/provider": model_commands.handle_provider,
-            "/clear": session_commands.handle_clear,
-            "/tokens": session_commands.handle_tokens,
-            "/tools": session_commands.handle_tools,
-            "/mcp": session_commands.handle_mcp,
-            "/skills": session_commands.handle_skills,
-            "/help": system_commands.handle_help,
-            "/update": system_commands.handle_update,
-            "/init": system_commands.handle_init,
-            "/setup": system_commands.handle_init,
+            "/model":           model_commands.handle_model,
+            "/models":          model_commands.handle_models,
+            "/provider":        model_commands.handle_provider,
+            "/clear":           session_commands.handle_clear,
+            "/tokens":          session_commands.handle_tokens,
+            "/tools":           session_commands.handle_tools,
+            "/mcp":             session_commands.handle_mcp,
+            "/skills":          session_commands.handle_skills,
+            "/help":            system_commands.handle_help,
+            "/update":          system_commands.handle_update,
+            "/init":            system_commands.handle_init,
+            "/setup":           system_commands.handle_init,
+            "/undo":            memory_commands.handle_undo,
+            "/redo":            memory_commands.handle_redo,
+            "/checkpoints":     memory_commands.handle_checkpoints,
+            "/memories":        memory_commands.handle_memories,
+            "/route-knowledge": memory_commands.handle_route_knowledge,
         }
 
         if command in ("/quit", "/exit", "/q"):

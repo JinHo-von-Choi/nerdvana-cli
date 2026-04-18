@@ -198,3 +198,22 @@ def project_mcp_json(cwd: str) -> Path:
 def project_nirnamd_path(cwd: str) -> Path:
     """Project-local NIRNA.md instructions file."""
     return Path(cwd) / "NIRNA.md"
+
+
+# ---------------------------------------------------------------------------
+# Memory helpers
+# ---------------------------------------------------------------------------
+
+def project_memories_dir(cwd: str) -> Path:
+    """Project-local memories directory (<cwd>/.nerdvana/memories/)."""
+    return Path(cwd) / ".nerdvana" / "memories"
+
+
+def project_onboarding_dir(cwd: str) -> Path:
+    """Project-local onboarding stamp directory."""
+    return Path(cwd) / ".nerdvana" / "memories" / "onboarding"
+
+
+def global_memories_dir() -> Path:
+    """User-global memories directory (~/.nerdvana/memories/global/)."""
+    return user_data_home() / "memories" / "global"

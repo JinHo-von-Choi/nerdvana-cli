@@ -52,6 +52,11 @@ class HookConfig(BaseModel):
     after_tool: list[str] = Field(default_factory=list)
 
 
+class CheckpointConfig(BaseModel):
+    enabled: bool = True
+    per_session_max: int = 50
+
+
 class NerdvanaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NERDVANA_", env_file=".env", extra="ignore")
 
@@ -60,6 +65,7 @@ class NerdvanaSettings(BaseSettings):
     session: SessionConfig = Field(default_factory=SessionConfig)
     parism: ParismConfig = Field(default_factory=ParismConfig)
     hooks: HookConfig = Field(default_factory=HookConfig)
+    checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     cwd: str = "."
     verbose: bool = False
     config_path: str = ""
@@ -91,6 +97,8 @@ class NerdvanaSettings(BaseSettings):
                     settings.parism = ParismConfig(**data["parism"])
                 if "hooks" in data:
                     settings.hooks = HookConfig(**data["hooks"])
+                if "checkpoint" in data:
+                    settings.checkpoint = CheckpointConfig(**data["checkpoint"])
                 settings.config_path = path
                 break
 
