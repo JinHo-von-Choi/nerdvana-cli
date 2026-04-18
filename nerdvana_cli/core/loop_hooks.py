@@ -3,9 +3,6 @@
 Wraps the general HookEngine to provide typed on_api_call / on_tool_result /
 on_turn_end entry points. Extracted from AgentLoop as part of Phase 0A
 (T-0A-05).
-
-# NOTE: ralph_loop_check 현재 end_turn stop_reason에서 fire되지 않는다.
-# Phase 0A는 구조 변경만. 버그 픽스는 별도 티켓(T-bug-ralph-loop)에서.
 """
 
 from __future__ import annotations
@@ -79,7 +76,7 @@ class LoopHookEngine:
             inject.extend(hr.inject_messages)
 
         new_stop = stop_reason or state.stop_reason
-        new_state = state.evolve(stop_reason=new_stop)  # type: ignore[arg-type]
+        new_state = state.evolve(stop_reason=new_stop)
         return new_state, inject
 
     def on_tool_result(
@@ -108,9 +105,6 @@ class LoopHookEngine:
 
     def on_turn_end(self, state: LoopState) -> LoopState:
         """Called when the loop is about to return (end_turn path).
-
-        # NOTE: ralph_loop_check is intentionally NOT fired here — this
-        # preserves the 0.4.1 behaviour (tracked in T-bug-ralph-loop).
 
         Args:
             state: Current LoopState.
