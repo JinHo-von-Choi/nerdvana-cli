@@ -1,9 +1,9 @@
 """LSP-backed tools: diagnostics, goto-definition, find-references, rename."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
@@ -48,9 +48,12 @@ class LspDiagnosticsTool(BaseTool[LspDiagnosticsArgs]):
         },
         "required": ["file_path"],
     }
-    is_concurrency_safe = True
-    is_read_only        = True
-    args_class          = LspDiagnosticsArgs
+    is_concurrency_safe    = True
+    args_class             = LspDiagnosticsArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"lsp"})
+    requires_confirmation  = False
 
     def __init__(self, client: LspClient):
         super().__init__()
@@ -95,9 +98,12 @@ class LspGotoDefinitionTool(BaseTool[LspPositionArgs]):
         },
         "required": ["file_path", "line", "symbol"],
     }
-    is_concurrency_safe = True
-    is_read_only        = True
-    args_class          = LspPositionArgs
+    is_concurrency_safe    = True
+    args_class             = LspPositionArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"lsp", "symbol"})
+    requires_confirmation  = False
 
     def __init__(self, client: LspClient):
         super().__init__()
@@ -141,9 +147,12 @@ class LspFindReferencesTool(BaseTool[LspPositionArgs]):
         },
         "required": ["file_path", "line", "symbol"],
     }
-    is_concurrency_safe = True
-    is_read_only        = True
-    args_class          = LspPositionArgs
+    is_concurrency_safe    = True
+    args_class             = LspPositionArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"lsp", "symbol"})
+    requires_confirmation  = False
 
     def __init__(self, client: LspClient):
         super().__init__()
@@ -189,9 +198,12 @@ class LspRenameTool(BaseTool[LspRenameArgs]):
         },
         "required": ["file_path", "line", "symbol", "new_name"],
     }
-    is_concurrency_safe = False
-    is_read_only        = False
-    args_class          = LspRenameArgs
+    is_concurrency_safe    = False
+    args_class             = LspRenameArgs
+    category               = ToolCategory.WRITE
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"lsp", "refactor"})
+    requires_confirmation  = True
 
     def __init__(self, client: LspClient):
         super().__init__()

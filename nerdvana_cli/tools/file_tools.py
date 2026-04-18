@@ -5,9 +5,9 @@ from __future__ import annotations
 import errno
 import hashlib
 import os
-from typing import Any
+from typing import Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.path import safe_makedirs, safe_open_fd, validate_path
 
@@ -97,9 +97,12 @@ Examples:
         },
         "required": ["path"],
     }
-    is_concurrency_safe = True
-    is_read_only = True
-    args_class = FileReadArgs
+    is_concurrency_safe    = True
+    args_class             = FileReadArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"file"})
+    requires_confirmation  = False
 
     async def call(
         self,
@@ -179,10 +182,13 @@ WARNING: This replaces the entire file content."""
         },
         "required": ["path", "content"],
     }
-    is_concurrency_safe = False
-    is_read_only = False
-    is_destructive = True
-    args_class = FileWriteArgs
+    is_concurrency_safe    = False
+    is_destructive         = True
+    args_class             = FileWriteArgs
+    category               = ToolCategory.WRITE
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"file"})
+    requires_confirmation  = False
 
     async def call(
         self,
@@ -274,10 +280,13 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
         },
         "required": ["path", "new_string"],
     }
-    is_concurrency_safe = False
-    is_read_only = False
-    is_destructive = False
-    args_class = FileEditArgs
+    is_concurrency_safe    = False
+    is_destructive         = False
+    args_class             = FileEditArgs
+    category               = ToolCategory.WRITE
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"file", "edit"})
+    requires_confirmation  = False
 
     def validate_input(self, args: FileEditArgs, context: ToolContext) -> str | None:
         if args.anchor_hash is None and not args.old_string:

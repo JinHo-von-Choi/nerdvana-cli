@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
 from nerdvana_cli.core.team import (
@@ -12,7 +12,7 @@ from nerdvana_cli.core.team import (
     get_inbox_path,
     write_to_inbox,
 )
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 # ---------------------------------------------------------------------------
@@ -38,8 +38,12 @@ class TeamCreateTool(BaseTool[TeamCreateArgs]):
         },
         "required": ["team_name"],
     }
-    is_concurrency_safe = True
-    args_class          = TeamCreateArgs
+    is_concurrency_safe    = True
+    args_class             = TeamCreateArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.NONE
+    tags: ClassVar[frozenset[str]] = frozenset({"agent", "team"})
+    requires_confirmation  = False
 
     def __init__(self, team_registry: TeamRegistry) -> None:
         self._team_registry = team_registry
@@ -86,8 +90,12 @@ class SendMessageTool(BaseTool[SendMessageArgs]):
         },
         "required": ["to", "message"],
     }
-    is_concurrency_safe = True
-    args_class          = SendMessageArgs
+    is_concurrency_safe    = True
+    args_class             = SendMessageArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"agent", "messaging"})
+    requires_confirmation  = False
 
     def __init__(
         self,
@@ -138,8 +146,12 @@ class TaskGetTool(BaseTool[TaskGetArgs]):
         },
         "required": ["task_id"],
     }
-    is_concurrency_safe = True
-    args_class          = TaskGetArgs
+    is_concurrency_safe    = True
+    args_class             = TaskGetArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.NONE
+    tags: ClassVar[frozenset[str]] = frozenset({"agent", "introspect"})
+    requires_confirmation  = False
 
     def __init__(self, task_registry: TaskRegistry) -> None:
         self._task_registry = task_registry
@@ -194,8 +206,12 @@ class TaskStopTool(BaseTool[TaskStopArgs]):
         },
         "required": ["task_id"],
     }
-    is_concurrency_safe = True
-    args_class          = TaskStopArgs
+    is_concurrency_safe    = True
+    args_class             = TaskStopArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"agent"})
+    requires_confirmation  = True
 
     def __init__(self, task_registry: TaskRegistry) -> None:
         self._task_registry = task_registry

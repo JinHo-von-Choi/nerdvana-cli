@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import os
 import re
-from typing import Any
+from typing import Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 
@@ -41,10 +41,13 @@ Examples:
         },
         "required": ["command"],
     }
-    is_concurrency_safe = False
-    is_read_only = False
-    is_destructive = False
-    args_class = BashArgs
+    is_concurrency_safe    = False
+    is_destructive         = False
+    args_class             = BashArgs
+    category               = ToolCategory.WRITE
+    side_effects           = ToolSideEffect.PROCESS
+    tags: ClassVar[frozenset[str]]  = frozenset({"shell"})
+    requires_confirmation          = False
 
     _DANGEROUS_PATTERNS: list[re.Pattern[str]] = [
         re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+[/~*]"),

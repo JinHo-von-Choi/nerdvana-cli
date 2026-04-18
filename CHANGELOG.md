@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-04-18
+
+Phase 0B foundational hardening. LSP client gaps identified across three
+rounds of multi-AI review are closed. Tool registry gains the metadata
+layer Phase D/F depend on. CI grows a language-server matrix to keep
+symbol-tool regressions out of main.
+
+### Added
+
+- `core/lsp_client.py` now derives `rootUri` from the project cwd as a
+  `file://` URI (previously hardcoded `None`).
+- `textDocument/didOpen` lifecycle tracking via a new `_open_files`
+  version map; every file touched by `definition`/`references`/`rename`
+  is opened before the request.
+- `workspace/applyEdit` handles `documentChanges` (rust-analyzer,
+  clangd) with legacy `changes` fallback.
+- Server-specific initialization timeouts
+  (pyright/ts-server/gopls 10s, clangd 15s, rust-analyzer 30s,
+  jdtls 45s, default 15s) replace the 10-second hardcode.
+- `shutdown` LSP request + `exit` notification precede SIGTERM on
+  server teardown, preventing orphan language-server processes.
+- Workspace edit writes flow through `utils/path.safe_open_fd`, closing
+  the symlink TOCTOU window matching `file_tools.py`.
+- `core/tool.py` introduces `ToolCategory` (read/write/destructive/
+  symbolic/meta), `ToolSideEffect` (none/filesystem/process/network/
+  external), and `BaseTool.tags`, `requires_confirmation` class
+  variables. All 17 built-in tools classified.
+- `ToolRegistry.filter()` predicate API supports
+  `category`/`side_effects`/`tags_any`/`tags_all`/`read_only` queries.
+  Phase F profile enforcement and Phase D symbol-tool gating build on
+  this.
+- `.github/workflows/lsp_tests.yml` CI job installs pyright and
+  typescript-language-server via npm on ubuntu-22.04 × python
+  3.11/3.12, caches `~/.npm`, and runs the `lsp_integration`-marked
+  suite separately from the main test job.
+- New pytest markers `lsp_integration` and `slow`. `tests/lsp/`
+  placeholder suite verifies binaries are on PATH under CI.
+
+### Changed
+
+- `BaseTool.is_read_only` is now a property derived from `category ∈
+  {READ, SYMBOLIC}`. Existing callers unchanged; `McpToolAdapter` no
+  longer assigns the attribute directly.
+- `_apply_workspace_edit` accepts an optional `cwd` parameter so
+  callers can scope path resolution; LSP rename supplies
+  `self._project_root`.
+
+### Test count
+
+Collected: 485 (0.4.2) → 505 (0.4.3), +20 net new:
+- 8 LSP hardening tests
+- 10 tool metadata tests
+- 2 LSP integration placeholders (CI-only)
+
 ## [0.4.2] - 2026-04-18
 
 Phase 0A foundational debt payment. No user-visible feature changes; pure

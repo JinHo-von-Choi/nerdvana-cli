@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 
@@ -53,10 +53,13 @@ Use format="compact" to reduce token cost for list-type outputs."""
         },
         "required": ["cmd"],
     }
-    args_class          = ParismArgs
-    is_concurrency_safe = False
-    is_read_only        = False
-    is_destructive      = False
+    args_class             = ParismArgs
+    is_concurrency_safe    = False
+    is_destructive         = False
+    category               = ToolCategory.WRITE
+    side_effects           = ToolSideEffect.PROCESS
+    tags: ClassVar[frozenset[str]] = frozenset({"shell", "structured"})
+    requires_confirmation  = False
 
     _client: Any = None
 
