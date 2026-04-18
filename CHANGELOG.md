@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-04-18
+
+Phase G2: External harness hook bridge + dual-gate sanitizer.
+
+### Added
+
+- `nerdvana_cli/server/hook_schemas.py` — TypedDict models for Claude Code /
+  Codex / VSCode hook payloads; `make_response` factory for `HookResponse`.
+- `nerdvana_cli/server/sanitizer.py` — dual-gate sanitiser (v3.1 §3.3):
+  Gate-1 blacklist tags 7 prompt-injection patterns; Gate-2 rejects
+  `role:system` / `<system>` / tool-definition structures.  Sensitive-data
+  redaction (OpenAI key, AWS AKID, email, bare tokens).  4 096-char cap.
+  `SanitizerAudit` records all events to `sanitizer_events` table.
+- `nerdvana_cli/server/hook_bridge.py` — full `HookBridge` implementation;
+  handles `pre-tool-use` (approve + optional context), `post-tool-use`
+  (context from tool output), `prompt-submit` (AnchorMind placeholder, opt-in).
+  `run_hook` stdin→stdout helper.  All calls logged to `hooks` table.
+- `nerdvana_cli/server/audit.py` — added `hooks` and `sanitizer_events` DDL
+  (ADD-only; no existing tables removed).
+- `main.py` — `nerdvana hook {pre-tool-use,post-tool-use,prompt-submit,list}`
+  sub-command group.
+- `tests/server/test_sanitizer.py` (16), `tests/server/test_hook_bridge.py`
+  (11), `tests/server/test_hook_audit.py` (3),
+  `tests/server/test_hook_bridge_integration.py` (3) — +33 tests (749 → 782).
+
+### Security
+
+- Gate-2 structure rejection prevents system-prompt injection via hook context.
+- Sensitive-data redaction applied to all injected context before dispatch.
+
 ## [0.8.0] - 2026-04-18
 
 Phase G1: MCP server mode — external harnesses can call nerdvana tools over
