@@ -260,7 +260,7 @@ class DashboardTab(Widget):
                 yield ToolHeatmap(id="dash-heatmap")
                 yield FailureRatePanel(id="dash-failures")
             with Horizontal(id="dash-row-mid"):
-                yield Log(id="dash-log", max_lines=200, markup=True)
+                yield Log(id="dash-log", max_lines=200, highlight=True)
                 yield TokenSparkline(id="dash-sparkline")
         yield HealthFooter(id="dash-footer")
 

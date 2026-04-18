@@ -413,7 +413,8 @@ class NerdvanaApp(App[object]):
         self.set_interval(2.0, lambda: asyncio.create_task(sidebar.refresh_files()))
 
         menu = self.query_one("#command-menu", CommandMenu)
-        _seen_triggers: set[str] = set()
+        # Pre-seed seen set with built-in slash command IDs to avoid DuplicateID
+        _seen_triggers: set[str] = {cmd for cmd, _ in SLASH_COMMANDS}
         for skill in self._agent_loop.skill_loader.list_skills():
             if skill.trigger not in _seen_triggers:
                 menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
