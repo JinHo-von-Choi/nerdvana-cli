@@ -305,5 +305,137 @@ def version() -> None:
     console.print(f"NerdVana CLI v{__version__}")
 
 
+# ---------------------------------------------------------------------------
+# nerdvana serve — Phase G1
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def serve(
+    transport:   str  = typer.Option("stdio", "--transport",  help="Transport: stdio or http"),
+    port:        int  = typer.Option(10830,   "--port",       help="HTTP listen port (≥10000)"),
+    host:        str  = typer.Option("127.0.0.1", "--host",   help="HTTP bind address"),
+    allow_write: bool = typer.Option(False,   "--allow-write", help="Enable write tools"),
+    tls_cert:    str  = typer.Option("",      "--tls-cert",   help="TLS certificate file (PEM)"),
+    tls_ca:      str  = typer.Option("",      "--tls-ca",     help="CA certificate for mTLS"),
+) -> None:
+    """Start NerdVana as an MCP 1.0 server.
+
+    External harnesses (Claude Code, Cursor, Continue …) can call
+    nerdvana tools via the mcp__nerdvana__* namespace.
+
+    Examples:
+        nerdvana serve                          # stdio (default)
+        nerdvana serve --transport http --port 10830
+        nerdvana serve --transport http --allow-write
+    """
+    from pathlib import Path as _Path
+
+    from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
+
+    if transport not in ("stdio", "http"):
+        console.print(f"[red]Error: unknown transport '{transport}'. Use 'stdio' or 'http'.[/red]")
+        raise typer.Exit(1)
+
+    if transport == "http" and port < 10000:
+        console.print(f"[red]Error: port {port} is below 10000. Use a port ≥ 10000.[/red]")
+        raise typer.Exit(1)
+
+    server = NerdvanaMcpServer(
+        allow_write = allow_write,
+        transport   = transport,
+        host        = host,
+        port        = port,
+        tls_cert    = _Path(tls_cert) if tls_cert else None,
+        tls_ca      = _Path(tls_ca)   if tls_ca  else None,
+    )
+
+    if transport == "http":
+        console.print(
+            f"[bold]NerdVana MCP server[/bold] listening on "
+            f"http://{host}:{port}/mcp  "
+            f"[{'write' if allow_write else 'read-only'}]",
+            file=sys.stderr,
+        )
+    else:
+        console.print(
+            f"[bold]NerdVana MCP server[/bold] running on stdio  "
+            f"[{'write' if allow_write else 'read-only'}]",
+            file=sys.stderr,
+        )
+
+    asyncio.run(server.run())
+
+
+# ---------------------------------------------------------------------------
+# nerdvana admin — ACL sub-group — Phase G1
+# ---------------------------------------------------------------------------
+
+admin_app = typer.Typer(
+    name    = "admin",
+    help    = "Administrative commands.",
+    add_completion = False,
+)
+app.add_typer(admin_app)
+
+acl_app = typer.Typer(
+    name    = "acl",
+    help    = "Manage MCP access-control list (mcp_acl.yml).",
+    add_completion = False,
+)
+admin_app.add_typer(acl_app)
+
+
+@acl_app.command("list")
+def acl_list() -> None:
+    """List all clients and their roles."""
+    from nerdvana_cli.server.acl import ACLManager
+
+    mgr = ACLManager()
+    mgr.load()
+
+    console.print("[bold]Clients:[/bold]")
+    for name, roles in sorted(mgr.list_clients().items()):
+        console.print(f"  {name}: {', '.join(roles) or '(none)'}")
+
+    console.print()
+    console.print("[bold]Roles:[/bold]")
+    for role, tools in sorted(mgr.list_roles().items()):
+        console.print(f"  {role}: {', '.join(tools)}")
+
+
+@acl_app.command("revoke")
+def acl_revoke(
+    key_prefix: str = typer.Argument(..., help="Client name prefix to revoke"),
+) -> None:
+    """Revoke ACL entries for clients whose name starts with KEY_PREFIX."""
+    from nerdvana_cli.server.acl import ACLManager
+
+    mgr     = ACLManager()
+    mgr.load()
+    removed = mgr.revoke(key_prefix)
+
+    if removed:
+        for name in removed:
+            console.print(f"Revoked: {name}")
+    else:
+        console.print(f"No clients found with prefix '{key_prefix}'.")
+
+
+@acl_app.command("add")
+def acl_add(
+    client_name: str = typer.Argument(..., help="Client name"),
+    roles:       str = typer.Argument(..., help="Comma-separated roles (e.g. 'read-only,edit')"),
+) -> None:
+    """Add or update a client's role assignments."""
+    from nerdvana_cli.server.acl import ACLManager
+
+    role_list = [r.strip() for r in roles.split(",") if r.strip()]
+    mgr       = ACLManager()
+    mgr.load()
+    mgr.add_client(client_name, role_list)
+    console.print(f"Updated '{client_name}' → {role_list}")
+
+
 if __name__ == "__main__":
     app()
