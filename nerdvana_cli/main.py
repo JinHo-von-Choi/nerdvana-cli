@@ -39,6 +39,15 @@ def _run_migration_once() -> None:
         console.print(f"[yellow]Migration warning: {e}[/yellow]")
 
 
+# Approval-mode → (mode, trust_level) mapping (Codex-style, Phase F §6.3)
+_APPROVAL_MODE_MAP: dict[str, tuple[str, str]] = {
+    "default":   ("interactive", "balanced"),
+    "auto_edit": ("editing",     "balanced"),
+    "yolo":      ("one-shot",    "yolo"),
+    "plan":      ("planning",    "strict"),
+}
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -49,6 +58,11 @@ def main(
     model: str = typer.Option("", "--model", "-m", help="Model name"),
     provider: str = typer.Option("", "--provider", "-p", help="AI provider"),
     max_tokens: int = typer.Option(0, "--max-tokens", help="Max tokens per response"),
+    approval_mode: str = typer.Option(
+        "",
+        "--approval-mode",
+        help="Preset mode: default | auto_edit | yolo | plan",
+    ),
 ) -> None:
     """NerdVana CLI — AI-powered development tool.
 
@@ -82,30 +96,36 @@ def main(
             _original_unraisablehook(unraisable)
 
         sys.unraisablehook = _quiet_unraisable
+
+        # --approval-mode shorthand → default_mode override applied in repl_loop
+        resolved_approval = approval_mode.strip().lower() if approval_mode else ""
+
         asyncio.run(
             repl_loop(
-                config_path=config or None,
-                cwd=cwd or os.getcwd(),
-                verbose=verbose,
-                model=model or None,
-                provider=provider or None,
-                max_tokens=max_tokens or None,
+                config_path    = config or None,
+                cwd            = cwd or os.getcwd(),
+                verbose        = verbose,
+                model          = model or None,
+                provider       = provider or None,
+                max_tokens     = max_tokens or None,
+                approval_mode  = resolved_approval or None,
             )
         )
 
 
 async def repl_loop(
-    config_path: str | None = None,
-    cwd: str = ".",
-    verbose: bool = False,
-    model: str | None = None,
-    provider: str | None = None,
-    max_tokens: int | None = None,
+    config_path:   str | None = None,
+    cwd:           str        = ".",
+    verbose:       bool       = False,
+    model:         str | None = None,
+    provider:      str | None = None,
+    max_tokens:    int | None = None,
+    approval_mode: str | None = None,
 ) -> None:
     """Interactive REPL loop."""
     settings = NerdvanaSettings.load(config_path)
     _run_migration_once()
-    settings.cwd = cwd
+    settings.cwd     = cwd
     settings.verbose = verbose
 
     if model:
@@ -114,6 +134,11 @@ async def repl_loop(
         settings.model.provider = provider
     if max_tokens:
         settings.model.max_tokens = max_tokens
+
+    # --approval-mode → default_mode override (Phase F §6.3)
+    if approval_mode:
+        mapped_mode, _ = _APPROVAL_MODE_MAP.get(approval_mode, (approval_mode, "balanced"))
+        settings.session.default_mode = mapped_mode
 
     # Auto-run setup if no config and no API key
     from nerdvana_cli.core.setup import has_config_file, has_valid_api_key, run_setup
