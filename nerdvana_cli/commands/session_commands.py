@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from nerdvana_cli.core.analytics import AnalyticsReader
+
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
 
@@ -20,11 +22,23 @@ async def handle_clear(app: NerdvanaApp, args: str) -> None:
 
 
 async def handle_tokens(app: NerdvanaApp, args: str) -> None:
-    """Handle /tokens command — show current token usage."""
+    """Handle /tokens command — show current token usage with accumulated cost."""
     if app._agent_loop:
         u = app._agent_loop.state.usage
+
+        # Compute session cost from analytics DB
+        cost_str = ""
+        try:
+            session_id = getattr(app._agent_loop.state, "session_id", "")
+            if session_id:
+                cost = AnalyticsReader().session_cost(session_id)
+                cost_str = f" / [bold green]${cost:.4f}[/bold green]"
+        except Exception:  # noqa: BLE001
+            pass
+
         app._add_chat_message(
-            f"[dim]Tokens: {u.input_tokens} in / {u.output_tokens} out / {u.total_tokens} total[/dim]"
+            f"[dim]Tokens: {u.input_tokens} in / {u.output_tokens} out / "
+            f"{u.total_tokens} total{cost_str}[/dim]"
         )
 
 
