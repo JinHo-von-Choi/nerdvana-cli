@@ -97,13 +97,19 @@ class NerdvanaMcpServer:
         auth_manager:  AuthManager | None  = None,
         acl_manager:   ACLManager  | None  = None,
         audit_logger:  AuditLogger | None  = None,
+        # Phase H extensions — external project subprocess support
+        project_path:  Path | None       = None,
+        mode:          str  | None       = None,
     ) -> None:
-        self.allow_write  = allow_write
-        self.transport    = transport
-        self.host         = host
-        self.port         = port
-        self.tls_cert     = tls_cert
-        self.tls_ca       = tls_ca
+        self.allow_write   = allow_write
+        self.transport     = transport
+        self.host          = host
+        self.port          = port
+        self.tls_cert      = tls_cert
+        self.tls_ca        = tls_ca
+        # Phase H: working directory override and mode name.
+        self.project_path  = project_path
+        self.mode          = mode
 
         self._auth:  AuthManager  = auth_manager  or AuthManager()
         self._acl:   ACLManager   = acl_manager   or ACLManager()

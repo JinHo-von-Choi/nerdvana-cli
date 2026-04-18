@@ -312,12 +312,14 @@ def version() -> None:
 
 @app.command()
 def serve(
-    transport:   str  = typer.Option("stdio", "--transport",  help="Transport: stdio or http"),
-    port:        int  = typer.Option(10830,   "--port",       help="HTTP listen port (≥10000)"),
-    host:        str  = typer.Option("127.0.0.1", "--host",   help="HTTP bind address"),
-    allow_write: bool = typer.Option(False,   "--allow-write", help="Enable write tools"),
-    tls_cert:    str  = typer.Option("",      "--tls-cert",   help="TLS certificate file (PEM)"),
-    tls_ca:      str  = typer.Option("",      "--tls-ca",     help="CA certificate for mTLS"),
+    transport:   str  = typer.Option("stdio",     "--transport",   help="Transport: stdio or http"),
+    port:        int  = typer.Option(10830,        "--port",        help="HTTP listen port (≥10000)"),
+    host:        str  = typer.Option("127.0.0.1", "--host",        help="HTTP bind address"),
+    allow_write: bool = typer.Option(False,        "--allow-write", help="Enable write tools"),
+    tls_cert:    str  = typer.Option("",           "--tls-cert",    help="TLS certificate file (PEM)"),
+    tls_ca:      str  = typer.Option("",           "--tls-ca",      help="CA certificate for mTLS"),
+    project:     str  = typer.Option("",           "--project",     help="Project root directory (Phase H)"),
+    mode:        str  = typer.Option("",           "--mode",        help="Profile mode name to activate (Phase H)"),
 ) -> None:
     """Start NerdVana as an MCP 1.0 server.
 
@@ -325,9 +327,10 @@ def serve(
     nerdvana tools via the mcp__nerdvana__* namespace.
 
     Examples:
-        nerdvana serve                          # stdio (default)
+        nerdvana serve                                              # stdio (default)
         nerdvana serve --transport http --port 10830
         nerdvana serve --transport http --allow-write
+        nerdvana serve --project /path/to/lib --mode query         # Phase H external query
     """
     from pathlib import Path as _Path
 
@@ -341,13 +344,23 @@ def serve(
         console.print(f"[red]Error: port {port} is below 10000. Use a port ≥ 10000.[/red]")
         raise typer.Exit(1)
 
+    # Phase H: resolve project path (defaults to cwd when not specified).
+    project_path: _Path | None = None
+    if project:
+        project_path = _Path(project).expanduser().resolve()
+        if not project_path.is_dir():
+            console.print(f"[red]Error: --project path does not exist: {project_path}[/red]")
+            raise typer.Exit(1)
+
     server = NerdvanaMcpServer(
-        allow_write = allow_write,
-        transport   = transport,
-        host        = host,
-        port        = port,
-        tls_cert    = _Path(tls_cert) if tls_cert else None,
-        tls_ca      = _Path(tls_ca)   if tls_ca  else None,
+        allow_write  = allow_write,
+        transport    = transport,
+        host         = host,
+        port         = port,
+        tls_cert     = _Path(tls_cert) if tls_cert else None,
+        tls_ca       = _Path(tls_ca)   if tls_ca  else None,
+        project_path = project_path,
+        mode         = mode or None,
     )
 
     if transport == "http":
