@@ -198,3 +198,27 @@ def project_mcp_json(cwd: str) -> Path:
 def project_nirnamd_path(cwd: str) -> Path:
     """Project-local NIRNA.md instructions file."""
     return Path(cwd) / "NIRNA.md"
+
+
+# ---------------------------------------------------------------------------
+# Phase F: runtime profile paths
+# ---------------------------------------------------------------------------
+
+def user_contexts_dir() -> Path:
+    """User-global context profile directory."""
+    return user_data_home() / "contexts"
+
+
+def user_modes_dir() -> Path:
+    """User-global mode profile directory."""
+    return user_data_home() / "modes"
+
+
+def project_contexts_dir(cwd: str) -> Path:
+    """Project-local context profile directory."""
+    return Path(cwd) / ".nerdvana" / "contexts"
+
+
+def project_modes_dir(cwd: str) -> Path:
+    """Project-local mode profile directory."""
+    return Path(cwd) / ".nerdvana" / "modes"

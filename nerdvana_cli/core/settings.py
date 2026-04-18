@@ -37,6 +37,9 @@ class SessionConfig(BaseModel):
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures
     planning_gate: bool = False  # enable complexity-triggered Plan agent before execution
+    # Phase F: runtime profiles — default context and mode names
+    default_context: str = "standalone"
+    default_mode:    str = "interactive"
 
 
 class ParismConfig(BaseModel):
@@ -86,7 +89,11 @@ class NerdvanaSettings(BaseSettings):
                 if "permissions" in data:
                     settings.permissions = PermissionConfig(**data["permissions"])
                 if "session" in data:
-                    settings.session = SessionConfig(**data["session"])
+                    session_data = dict(data["session"])
+                    # Phase F: planning_gate=true → default_mode=planning (deprecated in 0.8.0)
+                    if session_data.get("planning_gate") and "default_mode" not in session_data:
+                        session_data["default_mode"] = "planning"
+                    settings.session = SessionConfig(**session_data)
                 if "parism" in data:
                     settings.parism = ParismConfig(**data["parism"])
                 if "hooks" in data:
