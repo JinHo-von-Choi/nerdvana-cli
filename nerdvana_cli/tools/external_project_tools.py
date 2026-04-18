@@ -58,11 +58,8 @@ class ListQueryableProjectsTool(BaseTool[None]):
             lines.append(f"  {p.name}: {p.path}  [{langs}]")
         return ToolResult(tool_use_id="", content="\n".join(lines))
 
-    def get_permission_behavior(self, args: Any) -> PermissionBehavior:
-        return PermissionBehavior(behavior="allow")
-
-    def check_permission(self, args: Any) -> PermissionResult:
-        return PermissionResult(granted=True)
+    def check_permissions(self, args: Any, context: ToolContext) -> PermissionResult:
+        return PermissionResult(behavior=PermissionBehavior.ALLOW)
 
 
 # ---------------------------------------------------------------------------
@@ -143,11 +140,8 @@ class RegisterExternalProjectTool(BaseTool[RegisterExternalProjectArgs]):
             ),
         )
 
-    def get_permission_behavior(self, args: Any) -> PermissionBehavior:
-        return PermissionBehavior(behavior="ask")
-
-    def check_permission(self, args: Any) -> PermissionResult:
-        return PermissionResult(granted=True)
+    def check_permissions(self, args: Any, context: ToolContext) -> PermissionResult:
+        return PermissionResult(behavior=PermissionBehavior.ASK)
 
     @staticmethod
     def _safe_resolve(raw_path: str) -> Path:
@@ -267,8 +261,5 @@ class QueryExternalProjectTool(BaseTool[QueryExternalProjectArgs]):
 
         return ToolResult(tool_use_id="", content=answer)
 
-    def get_permission_behavior(self, args: Any) -> PermissionBehavior:
-        return PermissionBehavior(behavior="allow")
-
-    def check_permission(self, args: Any) -> PermissionResult:
-        return PermissionResult(granted=True)
+    def check_permissions(self, args: Any, context: ToolContext) -> PermissionResult:
+        return PermissionResult(behavior=PermissionBehavior.ASK)

@@ -138,14 +138,18 @@ class ToolExecutor:
                 is_error    = True,
             )
         if perm_result.behavior == PermissionBehavior.ASK:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = (
-                    f"Permission required (auto-denied in current mode): "
-                    f"{perm_result.message}"
-                ),
-                is_error    = True,
+            granted = await self._ask_user_permission(
+                tool_name = tool_use["name"],
+                message   = perm_result.message,
             )
+            if not granted:
+                return ToolResult(
+                    tool_use_id = tool_id,
+                    content     = (
+                        f"Permission denied by user: {perm_result.message}"
+                    ),
+                    is_error    = True,
+                )
 
         hook_ctx = HookContext(
             event      = HookEvent.BEFORE_TOOL,
@@ -211,6 +215,50 @@ class ToolExecutor:
                         success     = success,
                         error_class = exc_class,
                     )
+
+    async def _ask_user_permission(self, tool_name: str, message: str) -> bool:
+        """Prompt the user for explicit confirmation when a tool returns ASK.
+
+        Behaviour:
+        - Interactive TTY: prints a y/N prompt and reads a single line.
+          Accepts "y" or "yes" (case-insensitive); everything else is DENY.
+          An empty reply defaults to N (fail-safe).
+        - Non-interactive (piped stdin / CI / batch): immediately returns False
+          (DENY) without blocking — safe default prevents unattended approval.
+
+        Returns True only when the user explicitly confirms with y/yes.
+        """
+        import sys
+
+        prompt_text = (
+            f"\n[permission] {tool_name}: {message}\n"
+            "Allow this action? [y/N] "
+        )
+
+        if not sys.stdin.isatty():
+            # Non-interactive session — fail-safe DENY, never block.
+            logger.info(
+                "ASK permission for %s auto-denied: non-interactive session (no TTY)",
+                tool_name,
+            )
+            return False
+
+        try:
+            # Run blocking input() in a thread so we don't stall the event loop.
+            loop    = asyncio.get_running_loop()
+            reply   = await loop.run_in_executor(None, lambda: input(prompt_text))
+            granted = reply.strip().lower() in {"y", "yes"}
+        except (EOFError, OSError):
+            # stdin closed unexpectedly — treat as DENY.
+            granted = False
+
+        logger.info(
+            "ASK permission for %s: user replied %r → %s",
+            tool_name,
+            reply if "reply" in dir() else "<eof>",
+            "ALLOW" if granted else "DENY",
+        )
+        return granted
 
     def _record_reminder(self, call: dict[str, Any], result: ToolResult) -> None:
         """Record a completed tool call into the context reminder, if present."""
