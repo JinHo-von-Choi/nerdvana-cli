@@ -329,7 +329,23 @@ class AgentLoop:
                                 if asst_text:
                                     self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
                                     self.session.record_assistant_message(asst_text)
-                                return
+                                from nerdvana_cli.core.hooks import HookContext, HookEvent
+                                _et_ctx = HookContext(
+                                    event       = HookEvent.AFTER_API_CALL,
+                                    settings    = self.settings,
+                                    tools       = self.registry.all_tools(),
+                                    messages    = self.state.messages,
+                                    stop_reason = "end_turn",
+                                    extra       = {"agent_loop": self, "asst_text": asst_text},
+                                )
+                                _et_injected = False
+                                for _et_hr in self.hooks.fire(_et_ctx):
+                                    for _et_msg in _et_hr.inject_messages:
+                                        self.state.messages.append(Message(role=Role.USER, content=_et_msg["content"]))
+                                        _et_injected = True
+                                if not _et_injected:
+                                    return
+                                break
                             elif stop == "tool_use" and tool_uses:
                                 if asst_text:
                                     self.session.record_assistant_message(asst_text, tool_uses)

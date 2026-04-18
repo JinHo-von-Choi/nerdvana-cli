@@ -329,45 +329,33 @@ def test_scenario_08_ralph_loop_check(
     normalize_messages: Any,
     snapshot: Any,
 ) -> None:
-    """Captures current 0.4.1 behaviour of ralph_loop_check.
+    """ralph_loop_check fires on end_turn and injects a completion prompt.
 
-    The ralph_loop_check hook is registered on AFTER_API_CALL. In 0.4.1,
-    AgentLoop only fires AFTER_API_CALL when stop_reason == "max_tokens".
-    For end_turn stops, the hook is NOT fired — the loop simply appends the
-    assistant message and returns.
-
-    Therefore, even when the assistant reply contains TODO/FIXME markers,
-    NO additional user injection occurs.  This test captures that baseline
-    so that T-0A-05 (loop_hooks.py extraction) can detect any behavioural
-    change.
+    AFTER_API_CALL is now fired for end_turn stops (T-bug-ralph-loop fix).
+    When the assistant reply contains TODO/FIXME markers, ralph_loop_check
+    injects a user message asking for completion.  The second fixture response
+    provides the clean follow-up, and the loop terminates normally.
     """
-    # scenario_08 fixture: first response ends with end_turn + TODO content;
-    # we only need the first response to verify the non-injection behaviour.
     loop, _mock = build_loop("provider_mock_scenario_08.json")
-
-    # Discard the second response so loop terminates after the TODO-containing reply
-    _mock._responses = _mock._responses[:1]  # noqa: SLF001
 
     run_loop(loop, "Implement the function.")
 
     messages = loop.state.messages
 
-    # In 0.4.1 the ralph_loop_check hook is NOT wired into end_turn processing,
-    # so no additional user messages should appear beyond the original prompt.
+    # ralph_loop_check must have injected a continuation message
     user_contents = [str(m.content) for m in messages if str(m.role) == "user"]
     ralph_injected = [
         c for c in user_contents
         if "Incomplete items found" in c or "Complete all TODOs" in c
     ]
-    assert not ralph_injected, (
-        "In 0.4.1, ralph_loop_check does NOT fire on end_turn. "
-        "If this assertion fails, the baseline behaviour has changed."
+    assert ralph_injected, (
+        "ralph_loop_check must fire on end_turn and inject a completion prompt."
     )
 
-    # The assistant message must contain the TODO markers
+    # The first assistant message must contain the TODO markers
     assistant_contents = [str(m.content) for m in messages if str(m.role) == "assistant"]
     todo_in_reply = any("TODO" in c for c in assistant_contents)
-    assert todo_in_reply, "Expected assistant reply to contain TODO marker"
+    assert todo_in_reply, "Expected first assistant reply to contain TODO marker"
 
     normalized = normalize_messages(messages)
     snapshot.assert_match(
