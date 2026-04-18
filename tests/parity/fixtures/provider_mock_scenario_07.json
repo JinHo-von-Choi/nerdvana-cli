@@ -1,0 +1,16 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "Partial response before limit"},
+        {"type": "done", "stop_reason": "max_tokens"}
+      ]
+    },
+    {
+      "events": [
+        {"type": "content_delta", "content": "Continuation after context limit recovery."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}

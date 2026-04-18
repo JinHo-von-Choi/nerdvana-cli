@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-04-18
+
+Phase 0A foundational debt payment. No user-visible feature changes; pure
+structural refactor + metadata drift fix. Parity snapshots and fault-injection
+suite guarantee behavioral preservation.
+
+### Changed
+
+- `nerdvana_cli/core/agent_loop.py` decomposed from 752 to exactly 400 lines.
+  Responsibilities delegated to three new modules:
+  - `core/loop_state.py` — immutable `LoopState` dataclass; evolution via
+    `.evolve()` replaces scattered field mutations.
+  - `core/tool_executor.py` — `ToolExecutor` takes over tool scheduling,
+    permission checks, and result serialization. Preserves parallel-read /
+    serial-write policy and hook firing order.
+  - `core/loop_hooks.py` — `LoopHookEngine` relocates `context_limit_recovery`,
+    `json_parse_recovery`, `ralph_loop_check`, and `_is_retryable_error`.
+
+### Added
+
+- `tests/parity/` 8-scenario snapshot suite locks in 0.4.1 `AgentLoop`
+  behavior (REPL, streaming, tool chains, session resume, compaction,
+  context-limit/ralph-loop recovery). Serves as regression baseline for
+  future refactors.
+- `tests/parity/test_fault_injection.py` 3-scenario resilience suite
+  (provider HTTP 500 retry, tool `asyncio.TimeoutError`, session write
+  `OSError(ENOSPC)` integrity).
+- `tests/contracts/test_loop_decomposition.py` + `test_loop_hooks.py`
+  assert decomposition invariants (LoopState immutability, evolve field
+  preservation, hook signature contract).
+- `scripts/check_import_graph.py` detects circular imports via
+  `networkx.simple_cycles`, with baseline mode (`.import_cycles_baseline.json`
+  tracks 8 pre-existing cycles, fails only on new ones).
+- `scripts/sync_version_badges.py` + `scripts/sync_test_count.py`
+  propagate `pyproject.toml` version and `pytest --collect-only` count
+  into README and NIRNA.md.
+- `.pre-commit-config.yaml` wires the three scripts plus `ruff` as
+  pre-commit hooks (`sync-test-count` runs at pre-push to avoid recursion).
+
+### Fixed
+
+- README version badge drift (`0.3.0` → `0.4.2` after release).
+- `NIRNA.md` test count drift (272 → 485).
+- Known limitation preserved as-is (fix deferred to a dedicated bug
+  ticket): `ralph_loop_check` hook does not fire on `end_turn` stop
+  reason in 0.4.1. Captured in parity scenario 8 baseline to prevent
+  silent behavior change.
+
+### Test count
+
+Collected: 465 (0.4.1) → 485 (0.4.2), +20 net new:
+- 8 parity snapshots
+- 9 loop-decomposition contracts
+- 3 fault-injection scenarios
+
 ## [0.4.1] - 2026-04-16
 
 ### Added
