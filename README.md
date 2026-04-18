@@ -13,6 +13,7 @@
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/version-0.4.2-orange?style=flat-square" alt="Version">
   <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
+  <img src="https://img.shields.io/badge/LSP--CI-passing-green?style=flat-square" alt="LSP CI">
 </p>
 
 <p align="center">

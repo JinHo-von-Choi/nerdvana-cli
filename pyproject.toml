@@ -86,6 +86,10 @@ known-first-party = ["nerdvana_cli"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = [
+    "lsp_integration: Tests requiring actual language server processes (pyright, typescript-language-server)",
+    "slow: Tests taking > 1 second",
+]
 
 [tool.mypy]
 python_version = "3.11"
