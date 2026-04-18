@@ -4,7 +4,7 @@
 - Install: `pip install -e ".[all]"` (all providers) or `pip install -e ".[anthropic]"` (specific)
 - One-line install: `curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash`
 - Dev install: `pip install -e ".[dev]"`
-- Test: `pytest` (pytest-asyncio auto mode, 272 tests)
+- Test: `pytest` (pytest-asyncio auto mode, 485 tests)
 - Lint: `ruff check .` (line-length 120, 0 violations)
 - Format: `ruff format .`
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)

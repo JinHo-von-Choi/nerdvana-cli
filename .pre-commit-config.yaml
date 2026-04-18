@@ -1,0 +1,28 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-import-graph
+        name: check import graph
+        entry: python scripts/check_import_graph.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: sync-version-badges
+        name: sync version badges
+        entry: python scripts/sync_version_badges.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: "(pyproject\\.toml|README.*\\.md)$"
+      - id: sync-test-count
+        name: sync test count
+        entry: python scripts/sync_test_count.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: ruff
+        name: ruff
+        entry: ruff check
+        language: system
+        types: [python]
+        stages: [pre-commit]

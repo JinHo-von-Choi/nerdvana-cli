@@ -1,0 +1,16 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "Here is a function:\n\ndef my_func():\n    # TODO: implement this\n    pass\n\nFIXME: This needs more work."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    },
+    {
+      "events": [
+        {"type": "content_delta", "content": "All TODOs and FIXMEs are now complete."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}

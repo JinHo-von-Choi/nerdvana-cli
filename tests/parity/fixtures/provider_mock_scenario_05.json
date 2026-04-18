@@ -1,0 +1,16 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "First session response."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    },
+    {
+      "events": [
+        {"type": "content_delta", "content": "Resumed session response."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}

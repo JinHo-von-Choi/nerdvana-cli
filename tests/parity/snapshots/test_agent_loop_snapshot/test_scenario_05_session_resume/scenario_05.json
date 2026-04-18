@@ -1,0 +1,26 @@
+[
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "First session prompt."
+  },
+  {
+    "role": "assistant",
+    "content": "First session response."
+  },
+  {
+    "role": "user",
+    "content": "<system-reminder>\nHarness context refresh — turn=1, cwd=<CWD>\n\nStay grounded in this context. Do not re-run tools you already ran unless state changed. Cite file:line for references.\n</system-reminder>"
+  },
+  {
+    "role": "user",
+    "content": "Resume: continue from where we left off."
+  },
+  {
+    "role": "assistant",
+    "content": "Resumed session response."
+  }
+]

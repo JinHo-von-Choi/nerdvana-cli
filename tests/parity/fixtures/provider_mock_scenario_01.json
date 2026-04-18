@@ -1,0 +1,10 @@
+{
+  "responses": [
+    {
+      "events": [
+        {"type": "content_delta", "content": "Hello from the mock provider."},
+        {"type": "done", "stop_reason": "end_turn"}
+      ]
+    }
+  ]
+}
