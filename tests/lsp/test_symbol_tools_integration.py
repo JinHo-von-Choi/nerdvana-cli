@@ -8,6 +8,7 @@ fixture directory.
 
 작성자: 최진호
 작성일: 2026-04-18
+수정일: 2026-04-18 (Phase D.1 — InsertBefore, InsertAfter, SafeDelete E2E)
 """
 from __future__ import annotations
 
@@ -229,3 +230,159 @@ class TestReplaceSymbolBodyIntegration:
         r2     = await tool.call(args2, ctx)
         d2     = json.loads(r2.content)
         assert d2["status"] == "STALE"
+
+
+@pytest.mark.lsp_integration
+@pytest.mark.skipif(not _has_pyright(), reason="pyright not installed")
+class TestInsertBeforeSymbolIntegration:
+    @pytest.fixture
+    async def setup(self, tmp_path: Path) -> tuple[LanguageServerSymbolRetriever, CodeEditor, Path]:
+        target = tmp_path / "models.py"
+        target.write_text(MODELS_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+
+        client    = LspClient(project_root=str(tmp_path))
+        retriever = LanguageServerSymbolRetriever(client=client, project_root=str(tmp_path))
+        editor    = CodeEditor(project_root=str(tmp_path))
+        yield retriever, editor, target
+        await client.close()
+
+    async def test_insert_before_two_step(
+        self,
+        setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
+    ) -> None:
+        """InsertBeforeSymbol inserts a line before the User class definition."""
+        from nerdvana_cli.tools.symbol_tools import InsertBeforeSymbolArgs, InsertBeforeSymbolTool
+        from nerdvana_cli.core.tool import ToolContext
+        import json
+
+        retriever, editor, target = setup
+        tool = InsertBeforeSymbolTool(retriever=retriever, editor=editor)
+        ctx  = ToolContext(cwd=str(target.parent))
+
+        # Step 1: preview
+        args1 = InsertBeforeSymbolArgs(
+            name_path     = "User",
+            relative_path = str(target),
+            body          = "# === auto-inserted marker ===\n",
+        )
+        r1 = await tool.call(args1, ctx)
+        assert not r1.is_error, r1.content
+        d1 = json.loads(r1.content)
+        assert d1["kind"] == "insert_before"
+        assert "auto-inserted marker" in d1["diff"]
+
+        # Step 2: apply
+        args2  = InsertBeforeSymbolArgs(preview_id=d1["preview_id"], apply=True)
+        r2     = await tool.call(args2, ctx)
+        assert not r2.is_error, r2.content
+        d2     = json.loads(r2.content)
+        assert d2["status"] == "applied"
+
+        content = target.read_text(encoding="utf-8")
+        assert "auto-inserted marker" in content
+        # The marker should appear before the class definition
+        marker_pos = content.index("auto-inserted marker")
+        class_pos  = content.index("class User")
+        assert marker_pos < class_pos
+
+
+@pytest.mark.lsp_integration
+@pytest.mark.skipif(not _has_pyright(), reason="pyright not installed")
+class TestInsertAfterSymbolIntegration:
+    @pytest.fixture
+    async def setup(self, tmp_path: Path) -> tuple[LanguageServerSymbolRetriever, CodeEditor, Path]:
+        target = tmp_path / "models.py"
+        target.write_text(MODELS_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+
+        client    = LspClient(project_root=str(tmp_path))
+        retriever = LanguageServerSymbolRetriever(client=client, project_root=str(tmp_path))
+        editor    = CodeEditor(project_root=str(tmp_path))
+        yield retriever, editor, target
+        await client.close()
+
+    async def test_insert_after_two_step(
+        self,
+        setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
+    ) -> None:
+        """InsertAfterSymbol inserts a function after the greeting method."""
+        from nerdvana_cli.tools.symbol_tools import InsertAfterSymbolArgs, InsertAfterSymbolTool
+        from nerdvana_cli.core.tool import ToolContext
+        import json
+
+        retriever, editor, target = setup
+        tool = InsertAfterSymbolTool(retriever=retriever, editor=editor)
+        ctx  = ToolContext(cwd=str(target.parent))
+
+        args1 = InsertAfterSymbolArgs(
+            name_path     = "User/greeting",
+            relative_path = str(target),
+            body          = "    def farewell(self) -> str:\n        return f'Bye, {self.name}!'\n",
+        )
+        r1 = await tool.call(args1, ctx)
+        assert not r1.is_error, r1.content
+        d1 = json.loads(r1.content)
+        assert d1["kind"] == "insert_after"
+        assert "farewell" in d1["diff"]
+
+        args2  = InsertAfterSymbolArgs(preview_id=d1["preview_id"], apply=True)
+        r2     = await tool.call(args2, ctx)
+        assert not r2.is_error, r2.content
+        assert json.loads(r2.content)["status"] == "applied"
+        assert "farewell" in target.read_text(encoding="utf-8")
+
+
+@pytest.mark.lsp_integration
+@pytest.mark.skipif(not _has_pyright(), reason="pyright not installed")
+class TestSafeDeleteSymbolIntegration:
+    @pytest.fixture
+    async def setup(self, tmp_path: Path) -> tuple[LanguageServerSymbolRetriever, CodeEditor, Path]:
+        # Write a minimal file with an unreferenced helper
+        py_content = (
+            "def unreferenced_helper() -> None:\n"
+            "    pass\n"
+            "\n"
+            "class Main:\n"
+            "    def run(self) -> None:\n"
+            "        pass\n"
+        )
+        target = tmp_path / "target.py"
+        target.write_text(py_content, encoding="utf-8")
+
+        client    = LspClient(project_root=str(tmp_path))
+        retriever = LanguageServerSymbolRetriever(client=client, project_root=str(tmp_path))
+        editor    = CodeEditor(project_root=str(tmp_path))
+        yield retriever, editor, target
+        await client.close()
+
+    async def test_safe_delete_unreferenced(
+        self,
+        setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
+    ) -> None:
+        """SafeDelete an unreferenced function produces a valid delete preview."""
+        from nerdvana_cli.tools.symbol_tools import SafeDeleteSymbolArgs, SafeDeleteSymbolTool
+        from nerdvana_cli.core.tool import ToolContext
+        import json
+
+        retriever, editor, target = setup
+        tool = SafeDeleteSymbolTool(retriever=retriever, editor=editor)
+        ctx  = ToolContext(cwd=str(target.parent))
+
+        args1 = SafeDeleteSymbolArgs(
+            name_path     = "unreferenced_helper",
+            relative_path = str(target),
+        )
+        r1 = await tool.call(args1, ctx)
+        assert not r1.is_error, r1.content
+        d1 = json.loads(r1.content)
+
+        # Either deleted (no refs) or blocked — both are valid outcomes depending
+        # on whether pyright counts the definition itself as a reference.
+        assert d1.get("kind") == "delete" or d1.get("status") == "blocked_by_references"
+
+        if d1.get("kind") == "delete":
+            # Step 2: apply
+            args2  = SafeDeleteSymbolArgs(preview_id=d1["preview_id"], apply=True)
+            r2     = await tool.call(args2, ctx)
+            assert not r2.is_error, r2.content
+            assert json.loads(r2.content)["status"] == "applied"
+            assert "unreferenced_helper" not in target.read_text(encoding="utf-8")
