@@ -56,7 +56,7 @@ Examples:
         re.compile(r"\brm\s+-f\s+-r\s+[/~*]"),
         re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+\."),
         re.compile(r"\bmkfs\b"),
-        re.compile(r"\bdd\s+if="),
+        re.compile(r"\bdd\s+if=/dev/(?:sd|nvme|vd|hd)"),
         re.compile(r">\s*/dev/(?:sd|nvme|vd|hd)"),
         re.compile(r":\(\)\s*\{.*\}"),
         re.compile(r":\(\)\{"),
@@ -94,7 +94,7 @@ Examples:
         # We re-check the *inner content* of each substitution form separately.
         re.compile(r"\$\([^)]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r|-r\s+-f|-f\s+-r)[^)]*\)"),
         re.compile(r"\$\([^)]*\bmkfs\b[^)]*\)"),
-        re.compile(r"\$\([^)]*\bdd\s+if=[^)]*\)"),
+        re.compile(r"\$\([^)]*\bdd\s+if=/dev/(?:sd|nvme|vd|hd)[^)]*\)"),
         re.compile(r"\$\([^)]*\b(?:shutdown|reboot|halt|poweroff)\b[^)]*\)"),
         re.compile(r"\$\{[^}]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r)[^}]*\}"),
         re.compile(r"`[^`]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r|-r\s+-f|-f\s+-r)[^`]*`"),
