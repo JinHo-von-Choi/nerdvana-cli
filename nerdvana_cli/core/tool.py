@@ -4,11 +4,32 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, cast
+from enum import StrEnum
+from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 T = TypeVar("T")
+
+
+class ToolCategory(StrEnum):
+    """Functional classification of a tool's primary intent."""
+
+    READ        = "read"
+    WRITE       = "write"
+    DESTRUCTIVE = "destructive"
+    SYMBOLIC    = "symbolic"   # Phase D symbol-analysis tools (reserved)
+    META        = "meta"       # Agent/Swarm/Team/TaskGet/TaskStop etc.
+
+
+class ToolSideEffect(StrEnum):
+    """Observable side-effects a tool may produce beyond its return value."""
+
+    NONE       = "none"
+    FILESYSTEM = "filesystem"
+    PROCESS    = "process"
+    NETWORK    = "network"
+    EXTERNAL   = "external"
 
 
 class ToolContext:
@@ -32,14 +53,24 @@ class ToolContext:
 class BaseTool(ABC, Generic[T]):
     """Abstract base for all tools."""
 
-    name: str = ""
-    description_text: str = ""
-    input_schema: dict[str, Any] = {}
-    is_concurrency_safe: bool = False
-    is_read_only: bool = False
-    is_destructive: bool = False
-    max_result_size: int = 500_000
-    args_class: type | None = None
+    name:                str            = ""
+    description_text:    str            = ""
+    input_schema:        dict[str, Any] = {}
+    is_concurrency_safe: bool           = False
+    is_destructive:      bool           = False
+    max_result_size:     int            = 500_000
+    args_class:          type | None    = None
+
+    # ── Phase 0B metadata ────────────────────────────────────────────────
+    category:              ClassVar[ToolCategory]    = ToolCategory.READ
+    side_effects:          ClassVar[ToolSideEffect]  = ToolSideEffect.NONE
+    tags:                  ClassVar[frozenset[str]]  = frozenset()
+    requires_confirmation: ClassVar[bool]            = False
+
+    @property
+    def is_read_only(self) -> bool:
+        """Backward-compatible: True when category is READ or SYMBOLIC."""
+        return self.category in {ToolCategory.READ, ToolCategory.SYMBOLIC}
 
     def parse_args(self, raw: dict[str, Any]) -> Any:
         """Convert raw dict from API response to typed Args object."""
@@ -89,30 +120,58 @@ class BaseTool(ABC, Generic[T]):
 class ToolDef(Generic[T]):
     """Partial tool definition — filled by build_tool() factory."""
 
-    name: str
-    description_text: str
-    input_schema: dict[str, Any]
-    call_fn: Any
-    is_concurrency_safe: bool = False
-    is_read_only: bool = False
-    is_destructive: bool = False
-    max_result_size: int = 500_000
-    check_permissions_fn: Any = None
-    validate_input_fn: Any = None
-    prompt_fn: Any = None
+    name:                  str
+    description_text:      str
+    input_schema:          dict[str, Any]
+    call_fn:               Any
+    is_concurrency_safe:   bool             = False
+    # is_read_only is derived from category; kept for back-compat at call sites
+    is_read_only:          bool             = False
+    is_destructive:        bool             = False
+    max_result_size:       int              = 500_000
+    check_permissions_fn:  Any              = None
+    validate_input_fn:     Any              = None
+    prompt_fn:             Any              = None
+    # Phase 0B metadata
+    category:              ToolCategory     = ToolCategory.READ
+    side_effects:          ToolSideEffect   = ToolSideEffect.NONE
+    tags:                  frozenset[str]   = frozenset()
+    requires_confirmation: bool             = False
 
 
 def build_tool(defn: ToolDef[T]) -> BaseTool[T]:
-    """Factory that creates a concrete tool from a definition."""
+    """Factory that creates a concrete tool from a definition.
+
+    is_read_only in ToolDef is honoured for backward compatibility: when True,
+    the generated tool's category is set to READ (unless caller supplies an
+    explicit category != the default READ).
+    """
+    # Resolve effective category: explicit category takes precedence;
+    # fall back to READ when is_read_only=True, WRITE otherwise.
+    effective_category: ToolCategory
+    if defn.category != ToolCategory.READ:
+        effective_category = defn.category
+    elif defn.is_read_only:
+        effective_category = ToolCategory.READ
+    else:
+        effective_category = ToolCategory.WRITE
+
+    _cat  = effective_category
+    _se   = defn.side_effects
+    _tags = defn.tags
+    _rc   = defn.requires_confirmation
 
     class _Tool(BaseTool[T]):
-        name = defn.name
+        name             = defn.name
         description_text = defn.description_text
-        input_schema = defn.input_schema
+        input_schema     = defn.input_schema
         is_concurrency_safe = defn.is_concurrency_safe
-        is_read_only = defn.is_read_only
-        is_destructive = defn.is_destructive
-        max_result_size = defn.max_result_size
+        is_destructive   = defn.is_destructive
+        max_result_size  = defn.max_result_size
+        category: ClassVar[ToolCategory]   = _cat
+        side_effects: ClassVar[ToolSideEffect] = _se
+        tags: ClassVar[frozenset[str]]     = _tags
+        requires_confirmation: ClassVar[bool] = _rc
 
         async def call(
             self,
@@ -171,3 +230,50 @@ class ToolRegistry:
             }
             for t in self._tools.values()
         ]
+
+    def filter(
+        self,
+        *,
+        category:     ToolCategory | set[ToolCategory] | None  = None,
+        side_effects: ToolSideEffect | set[ToolSideEffect] | None = None,
+        tags_any:     set[str] | None                          = None,
+        tags_all:     set[str] | None                          = None,
+        read_only:    bool | None                              = None,
+        requires_confirmation: bool | None                     = None,
+    ) -> list[BaseTool[Any]]:
+        """Return tools matching all supplied predicates (AND semantics).
+
+        Parameters
+        ----------
+        category:
+            Single category or set of categories to include.
+        side_effects:
+            Single side-effect or set of side-effects to include.
+        tags_any:
+            At least one of these tags must be present.
+        tags_all:
+            All of these tags must be present.
+        read_only:
+            If True, include only read-only tools; if False, exclude them.
+        requires_confirmation:
+            Filter by requires_confirmation flag.
+        """
+        cat_set  = ({category}  if isinstance(category,    ToolCategory)    else category)
+        side_set = ({side_effects} if isinstance(side_effects, ToolSideEffect) else side_effects)
+
+        result: list[BaseTool[Any]] = []
+        for tool in self._tools.values():
+            if cat_set is not None and tool.category not in cat_set:
+                continue
+            if side_set is not None and tool.side_effects not in side_set:
+                continue
+            if tags_any is not None and not (tool.tags & tags_any):
+                continue
+            if tags_all is not None and not tags_all.issubset(tool.tags):
+                continue
+            if read_only is not None and tool.is_read_only != read_only:
+                continue
+            if requires_confirmation is not None and tool.requires_confirmation != requires_confirmation:
+                continue
+            result.append(tool)
+        return result

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import fnmatch
 import os
-from typing import Any
+from typing import Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.path import validate_path
 
@@ -37,9 +37,12 @@ Examples:
         },
         "required": ["pattern"],
     }
-    is_concurrency_safe = True
-    is_read_only = True
-    args_class = GlobArgs
+    is_concurrency_safe    = True
+    args_class             = GlobArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"search"})
+    requires_confirmation  = False
 
     async def call(
         self,
@@ -110,9 +113,12 @@ Examples:
         },
         "required": ["pattern"],
     }
-    is_concurrency_safe = True
-    is_read_only = True
-    args_class = GrepArgs
+    is_concurrency_safe    = True
+    args_class             = GrepArgs
+    category               = ToolCategory.READ
+    side_effects           = ToolSideEffect.FILESYSTEM
+    tags: ClassVar[frozenset[str]] = frozenset({"search"})
+    requires_confirmation  = False
 
     async def call(
         self,

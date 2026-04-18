@@ -6,12 +6,12 @@ import asyncio
 import copy
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 
@@ -66,8 +66,12 @@ class AgentTool(BaseTool[AgentToolArgs]):
         },
         "required": ["prompt"],
     }
-    is_concurrency_safe = True
-    args_class          = AgentToolArgs
+    is_concurrency_safe    = True
+    args_class             = AgentToolArgs
+    category               = ToolCategory.META
+    side_effects           = ToolSideEffect.EXTERNAL
+    tags: ClassVar[frozenset[str]] = frozenset({"agent"})
+    requires_confirmation  = False
 
     def __init__(
         self,

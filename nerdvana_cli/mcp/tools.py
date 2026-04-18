@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, ClassVar
 
-from nerdvana_cli.core.tool import BaseTool, ToolContext
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.types import ToolResult
 
@@ -18,22 +18,27 @@ def _normalize_server_name(name: str) -> str:
 class McpToolAdapter(BaseTool[dict[str, Any]]):
     """Wraps a single MCP server tool as a BaseTool for the registry."""
 
+    # MCP tools are treated as EXTERNAL write operations by default.
+    category:              ClassVar[ToolCategory]   = ToolCategory.WRITE
+    side_effects:          ClassVar[ToolSideEffect] = ToolSideEffect.EXTERNAL
+    tags:                  ClassVar[frozenset[str]] = frozenset({"mcp"})
+    requires_confirmation: ClassVar[bool]           = False
+
     def __init__(
         self,
         server_name: str,
         tool_def: dict[str, Any],
         client: McpClient,
     ) -> None:
-        normalized          = _normalize_server_name(server_name)
-        raw_tool_name       = tool_def.get("name", "unknown")
-        tool_name           = _normalize_server_name(raw_tool_name)
-        self.name           = f"mcp__{normalized}__{tool_name}"
+        normalized            = _normalize_server_name(server_name)
+        raw_tool_name         = tool_def.get("name", "unknown")
+        tool_name             = _normalize_server_name(raw_tool_name)
+        self.name             = f"mcp__{normalized}__{tool_name}"
         self.description_text = tool_def.get("description", "")
-        self.input_schema   = tool_def.get("inputSchema", {})
-        self._client        = client
-        self._server_name   = server_name
-        self._tool_name          = raw_tool_name
-        self.is_read_only        = False
+        self.input_schema     = tool_def.get("inputSchema", {})
+        self._client          = client
+        self._server_name     = server_name
+        self._tool_name       = raw_tool_name
         self.is_concurrency_safe = True
         self.is_destructive      = False
 
