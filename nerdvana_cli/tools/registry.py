@@ -61,6 +61,19 @@ def create_tool_registry(
         from nerdvana_cli.tools.swarm_tool import SwarmTool
         registry.register(SwarmTool(settings=settings, task_registry=_task_reg))
 
+    # Phase H: external project tools (always registered; subprocess-isolated)
+    from nerdvana_cli.tools.external_project_tools import (
+        ListQueryableProjectsTool,
+        QueryExternalProjectTool,
+        RegisterExternalProjectTool,
+    )
+
+    _ext_projects_enabled = getattr(settings, "external_projects_enabled", True) if settings else True
+    if _ext_projects_enabled:
+        registry.register(ListQueryableProjectsTool())
+        registry.register(RegisterExternalProjectTool())
+        registry.register(QueryExternalProjectTool())
+
     # LSP tools — registered only when a language server binary is installed
     from nerdvana_cli.core.lsp_client import LspClient
     lsp = LspClient()
