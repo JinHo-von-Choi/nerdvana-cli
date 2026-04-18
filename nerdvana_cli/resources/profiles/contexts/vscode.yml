@@ -1,0 +1,13 @@
+description: "VS Code context — removes tools already provided by the VS Code extension host"
+prompt_override: null
+prompt_append: "You are running inside VS Code. File operations and shell execution are available through the editor."
+excluded_tools:
+  - Bash
+  - FileRead
+  - FileWrite
+  - FileEdit
+  - Grep
+  - Glob
+included_tools: []
+tool_description_overrides: {}
+single_project: false

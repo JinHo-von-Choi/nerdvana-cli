@@ -1,0 +1,18 @@
+description: "Planning mode — read-only exploration; all write and execution tools are disabled"
+prompt_override: null
+prompt_append: "You are in planning mode. Do not execute code or modify files. Produce a detailed plan only."
+excluded_tools:
+  - Bash
+  - FileWrite
+  - FileEdit
+  - ReplaceSymbolBody
+  - InsertBeforeSymbol
+  - InsertAfterSymbol
+  - SafeDeleteSymbol
+  - WriteMemory
+  - EditMemory
+  - DeleteMemory
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: strict
