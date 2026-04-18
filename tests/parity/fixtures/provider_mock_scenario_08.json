@@ -8,7 +8,7 @@
     },
     {
       "events": [
-        {"type": "content_delta", "content": "All TODOs and FIXMEs are now complete."},
+        {"type": "content_delta", "content": "All incomplete items are now finished."},
         {"type": "done", "stop_reason": "end_turn"}
       ]
     }
