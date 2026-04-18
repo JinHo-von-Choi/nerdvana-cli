@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-18
+
+Phase H: External project subprocess isolation — natural-language queries to
+external library/repository paths via isolated Python subprocesses + stdio MCP
+channel.  Zero resource leaks, concurrency cap of 3, env-var token injection.
+
+### Added
+
+- `nerdvana_cli/core/external_projects.py` — `ExternalProject` model and
+  thread-safe `ExternalProjectRegistry` with atomic YAML persistence
+  (`~/.nerdvana/external_projects.yml`).
+- `nerdvana_cli/server/external_worker.py` — `ExternalWorker` subprocess
+  orchestrator: spawn/shutdown lifecycle, MCP JSON-RPC over stdio, SIGTERM →
+  SIGKILL fallback, `max_concurrent=3` semaphore, env-var API-token injection.
+- `nerdvana_cli/tools/external_project_tools.py` — three new tools:
+  `ListQueryableProjects` (READ), `RegisterExternalProject` (WRITE, path safety
+  validation), `QueryExternalProject` (READ+PROCESS, subprocess-isolated query).
+- `tests/test_external_projects.py` — 13 registry CRUD + YAML round-trip tests.
+- `tests/server/test_external_worker.py` — 8 spawn/shutdown/concurrency/timeout
+  + env-injection tests.
+- `tests/test_external_project_tools.py` — 12 tool schema + behaviour tests.
+- `tests/server/test_external_integration.py` — 3 real-subprocess integration
+  tests (`@pytest.mark.lsp_integration`).
+
+### Changed
+
+- `nerdvana serve` CLI — added `--project <path>` and `--mode <name>` flags
+  (Phase H extension of Phase G1's `mcp_server.py`).  Existing behaviour
+  unchanged when flags are omitted.
+- `NerdvanaMcpServer.__init__` — added `project_path` and `mode` keyword args
+  (server context for external-worker mode).
+
 ## [0.8.5] - 2026-04-18
 
 Phase G3+G4: Textual TUI observability dashboard + analytics + cost tracking.
