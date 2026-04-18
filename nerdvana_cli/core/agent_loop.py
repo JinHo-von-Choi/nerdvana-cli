@@ -404,8 +404,6 @@ class AgentLoop:
         self, system_prompt: str, messages: list[dict[str, Any]], tools: list[Any], context: ToolContext,
     ) -> AsyncGenerator[str, None]:
         """Non-streaming fallback when provider streaming fails."""
-        fb_state = LoopState(iteration=0, stop_reason="continue", continuation_hint=None,
-                             token_budget_used=0, session_id=self.session.session_id)
         for _ in range(10):
             try:
                 result = await self.provider.send(system_prompt, self._to_provider_messages(), tools)
