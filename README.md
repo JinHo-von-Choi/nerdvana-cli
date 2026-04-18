@@ -162,16 +162,25 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 |---------|-------------|
 | `/help` | Show help |
 | `/clear` | Clear chat |
-| `/init` | Generate NIRNA.md project instructions |
-| `/model` / `/model <name>` | Show or change current model (auto-detects provider) |
-| `/models` | List available models from the provider API |
-| `/provider` / `/provider <name>` | Show, add, or switch active provider |
-| `/mcp` | Show MCP server connection status |
-| `/tokens` | Show token usage for the current session |
+| `/init` | Generate NIRNA.md |
+| `/model` | Show/change model |
+| `/models` | List available models |
+| `/provider` | Add/switch provider |
+| `/mode` | Activate/deactivate mode profile |
+| `/context` | Set context profile |
+| `/mcp` | MCP server status |
+| `/tokens` | Show token usage |
 | `/skills` | List available skills |
-| `/tools` | List registered tools (built-in, LSP, and MCP) |
-| `/update` | Check for and install NerdVana CLI updates |
-| `/quit` | Exit the REPL (alias: `/exit`, `/q`) |
+| `/tools` | List tools |
+| `/update` | Check and install updates |
+| `/memories` | List project memories |
+| `/undo` | Restore pre-edit git checkpoint |
+| `/redo` | Re-apply last undone checkpoint |
+| `/checkpoints` | List session checkpoints |
+| `/route-knowledge` | Classify content → suggest WriteMemory scope |
+| `/dashboard` | Toggle observability dashboard |
+| `/health` | Show 7-day tool call health summary |
+| `/quit` | Exit (aliases: `/exit`, `/q`) |
 
 ## Built-in Tools
 

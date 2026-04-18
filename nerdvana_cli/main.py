@@ -20,7 +20,7 @@ from nerdvana_cli.tools.registry import create_tool_registry
 
 app = typer.Typer(
     name="nerdvana",
-    help="NerdVana CLI — AI-powered development tool. Supports 12 AI platforms.",
+    help="NerdVana CLI — AI-powered development tool. Supports 13 AI platforms.",
     add_completion=False,
     rich_markup_mode="rich",
 )
@@ -68,8 +68,8 @@ def main(
 ) -> None:
     """NerdVana CLI — AI-powered development tool.
 
-    Supports 12 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
-    Ollama, vLLM, DeepSeek, Mistral, Cohere, Together AI.
+    Supports 13 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
+    Ollama, vLLM, DeepSeek, Mistral, Cohere, Together AI, ZAI.
 
     Run without subcommands to start interactive REPL mode.
     First run triggers interactive setup wizard.

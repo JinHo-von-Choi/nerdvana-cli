@@ -351,7 +351,7 @@ class AgentLoop:
                                     self.session.record_assistant_message(asst_text, tool_uses)
                                 for tu in tool_uses:
                                     yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
-                                results = await self.tool_executor.run_batch(tool_uses, state, tool_ctx)
+                                results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
                                 for i, tr in enumerate(results):
                                     yield f"{TOOL_DONE_PREFIX}{tool_uses[i]['name'] if i < len(tool_uses) else 'unknown'} [{'error' if tr.is_error else 'done'}]"
                                 self.state.messages.append(Message(role=Role.ASSISTANT,
@@ -404,8 +404,6 @@ class AgentLoop:
         self, system_prompt: str, messages: list[dict[str, Any]], tools: list[Any], context: ToolContext,
     ) -> AsyncGenerator[str, None]:
         """Non-streaming fallback when provider streaming fails."""
-        fb_state = LoopState(iteration=0, stop_reason="continue", continuation_hint=None,
-                             token_budget_used=0, session_id=self.session.session_id)
         for _ in range(10):
             try:
                 result = await self.provider.send(system_prompt, self._to_provider_messages(), tools)
@@ -425,7 +423,7 @@ class AgentLoop:
                 self.state.messages.append(Message(role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses))
                 if content:
                     self.session.record_assistant_message(content, tool_uses)
-                for tr in await self.tool_executor.run_batch(tool_uses, fb_state, context):
+                for tr in await self.tool_executor.run_batch(tool_uses, context):
                     self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
                 continue
             if content:

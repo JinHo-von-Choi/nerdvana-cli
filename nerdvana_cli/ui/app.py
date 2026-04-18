@@ -845,7 +845,5 @@ class NerdvanaApp(App[object]):
 
     def action_toggle_dashboard(self) -> None:
         """Toggle observability dashboard (Ctrl+D)."""
-        try:
+        with contextlib.suppress(Exception):
             self.query_one("#dashboard-tab", DashboardTab).toggle()
-        except Exception:  # noqa: BLE001
-            pass
