@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-04-18
+
+User-data preservation hardening for the self-update path.
+
+### Added
+
+- `core/updater.py` now enforces four guards before and after every
+  `git pull` in the install tree:
+  1. **Install/data separation** — refuses when `install_dir` equals
+     or is nested under `user_data_home()` (or vice versa), so the
+     pull can never target the user data root.
+  2. **Dirty install refusal** — `git status --porcelain` must be
+     empty; uncommitted changes in the install tree block the update
+     with a clear message instead of being stashed or discarded.
+  3. **Rotating pre-update snapshot** — user data is copied to
+     `~/.nerdvana/.update-backups/pre-update-<timestamp>/` before the
+     pull. The 3 most recent snapshots are retained. SQLite WAL/SHM
+     sidecars are skipped to avoid copying a live database.
+  4. **Post-pull integrity hash** — SHA-256 over `config.yml`,
+     `NIRNA.md`, `mcp.json`, `mcp_acl.yml`, `mcp_keys.yml`,
+     `external_projects.yml`, and every file under `contexts/`,
+     `modes/`, `memories/`, `agents/`, `skills/`, `hooks/` is
+     compared before and after the pull; any drift aborts the update
+     and prints a restore command pointing at the snapshot.
+- `core/migrate.run_if_needed()` is re-run after a successful update
+  so schema migrations introduced by the new release take effect
+  without requiring a second session.
+- `tests/test_updater_preservation.py` — 13 tests covering
+  separation guards, dirty refusal, snapshot rotation, integrity
+  hashing, and an end-to-end no-op `run_self_update` run that
+  preserves byte-identical user data.
+
+### Changed
+
+- `run_self_update` success message now includes the backup path
+  (`Backup: ~/.nerdvana/.update-backups/pre-update-…`) and the count
+  of pruned older snapshots.
+
 ## [0.9.1] - 2026-04-18
 
 Debt cleanup release. Three tickets carried across Phase 0A → H are resolved
