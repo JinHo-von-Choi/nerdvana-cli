@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-04-18
+
+Debt cleanup release. Three tickets carried across Phase 0A → H are resolved
+with no feature additions.
+
+### Fixed
+
+- `T-bug-ralph-loop`: `ralph_loop_check` hook now fires on `end_turn` stop
+  reasons. `core/agent_loop.py` emits `AFTER_API_CALL` with
+  `stop_reason="end_turn"` and carries the current assistant text in
+  `HookContext.extra["asst_text"]` so the hook scans only the freshly
+  returned message (no infinite re-injection across history). Parity
+  scenario 8 snapshot updated to reflect the new correct behaviour —
+  TODO markers now trigger the ralph continuation prompt.
+- `T-debt-import-cycles`: all 8 baseline cycles were false positives from
+  `scripts/check_import_graph.py` walking into `if TYPE_CHECKING:` guards
+  and function-body lazy imports via `ast.walk`. The detector now uses a
+  module-level walker that skips `TYPE_CHECKING` branches and function
+  bodies. `.import_cycles_baseline.json` reduced to `count: 0`; `--strict`
+  passes on the current 95-module graph.
+- `T-debt-lsp-rename-symbol-tag`: `lsp_rename` now carries the `symbol`
+  tag alongside `lsp` and `refactor`. It belongs in the same
+  `filter(tags_all={"lsp","symbol"})` bucket as `lsp_goto_definition` and
+  `lsp_find_references`; read/write separation remains enforced via
+  `ToolCategory.WRITE` and `requires_confirmation=True`.
+
+### Changed
+
+- `core/loop_hooks.py`: stale comment noting the ralph-loop limitation
+  removed, unused `type: ignore` cleaned up.
+- `builtin_hooks.ralph_loop_check`: prefers `extra["asst_text"]` over
+  history scan; returns early when empty.
+
 ## [0.9.0] - 2026-04-18
 
 Phase H: External project subprocess isolation — natural-language queries to
