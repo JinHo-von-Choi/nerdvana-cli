@@ -295,7 +295,26 @@ class CodeEditor:
         if insert_lines and not insert_lines[-1].endswith("\n"):
             insert_lines[-1] += "\n"
 
-        uri = _path_to_uri(abs_path)
+        uri        = _path_to_uri(abs_path)
+        n_lines    = len(original_lines)
+
+        # When end_line is at or beyond the end of the file, anchor the insertion
+        # to the character-end of the last line so _apply_workspace_edit does not
+        # produce an IndexError on ``original[sl]``.
+        if end_line >= n_lines and n_lines > 0:
+            anchor_line = n_lines - 1
+            last_line   = original_lines[anchor_line]
+            # Strip trailing newline for the character offset; newText starts fresh.
+            anchor_char = len(last_line.rstrip("\n\r"))
+            insert_text = (
+                "\n" + "".join(insert_lines) if not last_line.endswith("\n")
+                else "".join(insert_lines)
+            )
+        else:
+            anchor_line = end_line
+            anchor_char = 0
+            insert_text = "".join(insert_lines)
+
         workspace_edit: dict[str, Any] = {
             "documentChanges": [
                 {
@@ -303,10 +322,10 @@ class CodeEditor:
                     "edits": [
                         {
                             "range": {
-                                "start": {"line": end_line, "character": 0},
-                                "end":   {"line": end_line, "character": 0},
+                                "start": {"line": anchor_line, "character": anchor_char},
+                                "end":   {"line": anchor_line, "character": anchor_char},
                             },
-                            "newText": "".join(insert_lines),
+                            "newText": insert_text,
                         }
                     ],
                 }
@@ -342,6 +361,16 @@ class CodeEditor:
         (preview_id, diff_text)
         """
         uri = _path_to_uri(abs_path)
+
+        # _apply_workspace_edit uses: original[:sl] + [original[sl][:sc] + newText] +
+        # original[el + 1:].  To delete lines [start_line, end_line) we need:
+        #   sl = start_line, sc = 0, newText = "", el = end_line - 1, ec = full line
+        # This yields: original[:start_line] + [""] + original[end_line:]
+        # Use end_line - 1 as the LSP range.end.line (inclusive last deleted line),
+        # with character = full length of that line so the line itself is cleared.
+        last_deleted_line = end_line - 1
+        last_line_len     = len(original_lines[last_deleted_line]) if last_deleted_line < len(original_lines) else 0
+
         workspace_edit: dict[str, Any] = {
             "documentChanges": [
                 {
@@ -349,8 +378,8 @@ class CodeEditor:
                     "edits": [
                         {
                             "range": {
-                                "start": {"line": start_line, "character": 0},
-                                "end":   {"line": end_line,   "character": 0},
+                                "start": {"line": start_line,      "character": 0},
+                                "end":   {"line": last_deleted_line, "character": last_line_len},
                             },
                             "newText": "",
                         }

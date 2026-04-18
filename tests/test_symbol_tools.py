@@ -23,10 +23,16 @@ from nerdvana_cli.tools.symbol_tools import (
     FindReferencingSymbolsTool,
     FindSymbolArgs,
     FindSymbolTool,
+    InsertAfterSymbolArgs,
+    InsertAfterSymbolTool,
+    InsertBeforeSymbolArgs,
+    InsertBeforeSymbolTool,
     ReplaceSymbolBodyArgs,
     ReplaceSymbolBodyTool,
     RestartLanguageServerArgs,
     RestartLanguageServerTool,
+    SafeDeleteSymbolArgs,
+    SafeDeleteSymbolTool,
     SymbolOverviewArgs,
     SymbolOverviewTool,
 )
@@ -308,3 +314,233 @@ class TestReplaceSymbolBodyTool:
         assert tool.side_effects  == ToolSideEffect.FILESYSTEM
         assert "edit" in tool.tags
         assert tool.requires_confirmation is True
+
+
+# ---------------------------------------------------------------------------
+# InsertBeforeSymbolTool
+# ---------------------------------------------------------------------------
+
+
+def _make_insert_tool(
+    cls:      type,
+    tmp_path: Path,
+    symbols:  list[LanguageServerSymbol],
+    refs:     list[Location] | None = None,
+) -> Any:
+    """Generic factory for Insert* and SafeDelete tools."""
+    retriever                 = AsyncMock()
+    retriever.find            = AsyncMock(return_value=symbols)
+    retriever.find_references = AsyncMock(return_value=refs or [])
+    retriever._resolve        = lambda p: str(tmp_path / p)
+
+    from nerdvana_cli.core.code_editor import CodeEditor
+    editor = CodeEditor(project_root=str(tmp_path))
+    return cls(retriever=retriever, editor=editor)
+
+
+class TestInsertBeforeSymbolTool:
+    def _sym(self, tmp_path: Path, line: int = 3) -> LanguageServerSymbol:
+        return LanguageServerSymbol(
+            name="foo", name_path="foo", kind="Function", kind_int=12,
+            location=Location(str(tmp_path / "src.py"), line, 0),
+        )
+
+    async def test_step1_generates_preview(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("# module\n\ndef foo():\n    pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=3)   # 1-based line 3
+        tool = _make_insert_tool(InsertBeforeSymbolTool, tmp_path, [sym])
+        args = InsertBeforeSymbolArgs(
+            name_path     = "foo",
+            relative_path = "src.py",
+            body          = "# decorator\n@some_decorator\n",
+        )
+        result = await tool.call(args, _ctx())
+        assert not result.is_error
+        data = json.loads(result.content)
+        assert "preview_id" in data
+        assert data["kind"] == "insert_before"
+        assert "decorator" in data["diff"]
+
+    async def test_step2_apply_success(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("# module\n\ndef foo():\n    pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=3)
+        tool = _make_insert_tool(InsertBeforeSymbolTool, tmp_path, [sym])
+        args1 = InsertBeforeSymbolArgs(
+            name_path="foo", relative_path="src.py",
+            body="BEFORE = True\n",
+        )
+        r1  = await tool.call(args1, _ctx())
+        pid = json.loads(r1.content)["preview_id"]
+
+        args2  = InsertBeforeSymbolArgs(preview_id=pid, apply=True)
+        result = await tool.call(args2, _ctx())
+        data   = json.loads(result.content)
+        assert data["status"] == "applied"
+        content = f.read_text(encoding="utf-8")
+        assert "BEFORE = True" in content
+        assert "def foo" in content
+
+    async def test_invalid_args_returns_error(self, tmp_path: Path) -> None:
+        tool   = _make_insert_tool(InsertBeforeSymbolTool, tmp_path, [])
+        result = await tool.call(InsertBeforeSymbolArgs(), _ctx())
+        assert result.is_error
+
+    def test_tool_schema(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.tool import ToolCategory, ToolSideEffect
+        tool = _make_insert_tool(InsertBeforeSymbolTool, tmp_path, [])
+        assert tool.category             == ToolCategory.WRITE
+        assert tool.side_effects         == ToolSideEffect.FILESYSTEM
+        assert "lsp" in tool.tags
+        assert "edit" in tool.tags
+        assert tool.requires_confirmation is True
+        assert tool.name == "insert_before_symbol"
+
+
+# ---------------------------------------------------------------------------
+# InsertAfterSymbolTool
+# ---------------------------------------------------------------------------
+
+
+class TestInsertAfterSymbolTool:
+    def _sym(self, tmp_path: Path, line: int = 1) -> LanguageServerSymbol:
+        return LanguageServerSymbol(
+            name="foo", name_path="foo", kind="Function", kind_int=12,
+            location=Location(str(tmp_path / "src.py"), line, 0),
+        )
+
+    async def test_step1_generates_preview(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def foo():\n    pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=1)
+        tool = _make_insert_tool(InsertAfterSymbolTool, tmp_path, [sym])
+        args = InsertAfterSymbolArgs(
+            name_path     = "foo",
+            relative_path = "src.py",
+            body          = "def bar(): pass\n",
+        )
+        result = await tool.call(args, _ctx())
+        assert not result.is_error
+        data = json.loads(result.content)
+        assert "preview_id" in data
+        assert data["kind"] == "insert_after"
+        assert "bar" in data["diff"]
+
+    async def test_step2_apply_success(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def foo():\n    pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=1)
+        tool = _make_insert_tool(InsertAfterSymbolTool, tmp_path, [sym])
+        args1 = InsertAfterSymbolArgs(
+            name_path="foo", relative_path="src.py",
+            body="AFTER = True\n",
+        )
+        r1  = await tool.call(args1, _ctx())
+        pid = json.loads(r1.content)["preview_id"]
+
+        args2  = InsertAfterSymbolArgs(preview_id=pid, apply=True)
+        result = await tool.call(args2, _ctx())
+        data   = json.loads(result.content)
+        assert data["status"] == "applied"
+        content = f.read_text(encoding="utf-8")
+        assert "AFTER = True" in content
+        assert "def foo" in content
+
+    async def test_invalid_args_returns_error(self, tmp_path: Path) -> None:
+        tool   = _make_insert_tool(InsertAfterSymbolTool, tmp_path, [])
+        result = await tool.call(InsertAfterSymbolArgs(), _ctx())
+        assert result.is_error
+
+    def test_tool_schema(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.tool import ToolCategory, ToolSideEffect
+        tool = _make_insert_tool(InsertAfterSymbolTool, tmp_path, [])
+        assert tool.category             == ToolCategory.WRITE
+        assert tool.side_effects         == ToolSideEffect.FILESYSTEM
+        assert "lsp" in tool.tags
+        assert "edit" in tool.tags
+        assert tool.requires_confirmation is True
+        assert tool.name == "insert_after_symbol"
+
+
+# ---------------------------------------------------------------------------
+# SafeDeleteSymbolTool
+# ---------------------------------------------------------------------------
+
+
+class TestSafeDeleteSymbolTool:
+    def _sym(self, tmp_path: Path, line: int = 1) -> LanguageServerSymbol:
+        return LanguageServerSymbol(
+            name="dead_func", name_path="dead_func", kind="Function", kind_int=12,
+            location=Location(str(tmp_path / "src.py"), line, 0),
+        )
+
+    async def test_step1_no_refs_generates_preview(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def dead_func():\n    pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=1)
+        tool = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, [sym], refs=[])
+        args = SafeDeleteSymbolArgs(name_path="dead_func", relative_path="src.py")
+        result = await tool.call(args, _ctx())
+        assert not result.is_error
+        data = json.loads(result.content)
+        assert "preview_id" in data
+        assert data["kind"] == "delete"
+        assert "dead_func" in data["diff"]
+
+    async def test_step1_with_refs_blocked(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def live_func():\n    pass\n", encoding="utf-8")
+        sym = LanguageServerSymbol(
+            name="live_func", name_path="live_func", kind="Function", kind_int=12,
+            location=Location(str(f), 1, 0),
+        )
+        refs = [Location("/proj/other.py", 5, 4)]
+        tool = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, [sym], refs=refs)
+        args = SafeDeleteSymbolArgs(name_path="live_func", relative_path="src.py")
+        result = await tool.call(args, _ctx())
+        assert not result.is_error
+        data = json.loads(result.content)
+        assert data["status"] == "blocked_by_references"
+        assert len(data["references"]) == 1
+        assert data["references"][0]["line"] == 5
+
+    async def test_step2_apply_success(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def dead_func():\n    pass\n\ndef other(): pass\n", encoding="utf-8")
+        sym  = self._sym(tmp_path, line=1)
+        tool = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, [sym], refs=[])
+        args1  = SafeDeleteSymbolArgs(name_path="dead_func", relative_path="src.py")
+        r1     = await tool.call(args1, _ctx())
+        pid    = json.loads(r1.content)["preview_id"]
+
+        args2  = SafeDeleteSymbolArgs(preview_id=pid, apply=True)
+        result = await tool.call(args2, _ctx())
+        data   = json.loads(result.content)
+        assert data["status"] == "applied"
+        content = f.read_text(encoding="utf-8")
+        assert "def dead_func" not in content
+        assert "def other" in content
+
+    async def test_invalid_args_returns_error(self, tmp_path: Path) -> None:
+        tool   = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, [])
+        result = await tool.call(SafeDeleteSymbolArgs(), _ctx())
+        assert result.is_error
+
+    async def test_symbol_not_found_returns_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("def foo(): pass\n", encoding="utf-8")
+        tool = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, symbols=[])
+        args = SafeDeleteSymbolArgs(name_path="ghost", relative_path="src.py")
+        result = await tool.call(args, _ctx())
+        assert result.is_error
+
+    def test_tool_schema(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.tool import ToolCategory, ToolSideEffect
+        tool = _make_insert_tool(SafeDeleteSymbolTool, tmp_path, [])
+        assert tool.category             == ToolCategory.DESTRUCTIVE
+        assert tool.side_effects         == ToolSideEffect.FILESYSTEM
+        assert "delete" in tool.tags
+        assert "safe" in tool.tags
+        assert tool.requires_confirmation is True
+        assert tool.name == "safe_delete_symbol"
