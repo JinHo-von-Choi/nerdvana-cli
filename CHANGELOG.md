@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-18
+
+Phase G1: MCP server mode — external harnesses can call nerdvana tools over
+MCP 1.0 (stdio + HTTP JSON-RPC) with API-key authentication, Unix-socket UID
+check, mTLS peer-CN auth, role-based ACL, and SQLite WAL audit logging.
+
+### Added
+
+- `nerdvana_cli/server/__init__.py` — server package root.
+- `nerdvana_cli/server/mcp_server.py` — `NerdvanaMcpServer` wrapping FastMCP;
+  6 read-only tools always available, 9 write tools behind `--allow-write` +
+  `confirm: true` dual-gate (v3 §7.5).
+- `nerdvana_cli/server/auth.py` — `AuthManager`: HTTP Bearer sha256-hash match
+  vs `~/.nerdvana/mcp_keys.yml`, Unix socket 0600/UID check, mTLS peer-CN
+  authentication.
+- `nerdvana_cli/server/acl.py` — `ACLManager`: role→tool mapping loaded from
+  `~/.nerdvana/mcp_acl.yml`; unknown clients auto-assigned `read-only` (v3.1 §3.1).
+- `nerdvana_cli/server/audit.py` — `AuditLogger`: SQLite WAL audit table, 0600
+  file permissions, pruning to keep file < 1 MB after every 1 000 writes (v3.1 §1.4).
+- `nerdvana_cli/server/hook_bridge.py` — Phase G2 scaffold: stdin JSON reader +
+  `HookBridge.dispatch` stub.
+- `main.py` — `nerdvana serve` command (`--transport {stdio,http}`,
+  `--port`, `--host`, `--allow-write`, `--tls-cert`, `--tls-ca`).
+- `main.py` — `nerdvana admin acl {list,revoke,add}` sub-commands.
+- `tests/server/test_mcp_server.py` (11 tests), `tests/server/test_auth.py`
+  (7 tests), `tests/server/test_acl.py` (7 tests), `tests/server/test_audit.py`
+  (4 tests) — total +30 tests (719 → 749 tests collected).
+
+### Security
+
+- API keys stored as `sha256:<hex>` only — no plaintext in YAML.
+- Default bind: `127.0.0.1`; `--host 0.0.0.0` prints a warning to stderr.
+- Audit log file created with permissions 0600 (owner read-write only).
+
 ## [0.7.0] - 2026-04-18
 
 Phase F: Runtime Profiles — context × mode × trust_level.
