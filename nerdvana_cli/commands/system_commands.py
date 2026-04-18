@@ -21,6 +21,8 @@ async def handle_help(app: NerdvanaApp, args: str) -> None:
         "/models     -- List available models\n"
         "/provider   -- Add/switch provider\n"
         "/mcp     -- MCP server status\n"
+        "/mode [<name>|list|off] -- Activate/deactivate a mode profile\n"
+        "/context [<name>|list]  -- Set context profile\n"
         "/skills  -- List available skills\n"
         "/tokens  -- Show usage\n"
         "/tools   -- List tools\n"
