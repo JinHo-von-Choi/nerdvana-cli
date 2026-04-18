@@ -70,6 +70,8 @@ SLASH_COMMANDS = [
     ("/model", "Show/change model"),
     ("/models", "List available models"),
     ("/provider", "Add/switch provider"),
+    ("/mode", "Activate/deactivate mode profile"),
+    ("/context", "Set context profile"),
     ("/mcp", "MCP server status"),
     ("/tokens", "Show token usage"),
     ("/skills", "List available skills"),
@@ -687,25 +689,28 @@ class NerdvanaApp(App[object]):
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands via dispatching to command modules."""
-        from nerdvana_cli.commands import model_commands, session_commands, system_commands
+        from nerdvana_cli.commands import model_commands, profile_commands, session_commands, system_commands
 
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
 
         handlers = {
-            "/model": model_commands.handle_model,
-            "/models": model_commands.handle_models,
+            "/model":   model_commands.handle_model,
+            "/models":  model_commands.handle_models,
             "/provider": model_commands.handle_provider,
-            "/clear": session_commands.handle_clear,
-            "/tokens": session_commands.handle_tokens,
-            "/tools": session_commands.handle_tools,
-            "/mcp": session_commands.handle_mcp,
-            "/skills": session_commands.handle_skills,
-            "/help": system_commands.handle_help,
-            "/update": system_commands.handle_update,
-            "/init": system_commands.handle_init,
-            "/setup": system_commands.handle_init,
+            "/clear":   session_commands.handle_clear,
+            "/tokens":  session_commands.handle_tokens,
+            "/tools":   session_commands.handle_tools,
+            "/mcp":     session_commands.handle_mcp,
+            "/skills":  session_commands.handle_skills,
+            "/help":    system_commands.handle_help,
+            "/update":  system_commands.handle_update,
+            "/init":    system_commands.handle_init,
+            "/setup":   system_commands.handle_init,
+            # Phase F: runtime profiles
+            "/mode":    profile_commands.handle_mode,
+            "/context": profile_commands.handle_context,
         }
 
         if command in ("/quit", "/exit", "/q"):
