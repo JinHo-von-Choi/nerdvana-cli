@@ -29,8 +29,16 @@ def project_dir(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def mgr(project_dir: str) -> MemoriesManager:
+def mgr(project_dir: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MemoriesManager:
     os.makedirs(project_dir, exist_ok=True)
+    # Isolate user_global memories to the tmp path so tests never see the
+    # real ~/.nerdvana/memories/global/ directory on the developer's box.
+    fake_global = tmp_path / "global"
+    fake_global.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        lambda: fake_global,
+    )
     return MemoriesManager(project_dir)
 
 
