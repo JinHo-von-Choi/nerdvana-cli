@@ -18,6 +18,7 @@ YAML schema for ~/.nerdvana/mcp_keys.yml:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import stat
 from dataclasses import dataclass, field
@@ -140,7 +141,7 @@ class AuthManager:
         self._ensure_loaded()
         digest = _sha256_hex(raw_key)
         for entry in self._entries:
-            if entry.key_hash == digest:
+            if hmac.compare_digest(entry.key_hash, digest):
                 return AuthResult(
                     authenticated   = True,
                     client_identity = entry.client_name,
@@ -234,11 +235,14 @@ class AuthManager:
                     roles           = list(entry.roles),
                 )
 
-        # Unknown CN: fall back to read-only (v3.1 §3.1)
+        # Unknown CN: fail-closed — reject unrecognised peers (v3.1 §3.1 rev).
+        # Previously failed open (authenticated=True + read-only), which allowed
+        # CN-spoofing clients unrestricted read access. Now requires explicit
+        # registration in mcp_keys.yml to be admitted.
         return AuthResult(
-            authenticated   = True,
+            authenticated   = False,
             client_identity = peer_cn,
-            roles           = ["read-only"],
+            reason          = "unknown_cn",
         )
 
     # ------------------------------------------------------------------
