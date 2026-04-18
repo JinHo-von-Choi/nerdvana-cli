@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-18
+
+Phase D: Semantic Reading + Minimal Edit + Diff Preview.
+Agents now operate at symbol granularity (Python + TypeScript), backed by
+pyright and typescript-language-server via the existing LSP client.
+
+### Added
+
+- `core/symbol.py` — `NamePathResolver` (``Foo/bar.baz`` path grammar),
+  `SymbolDictGrouper` (LSP DocumentSymbol → kind-grouped compact JSON),
+  `LanguageServerSymbol` dataclass (`name_path`, `kind`, `location`,
+  `children`), `LanguageServerSymbolRetriever` (high-level API over
+  `LspClient`: `get_overview`, `find`, `find_references`).
+- `core/code_editor.py` — `PreviewEntry` (NamedTuple capturing
+  workspace_edit + per-file SHA256 fingerprints), `CodeEditor`
+  (session-scoped preview store: `create_preview` → unified diff,
+  `apply` → SHA256 re-validation + LspClient write). LRU eviction at 20
+  entries; configurable via `.nerdvana.yml` `preview.lru_max`.
+- `core/symbol_graph.py` — `SymbolGraph` Repo Map: top-level + depth-1
+  nodes, call-graph edges from `find_references`, `to_compact_json`
+  LOC-weighted token-budget serialiser.
+- `tools/symbol_tools.py` — 5 new `BaseTool` subclasses:
+  - `symbol_overview` (`SYMBOLIC`, `EXTERNAL`)
+  - `find_symbol` (`SYMBOLIC`, `EXTERNAL`)
+  - `find_referencing_symbols` (`SYMBOLIC`, `EXTERNAL`)
+  - `restart_language_server` (`META`, `EXTERNAL`)
+  - `replace_symbol_body` (`WRITE`, `FILESYSTEM`, `requires_confirmation=True`)
+- `tools/registry.py` — 5 symbol tools registered when a language server
+  binary is present (alongside the existing 4 LSP tools).
+- Integration test fixtures: `tests/lsp/fixtures/sample_python_project/`
+  (`models.py`, `services.py`).
+- `tests/test_symbol.py` (19 tests), `tests/test_code_editor.py` (11),
+  `tests/test_symbol_graph.py` (8), `tests/test_symbol_tools.py` (20),
+  `tests/lsp/test_symbol_tools_integration.py` (lsp_integration marker).
+
+### Changed
+
+- `pyproject.toml` version 0.4.3 → 0.5.0.
+- Test count: 505 → 563 (+58 unit), 571 with integration markers collected.
+
 ## [0.4.3] - 2026-04-18
 
 Phase 0B foundational hardening. LSP client gaps identified across three
