@@ -87,6 +87,33 @@ def json_parse_recovery(ctx: HookContext) -> HookResult:
     )
 
 
+def session_start_memory_hint(ctx: HookContext) -> HookResult:
+    """Inject a memory count hint at session start (Phase E).
+
+    Appends a one-line hint to the system prompt: how many project memories
+    exist and that ListMemories can enumerate them.  Body is never injected
+    automatically — only the count, to avoid token over-consumption.
+    """
+    if ctx.settings is None:
+        return HookResult()
+
+    cwd = getattr(ctx.settings, "cwd", None)
+    if not cwd:
+        return HookResult()
+
+    try:
+        from nerdvana_cli.core.memories import MemoriesManager
+        mgr  = MemoriesManager(cwd)
+        hint = mgr.session_start_hint()
+    except Exception:  # noqa: BLE001
+        return HookResult()
+
+    if not hint:
+        return HookResult()
+
+    return HookResult(system_prompt_append=hint)
+
+
 _INCOMPLETE_PATTERNS = re.compile(
     r"(TODO|FIXME|#\s*구현\s*필요|#\s*미구현|#\s*needs?\s*implementation|NotImplemented|raise\s+NotImplementedError)",
     re.IGNORECASE,
