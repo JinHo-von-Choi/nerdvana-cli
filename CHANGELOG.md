@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-18
+
+Phase D.1: Edit symbol tools — insert before/after and safe delete.
+
+### Added
+
+- `tools/symbol_tools.py` — `InsertBeforeSymbolTool` (`insert_before_symbol`):
+  two-step diff-preview workflow that inserts code immediately before a symbol
+  definition.  Typical uses: decorators, imports above a class, type aliases.
+- `tools/symbol_tools.py` — `InsertAfterSymbolTool` (`insert_after_symbol`):
+  inserts code immediately after a symbol body end.  Typical uses: sibling
+  functions, new methods following an existing one.
+- `tools/symbol_tools.py` — `SafeDeleteSymbolTool` (`safe_delete_symbol`):
+  deletes a symbol only when `find_references` returns zero hits.  When
+  references exist the tool returns `{"status": "blocked_by_references",
+  "references": [...]}` without creating a preview or touching the filesystem.
+- `core/code_editor.py` — `prepare_insert_before`, `prepare_insert_after`,
+  `prepare_safe_delete` methods; `_path_to_uri` module-level helper.
+- `_locate_symbol_lines` and `_do_apply` shared async helpers in
+  `symbol_tools.py` (eliminate duplicate code between edit tools).
+- 12 new unit tests in `test_code_editor.py` and `test_symbol_tools.py`.
+- 3 new `@pytest.mark.lsp_integration` E2E tests in
+  `tests/lsp/test_symbol_tools_integration.py`.
+
+### Changed
+
+- `create_symbol_tools` factory now returns all 8 symbol tools (was 5).
+- `ReplaceSymbolBodyTool._do_apply` delegates to shared `_do_apply` helper.
+
 ## [0.5.0] - 2026-04-18
 
 Phase D: Semantic Reading + Minimal Edit + Diff Preview.
