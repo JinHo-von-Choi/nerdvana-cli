@@ -121,22 +121,37 @@ _INCOMPLETE_PATTERNS = re.compile(
 
 
 def ralph_loop_check(ctx: HookContext) -> HookResult:
-    """Scan the last assistant message for unfinished markers on end_turn.
+    """Scan the current assistant response for unfinished markers on end_turn.
 
     Registered on HookEvent.AFTER_API_CALL. If TODO/FIXME/NotImplemented
     patterns are present, inject a message asking the agent to finish them.
+
+    Uses ``ctx.extra["asst_text"]`` (the response text for this specific turn)
+    so that prior assistant messages in the history are not re-scanned on
+    subsequent turns, preventing spurious re-injection loops.
     """
     if ctx.stop_reason != "end_turn":
         return HookResult()
 
-    last_content = ""
-    if ctx.messages:
-        for msg in reversed(ctx.messages):
-            if str(getattr(msg, "role", "")) == "assistant":
-                last_content = getattr(msg, "content", "") or ""
-                break
+    # Prefer the current-turn text passed explicitly by the agent loop.
+    # Fall back to scanning history only when asst_text is absent (e.g. tests
+    # that do not populate extra).
+    asst_text_from_extra: str | None = (ctx.extra or {}).get("asst_text")
+    if asst_text_from_extra is not None:
+        last_content = asst_text_from_extra
+    else:
+        last_content = ""
+        if ctx.messages:
+            for msg in reversed(ctx.messages):
+                if str(getattr(msg, "role", "")) == "assistant":
+                    last_content = getattr(msg, "content", "") or ""
+                    break
 
     if not isinstance(last_content, str):
+        return HookResult()
+
+    # Nothing to scan when the turn produced no text.
+    if not last_content:
         return HookResult()
 
     matches = _INCOMPLETE_PATTERNS.findall(last_content)
