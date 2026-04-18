@@ -18,6 +18,7 @@ from typing import Any
 from rich.console import Console
 
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
+from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
@@ -185,6 +186,12 @@ class AgentLoop:
             hooks    = self.hooks,
             settings = self.settings,
             reminder = self._reminder,
+        )
+
+        self.loop_hook_engine = LoopHookEngine(
+            hooks    = self.hooks,
+            settings = self.settings,
+            registry = self.registry,
         )
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
