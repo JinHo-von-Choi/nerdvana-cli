@@ -1,0 +1,18 @@
+description: "Query mode — read-only; all write tools are disabled"
+prompt_override: null
+prompt_append: "You are in query mode. Answer questions and read files only. Do not modify anything."
+excluded_tools:
+  - Bash
+  - FileWrite
+  - FileEdit
+  - ReplaceSymbolBody
+  - InsertBeforeSymbol
+  - InsertAfterSymbol
+  - SafeDeleteSymbol
+  - WriteMemory
+  - EditMemory
+  - DeleteMemory
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: strict

@@ -1,0 +1,13 @@
+description: "No-memories mode — disables all memory read/write tools"
+prompt_override: null
+prompt_append: null
+excluded_tools:
+  - WriteMemory
+  - ReadMemory
+  - ListMemories
+  - EditMemory
+  - DeleteMemory
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: balanced

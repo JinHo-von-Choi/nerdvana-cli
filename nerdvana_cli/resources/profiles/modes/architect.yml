@@ -1,0 +1,17 @@
+description: "Architect mode — high-level design using a powerful model; editing disabled"
+prompt_override: null
+prompt_append: "You are in architect mode. Focus on high-level design, architecture, and planning. Do not write implementation code."
+excluded_tools:
+  - FileWrite
+  - FileEdit
+  - ReplaceSymbolBody
+  - InsertBeforeSymbol
+  - InsertAfterSymbol
+  - SafeDeleteSymbol
+  - WriteMemory
+  - EditMemory
+  - DeleteMemory
+included_tools: []
+tool_description_overrides: {}
+model_override: "claude-opus-4-7"
+trust_level: strict

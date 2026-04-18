@@ -1,0 +1,8 @@
+description: "Editing mode — full edit access, all tools enabled"
+prompt_override: null
+prompt_append: null
+excluded_tools: []
+included_tools: []
+tool_description_overrides: {}
+model_override: null
+trust_level: balanced

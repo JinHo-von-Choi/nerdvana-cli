@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerdvana-cli"
-version = "0.6.0"
+version = "0.7.0"
 description = "AI-powered CLI development tool — supports 13 AI platforms"
 readme = "README.md"
 license = {text = "MIT"}

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-18
+
+Phase F: Runtime Profiles — context × mode × trust_level.
+
+Two-axis YAML profile system: context profiles describe the harness environment
+(standalone, claude-code, vscode, ide, codex) and mode profiles describe the
+current task type (planning, editing, interactive, one-shot, query, architect,
+no-onboarding, no-memories). Both axes combine to produce a merged tool-visibility
+filter, prompt injection, and trust level for every agent turn.
+
+### Added
+
+- `core/profiles.py` — `ContextProfile`, `ModeProfile`, `MergedProfile`
+  dataclasses + `ProfileManager` (context × mode synthesis, mode stack,
+  `visible_tools()` filter, project/user/builtin YAML resolution).
+- `resources/profiles/contexts/` — 5 built-in context YAMLs:
+  `standalone`, `claude-code`, `codex`, `vscode`, `ide`.
+- `resources/profiles/modes/` — 8 built-in mode YAMLs with `trust_level`:
+  `interactive` (balanced), `editing` (balanced), `planning` (strict),
+  `query` (strict), `architect` (strict, model_override=claude-opus-4-7),
+  `one-shot` (yolo), `no-onboarding` (balanced), `no-memories` (balanced).
+- `commands/profile_commands.py` — `/mode` and `/context` slash-command
+  handlers (list / activate / deactivate / status).
+- `tools/profile_tools.py` — `GetCurrentConfigTool`, `ActivateModeTool`,
+  `DeactivateModeTool` (agent-accessible profile inspection and mode control).
+- `core/settings.py` — `SessionConfig.default_context` + `default_mode`
+  fields; `planning_gate=true` auto-maps to `default_mode=planning` (deprecated
+  in 0.8.0).
+- `core/paths.py` — `user_contexts_dir`, `user_modes_dir`,
+  `project_contexts_dir`, `project_modes_dir` path helpers.
+- `main.py` — `--approval-mode {default,auto_edit,yolo,plan}` CLI flag with
+  Codex-style mapping to (mode, trust_level).
+- `ui/app.py` — `/mode` and `/context` routed in `_handle_command`;
+  both entries added to `SLASH_COMMANDS` popup.
+- `tests/test_profiles.py` (32 tests), `tests/test_mode_commands.py` (10 tests),
+  `tests/test_approval_mode.py` (8 tests) — total +50 tests.
+
+### Changed
+
+- `commands/system_commands.py` — `/help` output lists `/mode` and `/context`.
+
 ## [0.6.0] - 2026-04-18
 
 Phase E: Project Memory + Onboarding + Git Checkpoints.
