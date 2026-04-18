@@ -89,6 +89,24 @@ Examples:
         # Gap fixes — find -delete / find -exec rm combos
         re.compile(r"\bfind\s+.*\s-delete\b"),
         re.compile(r"\bfind\s+.*\s-exec\s+rm\b"),
+        # Substitution bypass prevention — command/variable/backtick substitution
+        # These patterns detect injection vehicles that wrap blacklisted commands.
+        # We re-check the *inner content* of each substitution form separately.
+        re.compile(r"\$\([^)]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r|-r\s+-f|-f\s+-r)[^)]*\)"),
+        re.compile(r"\$\([^)]*\bmkfs\b[^)]*\)"),
+        re.compile(r"\$\([^)]*\bdd\s+if=[^)]*\)"),
+        re.compile(r"\$\([^)]*\b(?:shutdown|reboot|halt|poweroff)\b[^)]*\)"),
+        re.compile(r"\$\{[^}]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r)[^}]*\}"),
+        re.compile(r"`[^`]*\brm\s+(?:-\w*r\w*f|-\w*f\w*r|-r\s+-f|-f\s+-r)[^`]*`"),
+        re.compile(r"`[^`]*\bmkfs\b[^`]*`"),
+        re.compile(r"`[^`]*\b(?:shutdown|reboot|halt|poweroff)\b[^`]*`"),
+        # Gap fix — eval/exec as arbitrary code execution paths
+        re.compile(r"\beval\s+"),
+        re.compile(r"\bexec\s+"),
+        # Gap fix — dd writing to block devices (dd of= variant)
+        re.compile(r"\bdd\s+(?:\S+\s+)*of=/dev/(?:sd|nvme|vd|hd)"),
+        # Gap fix — env-prefix sudo bypass: FOO=1 sudo rm ...
+        re.compile(r"(?:\w+=\S+\s+)+sudo\s+"),
     ]
 
     _ASK_PATTERNS: list[re.Pattern[str]] = [
@@ -97,7 +115,13 @@ Examples:
         re.compile(r"\bwget\s+--post"),
     ]
 
+    _MAX_TIMEOUT: int = 600  # seconds — hard ceiling to prevent indefinite occupation
+
     def check_permissions(self, args: BashArgs, context: ToolContext) -> PermissionResult:
+        # Clamp timeout to hard ceiling — callers cannot exceed this.
+        if args.timeout > self._MAX_TIMEOUT:
+            args.timeout = self._MAX_TIMEOUT
+
         cmd_stripped = re.sub(r"^\s*sudo\s+", "", args.command.strip())
         full_cmd = args.command.strip()
 
