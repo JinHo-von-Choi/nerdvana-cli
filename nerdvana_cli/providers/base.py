@@ -27,6 +27,8 @@ class ProviderName(StrEnum):
     COHERE = "cohere"
     TOGETHER = "together"
     ZAI = "zai"
+    FEATHERLESS = "featherless"
+    XIAOMI_MIMO = "xiaomi_mimo"
 
 
 @dataclass
@@ -218,6 +220,20 @@ PROVIDER_CAPABILITIES: dict[ProviderName, dict[str, Any]] = {
         "supports_thinking": False,
         "max_context": 128_000,
     },
+    ProviderName.FEATHERLESS: {
+        "supports_tools": False,
+        "supports_streaming": False,
+        "supports_vision": False,
+        "supports_thinking": False,
+        "max_context": 32_768,
+    },
+    ProviderName.XIAOMI_MIMO: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": True,
+        "supports_thinking": True,
+        "max_context": 1_048_576,
+    },
 }
 
 # Model-specific context window sizes (prefix-matched)
@@ -283,6 +299,8 @@ DEFAULT_BASE_URLS: dict[ProviderName, str] = {
     ProviderName.COHERE: "https://api.cohere.com/v2",
     ProviderName.TOGETHER: "https://api.together.xyz/v1",
     ProviderName.ZAI: "https://api.z.ai/api/coding/paas/v4/",
+    ProviderName.FEATHERLESS: "https://api.featherless.ai/v1",
+    ProviderName.XIAOMI_MIMO: "https://token-plan-sgp.xiaomimimo.com/v1",
 }
 
 # Default models per provider
@@ -300,6 +318,8 @@ DEFAULT_MODELS: dict[ProviderName, str] = {
     ProviderName.COHERE: "command-r-plus",
     ProviderName.TOGETHER: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
     ProviderName.ZAI: "glm-4.7",
+    ProviderName.FEATHERLESS: "featherless-llama-3-70b",
+    ProviderName.XIAOMI_MIMO: "mimo-v2.5-pro",
 }
 
 # Environment variable names for API keys
@@ -317,6 +337,8 @@ PROVIDER_KEY_ENVVARS: dict[ProviderName, list[str]] = {
     ProviderName.COHERE: ["CO_API_KEY"],
     ProviderName.TOGETHER: ["TOGETHER_API_KEY"],
     ProviderName.ZAI: ["ZHIPUAI_API_KEY"],
+    ProviderName.FEATHERLESS: ["FEATHERLESS_API_KEY"],
+    ProviderName.XIAOMI_MIMO: ["MIMO_API_KEY", "XIAOMI_API_KEY"],
 }
 
 
@@ -359,6 +381,14 @@ def detect_provider(model: str) -> ProviderName:
     # Z.AI (GLM)
     if m.startswith("glm"):
         return ProviderName.ZAI
+
+    # Featherless — models typically prefixed with provider name
+    if m.startswith("featherless-") or "/featherless" in m:
+        return ProviderName.FEATHERLESS
+
+    # Xiaomi MiMo — model names start with 'mimo-'
+    if m.startswith("mimo-"):
+        return ProviderName.XIAOMI_MIMO
 
     # Ollama — distinctive tag-separated naming (qwen3:latest, gemma4:31b-cloud, ...)
     if ":" in m or m.endswith("-cloud"):
