@@ -50,8 +50,9 @@ class MemoryEntry:
 
     name:  str
     scope: MemoryScope
-    size:  int    # bytes
-    mtime: float  # Unix timestamp
+    size:  int
+    mtime: float
+    importance: float = 0.5  # Unix timestamp
 
 
 # ---------------------------------------------------------------------------
@@ -267,11 +268,16 @@ class MemoriesManager:
 
         raise FileNotFoundError(f"Memory '{name}' not found.")
 
-    def list_memories(self, topic: str | None = None) -> list[MemoryEntry]:
+    def list_memories(
+        self,
+        topic: str | None = None,
+        min_importance: float = 0.0,
+    ) -> list[MemoryEntry]:
         """Return MemoryEntry list for all file-backed memories.
 
         Args:
             topic: Optional slash-namespace prefix filter (e.g. "auth/login").
+            min_importance: Minimum importance threshold (0.0-1.0).
         """
         entries: list[MemoryEntry] = []
         for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
@@ -285,17 +291,18 @@ class MemoriesManager:
                         continue
                     fpath   = Path(root) / fname
                     rel     = fpath.relative_to(base_dir)
-                    # Strip .md suffix for display name
                     display = str(rel)[: -len(".md")]
                     if topic and not display.startswith(topic):
                         continue
                     stat = fpath.stat()
-                    entries.append(MemoryEntry(
+                    entry = MemoryEntry(
                         name  = display,
                         scope = scope,
                         size  = stat.st_size,
                         mtime = stat.st_mtime,
-                    ))
+                    )
+                    if entry.importance >= min_importance:
+                        entries.append(entry)
         return sorted(entries, key=lambda e: e.name)
 
     def list_stale(self, days: int = 30) -> list[MemoryEntry]:
@@ -349,3 +356,18 @@ class MemoriesManager:
             f"{count} project memor{'y' if count == 1 else 'ies'} available. "
             "Call ListMemories to see them."
         )
+
+def list_stale(
+        self,
+        days: int = 30,
+        topic: str | None = None,
+    ) -> list[MemoryEntry]:
+        """Return memories not modified in specified days.
+
+        Args:
+            days: Number of days since last modification.
+            topic: Optional slash-namespace prefix filter.
+        """
+        cutoff = time.time() - (days * 86400)
+        entries = self.list_memories(topic=topic)
+        return [e for e in entries if e.mtime < cutoff]
