@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-24
+
+### Added
+
+- **Featherless AI provider**: OpenAI-compatible API via `https://api.featherless.ai/v1`. Default model: `featherless-llama-3-70b`. API key: `FEATHERLESS_API_KEY`. Note: standard endpoints do not support streaming.
+- **Xiaomi MiMo provider**: OpenAI-compatible API via `https://token-plan-sgp.xiaomimimo.com/v1`. Default model: `mimo-v2.5-pro`. API key: `MIMO_API_KEY` or `XIAOMI_API_KEY`. Supports tools, streaming, vision, thinking. 1M context window.
+- **Ollama self-hosted mode**: Setup wizard now supports three deployment modes: Local (default), Cloud (`https://ollama.com/v1`), Self-hosted (custom URL).
+- **Context block splitting**: `split_into_blocks()` for topic-based conversation segmentation.
+- **Block summarization**: `summarize_block()` and `compact_with_blocks()` for Memento-style context compression.
+- **Memory importance tracking**: `MemoryEntry.importance` field (0.0-1.0), `min_importance` filter in `list_memories()`, `list_stale()` for time-based cleanup.
+- **Agent context sharing**: `create_shared_context()` for summarized context sharing between agents.
+- **Session restoration optimization**: `save_summary()`, `get_summary()`, `restore_with_summary()` for fast session recovery.
+
+### Changed
+
+- Provider count updated from 13 to 15.
+- Ollama setup wizard enhanced with self-hosted URL input option.
+- `nerdvana.yml.example` updated with new provider documentation.
+
+## [1.1.0] - 2026-04-23
+
+### Added
+
+- Featherless AI and Xiaomi MiMo providers (same as 1.1.1 above).
+
 ## [1.0.0] - 2026-04-18
 
 First stable release. The 0.9.x series shipped the full roadmap surface

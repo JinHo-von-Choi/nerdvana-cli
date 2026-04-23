@@ -101,3 +101,52 @@ class SessionStorage:
                 if best is None or mtime > best[0]:
                     best = (mtime, fname.replace(".jsonl", ""))
         return best[1] if best else None
+
+    def save_summary(self, session_id: str, summary: str) -> None:
+        """Save session summary for fast restoration."""
+        from pathlib import Path
+        path = self._summary_path(session_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(summary, encoding="utf-8")
+
+    def get_summary(self, session_id: str) -> str:
+        """Get session summary if available."""
+        from pathlib import Path
+        path = self._summary_path(session_id)
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        return ""
+
+    def _summary_path(self, session_id: str) -> "Path":
+        from pathlib import Path
+        base = Path(self.file_path).parent
+        return base / f"{session_id}.summary.md"
+
+    def restore_with_summary(
+        self,
+        max_messages: int = 5,
+    ) -> str:
+        """Restore session context using summary or recent messages.
+
+        Args:
+            max_messages: Max recent messages to include if no summary
+
+        Returns:
+            Context string for session restoration
+        """
+        summary = self.get_summary(self.session_id)
+        if summary:
+            return f"[Previous Session Summary]: {summary}"
+
+        messages = list(self.replay())
+        if not messages:
+            return ""
+
+        recent = messages[-max_messages:]
+        context_parts = []
+        for msg in recent:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")[:200]
+            context_parts.append(f"[{role}]: {content}")
+
+        return "\n".join(context_parts)

@@ -113,3 +113,109 @@ async def ai_compact(
         state.record_failure()
         logger.warning("ai_compact exception: %s", exc)
         return None
+
+
+def split_into_blocks(
+    messages: list[dict[str, str]],
+    max_block_size: int = 10,
+) -> list[list[dict[str, str]]]:
+    """Split conversation into blocks based on message count.
+
+    Args:
+        messages: List of message dicts with 'role' and 'content'
+        max_block_size: Maximum messages per block
+
+    Returns:
+        List of message blocks
+    """
+    if not messages:
+        return []
+
+    blocks: list[list[dict[str, str]]] = []
+    current_block: list[dict[str, str]] = []
+
+    for msg in messages:
+        current_block.append(msg)
+        if len(current_block) >= max_block_size:
+            blocks.append(current_block)
+            current_block = []
+
+    if current_block:
+        blocks.append(current_block)
+
+    return blocks
+
+
+def summarize_block(block: list[dict[str, str]]) -> str:
+    """Create extractive summary from a conversation block.
+
+    Args:
+        block: List of messages to summarize
+
+    Returns:
+        Concise summary string
+    """
+    if not block:
+        return ""
+
+    user_msgs = [m["content"] for m in block if m.get("role") == "user"]
+    assistant_msgs = [m["content"] for m in block if m.get("role") == "assistant"]
+
+    return _extractive_summary_simple(user_msgs, assistant_msgs)
+
+
+def _extractive_summary_simple(
+    user_msgs: list[str],
+    assistant_msgs: list[str],
+) -> str:
+    """Create extractive summary from message lists."""
+    parts = []
+    if user_msgs:
+        parts.append(f"User: {user_msgs[0][:100]}")
+    if assistant_msgs:
+        parts.append(f"Assistant: {assistant_msgs[0][:100]}")
+    return " | ".join(parts)
+
+
+def compact_with_blocks(
+    messages: list[dict[str, str]],
+    keep_recent: int = 2,
+    max_block_size: int = 10,
+) -> list[dict[str, str]]:
+    """Compact conversation using block splitting and summarization.
+
+    Args:
+        messages: Full conversation messages
+        keep_recent: Number of recent blocks to keep intact
+        max_block_size: Maximum messages per block
+
+    Returns:
+        Compacted message list with summaries for old blocks
+    """
+    if not messages:
+        return []
+
+    blocks = split_into_blocks(messages, max_block_size)
+
+    if len(blocks) <= keep_recent:
+        return messages
+
+    # Keep recent blocks intact
+    recent_blocks = blocks[-keep_recent:]
+    old_blocks = blocks[:-keep_recent]
+
+    # Summarize old blocks
+    compacted: list[dict[str, str]] = []
+    for block in old_blocks:
+        summary = summarize_block(block)
+        if summary:
+            compacted.append({
+                "role": "system",
+                "content": f"[Context summary]: {summary}",
+            })
+
+    # Add recent blocks
+    for block in recent_blocks:
+        compacted.extend(block)
+
+    return compacted
