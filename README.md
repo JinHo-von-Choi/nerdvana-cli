@@ -9,9 +9,9 @@
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/install-one--line-blue?style=flat-square" alt="Install"></a>
   <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/providers-13-green?style=flat-square" alt="Providers">
+  <img src="https://img.shields.io/badge/providers-15-green?style=flat-square" alt="Providers">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.0-orange?style=flat-square" alt="Version">
   <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
   <img src="https://img.shields.io/badge/LSP--CI-passing-green?style=flat-square" alt="LSP CI">
 </p>
@@ -46,6 +46,8 @@
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
 | **OpenRouter** | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` |
 | **xAI (Grok)** | grok-3 | `XAI_API_KEY` |
+| **Featherless AI** | featherless-llama-3-70b | `FEATHERLESS_API_KEY` |
+| **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
 | **Ollama** | qwen3 | `OLLAMA_API_KEY` |
 | **vLLM** | Qwen/Qwen3-32B | `OPENAI_API_KEY` |
 | **DeepSeek** | deepseek-chat | `DEEPSEEK_API_KEY` |
