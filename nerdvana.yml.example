@@ -2,7 +2,7 @@
 # Copy to ~/.config/nerdvana-cli/config.yml or ./nerdvana.yml
 
 model:
-  # Provider: anthropic, openai, gemini, groq, openrouter, xai, ollama, vllm, deepseek, mistral, cohere, together
+  # Provider: anthropic, openai, gemini, groq, openrouter, xai, featherless, xiaomi_mimo, ollama, vllm, deepseek, mistral, cohere, together
   # Leave empty to auto-detect from model name
   provider: ""
 
@@ -11,6 +11,9 @@ model:
   # OpenAI: gpt-4.1, gpt-4o, o3
   # Gemini: gemini-2.5-flash, gemini-2.5-pro
   # Groq: llama-3.3-70b-versatile, mixtral-8x7b-32768
+  # Featherless: featherless-llama-3-70b
+  # Xiaomi MiMo: mimo-v2.5-pro, mimo-v2-omni, mimo-v2-flash
+  # Ollama: qwen3, llama3:70b, gemma2:9b
   # DeepSeek: deepseek-chat, deepseek-reasoner
   # Mistral: mistral-medium-latest, codestral-latest
   model: claude-sonnet-4-20250514
@@ -20,10 +23,16 @@ model:
   # OpenAI: OPENAI_API_KEY
   # Gemini: GEMINI_API_KEY
   # Groq: GROQ_API_KEY
+  # Featherless: FEATHERLESS_API_KEY
+  # Xiaomi MiMo: MIMO_API_KEY or XIAOMI_API_KEY
+  # Ollama Cloud: OLLAMA_API_KEY (not needed for local)
   # etc.
   api_key: ""
 
   # Override API endpoint (for custom proxies, local servers)
+  # Ollama local: http://localhost:11434/v1
+  # Ollama cloud: https://ollama.com/v1
+  # Ollama self-hosted: http://192.168.1.100:11434/v1
   base_url: ""
 
   # Max tokens per response

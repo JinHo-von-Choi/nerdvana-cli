@@ -85,6 +85,8 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
         ("groq", "Groq (Fast LLM)", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
         ("openrouter", "OpenRouter (Many)", "anthropic/claude-sonnet-4", "OPENROUTER_API_KEY"),
         ("xai", "xAI (Grok)", "grok-3", "XAI_API_KEY"),
+        ("featherless", "Featherless AI", "featherless-llama-3-70b", "FEATHERLESS_API_KEY"),
+        ("xiaomi_mimo", "Xiaomi MiMo", "mimo-v2.5-pro", "MIMO_API_KEY"),
         ("ollama", "Ollama (Local)", "qwen3", "(no key needed)"),
         ("vllm", "vLLM (Local)", "Qwen/Qwen3-32B", "(no key needed)"),
         ("deepseek", "DeepSeek", "deepseek-chat", "DEEPSEEK_API_KEY"),
@@ -114,22 +116,35 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
 
     provider_name, provider_label, default_model, key_env = providers_display[int(choice) - 1]
 
-    # Ollama sub-mode: local vs cloud
+    # Ollama sub-mode: local / cloud / self-hosted
     ollama_mode = ""
     base_url_override = ""
     if provider_name == "ollama":
         console.print()
-        console.print("[dim]Ollama runs locally (http://localhost:11434) or via Ollama Cloud (https://ollama.com).[/dim]")
-        ollama_mode = Prompt.ask(
-            "Ollama mode",
-            choices=["local", "cloud"],
-            default="local",
-        )
-        if ollama_mode == "cloud":
+        console.print("[dim]Ollama deployment mode:[/dim]")
+        console.print("  1. Local (http://localhost:11434/v1) — no API key needed")
+        console.print("  2. Cloud (https://ollama.com/v1) — requires API key")
+        console.print("  3. Self-hosted — custom URL")
+        ollama_choice = Prompt.ask("Select mode", choices=["1", "2", "3"], default="1")
+        if ollama_choice == "1":
+            ollama_mode = "local"
+            base_url_override = "http://localhost:11434/v1"
+        elif ollama_choice == "2":
+            ollama_mode = "cloud"
             provider_label = "Ollama (Cloud)"
             key_env = "OLLAMA_API_KEY"
             default_model = "gpt-oss:120b"
             base_url_override = "https://ollama.com/v1"
+        else:
+            ollama_mode = "self-hosted"
+            provider_label = "Ollama (Self-hosted)"
+            base_url_override = Prompt.ask(
+                "Ollama server URL",
+                default="http://192.168.1.100:11434/v1",
+            )
+            use_key = Confirm.ask("Requires API key?", default=False)
+            if use_key:
+                key_env = "OLLAMA_API_KEY"
 
     # Step 2: API key
     console.print()
