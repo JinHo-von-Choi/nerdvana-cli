@@ -31,6 +31,10 @@ class ProviderName(StrEnum):
     XIAOMI_MIMO = "xiaomi_mimo"
     MOONSHOT = "moonshot"
     DASHSCOPE = "dashscope"
+    MINIMAX = "minimax"
+    PERPLEXITY = "perplexity"
+    FIREWORKS = "fireworks"
+    CEREBRAS = "cerebras"
 
 
 @dataclass
@@ -250,6 +254,34 @@ PROVIDER_CAPABILITIES: dict[ProviderName, dict[str, Any]] = {
         "supports_thinking": True,
         "max_context": 1_000_000,
     },
+    ProviderName.MINIMAX: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": True,
+        "supports_thinking": False,
+        "max_context": 1_000_000,
+    },
+    ProviderName.PERPLEXITY: {
+        "supports_tools": False,
+        "supports_streaming": True,
+        "supports_vision": False,
+        "supports_thinking": False,
+        "max_context": 200_000,
+    },
+    ProviderName.FIREWORKS: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": False,
+        "supports_thinking": False,
+        "max_context": 131_072,
+    },
+    ProviderName.CEREBRAS: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": False,
+        "supports_thinking": False,
+        "max_context": 65_536,
+    },
 }
 
 # Model-specific context window sizes (prefix-matched)
@@ -291,7 +323,29 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "qwen-vl-max": 32_768,
     "qwen-vl": 32_768,
     "qwq-": 131_072,
+    "MiniMax-M2": 1_000_000,
+    "minimax-m2": 1_000_000,
+    "abab6": 245_000,
+    "sonar-pro": 200_000,
+    "sonar-reasoning-pro": 127_000,
+    "sonar-": 127_000,
+    "accounts/fireworks/models/llama-v3p3-70b-instruct": 131_072,
+    "accounts/fireworks/models/qwen2p5-72b": 131_072,
+    "accounts/fireworks/models/": 131_072,
+    "llama-3.3-70b": 131_072,
+    "llama-4-scout": 131_072,
+    "qwen-3-32b": 65_536,
+    "qwen-3-235b": 131_072,
 }
+
+
+_CEREBRAS_MODELS: frozenset[str] = frozenset({
+    "llama-3.3-70b",
+    "llama-3.1-8b",
+    "llama-4-scout-17b-16e-instruct",
+    "qwen-3-32b",
+    "qwen-3-235b-a22b-instruct-2507",
+})
 
 
 def resolve_context_window(provider: ProviderName, model: str) -> int:
@@ -332,6 +386,10 @@ DEFAULT_BASE_URLS: dict[ProviderName, str] = {
     ProviderName.XIAOMI_MIMO: "https://token-plan-sgp.xiaomimimo.com/v1",
     ProviderName.MOONSHOT: "https://api.moonshot.ai/v1",
     ProviderName.DASHSCOPE: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    ProviderName.MINIMAX: "https://api.minimaxi.chat/v1",
+    ProviderName.PERPLEXITY: "https://api.perplexity.ai",
+    ProviderName.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+    ProviderName.CEREBRAS: "https://api.cerebras.ai/v1",
 }
 
 # Default models per provider
@@ -353,6 +411,10 @@ DEFAULT_MODELS: dict[ProviderName, str] = {
     ProviderName.XIAOMI_MIMO: "mimo-v2.5-pro",
     ProviderName.MOONSHOT: "kimi-k2-instruct",
     ProviderName.DASHSCOPE: "qwen3-coder-plus",
+    ProviderName.MINIMAX: "MiniMax-M2",
+    ProviderName.PERPLEXITY: "sonar-pro",
+    ProviderName.FIREWORKS: "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    ProviderName.CEREBRAS: "llama-3.3-70b",
 }
 
 # Environment variable names for API keys
@@ -374,6 +436,10 @@ PROVIDER_KEY_ENVVARS: dict[ProviderName, list[str]] = {
     ProviderName.XIAOMI_MIMO: ["MIMO_API_KEY", "XIAOMI_API_KEY"],
     ProviderName.MOONSHOT: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
     ProviderName.DASHSCOPE: ["DASHSCOPE_API_KEY", "ALIBABA_API_KEY"],
+    ProviderName.MINIMAX: ["MINIMAX_API_KEY"],
+    ProviderName.PERPLEXITY: ["PERPLEXITY_API_KEY", "PPLX_API_KEY"],
+    ProviderName.FIREWORKS: ["FIREWORKS_API_KEY"],
+    ProviderName.CEREBRAS: ["CEREBRAS_API_KEY"],
 }
 
 
@@ -384,6 +450,18 @@ def detect_provider(model: str) -> ProviderName:
     # Anthropic
     if m.startswith("claude"):
         return ProviderName.ANTHROPIC
+
+    # Fireworks AI — model IDs always carry this exact prefix
+    if m.startswith("accounts/fireworks/models/"):
+        return ProviderName.FIREWORKS
+
+    # MiniMax
+    if m.startswith(("minimax-", "abab")) or model.startswith("MiniMax-"):
+        return ProviderName.MINIMAX
+
+    # Perplexity
+    if m.startswith(("sonar-", "pplx-")):
+        return ProviderName.PERPLEXITY
 
     # OpenAI
     if m.startswith(("gpt-", "o1", "o3", "o4")):
@@ -403,6 +481,10 @@ def detect_provider(model: str) -> ProviderName:
         "qwen-vl", "qwen3-coder", "qwen3-72b-instruct", "qwq-",
     )):
         return ProviderName.DASHSCOPE
+
+    # Cerebras — exact catalog whitelist (avoids Groq llama-* collision)
+    if m in _CEREBRAS_MODELS:
+        return ProviderName.CEREBRAS
 
     # Groq
     if m.startswith(("llama-", "mixtral-", "gemma-", "qwen-")):
