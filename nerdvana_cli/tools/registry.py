@@ -9,6 +9,7 @@ from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
 from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
 from nerdvana_cli.tools.parism_tool import ParismTool
 from nerdvana_cli.tools.search_tools import GlobTool, GrepTool
+from nerdvana_cli.tools.web_tools import WebFetchTool, WebSearchTool
 
 
 def create_tool_registry(
@@ -41,6 +42,10 @@ def create_tool_registry(
     registry.register(FileEditTool())
     registry.register(GlobTool())
     registry.register(GrepTool())
+
+    # Web tools — WebSearch raises ToolError at call time when BRAVE_API_KEY is absent
+    registry.register(WebFetchTool())
+    registry.register(WebSearchTool())
 
     if settings is not None:
         from nerdvana_cli.tools.agent_tool import AgentTool

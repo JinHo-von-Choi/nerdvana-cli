@@ -396,6 +396,18 @@ def doctor(
     doctor_command(strict=strict, json_output=json_output)
 
 
+@app.command()
+def cost(
+    since:       str  = typer.Option("7d",      "--since", help="Time window (e.g. 7d, 30d, 24h, all)"),
+    json_output: bool = typer.Option(False,      "--json",  help="Machine-readable JSON output"),
+    by:          str  = typer.Option("provider", "--by",    help="Group by: provider | model"),
+) -> None:
+    """Aggregate token usage and USD cost over a time window."""
+    from nerdvana_cli.commands.cost_command import cost_command
+
+    cost_command(since=since, json_output=json_output, by=by)
+
+
 # ---------------------------------------------------------------------------
 # nerdvana hook — hook bridge sub-group — Phase G2
 # ---------------------------------------------------------------------------
