@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core import paths
@@ -104,21 +105,18 @@ class SessionStorage:
 
     def save_summary(self, session_id: str, summary: str) -> None:
         """Save session summary for fast restoration."""
-        from pathlib import Path
         path = self._summary_path(session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(summary, encoding="utf-8")
 
     def get_summary(self, session_id: str) -> str:
         """Get session summary if available."""
-        from pathlib import Path
         path = self._summary_path(session_id)
         if path.exists():
             return path.read_text(encoding="utf-8")
         return ""
 
-    def _summary_path(self, session_id: str) -> "Path":
-        from pathlib import Path
+    def _summary_path(self, session_id: str) -> Path:
         base = Path(self.file_path).parent
         return base / f"{session_id}.summary.md"
 

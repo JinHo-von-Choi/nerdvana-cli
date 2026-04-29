@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
+from pathlib import Path
 from typing import Any
 
 from rich.text import Text
@@ -12,7 +14,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Paste
-from textual.widgets import Footer, Header, Input, OptionList, Static
+from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
 
 from nerdvana_cli import __version__
@@ -22,8 +24,13 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
+from nerdvana_cli.ui.editor_pane import EditorPane, language_for_path
+from nerdvana_cli.ui.project_tree import ProjectTreePane
 from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
+from nerdvana_cli.utils.path import safe_open_fd, validate_path
+
+_MAX_EDITOR_FILE_BYTES = 1_000_000
 
 
 class MultilineAwareInput(Input):
@@ -326,9 +333,12 @@ class NerdvanaApp(App[object]):
     BINDINGS = [
         Binding("ctrl+c", "quit",             "Quit",      show=True),
         Binding("ctrl+b", "toggle_sidebar",   "Sidebar",   show=True),
+        Binding("ctrl+e", "toggle_project_tree", "Files",  show=True,  priority=True),
+        Binding("ctrl+o", "toggle_editor",    "Editor",    show=True,  priority=True),
+        Binding("ctrl+s", "save_editor",      "Save",      show=True,  priority=True),
         Binding("ctrl+l", "clear_chat",       "Clear",     show=True),
         Binding("ctrl+d", "toggle_dashboard", "Dashboard", show=True),
-        Binding("escape", "focus_input",      "Input",     show=False),
+        Binding("escape", "focus_input",      "Input",     show=False, priority=True),
     ]
 
     def __init__(
@@ -347,12 +357,16 @@ class NerdvanaApp(App[object]):
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
         self._sidebar_user_visible: bool | None = None  # None = follow auto rule
-        self._session_topic: str = ""
+        self._session_topic: str        = ""
+        self._project_root: str         = os.getcwd()
+        self._active_editor_path: str   = ""
+        self._editor_dirty: bool        = False
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="body"):
             yield Sidebar(id="sidebar")
+            yield ProjectTreePane(root_path=self._project_root, id="project-tree-pane")
             with Vertical(id="main-container"):
                 yield Static(id="logo-banner")
                 with VerticalScroll(id="chat-frame"):
@@ -366,6 +380,7 @@ class NerdvanaApp(App[object]):
                     placeholder="Message...",
                     id="user-input",
                 )
+            yield EditorPane(project_root=self._project_root, id="editor-pane")
         yield Static(id="context-bar")
         yield StatusBar(id="status-bar")
         yield Footer()
@@ -394,9 +409,8 @@ class NerdvanaApp(App[object]):
 
         self._update_banner()
 
-        import os
         sidebar = self.query_one("#sidebar", Sidebar)
-        sidebar.set_header(topic=self._session_topic, cwd=os.getcwd())
+        sidebar.set_header(topic=self._session_topic, cwd=self._project_root)
         sidebar.set_context(
             provider=self.settings.model.provider,
             model=self.settings.model.model,
@@ -409,8 +423,8 @@ class NerdvanaApp(App[object]):
         triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
         sidebar.set_skills(triggers)
         sidebar.set_tasks_registry(self._task_registry)
-        self.set_interval(0.5, lambda: self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows())
-        self.set_interval(2.0, lambda: asyncio.create_task(sidebar.refresh_files()))
+        self.set_interval(0.5, self._refresh_sidebar_tasks)
+        self.set_interval(2.0, self._schedule_sidebar_file_refresh)
 
         menu = self.query_one("#command-menu", CommandMenu)
         # Pre-seed seen set with built-in slash command IDs to avoid DuplicateID
@@ -446,6 +460,17 @@ class NerdvanaApp(App[object]):
         ]
         with contextlib.suppress(Exception):
             self.query_one("#sidebar", Sidebar).set_mcp(servers)
+
+    def _refresh_sidebar_tasks(self) -> None:
+        """Refresh sidebar task rows when the widget is still mounted."""
+        with contextlib.suppress(Exception):
+            self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows()
+
+    def _schedule_sidebar_file_refresh(self) -> None:
+        """Schedule async sidebar file refresh when the sidebar is still mounted."""
+        with contextlib.suppress(Exception):
+            sidebar = self.query_one("#sidebar", Sidebar)
+            asyncio.create_task(sidebar.refresh_files())
 
     def on_resize(self, event: object) -> None:
         """Apply the 140-col breakpoint unless the user has explicitly toggled."""
@@ -485,10 +510,9 @@ class NerdvanaApp(App[object]):
 
         if not self._session_topic and not user_text.startswith("/"):
             self._session_topic = user_text
-            import os
             self.query_one("#sidebar", Sidebar).set_header(
                 topic=self._session_topic,
-                cwd=os.getcwd(),
+                cwd=self._project_root,
             )
 
         # API key input mode
@@ -836,6 +860,39 @@ class NerdvanaApp(App[object]):
         """Focus input widget (Escape)."""
         self.query_one("#user-input", Input).focus()
 
+    def action_toggle_project_tree(self) -> None:
+        """Toggle project file tree visibility."""
+        tree_pane      = self.query_one("#project-tree-pane", ProjectTreePane)
+        became_visible = tree_pane.toggle_pane()
+        if became_visible:
+            tree_pane.focus_tree()
+
+    def action_toggle_editor(self) -> None:
+        """Toggle direct editor visibility."""
+        editor         = self.query_one("#editor-pane", EditorPane)
+        became_visible = editor.toggle_pane()
+        if became_visible:
+            editor.focus_editor()
+
+    def action_save_editor(self) -> None:
+        """Save the active editor buffer using the safe path helpers."""
+        editor        = self.query_one("#editor-pane", EditorPane)
+        relative_path = editor.current_path()
+        if not relative_path:
+            self._add_chat_message("[dim]No editor buffer to save[/dim]", raw_text="No editor buffer to save")
+            return
+
+        try:
+            self._save_editor_buffer(relative_path, editor.current_text())
+        except Exception as exc:
+            self._add_chat_message(f"[red]Save failed: {exc}[/red]", raw_text=f"Save failed: {exc}")
+            return
+
+        editor.mark_clean()
+        self._active_editor_path = relative_path
+        self._editor_dirty       = False
+        self._add_chat_message(f"[dim]Saved {relative_path}[/dim]", raw_text=f"Saved {relative_path}")
+
     def action_toggle_sidebar(self) -> None:
         """Toggle sidebar visibility. Sets a user-override that suppresses on_resize."""
         sidebar = self.query_one("#sidebar", Sidebar)
@@ -847,3 +904,69 @@ class NerdvanaApp(App[object]):
         """Toggle observability dashboard (Ctrl+D)."""
         with contextlib.suppress(Exception):
             self.query_one("#dashboard-tab", DashboardTab).toggle()
+
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        """Open selected project file in the editor pane."""
+        try:
+            relative_path = self._relative_project_path(event.path)
+            self._open_editor_buffer(relative_path)
+        except Exception as exc:
+            self._add_chat_message(f"[red]Open failed: {exc}[/red]", raw_text=f"Open failed: {exc}")
+
+    def _open_editor_buffer(self, relative_path: str) -> None:
+        """Load a relative project path into the direct editor pane."""
+        text   = self._read_editor_buffer(relative_path)
+        editor = self.query_one("#editor-pane", EditorPane)
+        editor.load_buffer(
+            relative_path = relative_path,
+            text          = text,
+            language      = language_for_path(relative_path),
+        )
+        editor.show_pane()
+        editor.focus_editor()
+        self._active_editor_path = relative_path
+        self._editor_dirty       = False
+
+    def _read_editor_buffer(self, relative_path: str) -> str:
+        """Read a project file through validated, symlink-aware path handling."""
+        path_error = validate_path(relative_path, self._project_root)
+        if path_error:
+            raise PermissionError(path_error)
+
+        fd = safe_open_fd(relative_path, self._project_root, os.O_RDONLY)
+        with os.fdopen(fd, "rb") as handle:
+            data = handle.read(_MAX_EDITOR_FILE_BYTES + 1)
+
+        if len(data) > _MAX_EDITOR_FILE_BYTES:
+            raise ValueError(f"Editor refuses files larger than {_MAX_EDITOR_FILE_BYTES} bytes")
+        if b"\x00" in data:
+            raise ValueError("Editor refuses binary files")
+        return data.decode("utf-8", errors="replace")
+
+    def _save_editor_buffer(self, relative_path: str, content: str) -> None:
+        """Write a project file through validated, symlink-aware path handling."""
+        path_error = validate_path(relative_path, self._project_root)
+        if path_error:
+            raise PermissionError(path_error)
+
+        fd = safe_open_fd(
+            relative_path,
+            self._project_root,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+
+    def _relative_project_path(self, path: str | Path) -> str:
+        """Convert an absolute selected path into a validated project-relative path."""
+        root     = Path(self._project_root).resolve()
+        selected = Path(path).expanduser().resolve()
+        try:
+            relative_path = str(selected.relative_to(root))
+        except ValueError as exc:
+            raise PermissionError(f"Path is outside project root: {selected}") from exc
+
+        path_error = validate_path(relative_path, self._project_root)
+        if path_error:
+            raise PermissionError(path_error)
+        return relative_path
