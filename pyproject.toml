@@ -90,6 +90,7 @@ addopts = "-v --tb=short"
 markers = [
     "lsp_integration: Tests requiring actual language server processes (pyright, typescript-language-server)",
     "slow: Tests taking > 1 second",
+    "live: Live API smoke tests requiring provider env keys (skipped without keys)",
 ]
 
 [tool.mypy]
