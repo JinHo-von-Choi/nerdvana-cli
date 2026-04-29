@@ -29,6 +29,8 @@ class ProviderName(StrEnum):
     ZAI = "zai"
     FEATHERLESS = "featherless"
     XIAOMI_MIMO = "xiaomi_mimo"
+    MOONSHOT = "moonshot"
+    DASHSCOPE = "dashscope"
 
 
 @dataclass
@@ -234,6 +236,20 @@ PROVIDER_CAPABILITIES: dict[ProviderName, dict[str, Any]] = {
         "supports_thinking": True,
         "max_context": 1_048_576,
     },
+    ProviderName.MOONSHOT: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": False,
+        "supports_thinking": False,
+        "max_context": 131_072,
+    },
+    ProviderName.DASHSCOPE: {
+        "supports_tools": True,
+        "supports_streaming": True,
+        "supports_vision": True,
+        "supports_thinking": True,
+        "max_context": 1_000_000,
+    },
 }
 
 # Model-specific context window sizes (prefix-matched)
@@ -262,6 +278,19 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "codestral": 256_000,
     "command-r-plus": 128_000,
     "command-r": 128_000,
+    "kimi-k2": 131_072,
+    "kimi-latest": 131_072,
+    "moonshot-v1-128k": 131_072,
+    "moonshot-v1-32k": 32_768,
+    "moonshot-v1-8k": 8_192,
+    "qwen3-coder-plus": 1_000_000,
+    "qwen3-coder": 256_000,
+    "qwen-max": 32_768,
+    "qwen-plus": 131_072,
+    "qwen-turbo": 1_000_000,
+    "qwen-vl-max": 32_768,
+    "qwen-vl": 32_768,
+    "qwq-": 131_072,
 }
 
 
@@ -301,6 +330,8 @@ DEFAULT_BASE_URLS: dict[ProviderName, str] = {
     ProviderName.ZAI: "https://api.z.ai/api/coding/paas/v4/",
     ProviderName.FEATHERLESS: "https://api.featherless.ai/v1",
     ProviderName.XIAOMI_MIMO: "https://token-plan-sgp.xiaomimimo.com/v1",
+    ProviderName.MOONSHOT: "https://api.moonshot.ai/v1",
+    ProviderName.DASHSCOPE: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 }
 
 # Default models per provider
@@ -320,6 +351,8 @@ DEFAULT_MODELS: dict[ProviderName, str] = {
     ProviderName.ZAI: "glm-4.7",
     ProviderName.FEATHERLESS: "featherless-llama-3-70b",
     ProviderName.XIAOMI_MIMO: "mimo-v2.5-pro",
+    ProviderName.MOONSHOT: "kimi-k2-instruct",
+    ProviderName.DASHSCOPE: "qwen3-coder-plus",
 }
 
 # Environment variable names for API keys
@@ -339,6 +372,8 @@ PROVIDER_KEY_ENVVARS: dict[ProviderName, list[str]] = {
     ProviderName.ZAI: ["ZHIPUAI_API_KEY"],
     ProviderName.FEATHERLESS: ["FEATHERLESS_API_KEY"],
     ProviderName.XIAOMI_MIMO: ["MIMO_API_KEY", "XIAOMI_API_KEY"],
+    ProviderName.MOONSHOT: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+    ProviderName.DASHSCOPE: ["DASHSCOPE_API_KEY", "ALIBABA_API_KEY"],
 }
 
 
@@ -357,6 +392,17 @@ def detect_provider(model: str) -> ProviderName:
     # Gemini
     if m.startswith("gemini"):
         return ProviderName.GEMINI
+
+    # Moonshot AI (Kimi)
+    if m.startswith(("kimi", "moonshot-")):
+        return ProviderName.MOONSHOT
+
+    # Alibaba DashScope (Qwen Cloud)
+    if m.startswith((
+        "qwen-max", "qwen-plus", "qwen-turbo",
+        "qwen-vl", "qwen3-coder", "qwen3-72b-instruct", "qwq-",
+    )):
+        return ProviderName.DASHSCOPE
 
     # Groq
     if m.startswith(("llama-", "mixtral-", "gemma-", "qwen-")):

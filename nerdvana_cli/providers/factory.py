@@ -38,6 +38,8 @@ _PROVIDER_CLASSES: dict[ProviderName, type[AnthropicProvider] | type[OpenAIProvi
     ProviderName.ZAI: OpenAIProvider,
     ProviderName.FEATHERLESS: OpenAIProvider,
     ProviderName.XIAOMI_MIMO: OpenAIProvider,
+    ProviderName.MOONSHOT: OpenAIProvider,
+    ProviderName.DASHSCOPE: OpenAIProvider,
 }
 
 

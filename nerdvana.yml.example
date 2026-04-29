@@ -2,7 +2,7 @@
 # Copy to ~/.config/nerdvana-cli/config.yml or ./nerdvana.yml
 
 model:
-  # Provider: anthropic, openai, gemini, groq, openrouter, xai, featherless, xiaomi_mimo, ollama, vllm, deepseek, mistral, cohere, together
+  # Provider: anthropic, openai, gemini, groq, openrouter, xai, ollama, vllm, deepseek, mistral, cohere, together, zai, featherless, xiaomi_mimo, moonshot, dashscope
   # Leave empty to auto-detect from model name
   provider: ""
 
@@ -11,11 +11,13 @@ model:
   # OpenAI: gpt-4.1, gpt-4o, o3
   # Gemini: gemini-2.5-flash, gemini-2.5-pro
   # Groq: llama-3.3-70b-versatile, mixtral-8x7b-32768
-  # Featherless: featherless-llama-3-70b
-  # Xiaomi MiMo: mimo-v2.5-pro, mimo-v2-omni, mimo-v2-flash
   # Ollama: qwen3, llama3:70b, gemma2:9b
   # DeepSeek: deepseek-chat, deepseek-reasoner
   # Mistral: mistral-medium-latest, codestral-latest
+  # Featherless: featherless-llama-3-70b
+  # Xiaomi MiMo: mimo-v2.5-pro, mimo-v2-omni, mimo-v2-flash
+  # Moonshot AI (Kimi): kimi-k2-instruct, kimi-latest, moonshot-v1-128k
+  # Alibaba DashScope (Qwen): qwen3-coder-plus, qwen-max, qwen-turbo
   model: claude-sonnet-4-20250514
 
   # Leave empty to use provider's env var
@@ -23,9 +25,13 @@ model:
   # OpenAI: OPENAI_API_KEY
   # Gemini: GEMINI_API_KEY
   # Groq: GROQ_API_KEY
+  # Ollama Cloud: OLLAMA_API_KEY (not needed for local)
+  # DeepSeek: DEEPSEEK_API_KEY
+  # Mistral: MISTRAL_API_KEY
   # Featherless: FEATHERLESS_API_KEY
   # Xiaomi MiMo: MIMO_API_KEY or XIAOMI_API_KEY
-  # Ollama Cloud: OLLAMA_API_KEY (not needed for local)
+  # Moonshot AI (Kimi): MOONSHOT_API_KEY or KIMI_API_KEY
+  # Alibaba DashScope (Qwen): DASHSCOPE_API_KEY or ALIBABA_API_KEY
   # etc.
   api_key: ""
 
@@ -41,6 +47,15 @@ model:
   # Temperature (0.0 = deterministic, 1.0 = creative)
   temperature: 1.0
 
+  # Fallback models tried in order on 429/529/503/timeout errors
+  fallback_models: []
+
+  # Enable extended thinking (activated automatically by ultrawork/ulw keywords)
+  extended_thinking: false
+
+  # Max tokens allocated for extended thinking
+  thinking_budget: 8192
+
 permissions:
   mode: default
   always_allow:
@@ -54,6 +69,18 @@ session:
   max_turns: 200
   max_context_tokens: 180000
   compact_threshold: 0.8
+  # Circuit breaker: max consecutive AI compaction failures before fallback
+  compact_max_failures: 3
+  # Spawn a Plan subagent on complex prompts before execution
+  planning_gate: false
+  # Default runtime context profile name
+  default_context: standalone
+  # Default runtime mode name (interactive, planning, etc.)
+  default_mode: interactive
+
+checkpoint:
+  enabled: true
+  per_session_max: 50
 
 hooks:
   session_start:
