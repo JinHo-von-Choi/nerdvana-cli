@@ -8,6 +8,26 @@ Screen {
     height: 1fr;
 }
 
+#project-tree-pane {
+    width: 34;
+    min-width: 24;
+    height: 1fr;
+}
+
+#project-tree-pane.hidden {
+    display: none;
+}
+
+#editor-pane {
+    width: 1fr;
+    min-width: 44;
+    height: 1fr;
+}
+
+#editor-pane.hidden {
+    display: none;
+}
+
 ChatMessage {
     padding: 0 1;
     width: 100%;
