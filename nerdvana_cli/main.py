@@ -381,6 +381,22 @@ def serve(
 
 
 # ---------------------------------------------------------------------------
+# nerdvana doctor — installation/env diagnostics
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def doctor(
+    strict:      bool = typer.Option(False, "--strict", help="Treat warnings as failures"),
+    json_output: bool = typer.Option(False, "--json",   help="Machine-readable JSON output"),
+) -> None:
+    """Diagnose installation, keys, and external dependencies."""
+    from nerdvana_cli.commands.doctor_command import doctor_command
+
+    doctor_command(strict=strict, json_output=json_output)
+
+
+# ---------------------------------------------------------------------------
 # nerdvana hook — hook bridge sub-group — Phase G2
 # ---------------------------------------------------------------------------
 
