@@ -210,7 +210,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/tokens` | Show token usage |
 | `/skills` | List available skills |
 | `/tools` | List tools |
-| `/update` | Check and install updates |
+| `/update` | Check and install updates (`/update parism` refreshes the bundled Parism MCP package to its latest version) |
 | `/memories` | List project memories |
 | `/undo` | Restore pre-edit git checkpoint |
 | `/redo` | Re-apply last undone checkpoint |
