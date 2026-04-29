@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
@@ -58,6 +59,20 @@ def save_config(config: dict[str, Any], path: str = "") -> str:
     return path
 
 
+def _resolve_default_provider_index(
+    saved_provider: str,
+    providers_display: Sequence[tuple[str, ...]],
+) -> str:
+    """Return the 1-based index string for saved_provider in providers_display.
+
+    Falls back to "1" when saved_provider is absent or unrecognized.
+    """
+    for i, entry in enumerate(providers_display, 1):
+        if entry[0] == saved_provider:
+            return str(i)
+    return "1"
+
+
 def run_setup(force: bool = False) -> dict[str, Any] | None:
     """Run interactive setup wizard. Returns config dict or None if skipped."""
 
@@ -108,10 +123,14 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
     console.print(table)
     console.print()
 
+    existing_cfg = load_config()
+    saved_provider = (existing_cfg.get("model") or {}).get("provider", "")
+    default_idx = _resolve_default_provider_index(saved_provider, providers_display)
+
     choice = Prompt.ask(
         "Select provider",
         choices=[str(i) for i in range(1, len(providers_display) + 1)],
-        default="1",
+        default=default_idx,
     )
 
     provider_name, provider_label, default_model, key_env = providers_display[int(choice) - 1]

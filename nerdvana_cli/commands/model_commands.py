@@ -29,6 +29,10 @@ async def handle_model(app: NerdvanaApp, args: str) -> None:
             existing["model"]["model"] = args
             existing["model"]["provider"] = app.settings.model.provider
             existing["model"]["base_url"] = app.settings.model.base_url
+            existing.setdefault("model_history", {})[app.settings.model.provider] = args
+            _mh = getattr(app.settings, "model_history", None)
+            if isinstance(_mh, dict):
+                _mh[app.settings.model.provider] = args
             save_config(existing)
         except Exception as save_err:
             app._add_chat_message(
@@ -66,11 +70,14 @@ async def handle_models(app: NerdvanaApp, args: str) -> None:
         else:
             selector = app.query_one("#model-selector", ModelSelector)
             selector.clear_options()
-            for m in models:
+            current_idx = 0
+            for idx, m in enumerate(models):
                 label = m.id
                 if m.id == app.settings.model.model:
                     label += "  [current]"
+                    current_idx = idx
                 selector.add_option(Option(label, id=m.id))
+            selector.highlighted = current_idx
             selector.add_class("visible")
             selector.focus()
     except Exception as e:
@@ -120,20 +127,22 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
 
     base_url = DEFAULT_BASE_URLS.get(prov, "")
     default_model = DEFAULT_MODELS.get(prov, "")
+    _mh = getattr(app.settings, "model_history", None)
+    last_model = (_mh.get(provider_name) if isinstance(_mh, dict) else None) or default_model
 
     # Apply settings unconditionally — key verification is the caller's job.
     app.settings.model.provider = provider_name
     app.settings.model.api_key = api_key
     app.settings.model.base_url = base_url
-    app.settings.model.model = default_model
+    app.settings.model.model = last_model
     assert app._agent_loop is not None
     app._agent_loop.provider = app._agent_loop.create_provider_from_settings()
 
-    app._add_chat_message(f"[dim]Switched to {provider_name}/{default_model}[/dim]")
+    app._add_chat_message(f"[dim]Switched to {provider_name}/{last_model}[/dim]")
 
     # Best-effort model enumeration for the selector. Empty result is fine.
     test_provider = create_provider(
-        provider=prov, model=default_model, api_key=api_key, base_url=base_url,
+        provider=prov, model=last_model, api_key=api_key, base_url=base_url,
     )
     models: list[Any] = []
     try:
@@ -147,15 +156,19 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
     if models:
         selector = app.query_one("#model-selector", ModelSelector)
         selector.clear_options()
-        for m in models:
-            current = " [current]" if m.id == default_model else ""
+        current_model_idx = 0
+        for idx, m in enumerate(models):
+            current = " [current]" if m.id == last_model else ""
+            if m.id == last_model:
+                current_model_idx = idx
             selector.add_option(Option(f"{m.id}{current}", id=m.id))
+        selector.highlighted = current_model_idx
         app._add_chat_message(f"[dim]{len(models)} models. Select one:[/dim]")
         selector.add_class("visible")
         selector.focus()
     else:
         app._add_chat_message(
-            f"[dim]Model enumeration unavailable. Using default: {default_model}[/dim]"
+            f"[dim]Model enumeration unavailable. Using default: {last_model}[/dim]"
         )
 
     app._update_banner()
@@ -177,6 +190,7 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
         "max_tokens": app.settings.model.max_tokens,
         "temperature": app.settings.model.temperature,
     }
+    existing.setdefault("model_history", {})[provider_name] = app.settings.model.model
     if "api_keys" not in existing:
         existing["api_keys"] = {}
     existing["api_keys"][provider_name] = api_key
@@ -236,12 +250,16 @@ async def handle_provider(app: NerdvanaApp, args: str) -> None:
 
     prov_selector = app.query_one("#provider-selector", ProviderSelector)
     prov_selector.clear_options()
-    for prov in ProviderName:
+    current_prov_idx = 0
+    for idx, prov in enumerate(ProviderName):
         default_model = DEFAULT_MODELS.get(prov, "")
         current = " [current]" if prov.value == app.settings.model.provider else ""
+        if prov.value == app.settings.model.provider:
+            current_prov_idx = idx
         prov_selector.add_option(Option(
             f"{prov.value}  ({default_model}){current}",
             id=prov.value,
         ))
+    prov_selector.highlighted = current_prov_idx
     prov_selector.add_class("visible")
     prov_selector.focus()

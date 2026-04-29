@@ -69,6 +69,7 @@ class NerdvanaSettings(BaseSettings):
     parism: ParismConfig = Field(default_factory=ParismConfig)
     hooks: HookConfig = Field(default_factory=HookConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
+    model_history: dict[str, str] = Field(default_factory=dict)
     cwd: str = "."
     verbose: bool = False
     config_path: str = ""
@@ -106,6 +107,10 @@ class NerdvanaSettings(BaseSettings):
                     settings.hooks = HookConfig(**data["hooks"])
                 if "checkpoint" in data:
                     settings.checkpoint = CheckpointConfig(**data["checkpoint"])
+                if "model_history" in data and isinstance(data["model_history"], dict):
+                    settings.model_history = {
+                        str(k): str(v) for k, v in data["model_history"].items()
+                    }
                 settings.config_path = path
                 break
 
