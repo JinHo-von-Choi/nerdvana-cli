@@ -40,7 +40,8 @@ deepseek:
   deepseek-reasoner:            {input_per_1k:  0.55,  output_per_1k:  2.19}
 
 fireworks:
-  accounts/fireworks/models/llama-v3p1-70b-instruct: {input_per_1k: 0.9, output_per_1k: 0.9}
+  # 2026-04-29 snapshot — https://fireworks.ai/pricing
+  accounts/fireworks/models/llama-v3p3-70b-instruct: {input_per_1k: 0.9, output_per_1k: 0.9}
   accounts/fireworks/models/qwen2p5-72b-instruct:    {input_per_1k: 0.9, output_per_1k: 0.9}
 
 cohere:
@@ -86,3 +87,21 @@ dashscope:
   qwen-plus:                    {input_per_1k:  0.4,   output_per_1k:  1.2}
   qwen-turbo:                   {input_per_1k:  0.05,  output_per_1k:  0.2}
   qwen-vl-max:                  {input_per_1k:  3.0,   output_per_1k:  9.0}
+
+minimax:
+  # 2026-04-29 snapshot — https://www.minimaxi.chat/document/pricing
+  MiniMax-M2:                   {input_per_1k: 0.0, output_per_1k: 0.0}  # pricing TBD
+  minimax-m2:                   {input_per_1k: 0.0, output_per_1k: 0.0}  # pricing TBD
+  abab6.5s-chat:                {input_per_1k: 0.0, output_per_1k: 0.0}  # pricing TBD
+
+perplexity:
+  # 2026-04-29 snapshot — https://docs.perplexity.ai/guides/pricing
+  sonar-pro:                    {input_per_1k: 3.0, output_per_1k: 15.0}
+  sonar-reasoning-pro:          {input_per_1k: 2.0, output_per_1k:  8.0}
+  sonar:                        {input_per_1k: 1.0, output_per_1k:  1.0}
+
+cerebras:
+  # 2026-04-29 snapshot — https://inference-docs.cerebras.ai/introduction#pricing
+  llama-3.3-70b:                {input_per_1k: 0.85, output_per_1k: 1.2}
+  llama-3.1-8b:                 {input_per_1k: 0.1,  output_per_1k: 0.1}
+  qwen-3-32b:                   {input_per_1k: 0.4,  output_per_1k: 0.8}

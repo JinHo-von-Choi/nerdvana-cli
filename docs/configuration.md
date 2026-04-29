@@ -35,6 +35,10 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `MIMO_API_KEY` | Xiaomi MiMo (`XIAOMI_API_KEY` accepted as fallback) |
 | `MOONSHOT_API_KEY` | Moonshot AI (Kimi) — `KIMI_API_KEY` accepted as fallback |
 | `DASHSCOPE_API_KEY` | Alibaba DashScope (Qwen) — `ALIBABA_API_KEY` accepted as fallback |
+| `MINIMAX_API_KEY` | MiniMax |
+| `PERPLEXITY_API_KEY` | Perplexity (`PPLX_API_KEY` accepted as fallback) |
+| `FIREWORKS_API_KEY` | Fireworks AI |
+| `CEREBRAS_API_KEY` | Cerebras |
 
 ## `nerdvana.yml` schema
 

@@ -40,6 +40,10 @@ _PROVIDER_CLASSES: dict[ProviderName, type[AnthropicProvider] | type[OpenAIProvi
     ProviderName.XIAOMI_MIMO: OpenAIProvider,
     ProviderName.MOONSHOT: OpenAIProvider,
     ProviderName.DASHSCOPE: OpenAIProvider,
+    ProviderName.MINIMAX: OpenAIProvider,
+    ProviderName.PERPLEXITY: OpenAIProvider,
+    ProviderName.FIREWORKS: OpenAIProvider,
+    ProviderName.CEREBRAS: OpenAIProvider,
 }
 
 

@@ -3,13 +3,13 @@
 </p>
 
 <p align="center">
-  <strong>AI-powered CLI development tool — 17 AI platforms, one interface</strong>
+  <strong>AI-powered CLI development tool — 21 AI platforms, one interface</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/install-one--line-blue?style=flat-square" alt="Install"></a>
   <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/providers-17-green?style=flat-square" alt="Providers">
+  <img src="https://img.shields.io/badge/providers-21-green?style=flat-square" alt="Providers">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/version-1.2.0-orange?style=flat-square" alt="Version">
   <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
@@ -24,7 +24,7 @@
 
 ## Features
 
-- **Multi-Provider Support** — works with 17 AI platforms from one CLI
+- **Multi-Provider Support** — works with 21 AI platforms from one CLI
 - **Interactive REPL** — conversational coding with streaming output and a live TaskPanel for background agents
 - **Non-interactive mode** — single prompt execution for scripting
 - **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
@@ -57,6 +57,10 @@
 | **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
 | **Moonshot AI (Kimi)** | kimi-k2-instruct | `MOONSHOT_API_KEY` |
 | **Alibaba DashScope (Qwen)** | qwen3-coder-plus | `DASHSCOPE_API_KEY` |
+| **MiniMax** | MiniMax-M2 | `MINIMAX_API_KEY` |
+| **Perplexity** | sonar-pro | `PERPLEXITY_API_KEY` |
+| **Fireworks AI** | accounts/fireworks/models/llama-v3p3-70b-instruct | `FIREWORKS_API_KEY` |
+| **Cerebras** | llama-3.3-70b | `CEREBRAS_API_KEY` |
 
 ## Installation
 
@@ -330,6 +334,10 @@ export CO_API_KEY="co-..."
 export TOGETHER_API_KEY="..."
 export MOONSHOT_API_KEY="..."
 export DASHSCOPE_API_KEY="..."
+export MINIMAX_API_KEY="..."
+export PERPLEXITY_API_KEY="..."
+export FIREWORKS_API_KEY="..."
+export CEREBRAS_API_KEY="..."
 ```
 
 ### Config File (`nerdvana.yml`)

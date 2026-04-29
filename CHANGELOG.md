@@ -11,10 +11,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - Moonshot AI (Kimi) provider: OpenAI-compatible API via `https://api.moonshot.ai/v1`. Default model: `kimi-k2-instruct`. API key: `MOONSHOT_API_KEY` or `KIMI_API_KEY`.
 - Alibaba DashScope (Qwen Cloud) provider: OpenAI-compatible API via `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`. Default model: `qwen3-coder-plus`. API key: `DASHSCOPE_API_KEY` or `ALIBABA_API_KEY`. Supports tools, streaming, vision, thinking. 1M context window.
+- MiniMax provider: OpenAI-compatible API via `https://api.minimaxi.chat/v1`. Default model: `MiniMax-M2`. API key: `MINIMAX_API_KEY`. Supports tools, streaming, vision. 1M context window.
+- Perplexity provider: OpenAI-compatible API via `https://api.perplexity.ai`. Default model: `sonar-pro`. API key: `PERPLEXITY_API_KEY` or `PPLX_API_KEY`. Web-search-augmented responses; tool calling not supported.
+- Fireworks AI provider: OpenAI-compatible API via `https://api.fireworks.ai/inference/v1`. Default model: `accounts/fireworks/models/llama-v3p3-70b-instruct`. API key: `FIREWORKS_API_KEY`.
+- Cerebras provider: OpenAI-compatible API via `https://api.cerebras.ai/v1`. Default model: `llama-3.3-70b`. API key: `CEREBRAS_API_KEY`. Catalog: llama-3.3-70b, llama-3.1-8b, llama-4-scout-17b-16e-instruct, qwen-3-32b, qwen-3-235b-a22b-instruct-2507.
 
 ### Changed
 
-- Provider count updated from 15 to 17.
+- Provider count updated from 15 to 21.
 
 ## [1.2.0] - 2026-04-29
 

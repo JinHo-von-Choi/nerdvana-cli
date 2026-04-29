@@ -1,10 +1,10 @@
 # NerdVana CLI
 
-AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, Ollama 등 **17개 AI 플랫폼**을 지원합니다.
+AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, Ollama 등 **21개 AI 플랫폼**을 지원합니다.
 
 ## 기능
 
-- **다중 제공자 지원** — 하나의 CLI로 17개 AI 플랫폼 사용 가능
+- **다중 제공자 지원** — 하나의 CLI로 21개 AI 플랫폼 사용 가능
 - **대화형 REPL** — 스트리밍 출력과 슬래시 명령어, 토큰 사용량 표시기
 - **비대화형 모드** — 스크립팅을 위한 단일 프롬프트 실행 (`nerdvana run`)
 - **17개 내장 도구** — 파일 I/O, 검색, 셸, MCP 외에 LSP·서브에이전트·팀·스웜·테스크 관리 도구
@@ -38,6 +38,10 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 | **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
 | **Moonshot AI (Kimi)** | kimi-k2-instruct | `MOONSHOT_API_KEY` |
 | **Alibaba DashScope (Qwen)** | qwen3-coder-plus | `DASHSCOPE_API_KEY` |
+| **MiniMax** | MiniMax-M2 | `MINIMAX_API_KEY` |
+| **Perplexity** | sonar-pro | `PERPLEXITY_API_KEY` |
+| **Fireworks AI** | accounts/fireworks/models/llama-v3p3-70b-instruct | `FIREWORKS_API_KEY` |
+| **Cerebras** | llama-3.3-70b | `CEREBRAS_API_KEY` |
 
 ## 설치
 
