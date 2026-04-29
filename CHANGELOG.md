@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-29
+
+### Added
+
+- **IDE 패널 레이아웃**: Textual 기반 메인 앱에 프로젝트 트리(`project_tree.py`)와 에디터 패널(`editor_pane.py`)을 추가하여 단일 화면에서 파일 탐색·편집·대화가 가능한 IDE형 워크플로우 제공.
+- **에디터 IO 분리**: 파일 열기/저장/디버운스 동작을 모듈화하여 멀티 패널 환경에서 안정적으로 동기화.
+- **IDE 워크플로우 테스트**: `test_ide_layout`, `test_ide_workflow`, `test_editor_io`, `test_editor_pane`, `test_project_tree` 등 패널 동작 회귀 테스트 신규 추가.
+
+### Changed
+
+- **심볼 도구 모듈 분리**: `tools/symbol_tools.py`(897줄)에서 편집 책임을 `tools/symbol_edit_tools.py`(722줄)로 분리하여 단일 책임 원칙 준수 및 가독성 향상.
+- **LSP 도구 확장**: `tools/lsp_tools.py`에 IDE 패널 연동에 필요한 신규 헬퍼 추가.
+- **세션 코어 정리**: `core/session.py` 인터페이스를 멀티 패널 컨텍스트에 맞춰 미세 조정.
+
 ## [1.1.1] - 2026-04-24
 
 ### Added
