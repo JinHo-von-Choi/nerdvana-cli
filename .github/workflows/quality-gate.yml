@@ -1,0 +1,50 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  UV_SYSTEM_PYTHON: "1"
+
+jobs:
+  lint-type-test:
+    name: Lint / Type / Test (py${{ matrix.python-version }})
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Resolve dependencies
+        run: uv sync --extra dev --extra mcp
+
+      - name: Ruff
+        run: uv run ruff check nerdvana_cli/
+
+      - name: Mypy
+        run: uv run mypy nerdvana_cli/ --ignore-missing-imports
+
+      - name: Pytest
+        run: uv run pytest -m "not lsp_integration and not live" -q --continue-on-collection-errors
+
+      - name: Verify test collection baseline
+        run: |
+          if [ -f tests/.collect-baseline ] && [ -f scripts/check_test_collection.py ]; then
+            python scripts/check_test_collection.py
+          else
+            echo "count-baseline skipped (Q7 not yet merged)"
+          fi

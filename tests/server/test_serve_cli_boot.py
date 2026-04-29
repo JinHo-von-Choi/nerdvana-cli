@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from nerdvana_cli.main import app
 
-runner = CliRunner(mix_stderr=False)
+runner = CliRunner()
 
 
 def test_serve_help_no_crash() -> None:

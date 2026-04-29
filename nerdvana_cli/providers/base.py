@@ -348,15 +348,26 @@ _CEREBRAS_MODELS: frozenset[str] = frozenset({
 })
 
 
+# Provider-specific context window overrides that take precedence over the
+# generic prefix table.  Keyed by (provider, model_prefix_lower).
+_PROVIDER_MODEL_CONTEXT_OVERRIDES: dict[tuple[ProviderName, str], int] = {
+    (ProviderName.GROQ, "llama-3.3-70b"): 32_768,
+}
+
+
 def resolve_context_window(provider: ProviderName, model: str) -> int:
     """Resolve context window size for a given model.
 
-    Uses longest-prefix matching against MODEL_CONTEXT_WINDOWS.
-    Falls back to provider-level max_context from PROVIDER_CAPABILITIES.
+    Provider-specific overrides are checked first, then longest-prefix
+    matching against MODEL_CONTEXT_WINDOWS.  Falls back to provider-level
+    max_context from PROVIDER_CAPABILITIES.
     """
+    model_lower = model.lower()
+    for (prov, prefix), ctx_size in _PROVIDER_MODEL_CONTEXT_OVERRIDES.items():
+        if prov == provider and model_lower.startswith(prefix.lower()):
+            return ctx_size
     best_match = ""
     best_value = 0
-    model_lower = model.lower()
     for prefix, ctx_size in MODEL_CONTEXT_WINDOWS.items():
         if model_lower.startswith(prefix.lower()) and len(prefix) > len(best_match):
             best_match = prefix
