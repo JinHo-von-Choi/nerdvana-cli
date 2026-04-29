@@ -305,11 +305,6 @@ class MemoriesManager:
                         entries.append(entry)
         return sorted(entries, key=lambda e: e.name)
 
-    def list_stale(self, days: int = 30) -> list[MemoryEntry]:
-        """Return memories not accessed in the last *days* days."""
-        cutoff = time.time() - days * 86_400
-        return [e for e in self.list_memories() if e.mtime < cutoff]
-
     # ------------------------------------------------------------------
     # PROJECT_RULE — append to NIRNA.md
     # ------------------------------------------------------------------
@@ -357,7 +352,7 @@ class MemoriesManager:
             "Call ListMemories to see them."
         )
 
-def list_stale(
+    def list_stale(
         self,
         days: int = 30,
         topic: str | None = None,

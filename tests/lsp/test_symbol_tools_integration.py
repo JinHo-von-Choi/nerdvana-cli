@@ -169,8 +169,8 @@ class TestReplaceSymbolBodyIntegration:
         setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
     ) -> None:
         """Step1 preview + Step2 apply replaces the method body."""
-        from nerdvana_cli.tools.symbol_tools import ReplaceSymbolBodyArgs, ReplaceSymbolBodyTool
         from nerdvana_cli.core.tool import ToolContext
+        from nerdvana_cli.tools.symbol_tools import ReplaceSymbolBodyArgs, ReplaceSymbolBodyTool
 
         retriever, editor, target = setup
 
@@ -202,10 +202,10 @@ class TestReplaceSymbolBodyIntegration:
         setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
     ) -> None:
         """STALE scenario: file mutated between preview and apply."""
-        from nerdvana_cli.tools.symbol_tools import ReplaceSymbolBodyArgs, ReplaceSymbolBodyTool
-        from nerdvana_cli.core.tool import ToolContext
-
         import json
+
+        from nerdvana_cli.core.tool import ToolContext
+        from nerdvana_cli.tools.symbol_tools import ReplaceSymbolBodyArgs, ReplaceSymbolBodyTool
 
         retriever, editor, target = setup
         tool = ReplaceSymbolBodyTool(retriever=retriever, editor=editor)
@@ -251,9 +251,10 @@ class TestInsertBeforeSymbolIntegration:
         setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
     ) -> None:
         """InsertBeforeSymbol inserts a line before the User class definition."""
-        from nerdvana_cli.tools.symbol_tools import InsertBeforeSymbolArgs, InsertBeforeSymbolTool
-        from nerdvana_cli.core.tool import ToolContext
         import json
+
+        from nerdvana_cli.core.tool import ToolContext
+        from nerdvana_cli.tools.symbol_tools import InsertBeforeSymbolArgs, InsertBeforeSymbolTool
 
         retriever, editor, target = setup
         tool = InsertBeforeSymbolTool(retriever=retriever, editor=editor)
@@ -305,9 +306,10 @@ class TestInsertAfterSymbolIntegration:
         setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
     ) -> None:
         """InsertAfterSymbol inserts a function after the greeting method."""
-        from nerdvana_cli.tools.symbol_tools import InsertAfterSymbolArgs, InsertAfterSymbolTool
-        from nerdvana_cli.core.tool import ToolContext
         import json
+
+        from nerdvana_cli.core.tool import ToolContext
+        from nerdvana_cli.tools.symbol_tools import InsertAfterSymbolArgs, InsertAfterSymbolTool
 
         retriever, editor, target = setup
         tool = InsertAfterSymbolTool(retriever=retriever, editor=editor)
@@ -359,9 +361,10 @@ class TestSafeDeleteSymbolIntegration:
         setup: tuple[LanguageServerSymbolRetriever, CodeEditor, Path],
     ) -> None:
         """SafeDelete an unreferenced function produces a valid delete preview."""
-        from nerdvana_cli.tools.symbol_tools import SafeDeleteSymbolArgs, SafeDeleteSymbolTool
-        from nerdvana_cli.core.tool import ToolContext
         import json
+
+        from nerdvana_cli.core.tool import ToolContext
+        from nerdvana_cli.tools.symbol_tools import SafeDeleteSymbolArgs, SafeDeleteSymbolTool
 
         retriever, editor, target = setup
         tool = SafeDeleteSymbolTool(retriever=retriever, editor=editor)
