@@ -1,9 +1,16 @@
 # Provider/model pricing for USD cost estimation.
 # Units: USD per 1,000 tokens (input_per_1k / output_per_1k).
-# Sources: official pricing pages as of 2026-04.
-# Models with no public pricing or local-only (ollama, vllm) use 0.
+# Each provider block carries a `# YYYY-MM-DD snapshot — <source URL>`
+# comment at the top. Stale threshold defaults to 90 days, override via
+# NERDVANA_PRICING_TTL_DAYS env var.
+# Run `python scripts/check_pricing_freshness.py` to scan, then either:
+# - `python scripts/update_pricing.py --provider <name>` (auto-fetch:
+#   anthropic, openai, google; others fall back to manual)
+# - manually edit against the source URL listed in the snapshot comment
+# 0 + comment marks pricing that is non-public or pending official release.
 
 anthropic:
+  # 2026-04-29 snapshot — https://www.anthropic.com/pricing
   claude-opus-4-7:              {input_per_1k: 15.0,   output_per_1k: 75.0}
   claude-sonnet-4-6:            {input_per_1k:  3.0,   output_per_1k: 15.0}
   claude-sonnet-4-20250514:     {input_per_1k:  3.0,   output_per_1k: 15.0}
@@ -13,6 +20,7 @@ anthropic:
   claude-3-opus-20240229:       {input_per_1k: 15.0,   output_per_1k: 75.0}
 
 openai:
+  # 2026-04-29 snapshot — https://openai.com/api/pricing
   gpt-4.1:                      {input_per_1k:  2.5,   output_per_1k: 10.0}
   gpt-4o:                       {input_per_1k:  5.0,   output_per_1k: 15.0}
   gpt-4o-mini:                  {input_per_1k:  0.15,  output_per_1k:  0.6}
@@ -20,22 +28,26 @@ openai:
   o3-mini:                      {input_per_1k:  1.1,   output_per_1k:  4.4}
 
 google:
+  # 2026-04-29 snapshot — https://ai.google.dev/pricing
   gemini-2.5-flash:             {input_per_1k:  0.075, output_per_1k:  0.3}
   gemini-2.5-pro:               {input_per_1k:  1.25,  output_per_1k:  5.0}
   gemini-1.5-pro:               {input_per_1k:  3.5,   output_per_1k: 10.5}
   gemini-1.5-flash:             {input_per_1k:  0.075, output_per_1k:  0.3}
 
 groq:
+  # 2026-04-29 snapshot — https://console.groq.com/docs/openai
   llama-3.3-70b-versatile:      {input_per_1k:  0.59,  output_per_1k:  0.79}
   llama-3.1-8b-instant:         {input_per_1k:  0.05,  output_per_1k:  0.08}
   mixtral-8x7b-32768:           {input_per_1k:  0.24,  output_per_1k:  0.24}
 
 mistral:
+  # 2026-04-29 snapshot — https://mistral.ai/technology/
   mistral-large-latest:         {input_per_1k:  3.0,   output_per_1k:  9.0}
   mistral-small-latest:         {input_per_1k:  0.2,   output_per_1k:  0.6}
   codestral-latest:             {input_per_1k:  1.0,   output_per_1k:  3.0}
 
 deepseek:
+  # 2026-04-29 snapshot — https://platform.deepseek.com/api-docs/pricing
   deepseek-chat:                {input_per_1k:  0.27,  output_per_1k:  1.1}
   deepseek-reasoner:            {input_per_1k:  0.55,  output_per_1k:  2.19}
 
@@ -45,27 +57,34 @@ fireworks:
   accounts/fireworks/models/qwen2p5-72b-instruct:    {input_per_1k: 0.9, output_per_1k: 0.9}
 
 cohere:
+  # 2026-04-29 snapshot — https://cohere.com/pricing
   command-r-plus:               {input_per_1k:  3.0,   output_per_1k: 15.0}
   command-r:                    {input_per_1k:  0.5,   output_per_1k:  1.5}
 
 together:
+  # 2026-04-29 snapshot — https://www.together.ai/pricing
   meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo: {input_per_1k: 0.88, output_per_1k: 0.88}
 
 # Local / self-hosted providers — no token cost
 ollama:
+  # 2026-04-29 snapshot — https://ollama.com  # local inference, no public pricing
   default:                      {input_per_1k: 0.0,   output_per_1k: 0.0}
 
 vllm:
+  # 2026-04-29 snapshot — https://docs.vllm.ai  # local inference, no public pricing
   default:                      {input_per_1k: 0.0,   output_per_1k: 0.0}
 
 lmstudio:
+  # 2026-04-29 snapshot — https://lmstudio.ai  # local inference, no public pricing
   default:                      {input_per_1k: 0.0,   output_per_1k: 0.0}
 
 featherless:
+  # 2026-04-29 snapshot — https://featherless.ai/pricing
   featherless-llama-3-70b:      {input_per_1k: 0.0009, output_per_1k: 0.0009}
   featherless-llama-3-8b:       {input_per_1k: 0.0002, output_per_1k: 0.0002}
 
 xiaomi_mimo:
+  # 2026-04-29 snapshot — https://token-plan-sgp.xiaomimimo.com
   mimo-v2.5-pro:                {input_per_1k: 0.0004, output_per_1k: 0.002}
   mimo-v2.5:                    {input_per_1k: 0.0004, output_per_1k: 0.002}
   mimo-v2-pro:                  {input_per_1k: 0.001,  output_per_1k: 0.003}
