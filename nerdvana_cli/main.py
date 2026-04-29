@@ -409,6 +409,21 @@ def cost(
 
 
 # ---------------------------------------------------------------------------
+# E4/E5 sub-apps — session, mcp, skill, memory
+# ---------------------------------------------------------------------------
+
+from nerdvana_cli.commands.session_command import session_app
+from nerdvana_cli.commands.mcp_command     import mcp_app
+from nerdvana_cli.commands.skill_command   import skill_app
+from nerdvana_cli.commands.memory_command  import memory_app
+
+app.add_typer(session_app, name="session")
+app.add_typer(mcp_app,     name="mcp")
+app.add_typer(skill_app,   name="skill")
+app.add_typer(memory_app,  name="memory")
+
+
+# ---------------------------------------------------------------------------
 # nerdvana hook — hook bridge sub-group — Phase G2
 # ---------------------------------------------------------------------------
 
