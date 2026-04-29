@@ -39,3 +39,46 @@ class TestDetectProvider:
     def test_case_insensitive(self):
         assert detect_provider("Claude-Opus-4") == ProviderName.ANTHROPIC
         assert detect_provider("GPT-4.1") == ProviderName.OPENAI
+
+    # Moonshot AI (Kimi)
+    def test_kimi_k2_instruct_returns_moonshot(self):
+        assert detect_provider("kimi-k2-instruct") == ProviderName.MOONSHOT
+
+    def test_kimi_latest_returns_moonshot(self):
+        assert detect_provider("kimi-latest") == ProviderName.MOONSHOT
+
+    def test_moonshot_v1_128k_returns_moonshot(self):
+        assert detect_provider("moonshot-v1-128k") == ProviderName.MOONSHOT
+
+    def test_moonshot_v1_32k_returns_moonshot(self):
+        assert detect_provider("moonshot-v1-32k") == ProviderName.MOONSHOT
+
+    # Alibaba DashScope (Qwen Cloud)
+    def test_qwen_max_returns_dashscope(self):
+        assert detect_provider("qwen-max") == ProviderName.DASHSCOPE
+
+    def test_qwen_plus_returns_dashscope(self):
+        assert detect_provider("qwen-plus") == ProviderName.DASHSCOPE
+
+    def test_qwen_turbo_returns_dashscope(self):
+        assert detect_provider("qwen-turbo") == ProviderName.DASHSCOPE
+
+    def test_qwen_vl_max_returns_dashscope(self):
+        assert detect_provider("qwen-vl-max") == ProviderName.DASHSCOPE
+
+    def test_qwen3_coder_plus_returns_dashscope(self):
+        assert detect_provider("qwen3-coder-plus") == ProviderName.DASHSCOPE
+
+    def test_qwq_32b_preview_returns_dashscope(self):
+        assert detect_provider("qwq-32b-preview") == ProviderName.DASHSCOPE
+
+    # Regression: Groq models must not be captured by Moonshot/DashScope
+    def test_llama_33_70b_versatile_returns_groq(self):
+        assert detect_provider("llama-3.3-70b-versatile") == ProviderName.GROQ
+
+    def test_llama_31_70b_instruct_returns_groq(self):
+        assert detect_provider("llama-3.1-70b-instruct") == ProviderName.GROQ
+
+    # Regression: vLLM-style slash-namespaced Qwen falls through to default
+    def test_qwen_slash_namespace_returns_anthropic(self):
+        assert detect_provider("Qwen/Qwen3-32B") == ProviderName.ANTHROPIC

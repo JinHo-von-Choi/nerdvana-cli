@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- Moonshot AI (Kimi) provider: OpenAI-compatible API via `https://api.moonshot.ai/v1`. Default model: `kimi-k2-instruct`. API key: `MOONSHOT_API_KEY` or `KIMI_API_KEY`.
+- Alibaba DashScope (Qwen Cloud) provider: OpenAI-compatible API via `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`. Default model: `qwen3-coder-plus`. API key: `DASHSCOPE_API_KEY` or `ALIBABA_API_KEY`. Supports tools, streaming, vision, thinking. 1M context window.
+
+### Changed
+
+- Provider count updated from 15 to 17.
+
 ## [1.2.0] - 2026-04-29
 
 ### Added

@@ -3,13 +3,13 @@
 </p>
 
 <p align="center">
-  <strong>AI-powered CLI development tool — 13 AI platforms, one interface</strong>
+  <strong>AI-powered CLI development tool — 17 AI platforms, one interface</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/install-one--line-blue?style=flat-square" alt="Install"></a>
   <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/providers-15-green?style=flat-square" alt="Providers">
+  <img src="https://img.shields.io/badge/providers-17-green?style=flat-square" alt="Providers">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/version-1.2.0-orange?style=flat-square" alt="Version">
   <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
@@ -24,7 +24,7 @@
 
 ## Features
 
-- **Multi-Provider Support** — works with 13 AI platforms from one CLI
+- **Multi-Provider Support** — works with 17 AI platforms from one CLI
 - **Interactive REPL** — conversational coding with streaming output and a live TaskPanel for background agents
 - **Non-interactive mode** — single prompt execution for scripting
 - **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
@@ -46,15 +46,17 @@
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
 | **OpenRouter** | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` |
 | **xAI (Grok)** | grok-3 | `XAI_API_KEY` |
-| **Featherless AI** | featherless-llama-3-70b | `FEATHERLESS_API_KEY` |
-| **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
 | **Ollama** | qwen3 | `OLLAMA_API_KEY` |
-| **vLLM** | Qwen/Qwen3-32B | `OPENAI_API_KEY` |
+| **vLLM** | Qwen/Qwen3-32B | `VLLM_API_KEY` |
 | **DeepSeek** | deepseek-chat | `DEEPSEEK_API_KEY` |
 | **Mistral** | mistral-medium-latest | `MISTRAL_API_KEY` |
 | **Cohere** | command-r-plus | `CO_API_KEY` |
 | **Together AI** | Llama-3.3-70B-Instruct-Turbo | `TOGETHER_API_KEY` |
 | **ZAI (GLM)** | glm-4.7 | `ZHIPUAI_API_KEY` |
+| **Featherless AI** | featherless-llama-3-70b | `FEATHERLESS_API_KEY` |
+| **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
+| **Moonshot AI (Kimi)** | kimi-k2-instruct | `MOONSHOT_API_KEY` |
+| **Alibaba DashScope (Qwen)** | qwen3-coder-plus | `DASHSCOPE_API_KEY` |
 
 ## Installation
 
@@ -106,6 +108,36 @@ nerdvana run "refactor this code" --provider deepseek
 # List all providers
 nerdvana providers
 ```
+
+## CLI Subcommands
+
+### Main commands
+
+| Subcommand | Purpose |
+|-|-|
+| `nerdvana` | Start interactive REPL (default when no subcommand given) |
+| `nerdvana run <prompt>` | Run a single prompt non-interactively |
+| `nerdvana setup` | Interactive setup wizard — choose provider, enter API key, select model |
+| `nerdvana providers` | List all supported AI providers |
+| `nerdvana version` | Show version |
+| `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
+
+### Hook bridge (`nerdvana hook ...`)
+
+| Subcommand | Purpose |
+|-|-|
+| `nerdvana hook pre-tool-use` | Handle a pre-tool-use hook event — reads JSON from stdin, writes response to stdout |
+| `nerdvana hook post-tool-use` | Handle a post-tool-use hook event |
+| `nerdvana hook prompt-submit` | Handle a prompt-submit hook event |
+| `nerdvana hook list` | List all supported hook event types |
+
+### ACL management (`nerdvana admin acl ...`)
+
+| Subcommand | Purpose |
+|-|-|
+| `nerdvana admin acl list` | List all clients and their assigned roles |
+| `nerdvana admin acl add <client> <roles>` | Add or update a client's role assignments |
+| `nerdvana admin acl revoke <prefix>` | Revoke ACL entries for clients whose name matches a prefix |
 
 ## Directory Layout
 
@@ -164,7 +196,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 |---------|-------------|
 | `/help` | Show help |
 | `/clear` | Clear chat |
-| `/init` | Generate NIRNA.md |
+| `/init` | Generate NIRNA.md (alias: `/setup`) |
 | `/model` | Show/change model |
 | `/models` | List available models |
 | `/provider` | Add/switch provider |
@@ -205,8 +237,18 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | LSP Goto Definition (`lsp_goto_definition`) | Read | Resolve a symbol to its definition location via the language server |
 | LSP Find References (`lsp_find_references`) | Read | List all references to a symbol via the language server |
 | LSP Rename (`lsp_rename`) | Write | Apply a workspace-wide rename refactor via the language server |
+| `symbol_overview` | Read | Return the symbol map (classes, functions, variables) for a file or directory |
+| `find_symbol` | Read | Locate a symbol by name path and optionally return its full body |
+| `find_referencing_symbols` | Read | Find all symbols that reference a given symbol |
+| `replace_symbol_body` | Write | Replace the complete body of a symbol in one atomic operation |
+| `insert_before_symbol` | Write | Insert code immediately before a symbol definition |
+| `insert_after_symbol` | Write | Insert code immediately after a symbol definition |
+| `safe_delete_symbol` | Write | Delete a symbol after verifying it has no remaining references |
+| `ListQueryableProjects` | Read | List all registered external nerdvana projects available for delegation |
+| `RegisterExternalProject` | Write | Register an external nerdvana project for subprocess-isolated query delegation |
+| `QueryExternalProject` | Read | Delegate a nerdvana query to a registered external project in an isolated subprocess |
 
-LSP tools are registered when a compatible language server is available; if none is detected they degrade gracefully and are simply omitted from the registry.
+LSP and symbol tools are registered when a compatible language server is available; if none is detected they degrade gracefully and are simply omitted from the registry. External project tools are always registered and controlled by the `external_projects_enabled` setting.
 
 ## Agent Types
 
@@ -286,6 +328,8 @@ export DEEPSEEK_API_KEY="sk-..."
 export MISTRAL_API_KEY="..."
 export CO_API_KEY="co-..."
 export TOGETHER_API_KEY="..."
+export MOONSHOT_API_KEY="..."
+export DASHSCOPE_API_KEY="..."
 ```
 
 ### Config File (`nerdvana.yml`)

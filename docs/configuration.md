@@ -19,17 +19,22 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `NERDVANA_MAX_TOKENS` | Max tokens per response |
 | `NERDVANA_CONFIG` | Path to YAML config file |
 | `ANTHROPIC_API_KEY` | Anthropic Claude |
-| `OPENAI_API_KEY` | OpenAI (also used by vLLM) |
+| `OPENAI_API_KEY` | OpenAI (also used by vLLM and Ollama as fallback) |
 | `GEMINI_API_KEY` | Google Gemini |
 | `GROQ_API_KEY` | Groq |
 | `OPENROUTER_API_KEY` | OpenRouter |
 | `XAI_API_KEY` | xAI (Grok) |
-| `OLLAMA_API_KEY` | Ollama (optional) |
+| `OLLAMA_API_KEY` | Ollama (`OPENAI_API_KEY` accepted as fallback) |
+| `VLLM_API_KEY` | vLLM (`OPENAI_API_KEY` accepted as fallback) |
 | `DEEPSEEK_API_KEY` | DeepSeek |
 | `MISTRAL_API_KEY` | Mistral |
 | `CO_API_KEY` | Cohere |
 | `TOGETHER_API_KEY` | Together AI |
 | `ZHIPUAI_API_KEY` | ZAI (GLM) |
+| `FEATHERLESS_API_KEY` | Featherless AI |
+| `MIMO_API_KEY` | Xiaomi MiMo (`XIAOMI_API_KEY` accepted as fallback) |
+| `MOONSHOT_API_KEY` | Moonshot AI (Kimi) — `KIMI_API_KEY` accepted as fallback |
+| `DASHSCOPE_API_KEY` | Alibaba DashScope (Qwen) — `ALIBABA_API_KEY` accepted as fallback |
 
 ## `nerdvana.yml` schema
 
@@ -64,7 +69,9 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `max_context_tokens` | int | `180000` | Auto-resolved per model; overridable |
 | `compact_threshold` | float | `0.8` | Fraction of max_context_tokens that triggers compaction |
 | `compact_max_failures` | int | `3` | AI compaction circuit breaker |
-| `planning_gate` | bool | `false` | Phase C: spawn Plan subagent on complex prompts |
+| `planning_gate` | bool | `false` | Spawn Plan subagent on complex prompts |
+| `default_context` | str | `"standalone"` | Default runtime context profile name |
+| `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
 
 ### `parism` (ParismConfig)
 
@@ -85,6 +92,13 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 
 Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) are auto-registered in `AgentLoop.__init__` and are not listed here.
 
+### `checkpoint` (CheckpointConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `true` | Automatically save session checkpoints |
+| `per_session_max` | int | `50` | Maximum number of checkpoints retained per session |
+
 ## Full example
 
 ```yaml
@@ -97,6 +111,8 @@ model:
     - claude-sonnet-4-20250514
     - openai/gpt-4.1
     - gemini-2.5-flash
+  extended_thinking: false
+  thinking_budget: 8192
 
 permissions:
   mode: default
@@ -113,8 +129,14 @@ session:
   compact_threshold: 0.8
   compact_max_failures: 3
   planning_gate: true        # opt-in
+  default_context: standalone
+  default_mode: interactive
 
 parism:
   enabled: true
   fallback_to_bash: true
+
+checkpoint:
+  enabled: true
+  per_session_max: 50
 ```

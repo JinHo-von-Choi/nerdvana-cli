@@ -18,36 +18,36 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 ### `Explore`
 
 - **Max turns:** 20
-- **Allowed tools:** `Glob`, `Grep`, `FileRead`, `Bash`
-- **System prompt:** "Use search and read tools to answer questions about the codebase. Do not write or edit files."
+- **Allowed tools:** `Glob`, `Grep`, `FileRead`
+- **System prompt:** "You are an exploration agent. Use search and read tools to answer questions about the codebase. Do not write or edit files. Return a concise factual report."
 - **Use:** fast read-only codebase exploration.
 
 ### `Plan`
 
 - **Max turns:** 20
-- **Allowed tools:** `Glob`, `Grep`, `FileRead`, `Bash`
-- **System prompt:** "Analyze the codebase and produce a structured implementation plan. Do not write code — only plan."
+- **Allowed tools:** `Glob`, `Grep`, `FileRead`
+- **System prompt:** "You are an architect agent. Analyze the codebase and produce a structured implementation plan. Do not write code — only plan."
 - **Use:** architecture planning without side effects.
 
 ### `code-reviewer`
 
 - **Max turns:** 15
 - **Allowed tools:** `FileRead`, `Grep`, `Glob`
-- **System prompt:** "Read files, search for patterns, and identify bugs, security issues, and style problems. Do not modify files."
+- **System prompt:** "You are a code review agent. Read files, search for patterns, and identify bugs, security issues, and style problems. Do not modify files. Return a structured review report."
 - **Use:** read-only code quality review. Cannot execute Bash or modify files — safe for review-only workflows.
 
 ### `git-management`
 
 - **Max turns:** 20
 - **Allowed tools:** `Bash`, `FileRead`
-- **System prompt:** "Use Bash for git commands only. Do not modify source files directly."
+- **System prompt:** "You are a git management agent. Use Bash for git commands only. Do not modify source files directly. Perform git operations: status, add, commit, branch, log, diff."
 - **Use:** commits, branches, status, diff, log.
 
 ### `test-writer`
 
 - **Max turns:** 30
 - **Allowed tools:** `*` (all)
-- **System prompt:** "Write thorough tests. Follow TDD: write failing test first, then implement minimal code to pass."
+- **System prompt:** "You are a test-writing agent. Write thorough tests using the project's existing test framework. Follow TDD: write failing test first, then implement minimal code to pass. Do not refactor existing code."
 - **Use:** TDD test generation and execution.
 
 ## Custom agent types

@@ -70,3 +70,19 @@ xiaomi_mimo:
   mimo-v2-pro:                  {input_per_1k: 0.001,  output_per_1k: 0.003}
   mimo-v2-omni:                 {input_per_1k: 0.0004, output_per_1k: 0.002}
   mimo-v2-flash:                {input_per_1k: 0.0001, output_per_1k: 0.0001}
+
+moonshot:
+  # 2026-04-29 snapshot — https://platform.moonshot.ai/docs/pricing
+  kimi-k2-instruct:             {input_per_1k:  0.5,   output_per_1k:  2.5}
+  kimi-latest:                  {input_per_1k:  0.5,   output_per_1k:  2.5}
+  moonshot-v1-8k:               {input_per_1k:  0.012, output_per_1k:  0.012}
+  moonshot-v1-32k:              {input_per_1k:  0.024, output_per_1k:  0.024}
+  moonshot-v1-128k:             {input_per_1k:  0.06,  output_per_1k:  0.06}
+
+dashscope:
+  # 2026-04-29 snapshot — https://help.aliyun.com/document_detail/2840914.html
+  qwen3-coder-plus:             {input_per_1k:  0.0,   output_per_1k:  0.0}  # pricing TBD
+  qwen-max:                     {input_per_1k:  1.6,   output_per_1k:  6.4}
+  qwen-plus:                    {input_per_1k:  0.4,   output_per_1k:  1.2}
+  qwen-turbo:                   {input_per_1k:  0.05,  output_per_1k:  0.2}
+  qwen-vl-max:                  {input_per_1k:  3.0,   output_per_1k:  9.0}

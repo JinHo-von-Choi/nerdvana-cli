@@ -59,13 +59,13 @@ class HookResult:
     allow: bool = True
     message: str = ""
     inject_messages: list[dict[str, Any]] = field(default_factory=list)
-    modified_input: dict[str, Any] | None = None
+    system_prompt_append: str = ""
 ```
 
 - `allow=False` vetoes the current tool call (only meaningful for `BEFORE_TOOL`). The loop skips execution and propagates `message` to the model.
 - `message` is a short, human-readable explanation. It is included in the synthetic tool error when a call is blocked.
 - `inject_messages` is a list of fully-formed message dicts (`{"role": ..., "content": ...}`) that the loop appends to the conversation before the next API call. This is the canonical mechanism for context recovery and continuation prompts.
-- `modified_input` (only for `BEFORE_TOOL`) replaces `tool_input` before the tool runs. Handlers can use this to sanitise paths, normalise arguments, or attach derived metadata.
+- `system_prompt_append` is exclusive to `SESSION_START` hooks. The returned string is cumulatively appended to the system prompt on every turn, persisting for the model across the entire session.
 
 Returning `None` is equivalent to returning a default `HookResult()` and is the right choice when a handler is purely observational.
 
@@ -195,3 +195,11 @@ def retry_on_network_error(ctx: HookContext) -> HookResult | None:
 - Handlers should be idempotent. Recovery hooks in particular may be invoked repeatedly within a single session.
 - Exceptions raised inside a handler are caught by `HookEngine.fire` and logged, but the corresponding `HookResult` is dropped. Defensive code is preferable to relying on the engine's safety net.
 - Use `extra` for cross-handler coordination instead of mutating `messages` or `tool_input` outside of the documented `HookResult` channel.
+
+## Built-in recovery hooks
+
+Three recovery hooks are defined in `nerdvana_cli/core/builtin_hooks.py` and registered automatically inside `AgentLoop.__init__`. Users do not need to register them; they are always active.
+
+- **`context_limit_recovery`** — registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "max_tokens"`; injects a continuation message asking the model to resume from where it left off, optionally including the last user message (up to 200 characters) as context.
+- **`json_parse_recovery`** — registered on `AFTER_TOOL`: triggers when `ctx.extra["json_error"]` is populated by the loop after a tool call whose arguments could not be parsed; injects a correction message containing the tool name and parse error, instructing the model to retry with valid JSON.
+- **`ralph_loop_check`** — registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "end_turn"` and the current assistant turn (read from `ctx.extra["asst_text"]`, falling back to message history) contains any of the patterns `TODO`, `FIXME`, `#\s*구현\s*필요`, `#\s*미구현`, `#\s*needs?\s*implementation`, `NotImplemented`, or `raise\s+NotImplementedError`; injects a follow-up message listing up to five unique matched markers and asking the model to complete all unfinished items before declaring the task done.
