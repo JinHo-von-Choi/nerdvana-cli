@@ -34,7 +34,7 @@ class ParismClient:
             return
 
         self._process = await asyncio.create_subprocess_exec(
-            "npx", "-y", "@nerdvana/parism",
+            "npx", "-y", "@nerdvana/parism@latest",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

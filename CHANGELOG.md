@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Perplexity provider: OpenAI-compatible API via `https://api.perplexity.ai`. Default model: `sonar-pro`. API key: `PERPLEXITY_API_KEY` or `PPLX_API_KEY`. Web-search-augmented responses; tool calling not supported.
 - Fireworks AI provider: OpenAI-compatible API via `https://api.fireworks.ai/inference/v1`. Default model: `accounts/fireworks/models/llama-v3p3-70b-instruct`. API key: `FIREWORKS_API_KEY`.
 - Cerebras provider: OpenAI-compatible API via `https://api.cerebras.ai/v1`. Default model: `llama-3.3-70b`. API key: `CEREBRAS_API_KEY`. Catalog: llama-3.3-70b, llama-3.1-8b, llama-4-scout-17b-16e-instruct, qwen-3-32b, qwen-3-235b-a22b-instruct-2507.
+- `/update parism` slash sub-command refreshes the bundled `@nerdvana/parism` MCP package to its latest npm release through the npx cache.
 
 ### Changed
 
 - Provider count updated from 15 to 21.
+- Parism subprocess spawn now pins `@nerdvana/parism@latest` so the bundled MCP package follows the latest npm release.
 
 ## [1.2.0] - 2026-04-29
 

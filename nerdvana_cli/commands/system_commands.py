@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import shutil
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -29,8 +31,39 @@ async def handle_help(app: NerdvanaApp, args: str) -> None:
     app._add_chat_message("\n".join(lines))
 
 
+async def _refresh_parism(app: NerdvanaApp) -> None:
+    if shutil.which("npx") is None:
+        app._add_chat_message("[red]npx not found. Install Node.js to refresh Parism.[/red]")
+        return
+    app._add_chat_message("[dim]Refreshing @nerdvana/parism to latest...[/dim]")
+    proc = await asyncio.create_subprocess_exec(
+        "npx",
+        "-y",
+        "--package=@nerdvana/parism@latest",
+        "parism",
+        "--version",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    version = stdout.decode().strip() or "unknown"
+    if proc.returncode == 0:
+        app._add_chat_message(f"[green]Parism refreshed to {version}[/green]")
+    else:
+        err = stderr.decode().strip() or "unknown error"
+        app._add_chat_message(f"[red]Parism refresh failed: {err}[/red]")
+
+
 async def handle_update(app: NerdvanaApp, args: str) -> None:
-    """Handle /update command — check for and install updates."""
+    """Handle /update command. Sub-args:
+    - empty: self-update via core.updater.run_self_update.
+    - 'parism': force-refresh @nerdvana/parism through the npx cache.
+    """
+    target = args.strip().lower()
+    if target == "parism":
+        await _refresh_parism(app)
+        return
+
     from nerdvana_cli.core.updater import run_self_update
 
     app._add_chat_message("[dim]Checking for updates...[/dim]")
