@@ -408,6 +408,19 @@ mypy nerdvana_cli/
 
 Release notes are tracked in [CHANGELOG.md](CHANGELOG.md). The full Phase A (Edit Quality), Phase B (Multi-Agent Swarm), and Phase C (Self-Recovery Hooks) implementation plans live under [`docs/superpowers/plans/`](docs/superpowers/plans/).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for environment setup and PR gate details.
+Key commands:
+
+```bash
+uv sync --extra dev --extra mcp
+pre-commit install
+uv run pytest -m "not lsp_integration and not live" -q
+```
+
+Secrets policy for live tests: [docs/security.md](docs/security.md).
+
 ## License
 
 MIT

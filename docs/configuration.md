@@ -103,6 +103,61 @@ Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, 
 | `enabled` | bool | `true` | Automatically save session checkpoints |
 | `per_session_max` | int | `50` | Maximum number of checkpoints retained per session |
 
+### Pricing maintenance
+
+`nerdvana_cli/providers/pricing.yml` stores USD/1k-token estimates used for cost reporting. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
+
+Scanning for stale entries:
+
+```
+python scripts/check_pricing_freshness.py
+```
+
+Exits 0 if all snapshots are within the TTL (default 90 days, override with `NERDVANA_PRICING_TTL_DAYS`). Pass `--report-only` to suppress the non-zero exit code in CI informational runs.
+
+Updating a provider:
+
+```
+python scripts/update_pricing.py --provider anthropic
+python scripts/update_pricing.py --provider groq        # manual URL printed
+```
+
+Auto-fetch is available for `anthropic`, `openai`, and `google`. For all other providers the script prints the canonical source URL and exits 2; update the YAML manually and bump the snapshot comment date.
+
+Snapshot comment format (first comment line inside the provider block):
+
+```yaml
+anthropic:
+  # 2026-04-29 snapshot — https://www.anthropic.com/pricing
+  claude-sonnet-4-20250514: ...
+```
+
+Provider pricing sources:
+
+| Provider | Pricing source URL |
+|-|-|
+| Anthropic | https://www.anthropic.com/pricing |
+| OpenAI | https://openai.com/api/pricing |
+| Google (Gemini) | https://ai.google.dev/pricing |
+| Groq | https://console.groq.com/docs/openai |
+| OpenRouter | https://openrouter.ai/models |
+| xAI (Grok) | https://x.ai/api |
+| Ollama | https://ollama.com (local inference, no public pricing) |
+| vLLM | https://docs.vllm.ai (local inference, no public pricing) |
+| DeepSeek | https://platform.deepseek.com/api-docs/pricing |
+| Mistral | https://mistral.ai/technology/ |
+| Cohere | https://cohere.com/pricing |
+| Together AI | https://www.together.ai/pricing |
+| ZAI (GLM) | https://open.bigmodel.cn/pricing |
+| Featherless AI | https://featherless.ai/pricing |
+| Xiaomi MiMo | https://token-plan-sgp.xiaomimimo.com |
+| Moonshot (Kimi) | https://platform.moonshot.ai/docs/pricing |
+| DashScope (Qwen) | https://help.aliyun.com/document_detail/2840914.html |
+| MiniMax | https://www.minimaxi.chat/document/pricing |
+| Perplexity | https://docs.perplexity.ai/guides/pricing |
+| Fireworks AI | https://fireworks.ai/pricing |
+| Cerebras | https://inference-docs.cerebras.ai/introduction#pricing |
+
 ## Full example
 
 ```yaml
