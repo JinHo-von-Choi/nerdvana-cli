@@ -64,6 +64,10 @@ model:
   # Max tokens allocated for extended thinking
   thinking_budget: 8192
 
+# Per-provider last-used model. Updated automatically by /provider and /model.
+# Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
+model_history: {}
+
 permissions:
   mode: default
   always_allow:

@@ -56,6 +56,12 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `extended_thinking` | bool | `false` | Phase C: enabled automatically by `ultrawork`/`ulw` keywords |
 | `thinking_budget` | int | `8192` | Phase C: max tokens for extended thinking |
 
+### `model_history` (dict[str, str])
+
+| Field | Type | Default | Description |
+|-|-|-|-|
+| `model_history` | `dict[str, str]` | `{}` | Per-provider last-used model. Updated whenever `/model` or `/provider` switches a selection so that returning to a provider restores its previous model. Keys are provider names (lowercase, matching `ProviderName.value`); values are model identifiers. |
+
 ### `permissions` (PermissionConfig)
 
 | Field | Type | Default | Description |
@@ -157,6 +163,10 @@ Provider pricing sources:
 | Perplexity | https://docs.perplexity.ai/guides/pricing |
 | Fireworks AI | https://fireworks.ai/pricing |
 | Cerebras | https://inference-docs.cerebras.ai/introduction#pricing |
+
+## Selection persistence
+
+`/provider` and `/model` write both the active selection and the per-provider history to the config file referenced by the priority chain above. Restarting `nerdvana` reads the same file, so the last active provider, model, base URL, and per-provider history are restored without further input.
 
 ## Full example
 

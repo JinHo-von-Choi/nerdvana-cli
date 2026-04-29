@@ -201,9 +201,9 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/help` | Show help |
 | `/clear` | Clear chat |
 | `/init` | Generate NIRNA.md (alias: `/setup`) |
-| `/model` | Show/change model |
-| `/models` | List available models |
-| `/provider` | Add/switch provider |
+| `/model` | Show/change current model (per-provider history persists across restarts) |
+| `/models` | List available models for the current provider; cursor starts on the active model |
+| `/provider` | Add/switch provider (selection persists across restarts) |
 | `/mode` | Activate/deactivate mode profile |
 | `/context` | Set context profile |
 | `/mcp` | MCP server status |
