@@ -64,6 +64,9 @@ model:
   # Max tokens allocated for extended thinking
   thinking_budget: 8192
 
+  # Render <think>...</think> blocks as a dim italic prefix above the answer.
+  show_thinking: true
+
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
 model_history: {}
@@ -85,6 +88,8 @@ session:
   compact_max_failures: 3
   # Spawn a Plan subagent on complex prompts before execution
   planning_gate: false
+  # Show the live ActivityIndicator (idle/thinking/tool/streaming/waiting).
+  show_activity: true
   # Default runtime context profile name
   default_context: standalone
   # Default runtime mode name (interactive, planning, etc.)

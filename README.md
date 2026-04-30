@@ -30,6 +30,7 @@
 - **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
 - **Phase B — Multi-Agent Swarm** — first-class `Agent`, `Swarm`, `TeamCreate`, `SendMessage`, `TaskGet`, and `TaskStop` tools with concurrent execution budgets and a TaskPanel UI
 - **Phase C — Self-Recovery Hooks** — built-in lifecycle hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) that auto-resume max-token stops, repair JSON tool errors, and chase down TODO/FIXME/NotImplemented markers; optional planning gate, fallback models, and extended thinking
+- **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TeamCreate, SendMessage, TaskGet, TaskStop, plus four LSP tools
 - **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`)
 - **Session Persistence** — JSONL transcripts for resume
@@ -218,6 +219,8 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/route-knowledge` | Classify content → suggest WriteMemory scope |
 | `/dashboard` | Toggle observability dashboard |
 | `/health` | Show 7-day tool call health summary |
+| `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |
+| `/activity` | Toggle activity indicator widget (on/off, persists to config.yml) |
 | `/quit` | Exit (aliases: `/exit`, `/q`) |
 
 ## Built-in Tools

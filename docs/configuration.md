@@ -55,6 +55,7 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `fallback_models` | list[str] | `[]` | Phase C: models to try on 429/529/503/timeout errors |
 | `extended_thinking` | bool | `false` | Phase C: enabled automatically by `ultrawork`/`ulw` keywords |
 | `thinking_budget` | int | `8192` | Phase C: max tokens for extended thinking |
+| `show_thinking` | bool | `true` | Render `<think>...</think>` content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
 
 ### `model_history` (dict[str, str])
 
@@ -82,6 +83,7 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `planning_gate` | bool | `false` | Spawn Plan subagent on complex prompts |
 | `default_context` | str | `"standalone"` | Default runtime context profile name |
 | `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
+| `show_activity` | bool | `true` | Show the live ActivityIndicator widget between the chat log and the input row. Toggled via `/activity on|off`. |
 
 ### `parism` (ParismConfig)
 
@@ -182,6 +184,7 @@ model:
     - gemini-2.5-flash
   extended_thinking: false
   thinking_budget: 8192
+  show_thinking: true
 
 permissions:
   mode: default
@@ -200,6 +203,7 @@ session:
   planning_gate: true        # opt-in
   default_context: standalone
   default_mode: interactive
+  show_activity: true
 
 parism:
   enabled: true
