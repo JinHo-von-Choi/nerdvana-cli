@@ -20,8 +20,13 @@ def build_system_prompt(
     model: str = "",
     provider: str = "",
     cwd: str = ".",
+    active_tool_mode: bool = False,
 ) -> str:
-    """Build the complete system prompt from ordered sections."""
+    """Build the complete system prompt from ordered sections.
+
+    active_tool_mode: when true, inject the stronger active-tool augment
+    section. Triggered by ultrawork keyword or extended_thinking flag.
+    """
     nirna_files   = load_nirna_files(cwd=cwd)
     nirna_section = format_nirna_for_prompt(nirna_files)
 
@@ -30,6 +35,7 @@ def build_system_prompt(
         _system_section(),
         _doing_tasks_section(),
         _tool_judgment_section(),
+        _active_tool_augment_section() if active_tool_mode else None,
         _using_tools_section(tools or []),
         _parism_section() if parism_active else None,
         _tone_and_style_section(),
@@ -119,7 +125,25 @@ def _tool_judgment_section() -> str:
         "- If a tool call fails, explain the error. "
         "Do not silently retry with variations.\n"
         "- Never use tools to \"explore\" the codebase out of curiosity. "
-        "Only explore when the task requires it."
+        "Only explore when the task requires it.\n"
+        "- When the task plainly requires information you do not have, "
+        "do not stall or guess: invoke the right tool immediately and "
+        "report a one-line status if the chain runs long."
+    )
+
+
+def _active_tool_augment_section() -> str:
+    """Stronger active-tool guidance, only injected under ultrawork or
+    extended_thinking modes where the user has signalled they want
+    deep, autonomous work."""
+    return (
+        "# Active Tool Use (ultrawork / extended thinking)\n"
+        "- The user has signalled they want autonomous, multi-step work.\n"
+        "- Default to using tools whenever they shorten the path to a verified answer.\n"
+        "- Read source, run searches, execute checks, and gather facts before "
+        "asserting anything that depends on the codebase or environment.\n"
+        "- Each tool chain should still emit a short status line when it runs "
+        "longer than five calls so the user can follow the trajectory."
     )
 
 
