@@ -94,12 +94,13 @@ class AgentLoop:
 
     def __init__(
         self,
-        settings:           NerdvanaSettings,
-        registry:           ToolRegistry,
-        session:            SessionStorage | None = None,
-        task_registry:      Any = None,
-        team_registry:      Any = None,
-        on_activity_change: Callable[[ActivityState], None] | None = None,
+        settings:            NerdvanaSettings,
+        registry:            ToolRegistry,
+        session:             SessionStorage | None = None,
+        task_registry:       Any = None,
+        team_registry:       Any = None,
+        on_activity_change:  Callable[[ActivityState], None] | None = None,
+        on_thinking_chunk:   Callable[[str], None] | None = None,
     ) -> None:
         self.settings             = settings
         self.registry             = registry
@@ -110,6 +111,8 @@ class AgentLoop:
         self.console              = Console()
         self.activity_state       = ActivityState()
         self._on_activity_change  = on_activity_change
+        self._on_thinking_chunk   = on_thinking_chunk
+        self.last_thinking:  str  = ""
         from nerdvana_cli.core.builtin_hooks import (
             context_limit_recovery,
             json_parse_recovery,
@@ -326,6 +329,10 @@ class AgentLoop:
                         elif ev.type == "thinking_delta":
                             thinking_buffer += ev.thinking
                             self._set_activity(phase="thinking", label="Thinking...")
+                            if self._on_thinking_chunk is not None:
+                                import contextlib as _cl
+                                with _cl.suppress(Exception):
+                                    self._on_thinking_chunk(thinking_buffer)
                         elif ev.type == "tool_use_complete":
                             tool_uses.append({"id": ev.tool_use_id or f"call_{len(tool_uses)}",
                                               "name": ev.tool_name, "input": ev.tool_input_complete or {}})
@@ -349,6 +356,7 @@ class AgentLoop:
                                     return
                                 break
                             elif stop == "end_turn":
+                                self.last_thinking = thinking_buffer
                                 if asst_text:
                                     self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
                                     self.session.record_assistant_message(asst_text)
