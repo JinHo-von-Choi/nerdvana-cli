@@ -104,3 +104,74 @@ async def handle_init(app: NerdvanaApp, args: str) -> None:
         "Write the file using FileWrite tool."
     )
     app._generate_response(init_prompt)
+
+
+async def handle_thinking(app: NerdvanaApp, args: str) -> None:
+    """Handle /thinking command.
+
+    Sub-args:
+    - empty: show current state
+    - 'on'  : enable inline thinking display
+    - 'off' : disable
+    """
+    target = args.strip().lower()
+    if not target:
+        cur = "on" if app.settings.model.show_thinking else "off"
+        app._add_chat_message(f"[dim]Thinking display: {cur}[/dim]")
+        return
+    if target not in {"on", "off"}:
+        app._add_chat_message("[red]Usage: /thinking [on|off][/red]")
+        return
+    new_value = target == "on"
+    app.settings.model.show_thinking = new_value
+
+    try:
+        from nerdvana_cli.core.setup import load_config, save_config
+        existing = load_config()
+        existing.setdefault("model", {})
+        existing["model"]["show_thinking"] = new_value
+        save_config(existing)
+    except Exception as save_err:
+        app._add_chat_message(f"[yellow]Config save failed: {save_err}[/yellow]")
+
+    state_str = "enabled" if new_value else "disabled"
+    app._add_chat_message(f"[dim]Thinking display {state_str}.[/dim]")
+
+
+async def handle_activity(app: NerdvanaApp, args: str) -> None:
+    """Handle /activity command.
+
+    Sub-args:
+    - empty: show current state
+    - 'on'  : show ActivityIndicator widget
+    - 'off' : hide
+    """
+    target = args.strip().lower()
+    if not target:
+        cur = "on" if app.settings.session.show_activity else "off"
+        app._add_chat_message(f"[dim]Activity indicator: {cur}[/dim]")
+        return
+    if target not in {"on", "off"}:
+        app._add_chat_message("[red]Usage: /activity [on|off][/red]")
+        return
+    new_value = target == "on"
+    app.settings.session.show_activity = new_value
+
+    try:
+        from nerdvana_cli.core.setup import load_config, save_config
+        existing = load_config()
+        existing.setdefault("session", {})
+        existing["session"]["show_activity"] = new_value
+        save_config(existing)
+    except Exception as save_err:
+        app._add_chat_message(f"[yellow]Config save failed: {save_err}[/yellow]")
+
+    try:
+        from nerdvana_cli.ui.app import ActivityIndicator
+        widget = app.query_one("#activity-indicator", ActivityIndicator)
+        widget.styles.display = "block" if new_value else "none"
+    except Exception:
+        pass
+
+    state_str = "enabled" if new_value else "disabled"
+    app._add_chat_message(f"[dim]Activity indicator {state_str}.[/dim]")

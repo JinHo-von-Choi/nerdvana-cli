@@ -22,6 +22,7 @@ class ModelConfig(BaseModel):
     fallback_models: list[str] = Field(default_factory=list)
     extended_thinking: bool = False
     thinking_budget: int = 8192
+    show_thinking: bool = True
 
 
 class PermissionConfig(BaseModel):
@@ -40,6 +41,7 @@ class SessionConfig(BaseModel):
     # Phase F: runtime profiles — default context and mode names
     default_context: str = "standalone"
     default_mode:    str = "interactive"
+    show_activity:   bool = True
 
 
 class ParismConfig(BaseModel):
