@@ -8,6 +8,7 @@ from typing import Any
 
 from rich.console import Console
 
+from nerdvana_cli.core.thinking_parser import ThinkBlockParser
 from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
 
@@ -112,6 +113,7 @@ class OpenAIProvider:
             current_tool_calls: dict[int, dict[str, str]] = {}
             usage_received = False
             total_completion_chars = 0
+            parser = ThinkBlockParser()
 
             async for chunk in stream:
                 try:
@@ -132,7 +134,11 @@ class OpenAIProvider:
                     # Content delta — handle potential encoding issues
                     if choice.delta.content:
                         total_completion_chars += len(choice.delta.content)
-                        yield ProviderEvent(type="content_delta", content=choice.delta.content)
+                        parsed = parser.feed(choice.delta.content)
+                        if parsed.content:
+                            yield ProviderEvent(type="content_delta", content=parsed.content)
+                        if parsed.thinking:
+                            yield ProviderEvent(type="thinking_delta", thinking=parsed.thinking)
 
                     # Tool call deltas
                     if choice.delta.tool_calls:
@@ -169,6 +175,13 @@ class OpenAIProvider:
                                     tool_name=tc["name"],
                                     tool_input_complete=input_data,
                                 )
+
+                        # Flush any buffered think-block content
+                        final = parser.flush()
+                        if final.content:
+                            yield ProviderEvent(type="content_delta", content=final.content)
+                        if final.thinking:
+                            yield ProviderEvent(type="thinking_delta", thinking=final.thinking)
 
                         # Emit estimated usage if no usage event received
                         if not usage_received and total_completion_chars > 0:
