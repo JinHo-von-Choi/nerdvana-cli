@@ -95,6 +95,8 @@ SLASH_COMMANDS = [
     ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
     ("/dashboard", "Toggle observability dashboard"),
     ("/health", "Show 7-day tool call health summary"),
+    ("/thinking", "Toggle inline thinking display (on/off)"),
+    ("/activity", "Toggle activity indicator (on/off)"),
     ("/quit", "Exit"),
 ]
 
@@ -541,6 +543,10 @@ class NerdvanaApp(App[object]):
 
         self.query_one("#user-input", Input).focus()
 
+        if not self.settings.session.show_activity:
+            with contextlib.suppress(Exception):
+                self.query_one("#activity-indicator", ActivityIndicator).styles.display = "none"
+
         self._check_update_task = asyncio.create_task(self._check_update())
 
     def _refresh_mcp_section(self) -> None:
@@ -867,6 +873,8 @@ class NerdvanaApp(App[object]):
             "/context":         profile_commands.handle_context,
             "/health":          observability_commands.handle_health,
             "/dashboard":       observability_commands.handle_dashboard,
+            "/thinking":        system_commands.handle_thinking,
+            "/activity":        system_commands.handle_activity,
         }
 
         if command in ("/quit", "/exit", "/q"):
