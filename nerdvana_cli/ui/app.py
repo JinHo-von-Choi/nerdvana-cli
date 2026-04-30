@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +15,12 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Paste
+from textual.reactive import reactive
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
 
 from nerdvana_cli import __version__
+from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
@@ -210,6 +213,87 @@ class StreamingOutput(Static):
     }
     """
 
+    _thinking: str = ""
+    _content:  str = ""
+
+    def update_thinking(self, text: str) -> None:
+        """Replace the current thinking preview."""
+        self._thinking = text
+        self._refresh_display()
+
+    def update_content(self, text: str) -> None:
+        """Replace the current streamed content."""
+        self._content = text
+        self._refresh_display()
+
+    def reset(self) -> None:
+        """Clear both thinking and content buffers."""
+        self._thinking = ""
+        self._content  = ""
+        self.update("")
+
+    def _refresh_display(self) -> None:
+        parts: list[str] = []
+        if self._thinking:
+            parts.append(
+                f"[dim italic][thinking]\n{self._thinking}\n[/thinking][/dim italic]"
+            )
+        if self._content:
+            parts.append(self._content)
+        self.update("\n\n".join(parts))
+
+
+class ActivityIndicator(Static):
+    """Single-line indicator showing the current AgentLoop activity phase."""
+
+    DEFAULT_CSS = """
+    ActivityIndicator {
+        height: 1;
+        width: 100%;
+        padding: 0 1;
+        background: $surface;
+        color: $text-muted;
+    }
+    ActivityIndicator.-thinking { color: $warning; }
+    ActivityIndicator.-tool     { color: $accent;  }
+    ActivityIndicator.-stream   { color: $success; }
+    ActivityIndicator.-waiting  { color: $warning; }
+    ActivityIndicator.-idle     { color: $text-muted; }
+    """
+
+    state: reactive[ActivityState] = reactive(ActivityState)
+
+    _ICONS: dict[str, str] = {
+        "idle":         "●",
+        "thinking":     "◐",
+        "waiting_api":  "◔",
+        "streaming":    "◑",
+        "tool_running": "◉",
+    }
+    _CLASS_MAP: dict[str, str] = {
+        "idle":         "-idle",
+        "thinking":     "-thinking",
+        "waiting_api":  "-waiting",
+        "streaming":    "-stream",
+        "tool_running": "-tool",
+    }
+
+    def watch_state(self, new_state: ActivityState) -> None:
+        for css in self._CLASS_MAP.values():
+            self.remove_class(css)
+        self.add_class(self._CLASS_MAP.get(new_state.phase, "-idle"))
+        self._refresh_label(new_state)
+
+    def _refresh_label(self, state: ActivityState) -> None:
+        icon    = self._ICONS.get(state.phase, "●")
+        elapsed = ""
+        if state.started_at is not None:
+            secs = int(time.time() - state.started_at)
+            if secs >= 1:
+                elapsed = f" [{secs}s]"
+        detail = f": {state.detail}" if state.detail else ""
+        self.update(f"{icon} {state.label}{detail}{elapsed}")
+
 
 class ToolStatusLine(Static):
     """Single-line tool execution status, overwrites in place."""
@@ -373,6 +457,7 @@ class NerdvanaApp(App[object]):
                     yield StreamingOutput(id="streaming-output")
                     yield ToolStatusLine(id="tool-status")
                 yield DashboardTab(id="dashboard-tab")
+                yield ActivityIndicator(id="activity-indicator")
                 yield CommandMenu(id="command-menu")
                 yield ProviderSelector(id="provider-selector")
                 yield ModelSelector(id="model-selector")
@@ -399,12 +484,21 @@ class NerdvanaApp(App[object]):
             team_registry = team_registry,
         )
         session  = SessionStorage()
+
+        def _on_activity_change(state: ActivityState) -> None:
+            self.call_from_thread(
+                lambda: self.query_one(
+                    "#activity-indicator", ActivityIndicator
+                ).__setattr__("state", state)
+            )
+
         self._agent_loop = AgentLoop(
-            settings      = self.settings,
-            registry      = registry,
-            session       = session,
-            task_registry = self._task_registry,
-            team_registry = team_registry,
+            settings           = self.settings,
+            registry           = registry,
+            session            = session,
+            task_registry      = self._task_registry,
+            team_registry      = team_registry,
+            on_activity_change = _on_activity_change,
         )
 
         self._update_banner()
@@ -569,7 +663,7 @@ class NerdvanaApp(App[object]):
 
         try:
             accumulated = ""
-            chat_frame = self.query_one("#chat-frame", VerticalScroll)
+            chat_frame  = self.query_one("#chat-frame", VerticalScroll)
 
             from nerdvana_cli.core.agent_loop import (
                 COMPACT_STATUS_PREFIX,
@@ -579,6 +673,13 @@ class NerdvanaApp(App[object]):
             )
 
             assert self._agent_loop is not None
+
+            # Wire thinking-chunk callback to streaming widget
+            def _on_thinking_chunk(text: str) -> None:
+                streaming.update_thinking(text)
+
+            self._agent_loop._on_thinking_chunk = _on_thinking_chunk
+
             async for chunk in self._agent_loop.run(prompt):
                 if chunk.startswith(CONTEXT_USAGE_PREFIX):
                     pct = int(chunk[len(CONTEXT_USAGE_PREFIX):])
@@ -613,7 +714,7 @@ class NerdvanaApp(App[object]):
                 else:
                     tool_status.remove_class("active")
                     accumulated += chunk
-                    streaming.update(accumulated)
+                    streaming.update_content(accumulated)
                     chat_frame.scroll_end(animate=False)
 
             # Stop timer
@@ -624,9 +725,10 @@ class NerdvanaApp(App[object]):
 
             tool_status.remove_class("active")
             streaming.remove_class("active")
-            streaming.update("")
+            streaming.reset()
+            thinking_buf = getattr(self._agent_loop, "last_thinking", "")
             if accumulated.strip():
-                self._add_chat_message(accumulated, raw_text=accumulated)
+                self._add_chat_message(accumulated, raw_text=accumulated, thinking=thinking_buf)
 
             # Final status with total elapsed
             elapsed = time.monotonic() - start_time
@@ -668,11 +770,17 @@ class NerdvanaApp(App[object]):
         from nerdvana_cli.commands.session_commands import show_session_context
         show_session_context(self, registry)
 
-    def _add_chat_message(self, markup: str, raw_text: str = "") -> None:
+    def _add_chat_message(self, markup: str, raw_text: str = "", thinking: str = "") -> None:
         """Add a clickable chat message to the chat frame."""
-        chat_frame = self.query_one("#chat-frame", VerticalScroll)
-        streaming = self.query_one("#streaming-output", StreamingOutput)
-        msg = ChatMessage(markup, raw_text=raw_text)
+        chat_frame  = self.query_one("#chat-frame", VerticalScroll)
+        streaming   = self.query_one("#streaming-output", StreamingOutput)
+        full_markup = markup
+        if thinking and getattr(self.settings.model, "show_thinking", True):
+            thinking_block = (
+                f"[dim italic][thinking]\n{thinking}\n[/thinking][/dim italic]\n\n"
+            )
+            full_markup = thinking_block + markup
+        msg = ChatMessage(full_markup, raw_text=raw_text)
         chat_frame.mount(msg, before=streaming)
         chat_frame.scroll_end(animate=False)
 
