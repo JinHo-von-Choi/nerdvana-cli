@@ -56,8 +56,9 @@ class ProviderResponse:
 class ProviderEvent:
     """Streaming event from provider."""
 
-    type: str  # content_delta, tool_use_start, tool_use_delta, tool_use_complete, done, error
+    type: str  # content_delta, thinking_delta, tool_use_start, tool_use_delta, tool_use_complete, done, error
     content: str = ""
+    thinking: str = ""
     tool_use_id: str = ""
     tool_name: str = ""
     tool_input_delta: str = ""

@@ -109,6 +109,8 @@ class AnthropicProvider:
                     delta = event.delta
                     if delta.type == "text_delta":
                         yield ProviderEvent(type="content_delta", content=delta.text)
+                    elif delta.type == "thinking_delta":
+                        yield ProviderEvent(type="thinking_delta", thinking=delta.thinking)
                     elif delta.type == "input_json_delta":
                         current_tool_input += delta.partial_json
                         yield ProviderEvent(
