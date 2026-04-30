@@ -11,11 +11,12 @@ import json
 import logging
 import math
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 from rich.console import Console
 
+from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
@@ -93,19 +94,22 @@ class AgentLoop:
 
     def __init__(
         self,
-        settings:      NerdvanaSettings,
-        registry:      ToolRegistry,
-        session:       SessionStorage | None = None,
-        task_registry: Any = None,
-        team_registry: Any = None,
+        settings:           NerdvanaSettings,
+        registry:           ToolRegistry,
+        session:            SessionStorage | None = None,
+        task_registry:      Any = None,
+        team_registry:      Any = None,
+        on_activity_change: Callable[[ActivityState], None] | None = None,
     ) -> None:
-        self.settings       = settings
-        self.registry       = registry
-        self.session        = session or SessionStorage()
-        self.state          = SessionState()
-        self._task_registry = task_registry
-        self._team_registry = team_registry
-        self.console        = Console()
+        self.settings             = settings
+        self.registry             = registry
+        self.session              = session or SessionStorage()
+        self.state                = SessionState()
+        self._task_registry       = task_registry
+        self._team_registry       = team_registry
+        self.console              = Console()
+        self.activity_state       = ActivityState()
+        self._on_activity_change  = on_activity_change
         from nerdvana_cli.core.builtin_hooks import (
             context_limit_recovery,
             json_parse_recovery,
@@ -152,6 +156,17 @@ class AgentLoop:
             checkpoint_manager  = self._checkpoint_manager,
         )
         self.loop_hook_engine = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
+        from nerdvana_cli.core.activity_hooks import register_activity_hooks
+        register_activity_hooks(self)
+
+    def _set_activity(self, **kwargs: Any) -> None:
+        """Mutate self.activity_state and notify subscribers."""
+        for key, value in kwargs.items():
+            setattr(self.activity_state, key, value)
+        if self._on_activity_change is not None:
+            import contextlib
+            with contextlib.suppress(Exception):
+                self._on_activity_change(self.activity_state)
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
         pname = ProviderName(self.settings.model.provider) if self.settings.model.provider else None
@@ -296,13 +311,21 @@ class AgentLoop:
 
                 messages = self._to_provider_messages()
                 try:
-                    asst_text = ""
+                    asst_text       = ""
+                    thinking_buffer = ""
                     tool_uses: list[dict[str, Any]] = []
 
                     async for ev in self.provider.stream(system_prompt, messages, tools):
                         if ev.type == "content_delta":
+                            self._set_activity(
+                                phase="streaming",
+                                label=f"Streaming from {self.settings.model.model}",
+                            )
                             asst_text += ev.content
                             yield ev.content
+                        elif ev.type == "thinking_delta":
+                            thinking_buffer += ev.thinking
+                            self._set_activity(phase="thinking", label="Thinking...")
                         elif ev.type == "tool_use_complete":
                             tool_uses.append({"id": ev.tool_use_id or f"call_{len(tool_uses)}",
                                               "name": ev.tool_name, "input": ev.tool_input_complete or {}})
@@ -344,6 +367,7 @@ class AgentLoop:
                                         self.state.messages.append(Message(role=Role.USER, content=_et_msg["content"]))
                                         _et_injected = True
                                 if not _et_injected:
+                                    self._set_activity(phase="idle", label="Ready")
                                     return
                                 break
                             elif stop == "tool_use" and tool_uses:
