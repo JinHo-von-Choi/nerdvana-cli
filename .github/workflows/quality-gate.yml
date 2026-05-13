@@ -48,3 +48,15 @@ jobs:
           else
             echo "count-baseline skipped (Q7 not yet merged)"
           fi
+
+      - name: Import graph (baseline 0-cycle invariant)
+        # Fails when a new circular import appears beyond the
+        # `.import_cycles_baseline.json` allow-list. Baseline is currently 0
+        # cycles; any drift requires an explicit baseline update PR.
+        run: uv run python scripts/check_import_graph.py --root nerdvana_cli
+
+      - name: Pricing snapshot freshness
+        # Fails when any provider entry in providers/pricing.yml exceeds the
+        # NERDVANA_PRICING_TTL_DAYS window (default 90 days). Forces routine
+        # pricing refresh PRs instead of silent drift.
+        run: uv run python scripts/check_pricing_freshness.py
