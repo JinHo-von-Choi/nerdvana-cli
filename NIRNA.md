@@ -10,7 +10,7 @@
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)
 
 ## Architecture
-- 13 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 10, Anthropic/Gemini separate)
+- 21 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 18, Anthropic/Gemini separate)
 - Tool pipeline: parse_args -> check_permissions (ALLOW/DENY/ASK) -> validate_input -> call
 - Concurrency: read-only tools parallel (asyncio.gather), write tools serial
 - Session: JSONL append-only logs, messages recorded after API response

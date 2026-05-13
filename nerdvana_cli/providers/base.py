@@ -135,155 +135,26 @@ class BaseProvider(Protocol):
 
 
 # Provider capability matrix
-PROVIDER_CAPABILITIES: dict[ProviderName, dict[str, Any]] = {
-    ProviderName.ANTHROPIC: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": True,
-        "max_context": 200_000,
-    },
-    ProviderName.OPENAI: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": False,
-        "max_context": 1_048_576,
-    },
-    ProviderName.GEMINI: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": True,
-        "max_context": 1_048_576,
-    },
-    ProviderName.GROQ: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 32_768,
-    },
-    ProviderName.OPENROUTER: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": False,
-        "max_context": 200_000,
-    },
-    ProviderName.XAI: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.OLLAMA: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.VLLM: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.DEEPSEEK: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": True,
-        "max_context": 65_536,
-    },
-    ProviderName.MISTRAL: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": False,
-        "max_context": 128_000,
-    },
-    ProviderName.COHERE: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 128_000,
-    },
-    ProviderName.TOGETHER: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.ZAI: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 128_000,
-    },
-    ProviderName.FEATHERLESS: {
-        "supports_tools": False,
-        "supports_streaming": False,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 32_768,
-    },
-    ProviderName.XIAOMI_MIMO: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": True,
-        "max_context": 1_048_576,
-    },
-    ProviderName.MOONSHOT: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.DASHSCOPE: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": True,
-        "max_context": 1_000_000,
-    },
-    ProviderName.MINIMAX: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": True,
-        "supports_thinking": False,
-        "max_context": 1_000_000,
-    },
-    ProviderName.PERPLEXITY: {
-        "supports_tools": False,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 200_000,
-    },
-    ProviderName.FIREWORKS: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 131_072,
-    },
-    ProviderName.CEREBRAS: {
-        "supports_tools": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_thinking": False,
-        "max_context": 65_536,
-    },
-}
+def _load_variants() -> dict[str, dict[str, Any]]:
+    """Load provider variant metadata from ``variants.yml`` (single source of truth)."""
+    from pathlib import Path
+
+    import yaml  # type: ignore[import-untyped]
+
+    with Path(__file__).with_name("variants.yml").open(encoding="utf-8") as fh:
+        data: dict[str, dict[str, Any]] = yaml.safe_load(fh) or {}
+    return data
+
+
+_VARIANTS: dict[str, dict[str, Any]] = _load_variants()
+
+
+def _by_provider(field: str) -> dict[ProviderName, Any]:
+    """Project a single ``variants.yml`` field across all entries, keyed by ProviderName."""
+    return {ProviderName(name): entry[field] for name, entry in _VARIANTS.items()}
+
+
+PROVIDER_CAPABILITIES: dict[ProviderName, dict[str, Any]] = _by_provider("capabilities")
 
 # Model-specific context window sizes (prefix-matched)
 MODEL_CONTEXT_WINDOWS: dict[str, int] = {
@@ -380,79 +251,13 @@ def resolve_context_window(provider: ProviderName, model: str) -> int:
 
 
 # Default base URLs per provider
-DEFAULT_BASE_URLS: dict[ProviderName, str] = {
-    ProviderName.ANTHROPIC: "https://api.anthropic.com",
-    ProviderName.OPENAI: "https://api.openai.com/v1",
-    ProviderName.GEMINI: "https://generativelanguage.googleapis.com",
-    ProviderName.GROQ: "https://api.groq.com/openai/v1",
-    ProviderName.OPENROUTER: "https://openrouter.ai/api/v1",
-    ProviderName.XAI: "https://api.x.ai/v1",
-    ProviderName.OLLAMA: "http://localhost:11434/v1",
-    ProviderName.VLLM: "http://localhost:8000/v1",
-    ProviderName.DEEPSEEK: "https://api.deepseek.com",
-    ProviderName.MISTRAL: "https://api.mistral.ai/v1",
-    ProviderName.COHERE: "https://api.cohere.com/v2",
-    ProviderName.TOGETHER: "https://api.together.xyz/v1",
-    ProviderName.ZAI: "https://api.z.ai/api/coding/paas/v4/",
-    ProviderName.FEATHERLESS: "https://api.featherless.ai/v1",
-    ProviderName.XIAOMI_MIMO: "https://token-plan-sgp.xiaomimimo.com/v1",
-    ProviderName.MOONSHOT: "https://api.moonshot.ai/v1",
-    ProviderName.DASHSCOPE: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    ProviderName.MINIMAX: "https://api.minimaxi.chat/v1",
-    ProviderName.PERPLEXITY: "https://api.perplexity.ai",
-    ProviderName.FIREWORKS: "https://api.fireworks.ai/inference/v1",
-    ProviderName.CEREBRAS: "https://api.cerebras.ai/v1",
-}
+DEFAULT_BASE_URLS: dict[ProviderName, str] = _by_provider("base_url")
 
 # Default models per provider
-DEFAULT_MODELS: dict[ProviderName, str] = {
-    ProviderName.ANTHROPIC: "claude-sonnet-4-20250514",
-    ProviderName.OPENAI: "gpt-4.1",
-    ProviderName.GEMINI: "gemini-2.5-flash",
-    ProviderName.GROQ: "llama-3.3-70b-versatile",
-    ProviderName.OPENROUTER: "anthropic/claude-sonnet-4",
-    ProviderName.XAI: "grok-3",
-    ProviderName.OLLAMA: "qwen3",
-    ProviderName.VLLM: "Qwen/Qwen3-32B",
-    ProviderName.DEEPSEEK: "deepseek-chat",
-    ProviderName.MISTRAL: "mistral-medium-latest",
-    ProviderName.COHERE: "command-r-plus",
-    ProviderName.TOGETHER: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    ProviderName.ZAI: "glm-4.7",
-    ProviderName.FEATHERLESS: "featherless-llama-3-70b",
-    ProviderName.XIAOMI_MIMO: "mimo-v2.5-pro",
-    ProviderName.MOONSHOT: "kimi-k2-instruct",
-    ProviderName.DASHSCOPE: "qwen3-coder-plus",
-    ProviderName.MINIMAX: "MiniMax-M2",
-    ProviderName.PERPLEXITY: "sonar-pro",
-    ProviderName.FIREWORKS: "accounts/fireworks/models/llama-v3p3-70b-instruct",
-    ProviderName.CEREBRAS: "llama-3.3-70b",
-}
+DEFAULT_MODELS: dict[ProviderName, str] = _by_provider("default_model")
 
 # Environment variable names for API keys
-PROVIDER_KEY_ENVVARS: dict[ProviderName, list[str]] = {
-    ProviderName.ANTHROPIC: ["ANTHROPIC_API_KEY"],
-    ProviderName.OPENAI: ["OPENAI_API_KEY"],
-    ProviderName.GEMINI: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-    ProviderName.GROQ: ["GROQ_API_KEY"],
-    ProviderName.OPENROUTER: ["OPENROUTER_API_KEY"],
-    ProviderName.XAI: ["XAI_API_KEY"],
-    ProviderName.OLLAMA: ["OLLAMA_API_KEY", "OPENAI_API_KEY"],
-    ProviderName.VLLM: ["VLLM_API_KEY", "OPENAI_API_KEY"],
-    ProviderName.DEEPSEEK: ["DEEPSEEK_API_KEY"],
-    ProviderName.MISTRAL: ["MISTRAL_API_KEY"],
-    ProviderName.COHERE: ["CO_API_KEY"],
-    ProviderName.TOGETHER: ["TOGETHER_API_KEY"],
-    ProviderName.ZAI: ["ZHIPUAI_API_KEY"],
-    ProviderName.FEATHERLESS: ["FEATHERLESS_API_KEY"],
-    ProviderName.XIAOMI_MIMO: ["MIMO_API_KEY", "XIAOMI_API_KEY"],
-    ProviderName.MOONSHOT: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
-    ProviderName.DASHSCOPE: ["DASHSCOPE_API_KEY", "ALIBABA_API_KEY"],
-    ProviderName.MINIMAX: ["MINIMAX_API_KEY"],
-    ProviderName.PERPLEXITY: ["PERPLEXITY_API_KEY", "PPLX_API_KEY"],
-    ProviderName.FIREWORKS: ["FIREWORKS_API_KEY"],
-    ProviderName.CEREBRAS: ["CEREBRAS_API_KEY"],
-}
+PROVIDER_KEY_ENVVARS: dict[ProviderName, list[str]] = _by_provider("env_vars")
 
 
 def detect_provider(model: str) -> ProviderName:

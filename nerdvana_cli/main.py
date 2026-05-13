@@ -5,13 +5,18 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.prompt import Prompt
 
 from nerdvana_cli import __version__
+from nerdvana_cli.commands.admin_command import admin_app
+from nerdvana_cli.commands.hook_command import hook_app
+from nerdvana_cli.commands.mcp_command import mcp_app
+from nerdvana_cli.commands.memory_command import memory_app
+from nerdvana_cli.commands.session_command import session_app
+from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.session import SessionStorage
@@ -20,12 +25,53 @@ from nerdvana_cli.tools.registry import create_tool_registry
 
 app = typer.Typer(
     name="nerdvana",
-    help="NerdVana CLI — AI-powered development tool. Supports 13 AI platforms.",
+    help="NerdVana CLI — AI-powered development tool. Supports 21 AI platforms.",
     add_completion=False,
     rich_markup_mode="rich",
 )
+app.add_typer(session_app, name="session")
+app.add_typer(mcp_app,     name="mcp")
+app.add_typer(skill_app,   name="skill")
+app.add_typer(memory_app,  name="memory")
+app.add_typer(hook_app)
+app.add_typer(admin_app)
 console        = Console()
 console_stderr = Console(stderr=True)
+
+
+def _maybe_show_update_notice() -> None:
+    """Print a single dim line if a newer release is available.
+
+    Uses a 24-hour cache and a 5s HTTP timeout. Silent on every failure mode
+    (offline, rate-limit, malformed cache). Suppressed when
+    `NERDVANA_NO_UPDATE_CHECK=1` or `session.update_check` is False.
+    """
+    try:
+        import asyncio as _asyncio
+
+        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.core.updater import (
+            cached_or_check,
+            format_update_notice,
+            is_update_check_enabled,
+        )
+
+        try:
+            _flag = bool(NerdvanaSettings().session.update_check)
+        except Exception:
+            _flag = True
+        if not is_update_check_enabled(_flag):
+            return
+
+        result = _asyncio.run(cached_or_check(__version__))
+        if result and result.get("version"):
+            console.print(
+                format_update_notice(__version__, result["version"], result.get("url", "")),
+                highlight=False,
+            )
+    except Exception:
+        # Never let a startup notice abort the CLI.
+        pass
 
 
 def _run_migration_once() -> None:
@@ -65,28 +111,30 @@ def main(
         "--approval-mode",
         help="Preset mode: default | auto_edit | yolo | plan",
     ),
+    no_update_check: bool = typer.Option(
+        False,
+        "--no-update-check",
+        help="Skip the startup new-version check for this run.",
+    ),
 ) -> None:
     """NerdVana CLI — AI-powered development tool.
 
-    Supports 13 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
-    Ollama, vLLM, DeepSeek, Mistral, Cohere, Together AI, ZAI.
+    Supports 21 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
+    Ollama, vLLM, DeepSeek, Mistral, Cohere, Together AI, ZAI, Featherless AI,
+    Moonshot AI (Kimi), Fireworks AI, Cerebras, Perplexity, SambaNova, NovitaAI, MiMo.
 
     Run without subcommands to start interactive REPL mode.
     First run triggers interactive setup wizard.
     """
+    if no_update_check:
+        os.environ["NERDVANA_NO_UPDATE_CHECK"] = "1"
+
     if version:
         console.print(f"[bold]NerdVana CLI[/bold] v{__version__}")
-        try:
-            import asyncio as _asyncio
-
-            from nerdvana_cli.core.updater import check_for_update
-            result = _asyncio.run(check_for_update(__version__))
-            if result:
-                console.print(f"[yellow]Update available: {result['version']}[/yellow]")
-                console.print("[dim]Run: nerdvana update  or  /update in REPL[/dim]")
-        except Exception:
-            pass
+        _maybe_show_update_notice()
         raise typer.Exit()
+
+    _maybe_show_update_notice()
 
     if ctx.invoked_subcommand is None:
         # Suppress "Event loop is closed" warnings from subprocess GC
@@ -406,146 +454,6 @@ def cost(
     from nerdvana_cli.commands.cost_command import cost_command
 
     cost_command(since=since, json_output=json_output, by=by)
-
-
-# ---------------------------------------------------------------------------
-# E4/E5 sub-apps — session, mcp, skill, memory
-# ---------------------------------------------------------------------------
-
-from nerdvana_cli.commands.session_command import session_app
-from nerdvana_cli.commands.mcp_command     import mcp_app
-from nerdvana_cli.commands.skill_command   import skill_app
-from nerdvana_cli.commands.memory_command  import memory_app
-
-app.add_typer(session_app, name="session")
-app.add_typer(mcp_app,     name="mcp")
-app.add_typer(skill_app,   name="skill")
-app.add_typer(memory_app,  name="memory")
-
-
-# ---------------------------------------------------------------------------
-# nerdvana hook — hook bridge sub-group — Phase G2
-# ---------------------------------------------------------------------------
-
-hook_app = typer.Typer(
-    name           = "hook",
-    help           = "Dispatch Claude Code / Codex / VSCode hook JSON via stdin/stdout.",
-    add_completion = False,
-)
-app.add_typer(hook_app)
-
-
-@hook_app.command("pre-tool-use")
-def hook_pre_tool_use(
-    db: str = typer.Option("", "--db", help="Path to audit.sqlite (default: ~/.nerdvana/audit.sqlite)"),
-) -> None:
-    """Handle a pre-tool-use hook: read JSON from stdin, write response to stdout."""
-    from nerdvana_cli.server.hook_bridge import run_hook
-
-    db_path = Path(db) if db else None
-    raise typer.Exit(run_hook("pre-tool-use", db_path=db_path))
-
-
-@hook_app.command("post-tool-use")
-def hook_post_tool_use(
-    db: str = typer.Option("", "--db", help="Path to audit.sqlite (default: ~/.nerdvana/audit.sqlite)"),
-) -> None:
-    """Handle a post-tool-use hook: read JSON from stdin, write response to stdout."""
-    from nerdvana_cli.server.hook_bridge import run_hook
-
-    db_path = Path(db) if db else None
-    raise typer.Exit(run_hook("post-tool-use", db_path=db_path))
-
-
-@hook_app.command("prompt-submit")
-def hook_prompt_submit(
-    db: str = typer.Option("", "--db", help="Path to audit.sqlite (default: ~/.nerdvana/audit.sqlite)"),
-) -> None:
-    """Handle a prompt-submit hook: read JSON from stdin, write response to stdout."""
-    from nerdvana_cli.server.hook_bridge import run_hook
-
-    db_path = Path(db) if db else None
-    raise typer.Exit(run_hook("prompt-submit", db_path=db_path))
-
-
-@hook_app.command("list")
-def hook_list() -> None:
-    """List supported hook types."""
-    from nerdvana_cli.server.hook_schemas import HOOK_NAMES
-
-    console.print("[bold]Supported hooks:[/bold]")
-    for name in sorted(HOOK_NAMES):
-        console.print(f"  {name}")
-
-
-# ---------------------------------------------------------------------------
-# nerdvana admin — ACL sub-group — Phase G1
-# ---------------------------------------------------------------------------
-
-admin_app = typer.Typer(
-    name    = "admin",
-    help    = "Administrative commands.",
-    add_completion = False,
-)
-app.add_typer(admin_app)
-
-acl_app = typer.Typer(
-    name    = "acl",
-    help    = "Manage MCP access-control list (mcp_acl.yml).",
-    add_completion = False,
-)
-admin_app.add_typer(acl_app)
-
-
-@acl_app.command("list")
-def acl_list() -> None:
-    """List all clients and their roles."""
-    from nerdvana_cli.server.acl import ACLManager
-
-    mgr = ACLManager()
-    mgr.load()
-
-    console.print("[bold]Clients:[/bold]")
-    for name, roles in sorted(mgr.list_clients().items()):
-        console.print(f"  {name}: {', '.join(roles) or '(none)'}")
-
-    console.print()
-    console.print("[bold]Roles:[/bold]")
-    for role, tools in sorted(mgr.list_roles().items()):
-        console.print(f"  {role}: {', '.join(tools)}")
-
-
-@acl_app.command("revoke")
-def acl_revoke(
-    key_prefix: str = typer.Argument(..., help="Client name prefix to revoke"),
-) -> None:
-    """Revoke ACL entries for clients whose name starts with KEY_PREFIX."""
-    from nerdvana_cli.server.acl import ACLManager
-
-    mgr     = ACLManager()
-    mgr.load()
-    removed = mgr.revoke(key_prefix)
-
-    if removed:
-        for name in removed:
-            console.print(f"Revoked: {name}")
-    else:
-        console.print(f"No clients found with prefix '{key_prefix}'.")
-
-
-@acl_app.command("add")
-def acl_add(
-    client_name: str = typer.Argument(..., help="Client name"),
-    roles:       str = typer.Argument(..., help="Comma-separated roles (e.g. 'read-only,edit')"),
-) -> None:
-    """Add or update a client's role assignments."""
-    from nerdvana_cli.server.acl import ACLManager
-
-    role_list = [r.strip() for r in roles.split(",") if r.strip()]
-    mgr       = ACLManager()
-    mgr.load()
-    mgr.add_client(client_name, role_list)
-    console.print(f"Updated '{client_name}' → {role_list}")
 
 
 if __name__ == "__main__":
