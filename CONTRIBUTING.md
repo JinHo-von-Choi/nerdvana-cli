@@ -51,7 +51,9 @@ uv run pytest -m lsp_integration
 ```
 
 **Live smoke tests** — requires provider API keys set as environment variables.
-See [docs/security.md](docs/security.md) for the secrets policy before running:
+See [docs/security.md](docs/security.md) for the secrets policy and
+[docs/testing-live.md](docs/testing-live.md) for the full provider matrix,
+single-provider run recipes, and cost-aware execution guidance:
 
 ```bash
 uv run pytest -m live

@@ -60,3 +60,6 @@ docs/superpowers/
 .nerdvana/
 .github/logs/
 retrospectives/
+
+# LSP benchmark fixtures fetched on demand (see scripts/fetch_lsp_bench_fixtures.sh)
+tests/lsp/fixtures-medium/
