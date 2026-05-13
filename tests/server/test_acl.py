@@ -12,12 +12,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from nerdvana_cli.server.acl import ACLManager
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -125,3 +122,29 @@ def test_allowed_tools_union(full_acl):
     # but not write-memory or admin
     assert "WriteMemory" not in tools
     assert "DeleteMemory" not in tools
+
+
+def test_effective_roles_public_api(full_acl):
+    """effective_roles() public method returns the same list as _effective_roles()."""
+    # Known client with explicit role assignment
+    assert full_acl.effective_roles("cursor-dev") == ["read-only", "edit"]
+    # Unknown client falls back to read-only default
+    assert full_acl.effective_roles("nobody") == ["read-only"]
+    # superuser has all four roles
+    roles = full_acl.effective_roles("superuser")
+    assert set(roles) == {"read-only", "edit", "write-memory", "admin"}
+
+
+def test_effective_roles_triggers_load(tmp_path):
+    """effective_roles() loads config on first call (lazy load)."""
+    content = (
+        "clients:\n"
+        "  special-bot:\n"
+        "    roles: [read-only, edit]\n"
+    )
+    path = tmp_path / "mcp_acl.yml"
+    path.write_text(content, encoding="utf-8")
+    mgr = ACLManager(acl_path=path)
+    # Do NOT call load() explicitly — effective_roles() must trigger it.
+    roles = mgr.effective_roles("special-bot")
+    assert "edit" in roles

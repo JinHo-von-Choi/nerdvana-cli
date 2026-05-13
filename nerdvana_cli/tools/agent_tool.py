@@ -150,21 +150,21 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 content     = f"Agent started in background. Task ID: {task_id}",
             )
 
-        output = await self._run_and_record(config, task, abort)
-        return ToolResult(tool_use_id="", content=output)
+        output, total_tokens = await self._run_and_record(config, task, abort)
+        return ToolResult(tool_use_id="", content=output, tokens=total_tokens)
 
     async def _run_and_record(
         self,
         config: SubagentConfig,
         task:   TaskState,
         abort:  asyncio.Event,
-    ) -> str:
+    ) -> tuple[str, int]:
         try:
-            output      = await run_subagent(config, abort)
+            output, total_tokens = await run_subagent(config, abort)
             task.status = TaskStatus.COMPLETED
             task.output = output
-            return output
+            return output, total_tokens
         except Exception as exc:
             task.status = TaskStatus.FAILED
             task.error  = str(exc)
-            return f"[agent error] {exc}"
+            return f"[agent error] {exc}", 0

@@ -12,7 +12,6 @@ from __future__ import annotations
 from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.auth import AuthManager
-from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
 
 __all__ = [
     "ACLManager",
@@ -20,3 +19,10 @@ __all__ = [
     "AuthManager",
     "NerdvanaMcpServer",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name == "NerdvanaMcpServer":
+        from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
+        return NerdvanaMcpServer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
