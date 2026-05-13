@@ -16,11 +16,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Fireworks AI provider: OpenAI-compatible API via `https://api.fireworks.ai/inference/v1`. Default model: `accounts/fireworks/models/llama-v3p3-70b-instruct`. API key: `FIREWORKS_API_KEY`.
 - Cerebras provider: OpenAI-compatible API via `https://api.cerebras.ai/v1`. Default model: `llama-3.3-70b`. API key: `CEREBRAS_API_KEY`. Catalog: llama-3.3-70b, llama-3.1-8b, llama-4-scout-17b-16e-instruct, qwen-3-32b, qwen-3-235b-a22b-instruct-2507.
 - `/update parism` slash sub-command refreshes the bundled `@nerdvana/parism` MCP package to its latest npm release through the npx cache.
+- Startup update-check notice: `core/updater.py` adds `cached_or_check` (24 h TTL on-disk cache), `format_update_notice`, and `is_update_check_enabled`. Opt-out via `session.update_check: false` in `nerdvana.yml`, `--no-update-check` CLI flag, or `NERDVANA_NO_UPDATE_CHECK` env var.
+- `nerdvana_cli/server/quota.py`: `QuotaPolicy`, `QuotaDecision`, `QuotaStore` (sliding-window in-memory), `QuotaPolicyResolver` (tenant > role > default hierarchy), `QuotaExceeded` exception. Wired into `NerdvanaMcpServer._dispatch` between ACL check and tool execution. `_QuotaErrorMiddleware` returns HTTP 429 with `Retry-After` header (subject to FastMCP version constraints; see `docs/mcp-quota.md`).
+- `ACLManager.effective_roles()` public wrapper.
+- `ToolResult.tokens` field for downstream token accounting; populated by `tools/agent_tool.py`.
+- New CI gates in `.github/workflows/quality-gate.yml`: import-graph zero-new-cycle invariant (baseline in `.import_cycles_baseline.json`) and `pricing.yml` snapshot TTL check (default 90 days, override via `NERDVANA_PRICING_TTL_DAYS`).
+- `scripts/bench_lsp.py`: cold-open, diagnostics, goto-definition, and find-references measurement harness.
+- `scripts/bench_lsp_diff.py`: markdown delta table generator with warn/fail regression thresholds.
+- `scripts/fetch_lsp_bench_fixtures.sh`: pinned-SHA medium-tier fixture downloader.
+- `tests/test_bench_lsp_diff.py`: no-regression, warn, and fail scenario coverage for the diff tool.
+- `docs/testing-live.md`: per-provider env-var matrix and cost-aware single-provider run recipes.
+- `docs/mcp-quota.md`: `mcp_quota.yml` config schema and known FastMCP 1.27 exception-handling limitation.
+- `docs/benchmarks/lsp-baseline-2026-05-13.md`: methodology, fixture tiers, and regression policy.
+- `docs/adr/0004-lsp-cache-strategy.md`: LRU vs JSONL-TTL vs SQLite trade-off analysis; decision deferred pending medium-tier baseline.
 
 ### Changed
 
 - Provider count updated from 15 to 21.
 - Parism subprocess spawn now pins `@nerdvana/parism@latest` so the bundled MCP package follows the latest npm release.
+- `nerdvana_cli/ui/app.py` reduced from ~1088 to ~615 lines. Widget classes (ActivityIndicator, ChatMessage, CommandMenu, ModelSelector, MultilineAwareInput, ProviderSelector, StatusBar, StreamingOutput, ToolStatusLine) moved to `nerdvana_cli/ui/widgets/`. Streaming response loop extracted to `ui/response_runner.py`. Slash-command routing extracted to `ui/command_dispatcher.py`.
+- `nerdvana_cli/core/agent_loop.py`: `_loop` decomposed into `_maybe_compact_messages`, `_handle_max_tokens_stop`, `_handle_end_turn_stop`, and `_handle_tool_use_stop`. Provider classes now imported under `TYPE_CHECKING` only, so the CLI starts without optional provider extras installed.
+- `nerdvana_cli/core/subagent.py`: `run_subagent` now returns `(text, total_tokens)` instead of `text` alone.
+- `nerdvana_cli/main.py`: `nerdvana hook` and `nerdvana admin` subcommands extracted to `commands/hook_command.py` and `commands/admin_command.py`. Sub-Typer registration consolidated at module top.
+- `nerdvana_cli/providers/base.py`: per-provider capabilities, base URLs, default models, and env-var names now loaded from `nerdvana_cli/providers/variants.yml`. Public dict names (`PROVIDER_CAPABILITIES`, `DEFAULT_BASE_URLS`, `DEFAULT_MODELS`, `PROVIDER_KEY_ENVVARS`) preserved for backwards compatibility.
+- `nerdvana_cli/server/__init__.py`: `NerdvanaMcpServer` exposed via PEP 562 `__getattr__` so `nerdvana hook` and `nerdvana admin acl` work without the `[mcp]` extras installed.
+- `nerdvana_cli/server/mcp_server.py`: `_execute_tool` split into `_call_tool_raw` (returns `ToolResult`) and a string-wrapper `_execute_tool`.
+- `pyproject.toml` and `NIRNA.md`: provider count updated to 21.
+
+### Removed
+
+- Git-tracked entries for `CLAUDE.md` and `docs/plans/2026-04-18-post-release-audit-plan.md`. Both files remain on disk; `.gitignore` now excludes them from future commits.
 
 ## [1.2.0] - 2026-04-29
 
