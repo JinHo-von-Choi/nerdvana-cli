@@ -42,6 +42,7 @@ class SessionConfig(BaseModel):
     default_context: str = "standalone"
     default_mode:    str = "interactive"
     show_activity:   bool = True
+    update_check:    bool = True  # startup new-version check (cached, 24h TTL)
 
 
 class ParismConfig(BaseModel):

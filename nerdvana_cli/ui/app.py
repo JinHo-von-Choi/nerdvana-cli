@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import time
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +13,6 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.events import Paste
-from textual.reactive import reactive
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
 
@@ -31,319 +28,21 @@ from nerdvana_cli.ui.editor_pane import EditorPane, language_for_path
 from nerdvana_cli.ui.project_tree import ProjectTreePane
 from nerdvana_cli.ui.sidebar import Sidebar
 from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
+from nerdvana_cli.ui.widgets import (
+    SLASH_COMMANDS,
+    ActivityIndicator,
+    ChatMessage,
+    CommandMenu,
+    ModelSelector,
+    MultilineAwareInput,
+    ProviderSelector,
+    StatusBar,
+    StreamingOutput,
+    ToolStatusLine,
+)
 from nerdvana_cli.utils.path import safe_open_fd, validate_path
 
 _MAX_EDITOR_FILE_BYTES = 1_000_000
-
-
-class MultilineAwareInput(Input):
-    """Input widget that collapses multi-line paste into a compact summary.
-
-    The original text is preserved in `_pending_multiline` and used when
-    the user submits the form.
-    """
-
-    _pending_multiline: str | None = None
-    _setting_summary:   bool       = False
-
-    def _on_paste(self, event: Paste) -> None:
-        # Normalize line endings — terminals may send \r\n or bare \r
-        text = event.text.replace('\r\n', '\n').replace('\r', '\n')
-
-        if '\n' not in text:
-            self._pending_multiline = None
-            return  # let Textual's Input._on_paste handle single-line
-
-        lines = [ln for ln in text.splitlines() if ln.strip()]
-        if not lines:
-            return
-
-        self._pending_multiline = text
-        summary = f"[{len(lines)} lines · {len(text)} chars]"
-
-        def _apply_summary() -> None:
-            self._setting_summary = True
-            try:
-                self.value           = summary
-                self.cursor_position = len(summary)
-            finally:
-                self._setting_summary = False
-
-        # Schedule after the current event cycle so any parent-handler
-        # inserts are already done and we can safely overwrite.
-        self.call_after_refresh(_apply_summary)
-
-
-SLASH_COMMANDS = [
-    ("/help", "Show help"),
-    ("/clear", "Clear chat"),
-    ("/init", "Generate NIRNA.md"),
-    ("/model", "Show/change model"),
-    ("/models", "List available models"),
-    ("/provider", "Add/switch provider"),
-    ("/mode", "Activate/deactivate mode profile"),
-    ("/context", "Set context profile"),
-    ("/mcp", "MCP server status"),
-    ("/tokens", "Show token usage"),
-    ("/skills", "List available skills"),
-    ("/tools", "List tools"),
-    ("/update", "Check and install updates"),
-    ("/memories", "List project memories"),
-    ("/undo", "Restore pre-edit git checkpoint"),
-    ("/redo", "Re-apply last undone checkpoint"),
-    ("/checkpoints", "List session checkpoints"),
-    ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
-    ("/dashboard", "Toggle observability dashboard"),
-    ("/health", "Show 7-day tool call health summary"),
-    ("/thinking", "Toggle inline thinking display (on/off)"),
-    ("/activity", "Toggle activity indicator (on/off)"),
-    ("/quit", "Exit"),
-]
-
-
-class CommandMenu(OptionList):
-    """Popup menu for slash commands."""
-
-    DEFAULT_CSS = """
-    CommandMenu {
-        layer: overlay;
-        dock: bottom;
-        height: auto;
-        max-height: 10;
-        margin: 0 0 3 0;
-        border: tall $accent;
-        background: $surface;
-        display: none;
-    }
-    CommandMenu.visible {
-        display: block;
-    }
-    """
-
-    def on_mount(self) -> None:
-        for cmd, desc in SLASH_COMMANDS:
-            self.add_option(Option(f"{cmd}  {desc}", id=cmd))
-
-
-class ProviderSelector(OptionList):
-    """Popup selector for provider switching via /provider."""
-
-    DEFAULT_CSS = """
-    ProviderSelector {
-        layer: overlay;
-        dock: bottom;
-        height: auto;
-        max-height: 15;
-        margin: 0 0 3 0;
-        border: tall $accent;
-        background: $surface;
-        display: none;
-    }
-    ProviderSelector.visible {
-        display: block;
-    }
-    """
-
-
-class ModelSelector(OptionList):
-    """Popup selector for model switching via /models."""
-
-    DEFAULT_CSS = """
-    ModelSelector {
-        layer: overlay;
-        dock: bottom;
-        height: auto;
-        max-height: 15;
-        margin: 0 0 3 0;
-        border: tall $accent;
-        background: $surface;
-        display: none;
-    }
-    ModelSelector.visible {
-        display: block;
-    }
-    """
-
-
-class ChatMessage(Static):
-    """Clickable chat message block. Click to copy content."""
-
-    DEFAULT_CSS = """
-    ChatMessage {
-        padding: 0 1;
-        width: 100%;
-    }
-    ChatMessage:hover {
-        background: #1e293b;
-    }
-    ChatMessage.-copied {
-        background: #064e3b;
-    }
-    """
-
-    def __init__(self, content: str, raw_text: str = "", **kwargs: Any) -> None:
-        super().__init__(content, **kwargs)
-        self._raw_text = raw_text or self._strip_markup(content)
-
-    @staticmethod
-    def _strip_markup(text: str) -> str:
-        """Remove Rich markup tags for clipboard content."""
-        import re
-        return re.sub(r'\[/?[^\]]+\]', '', text)
-
-    def on_click(self) -> None:
-        from nerdvana_cli.ui.clipboard import copy_to_clipboard
-        success = copy_to_clipboard(self._raw_text)
-        if success:
-            self.add_class("-copied")
-            self.set_timer(1.0, lambda: self.remove_class("-copied"))
-            self.app.notify("Copied!", timeout=1)
-
-
-class StreamingOutput(Static):
-    """In-place updating widget for streaming LLM output."""
-
-    DEFAULT_CSS = """
-    StreamingOutput {
-        height: auto;
-        max-height: 50%;
-        padding: 0 1;
-        display: none;
-    }
-    StreamingOutput.active {
-        display: block;
-    }
-    """
-
-    _thinking: str = ""
-    _content:  str = ""
-
-    def update_thinking(self, text: str) -> None:
-        """Replace the current thinking preview."""
-        self._thinking = text
-        self._refresh_display()
-
-    def update_content(self, text: str) -> None:
-        """Replace the current streamed content."""
-        self._content = text
-        self._refresh_display()
-
-    def reset(self) -> None:
-        """Clear both thinking and content buffers."""
-        self._thinking = ""
-        self._content  = ""
-        self.update("")
-
-    def _refresh_display(self) -> None:
-        parts: list[str] = []
-        if self._thinking:
-            parts.append(
-                f"[dim italic][thinking]\n{self._thinking}\n[/thinking][/dim italic]"
-            )
-        if self._content:
-            parts.append(self._content)
-        self.update("\n\n".join(parts))
-
-
-class ActivityIndicator(Static):
-    """Single-line indicator showing the current AgentLoop activity phase."""
-
-    DEFAULT_CSS = """
-    ActivityIndicator {
-        height: 1;
-        width: 100%;
-        padding: 0 1;
-        background: $surface;
-        color: $text-muted;
-    }
-    ActivityIndicator.-thinking { color: $warning; }
-    ActivityIndicator.-tool     { color: $accent;  }
-    ActivityIndicator.-stream   { color: $success; }
-    ActivityIndicator.-waiting  { color: $warning; }
-    ActivityIndicator.-idle     { color: $text-muted; }
-    """
-
-    state: reactive[ActivityState] = reactive(ActivityState)
-
-    _ICONS: dict[str, str] = {
-        "idle":         "●",
-        "thinking":     "◐",
-        "waiting_api":  "◔",
-        "streaming":    "◑",
-        "tool_running": "◉",
-    }
-    _CLASS_MAP: dict[str, str] = {
-        "idle":         "-idle",
-        "thinking":     "-thinking",
-        "waiting_api":  "-waiting",
-        "streaming":    "-stream",
-        "tool_running": "-tool",
-    }
-
-    def watch_state(self, new_state: ActivityState) -> None:
-        for css in self._CLASS_MAP.values():
-            self.remove_class(css)
-        self.add_class(self._CLASS_MAP.get(new_state.phase, "-idle"))
-        self._refresh_label(new_state)
-
-    def _refresh_label(self, state: ActivityState) -> None:
-        icon    = self._ICONS.get(state.phase, "●")
-        elapsed = ""
-        if state.started_at is not None:
-            secs = int(time.time() - state.started_at)
-            if secs >= 1:
-                elapsed = f" [{secs}s]"
-        detail = f": {state.detail}" if state.detail else ""
-        self.update(f"{icon} {state.label}{detail}{elapsed}")
-
-
-class ToolStatusLine(Static):
-    """Single-line tool execution status, overwrites in place."""
-
-    DEFAULT_CSS = """
-    ToolStatusLine {
-        height: 1;
-        padding: 0 1;
-        color: $text-muted;
-        display: none;
-    }
-    ToolStatusLine.active {
-        display: block;
-    }
-    """
-
-
-class StatusBar(Static):
-    """Bottom status bar showing model, tokens, session info."""
-
-    def update_status(
-        self,
-        model: str    = "",
-        provider: str = "",
-        tokens_in: int  = 0,
-        tokens_out: int = 0,
-        tools: int = 0,
-        parism: bool = False,
-        thinking: bool = False,
-        elapsed_s: float = 0.0,
-    ) -> None:
-        parts: list[str] = []
-        if thinking:
-            elapsed_str = f"{elapsed_s:.1f}s" if elapsed_s < 60 else f"{elapsed_s / 60:.1f}m"
-            token_str = ""
-            if tokens_in or tokens_out:
-                token_str = f" | {tokens_in + tokens_out} tokens"
-            parts.append(f"thinking ({elapsed_str}{token_str})")
-        if provider and model:
-            parts.append(f"{provider}/{model}")
-        if not thinking and (tokens_in or tokens_out):
-            parts.append(f"tokens: {tokens_in} in / {tokens_out} out")
-        if tools:
-            tool_text = f"tools: {tools}"
-            if parism:
-                tool_text += " (Parism)"
-            parts.append(tool_text)
-        self.update(" | ".join(parts) if parts else "Ready")
 
 
 class NerdvanaApp(App[object]):
@@ -582,15 +281,24 @@ class NerdvanaApp(App[object]):
 
     async def _check_update(self) -> None:
         from nerdvana_cli import __version__
-        from nerdvana_cli.core.updater import check_for_update
+        from nerdvana_cli.core.updater import (
+            cached_or_check,
+            format_update_notice,
+            is_update_check_enabled,
+        )
 
-        result = await check_for_update(__version__)
-        if result:
+        try:
+            flag = bool(self.settings.session.update_check)
+        except Exception:
+            flag = True
+        if not is_update_check_enabled(flag):
+            return
+
+        result = await cached_or_check(__version__)
+        if result and result.get("version"):
             with contextlib.suppress(Exception):
                 self._add_chat_message(
-                    f"[bold yellow]Update available: {result['version']}[/bold yellow] "
-                    f"[dim](current: v{__version__})[/dim]\n"
-                    f"[dim]Run /update to install[/dim]"
+                    format_update_notice(__version__, result["version"], result.get("url", ""))
                 )
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -634,132 +342,13 @@ class NerdvanaApp(App[object]):
 
     @work(exclusive=True)
     async def _generate_response(self, prompt: str) -> None:
-        """Run agent loop and stream response to chat."""
-        import time
+        """Run agent loop and stream response to chat.
 
-        self._is_generating = True
-        streaming   = self.query_one("#streaming-output", StreamingOutput)
-        tool_status = self.query_one("#tool-status", ToolStatusLine)
-        status_bar  = self.query_one("#status-bar", StatusBar)
-
-        streaming.add_class("active")
-        streaming.update("")
-
-        start_time = time.monotonic()
-        timer_running = True
-
-        async def _update_thinking_timer() -> None:
-            """Periodically update status bar with elapsed time."""
-            while timer_running:
-                elapsed = time.monotonic() - start_time
-                usage = self._agent_loop.state.usage if self._agent_loop else None
-                status_bar.update_status(
-                    model=self.settings.model.model,
-                    provider=self.settings.model.provider,
-                    tokens_in=usage.input_tokens if usage else 0,
-                    tokens_out=usage.output_tokens if usage else 0,
-                    tools=len(self._agent_loop.registry.all_tools()) if self._agent_loop else 0,
-                    parism=self.parism_client is not None,
-                    thinking=True,
-                    elapsed_s=elapsed,
-                )
-                await asyncio.sleep(0.5)
-
-        timer_task = asyncio.create_task(_update_thinking_timer())
-
-        try:
-            accumulated = ""
-            chat_frame  = self.query_one("#chat-frame", VerticalScroll)
-
-            from nerdvana_cli.core.agent_loop import (
-                COMPACT_STATUS_PREFIX,
-                CONTEXT_USAGE_PREFIX,
-                TOOL_DONE_PREFIX,
-                TOOL_STATUS_PREFIX,
-            )
-
-            assert self._agent_loop is not None
-
-            # Wire thinking-chunk callback to streaming widget
-            def _on_thinking_chunk(text: str) -> None:
-                streaming.update_thinking(text)
-
-            self._agent_loop._on_thinking_chunk = _on_thinking_chunk
-
-            async for chunk in self._agent_loop.run(prompt):
-                if chunk.startswith(CONTEXT_USAGE_PREFIX):
-                    pct = int(chunk[len(CONTEXT_USAGE_PREFIX):])
-                    self._update_context_usage(pct)
-                    continue
-
-                elif chunk.startswith(TOOL_STATUS_PREFIX):
-                    tool_info = chunk[len(TOOL_STATUS_PREFIX):].replace("[", "\\[")
-                    tool_status.update(Text.from_markup(f"  [cyan]\u27f3 {tool_info}[/cyan]"))
-                    tool_status.add_class("active")
-                    chat_frame.scroll_end(animate=False)
-
-                elif chunk.startswith(TOOL_DONE_PREFIX):
-                    tool_info = chunk[len(TOOL_DONE_PREFIX):]
-                    safe_info = tool_info.replace("[", "\\[")
-                    if "[error]" in tool_info:
-                        tool_status.update(Text.from_markup(f"  [red]\u2717 {safe_info}[/red]"))
-                    else:
-                        tool_status.update(Text.from_markup(f"  [green]\u2713 {safe_info}[/green]"))
-
-                elif chunk.startswith(COMPACT_STATUS_PREFIX):
-                    compact_info = chunk[len(COMPACT_STATUS_PREFIX):]
-                    if "done" in compact_info or "fallback" in compact_info:
-                        with contextlib.suppress(Exception):
-                            self.query_one(ToolStatusLine).remove_class("active")
-                    else:
-                        with contextlib.suppress(Exception):
-                            tool_status = self.query_one(ToolStatusLine)
-                            tool_status.update("[dim yellow]compressing context...[/dim yellow]")
-                            tool_status.add_class("active")
-
-                else:
-                    tool_status.remove_class("active")
-                    accumulated += chunk
-                    streaming.update_content(accumulated)
-                    chat_frame.scroll_end(animate=False)
-
-            # Stop timer
-            timer_running = False
-            timer_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await timer_task
-
-            tool_status.remove_class("active")
-            streaming.remove_class("active")
-            streaming.reset()
-            thinking_buf = getattr(self._agent_loop, "last_thinking", "")
-            if accumulated.strip():
-                self._add_chat_message(accumulated, raw_text=accumulated, thinking=thinking_buf)
-
-            # Final status with total elapsed
-            elapsed = time.monotonic() - start_time
-            usage = self._agent_loop.state.usage
-            self._add_chat_message(
-                f"[dim]({elapsed:.1f}s | {usage.input_tokens} in / {usage.output_tokens} out)[/dim]"
-            )
-
-            status_bar.update_status(
-                model=self.settings.model.model,
-                provider=self.settings.model.provider,
-                tokens_in=usage.input_tokens,
-                tokens_out=usage.output_tokens,
-                tools=len(self._agent_loop.registry.all_tools()),
-                parism=self.parism_client is not None,
-            )
-        except Exception as e:
-            timer_running = False
-            timer_task.cancel()
-            tool_status.remove_class("active")
-            streaming.remove_class("active")
-            streaming.update("")
-            self._add_chat_message(f"\n[bold red]Error: {e}[/bold red]")
-        finally:
-            self._is_generating = False
+        Delegates the heavy lifting to ``ui.response_runner`` so the App class
+        stays focused on widget composition and event wiring.
+        """
+        from nerdvana_cli.ui.response_runner import run_response_stream
+        await run_response_stream(self, prompt)
 
     async def _handle_api_key_input(self, api_key: str) -> None:
         """Handle API key input for /provider flow."""
@@ -837,71 +426,9 @@ class NerdvanaApp(App[object]):
         ))
 
     async def _handle_command(self, cmd: str) -> None:
-        """Handle slash commands via dispatching to command modules."""
-        from nerdvana_cli.commands import (
-            memory_commands,
-            model_commands,
-            observability_commands,
-            profile_commands,
-            session_commands,
-            system_commands,
-        )
-
-        parts = cmd.split(maxsplit=1)
-        command = parts[0].lower()
-        args = parts[1] if len(parts) > 1 else ""
-
-        handlers = {
-            "/model":           model_commands.handle_model,
-            "/models":          model_commands.handle_models,
-            "/provider":        model_commands.handle_provider,
-            "/clear":           session_commands.handle_clear,
-            "/tokens":          session_commands.handle_tokens,
-            "/tools":           session_commands.handle_tools,
-            "/mcp":             session_commands.handle_mcp,
-            "/skills":          session_commands.handle_skills,
-            "/help":            system_commands.handle_help,
-            "/update":          system_commands.handle_update,
-            "/init":            system_commands.handle_init,
-            "/setup":           system_commands.handle_init,
-            "/undo":            memory_commands.handle_undo,
-            "/redo":            memory_commands.handle_redo,
-            "/checkpoints":     memory_commands.handle_checkpoints,
-            "/memories":        memory_commands.handle_memories,
-            "/route-knowledge": memory_commands.handle_route_knowledge,
-            "/mode":            profile_commands.handle_mode,
-            "/context":         profile_commands.handle_context,
-            "/health":          observability_commands.handle_health,
-            "/dashboard":       observability_commands.handle_dashboard,
-            "/thinking":        system_commands.handle_thinking,
-            "/activity":        system_commands.handle_activity,
-        }
-
-        if command in ("/quit", "/exit", "/q"):
-            self.exit()
-            return
-
-        handler = handlers.get(command)
-        if handler:
-            await handler(self, args)
-            return
-
-        # Skill trigger fallback
-        if self._agent_loop:
-            skill = self._agent_loop.skill_loader.get_by_trigger(command)
-            if skill:
-                self._agent_loop.activate_skill(skill.body)
-                self._add_chat_message(
-                    f"[dim]Skill activated: {skill.name}[/dim]",
-                    raw_text=f"Skill activated: {skill.name}",
-                )
-                if args:
-                    input_widget = self.query_one("#user-input", Input)
-                    input_widget.value = args
-                    self.call_later(input_widget.action_submit)
-                return
-
-        self._add_chat_message(f"[red]Unknown command: {command}[/red]")
+        """Handle slash commands by delegating to ``ui.command_dispatcher``."""
+        from nerdvana_cli.ui.command_dispatcher import dispatch_command
+        await dispatch_command(self, cmd)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Show/hide command menu based on input."""

@@ -27,11 +27,13 @@ class SubagentConfig:
     max_turns: int = 50
 
 
-async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> str:
-    """Run an isolated AgentLoop and return captured text output.
+async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
+    """Run an isolated AgentLoop and return (output_text, total_tokens).
 
     Protocol markers (tool status, context usage, compaction) are stripped
-    so the parent receives only model-generated text.
+    so the parent receives only model-generated text.  ``total_tokens`` is
+    the sum of input + output tokens recorded by the AgentLoop's usage tracker;
+    it is 0 when no LLM calls were made (e.g. abort before first turn).
     """
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
@@ -41,11 +43,12 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> str:
 
     async for chunk in loop.run(config.prompt):
         if abort.is_set():
-            return "".join(parts) + "\n[aborted]"
+            return "".join(parts) + "\n[aborted]", 0
         if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
             parts.append(chunk)
 
-    return "".join(parts)
+    total_tokens = loop.state.usage.input_tokens + loop.state.usage.output_tokens
+    return "".join(parts), total_tokens
 
 def create_shared_context(
     messages: list[dict[str, str]],
