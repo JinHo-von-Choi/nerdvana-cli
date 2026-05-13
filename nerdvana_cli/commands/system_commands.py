@@ -14,10 +14,11 @@ if TYPE_CHECKING:
 async def handle_help(app: NerdvanaApp, args: str) -> None:
     """Handle /help command — display available commands.
 
-    Command list is derived from SLASH_COMMANDS in ``nerdvana_cli.ui.app``
-    (single source of truth).  Extra aliases and key bindings are appended.
+    Command list is derived from SLASH_COMMANDS in
+    ``nerdvana_cli.ui.widgets.command_menu`` (single source of truth).
+    Extra aliases and key bindings are appended.
     """
-    from nerdvana_cli.ui.app import SLASH_COMMANDS
+    from nerdvana_cli.ui.widgets.command_menu import SLASH_COMMANDS
 
     lines = ["[bold]Commands[/bold]"]
     for cmd, desc in SLASH_COMMANDS:

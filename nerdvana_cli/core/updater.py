@@ -19,15 +19,17 @@ Update path hardening (T-user-data-preservation, 2026-04-18):
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import os
 import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from nerdvana_cli.core.paths import install_root, user_data_home
+from nerdvana_cli.core.paths import install_root, user_cache_dir, user_data_home
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,109 @@ async def check_for_update(current_version: str) -> dict[str, str] | None:
     except Exception:
         pass
     return None
+
+
+# ---------------------------------------------------------------------------
+# Cached check + compact formatter (startup notice path)
+# ---------------------------------------------------------------------------
+
+_UPDATE_CACHE_FILENAME = "update_check.json"
+_DEFAULT_CACHE_TTL_HOURS = 24
+
+
+def _update_cache_path() -> Path:
+    return user_cache_dir() / _UPDATE_CACHE_FILENAME
+
+
+def read_update_cache() -> dict[str, str] | None:
+    """Return cached `{checked_at, latest, url}` dict or None on miss/corruption."""
+    path = _update_cache_path()
+    try:
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        if "checked_at" not in data or "latest" not in data:
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def write_update_cache(latest: str, url: str) -> None:
+    """Persist last successful check. Silent on I/O failure."""
+    path = _update_cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "checked_at": datetime.now(UTC).isoformat(),
+            "latest":     latest,
+            "url":        url,
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _cache_is_fresh(entry: dict[str, str], ttl_hours: int) -> bool:
+    try:
+        checked = datetime.fromisoformat(entry["checked_at"])
+        if checked.tzinfo is None:
+            checked = checked.replace(tzinfo=UTC)
+        return datetime.now(UTC) - checked < timedelta(hours=ttl_hours)
+    except Exception:
+        return False
+
+
+async def cached_or_check(
+    current_version: str,
+    ttl_hours: int = _DEFAULT_CACHE_TTL_HOURS,
+) -> dict[str, str] | None:
+    """Return update info using a TTL cache.
+
+    Cache hit: avoids network entirely (~ms). Cache miss or stale: calls the
+    GitHub API and refreshes the cache. Returns None when current_version is
+    already the latest, or on any failure.
+    """
+    entry = read_update_cache()
+    if entry and _cache_is_fresh(entry, ttl_hours):
+        latest = entry.get("latest", "")
+        if latest and compare_versions(current_version, latest) < 0:
+            return {"version": latest, "url": entry.get("url", "")}
+        return None
+
+    result = await check_for_update(current_version)
+    if result:
+        write_update_cache(result["version"], result["url"])
+        return result
+    # No update available — still record a fresh check timestamp so the
+    # next startup skips the network call within the TTL window.
+    write_update_cache(current_version, "")
+    return None
+
+
+def is_update_check_enabled(settings_flag: bool = True) -> bool:
+    """Resolve enable/disable precedence: env > settings.
+
+    The CLI flag is expressed via env var by main.py before this is read.
+    """
+    env_raw = os.environ.get("NERDVANA_NO_UPDATE_CHECK", "").strip().lower()
+    if env_raw in ("1", "true", "yes", "on"):
+        return False
+    return bool(settings_flag)
+
+
+def format_update_notice(current: str, latest: str, url: str = "") -> str:
+    """One-line dim-styled Rich markup for the startup update prompt."""
+    current_disp = current if current.startswith("v") else f"v{current}"
+    latest_disp  = latest if latest.startswith("v") else f"v{latest}"
+    tail = f" — {url}" if url else ""
+    return (
+        f"[dim]↑ Update available: {latest_disp} "
+        f"(current {current_disp}). Run [/dim][cyan]/update[/cyan]"
+        f"[dim]{tail}[/dim]"
+    )
 
 
 # ---------------------------------------------------------------------------

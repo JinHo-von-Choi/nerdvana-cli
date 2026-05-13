@@ -12,7 +12,7 @@ import logging
 import math
 import re
 from collections.abc import AsyncGenerator, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -24,12 +24,19 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
-from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider
-from nerdvana_cli.providers.gemini_provider import GeminiProvider
-from nerdvana_cli.providers.openai_provider import OpenAIProvider
 from nerdvana_cli.types import Message, Role, SessionState
+
+if TYPE_CHECKING:
+    # Provider classes are optional-extras imports. They are only needed for
+    # type hints and the factory; runtime instantiation goes through
+    # `create_provider`, which performs lazy imports inside its body. Keeping
+    # these imports under TYPE_CHECKING lets the CLI boot in a minimal
+    # install where no provider SDK is present.
+    from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
+    from nerdvana_cli.providers.gemini_provider import GeminiProvider
+    from nerdvana_cli.providers.openai_provider import OpenAIProvider
 
 console = Console()
 logger  = logging.getLogger(__name__)
@@ -274,6 +281,119 @@ class AgentLoop:
         except Exception as exc:  # noqa: BLE001
             return f"[plan agent error] {exc}"
 
+    async def _maybe_compact_messages(self, cur_toks: int, thr: int) -> AsyncGenerator[str, None]:
+        """Compress message history when the token threshold is exceeded.
+
+        Yields ``COMPACT_STATUS_PREFIX`` status strings the UI consumes; mutates
+        ``self.state.messages`` in place. Falls back to naive truncation when
+        AI compaction returns None or the circuit breaker is open.
+        """
+        before = len(self.state.messages)
+        if not self._compaction_state.is_circuit_open:
+            yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."
+            summary = await ai_compact(
+                self.state.messages, self.provider, self._compaction_state, prompt=self._compact_prompt
+            )
+            if summary is not None:
+                recent = self.state.messages[-4:]
+                while recent and recent[0].role == Role.TOOL:
+                    recent = recent[1:]
+                self.state.messages = [summary] + recent
+                self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
+                yield f"{COMPACT_STATUS_PREFIX}done"
+                return
+        self.state.messages = compact_messages(self.state.messages, thr)
+        self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
+
+    def _handle_max_tokens_stop(self) -> bool:
+        """Run AFTER_API_CALL hooks with stop_reason='max_tokens'.
+
+        Returns True if a hook injected recovery messages (caller should
+        continue the loop); False if no recovery is available (caller should
+        terminate).
+        """
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        ctx = HookContext(
+            event       = HookEvent.AFTER_API_CALL,
+            settings    = self.settings,
+            tools       = self.registry.all_tools(),
+            messages    = self.state.messages,
+            stop_reason = "max_tokens",
+            extra       = {"agent_loop": self},
+        )
+        recovered = False
+        for hr in self.hooks.fire(ctx):
+            for msg in hr.inject_messages:
+                self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
+                recovered = True
+        return recovered
+
+    def _handle_end_turn_stop(self, asst_text: str, thinking_buffer: str) -> bool:
+        """Finalize the assistant turn and run AFTER_API_CALL hooks.
+
+        Persists the assistant message, fires hooks. Returns True if a hook
+        injected continuation messages (caller should keep looping); False if
+        the turn is complete and the caller should stop.
+        """
+        self.last_thinking = thinking_buffer
+        if asst_text:
+            self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
+            self.session.record_assistant_message(asst_text)
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        ctx = HookContext(
+            event       = HookEvent.AFTER_API_CALL,
+            settings    = self.settings,
+            tools       = self.registry.all_tools(),
+            messages    = self.state.messages,
+            stop_reason = "end_turn",
+            extra       = {"agent_loop": self, "asst_text": asst_text},
+        )
+        injected = False
+        for hr in self.hooks.fire(ctx):
+            for msg in hr.inject_messages:
+                self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
+                injected = True
+        return injected
+
+    async def _handle_tool_use_stop(
+        self,
+        asst_text:  str,
+        tool_uses:  list[dict[str, Any]],
+        tool_ctx:   ToolContext,
+    ) -> AsyncGenerator[str, None]:
+        """Execute the requested tool calls and append results to history.
+
+        Yields ``TOOL_STATUS_PREFIX`` / ``TOOL_DONE_PREFIX`` markers that the UI
+        consumes; mutates ``self.state.messages`` and records each tool result
+        in the session log.
+        """
+        if asst_text:
+            self.session.record_assistant_message(asst_text, tool_uses)
+        for tu in tool_uses:
+            yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
+        results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
+        for i, tr in enumerate(results):
+            tname = tool_uses[i]['name'] if i < len(tool_uses) else 'unknown'
+            yield f"{TOOL_DONE_PREFIX}{tname} [{'error' if tr.is_error else 'done'}]"
+        self.state.messages.append(Message(
+            role      = Role.ASSISTANT,
+            content   = asst_text if asst_text else "[tool execution]",
+            tool_uses = tool_uses,
+        ))
+        for tr in results:
+            self.state.messages.append(Message(
+                role        = Role.TOOL,
+                content     = tr.content,
+                tool_use_id = tr.tool_use_id,
+                is_error    = tr.is_error,
+            ))
+            self.session.record_tool_result(
+                tool_name   = tr.tool_use_id.split(":")[0] if ":" in tr.tool_use_id else "unknown",
+                tool_use_id = tr.tool_use_id,
+                content     = tr.content,
+                is_error    = tr.is_error,
+            )
+
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
         tool_ctx   = ToolContext(cwd=self.settings.cwd, task_registry=self._task_registry, team_registry=self._team_registry)
         state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
@@ -291,23 +411,8 @@ class AgentLoop:
                 state    = state.evolve(token_budget_used=cur_toks)
 
                 if cur_toks > thr:
-                    before = len(self.state.messages)
-                    if not self._compaction_state.is_circuit_open:
-                        yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."
-                        summary = await ai_compact(self.state.messages, self.provider, self._compaction_state, prompt=self._compact_prompt)
-                        if summary is not None:
-                            recent = self.state.messages[-4:]
-                            while recent and recent[0].role == Role.TOOL:
-                                recent = recent[1:]
-                            self.state.messages = [summary] + recent
-                            self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
-                            yield f"{COMPACT_STATUS_PREFIX}done"
-                        else:
-                            self.state.messages = compact_messages(self.state.messages, thr)
-                            self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
-                    else:
-                        self.state.messages = compact_messages(self.state.messages, thr)
-                        self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
+                    async for status in self._maybe_compact_messages(cur_toks, thr):
+                        yield status
 
                 yield f"{CONTEXT_USAGE_PREFIX}{min(100, int(cur_toks / max_ctx * 100)) if max_ctx > 0 else 0}"
                 if self.settings.verbose:
@@ -343,57 +448,18 @@ class AgentLoop:
                         elif ev.type == "done":
                             stop = ev.stop_reason
                             if stop == "max_tokens":
-                                from nerdvana_cli.core.hooks import HookContext, HookEvent
-                                ctx = HookContext(event=HookEvent.AFTER_API_CALL, settings=self.settings,
-                                                  tools=self.registry.all_tools(), messages=self.state.messages,
-                                                  stop_reason="max_tokens", extra={"agent_loop": self})
-                                recovered = False
-                                for hr in self.hooks.fire(ctx):
-                                    for msg in hr.inject_messages:
-                                        self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
-                                        recovered = True
-                                if not recovered:
+                                if not self._handle_max_tokens_stop():
                                     yield "\n\n[bold red]Max tokens reached.[/bold red]"
                                     return
                                 break
                             elif stop == "end_turn":
-                                self.last_thinking = thinking_buffer
-                                if asst_text:
-                                    self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
-                                    self.session.record_assistant_message(asst_text)
-                                from nerdvana_cli.core.hooks import HookContext, HookEvent
-                                _et_ctx = HookContext(
-                                    event       = HookEvent.AFTER_API_CALL,
-                                    settings    = self.settings,
-                                    tools       = self.registry.all_tools(),
-                                    messages    = self.state.messages,
-                                    stop_reason = "end_turn",
-                                    extra       = {"agent_loop": self, "asst_text": asst_text},
-                                )
-                                _et_injected = False
-                                for _et_hr in self.hooks.fire(_et_ctx):
-                                    for _et_msg in _et_hr.inject_messages:
-                                        self.state.messages.append(Message(role=Role.USER, content=_et_msg["content"]))
-                                        _et_injected = True
-                                if not _et_injected:
-                                    self._set_activity(phase="idle", label="Ready")
-                                    return
-                                break
+                                if self._handle_end_turn_stop(asst_text, thinking_buffer):
+                                    break
+                                self._set_activity(phase="idle", label="Ready")
+                                return
                             elif stop == "tool_use" and tool_uses:
-                                if asst_text:
-                                    self.session.record_assistant_message(asst_text, tool_uses)
-                                for tu in tool_uses:
-                                    yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
-                                results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
-                                for i, tr in enumerate(results):
-                                    yield f"{TOOL_DONE_PREFIX}{tool_uses[i]['name'] if i < len(tool_uses) else 'unknown'} [{'error' if tr.is_error else 'done'}]"
-                                self.state.messages.append(Message(role=Role.ASSISTANT,
-                                    content=asst_text if asst_text else "[tool execution]", tool_uses=tool_uses))
-                                for tr in results:
-                                    self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
-                                    self.session.record_tool_result(
-                                        tool_name=tr.tool_use_id.split(":")[0] if ":" in tr.tool_use_id else "unknown",
-                                        tool_use_id=tr.tool_use_id, content=tr.content, is_error=tr.is_error)
+                                async for status in self._handle_tool_use_stop(asst_text, tool_uses, tool_ctx):
+                                    yield status
                             else:
                                 logger.warning("Unhandled stop_reason: %s", stop)
                                 if asst_text:
