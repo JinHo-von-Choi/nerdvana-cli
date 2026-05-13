@@ -107,6 +107,21 @@ A pre-commit secret scanner such as `detect-secrets` is recommended to catch acc
 
 ---
 
+## Access Control
+
+Two CLI subcommands provide access control and audit surfaces:
+
+- `nerdvana admin acl ...` — manages per-tenant allow/deny rules for MCP tool exposure.
+- `nerdvana hook` — registers and lists lifecycle hooks that fire around agent interactions.
+
+Both subcommands are available on a minimal install (no `[mcp]` extras required). The audit log and ACL enforcement paths remain functional regardless of which optional dependency groups are installed.
+
+Per-tenant quota limits form an additional access-control surface alongside ACL rules and the audit log. Quota configuration is separate from authentication and applies after ACL evaluation. See [docs/mcp-quota.md](mcp-quota.md) for configuration details.
+
+---
+
 ## Live Smoke and Environment Isolation
 
 Tests under `tests/live/` read provider keys exclusively from environment variables and never from committed files. When GitHub Actions runs the live smoke suite, it should target an environment named `live-smoke` so that the key exposure is gated by environment protection rules, not repository-level access alone.
+
+For the per-provider environment variable names and the recommendation against globally exporting `*_API_KEY` variables in shell profiles, see [docs/testing-live.md](testing-live.md).

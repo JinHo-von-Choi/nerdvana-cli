@@ -27,12 +27,14 @@
 - **Multi-Provider Support** — works with 21 AI platforms from one CLI
 - **Interactive REPL** — conversational coding with streaming output and a live TaskPanel for background agents
 - **Non-interactive mode** — single prompt execution for scripting
+- **Startup update notice** — on every invocation, a dim one-line notice is printed when a newer GitHub release is available (cached 24 h). Disable via `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, or `session.update_check: false` in `nerdvana.yml`.
 - **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
 - **Phase B — Multi-Agent Swarm** — first-class `Agent`, `Swarm`, `TeamCreate`, `SendMessage`, `TaskGet`, and `TaskStop` tools with concurrent execution budgets and a TaskPanel UI
 - **Phase C — Self-Recovery Hooks** — built-in lifecycle hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) that auto-resume max-token stops, repair JSON tool errors, and chase down TODO/FIXME/NotImplemented markers; optional planning gate, fallback models, and extended thinking
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TeamCreate, SendMessage, TaskGet, TaskStop, plus four LSP tools
 - **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`)
+- **MCP server per-tenant quota** — `nerdvana serve` supports rpm / rph / daily_tokens / max_concurrent limits per client, configured via `mcp_quota.yml`. See [`docs/mcp-quota.md`](docs/mcp-quota.md).
 - **Session Persistence** — JSONL transcripts for resume
 - **Auto Provider Detection** — picks the right provider from model name
 - **Configurable** — YAML config, environment variables, CLI flags, fallback models, and complexity-triggered planning gate
@@ -136,6 +138,8 @@ nerdvana providers
 | `nerdvana hook prompt-submit` | Handle a prompt-submit hook event |
 | `nerdvana hook list` | List all supported hook event types |
 
+`nerdvana hook list` works without the `[mcp]` extras installed — the server package is loaded lazily. See [`docs/hooks.md`](docs/hooks.md) for the full event reference.
+
 ### ACL management (`nerdvana admin acl ...`)
 
 | Subcommand | Purpose |
@@ -143,6 +147,8 @@ nerdvana providers
 | `nerdvana admin acl list` | List all clients and their assigned roles |
 | `nerdvana admin acl add <client> <roles>` | Add or update a client's role assignments |
 | `nerdvana admin acl revoke <prefix>` | Revoke ACL entries for clients whose name matches a prefix |
+
+`nerdvana admin acl` commands work without the `[mcp]` extras installed.
 
 ## Directory Layout
 
@@ -371,6 +377,7 @@ session:
   compact_threshold: 0.8
   compact_max_failures: 3    # circuit breaker for consecutive compact failures
   planning_gate: false       # auto-run a Plan agent when a request looks complex
+  update_check: true         # set to false to suppress the startup update notice
 ```
 
 Config search order:
@@ -406,6 +413,18 @@ ruff check nerdvana_cli/
 # Type check
 mypy nerdvana_cli/
 ```
+
+## Documentation
+
+| Document | Description |
+|-|-|
+| [docs/configuration.md](docs/configuration.md) | Full config reference |
+| [docs/hooks.md](docs/hooks.md) | Hook event system and bridge protocol |
+| [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
+| [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
+| [docs/testing-live.md](docs/testing-live.md) | Live provider test matrix and secrets setup |
+| [docs/adr/0004-lsp-cache-strategy.md](docs/adr/0004-lsp-cache-strategy.md) | ADR: LSP result cache strategy |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
 ## Changelog
 

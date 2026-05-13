@@ -18,6 +18,7 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `NERDVANA_MODEL` | Model name override |
 | `NERDVANA_MAX_TOKENS` | Max tokens per response |
 | `NERDVANA_CONFIG` | Path to YAML config file |
+| `NERDVANA_NO_UPDATE_CHECK` | Set to `1` to disable the startup version check (same effect as `--no-update-check`) |
 | `ANTHROPIC_API_KEY` | Anthropic Claude |
 | `OPENAI_API_KEY` | OpenAI (also used by vLLM and Ollama as fallback) |
 | `GEMINI_API_KEY` | Google Gemini |
@@ -84,6 +85,7 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `default_context` | str | `"standalone"` | Default runtime context profile name |
 | `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
 | `show_activity` | bool | `true` | Show the live ActivityIndicator widget between the chat log and the input row. Toggled via `/activity on|off`. |
+| `update_check` | bool | `true` | Check GitHub Releases for a newer version on every CLI invocation. The result is cached for 24 hours at `~/.nerdvana/cache/update_check.json`. A one-line notice is printed when a newer version is available. Override priority (highest to lowest): `--no-update-check` flag > `NERDVANA_NO_UPDATE_CHECK=1` env > this setting. |
 
 ### `parism` (ParismConfig)
 
@@ -103,6 +105,31 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `after_tool` | list[str] | `[]` | |
 
 Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) are auto-registered in `AgentLoop.__init__` and are not listed here.
+
+### MCP server quota
+
+Optional. When `~/.nerdvana/mcp_quota.yml` is absent, no quota enforcement is applied and existing behaviour is preserved. The file path can be overridden by passing a custom `quota_resolver=` to `NerdvanaMcpServer`.
+
+Minimal example:
+
+```yaml
+default:
+  rpm: 60
+  rph: 0          # 0 = unlimited
+  daily_tokens: 0
+  max_concurrent: 4
+
+tenants:
+  free_tier:
+    rpm: 10
+    daily_tokens: 100000
+
+roles:
+  admin:
+    rpm: 0
+```
+
+Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per minute), `rph` (requests per hour), `daily_tokens`, `max_concurrent`. A value of `0` means unlimited. See [docs/mcp-quota.md](mcp-quota.md) for the full schema reference.
 
 ### `checkpoint` (CheckpointConfig)
 
@@ -204,6 +231,7 @@ session:
   default_context: standalone
   default_mode: interactive
   show_activity: true
+  update_check: true
 
 parism:
   enabled: true
