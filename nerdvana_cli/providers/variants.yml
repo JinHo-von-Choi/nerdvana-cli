@@ -1,0 +1,244 @@
+# Provider variant metadata.
+#
+# Single source of truth for per-provider metadata that ``providers/base.py``
+# exposes as PROVIDER_CAPABILITIES, DEFAULT_BASE_URLS, DEFAULT_MODELS, and
+# PROVIDER_KEY_ENVVARS. Adding a new provider only requires:
+#
+#   1. Append a new ProviderName enum value in base.py.
+#   2. Add a new entry below with the same key.
+#   3. Wire the provider class in providers/factory.py:_PROVIDER_CLASSES.
+#
+# Each entry MUST include: base_url, default_model, env_vars (non-empty),
+# capabilities (supports_tools, supports_streaming, supports_vision,
+# supports_thinking, max_context). Missing fields fail loudly at import.
+
+anthropic:
+  base_url:      "https://api.anthropic.com"
+  default_model: "claude-sonnet-4-20250514"
+  env_vars:      ["ANTHROPIC_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  true
+    max_context:        200000
+
+openai:
+  base_url:      "https://api.openai.com/v1"
+  default_model: "gpt-4.1"
+  env_vars:      ["OPENAI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  false
+    max_context:        1048576
+
+gemini:
+  base_url:      "https://generativelanguage.googleapis.com"
+  default_model: "gemini-2.5-flash"
+  env_vars:      ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  true
+    max_context:        1048576
+
+groq:
+  base_url:      "https://api.groq.com/openai/v1"
+  default_model: "llama-3.3-70b-versatile"
+  env_vars:      ["GROQ_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        32768
+
+openrouter:
+  base_url:      "https://openrouter.ai/api/v1"
+  default_model: "anthropic/claude-sonnet-4"
+  env_vars:      ["OPENROUTER_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  false
+    max_context:        200000
+
+xai:
+  base_url:      "https://api.x.ai/v1"
+  default_model: "grok-3"
+  env_vars:      ["XAI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        131072
+
+ollama:
+  base_url:      "http://localhost:11434/v1"
+  default_model: "qwen3"
+  env_vars:      ["OLLAMA_API_KEY", "OPENAI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  false
+    max_context:        131072
+
+vllm:
+  base_url:      "http://localhost:8000/v1"
+  default_model: "Qwen/Qwen3-32B"
+  env_vars:      ["VLLM_API_KEY", "OPENAI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        131072
+
+deepseek:
+  base_url:      "https://api.deepseek.com"
+  default_model: "deepseek-chat"
+  env_vars:      ["DEEPSEEK_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  true
+    max_context:        65536
+
+mistral:
+  base_url:      "https://api.mistral.ai/v1"
+  default_model: "mistral-medium-latest"
+  env_vars:      ["MISTRAL_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  false
+    max_context:        128000
+
+cohere:
+  base_url:      "https://api.cohere.com/v2"
+  default_model: "command-r-plus"
+  env_vars:      ["CO_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        128000
+
+together:
+  base_url:      "https://api.together.xyz/v1"
+  default_model: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+  env_vars:      ["TOGETHER_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        131072
+
+zai:
+  base_url:      "https://api.z.ai/api/coding/paas/v4/"
+  default_model: "glm-4.7"
+  env_vars:      ["ZHIPUAI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        128000
+
+featherless:
+  base_url:      "https://api.featherless.ai/v1"
+  default_model: "featherless-llama-3-70b"
+  env_vars:      ["FEATHERLESS_API_KEY"]
+  capabilities:
+    supports_tools:     false
+    supports_streaming: false
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        32768
+
+xiaomi_mimo:
+  base_url:      "https://token-plan-sgp.xiaomimimo.com/v1"
+  default_model: "mimo-v2.5-pro"
+  env_vars:      ["MIMO_API_KEY", "XIAOMI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  true
+    max_context:        1048576
+
+moonshot:
+  base_url:      "https://api.moonshot.ai/v1"
+  default_model: "kimi-k2-instruct"
+  env_vars:      ["MOONSHOT_API_KEY", "KIMI_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        131072
+
+dashscope:
+  base_url:      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+  default_model: "qwen3-coder-plus"
+  env_vars:      ["DASHSCOPE_API_KEY", "ALIBABA_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  true
+    max_context:        1000000
+
+minimax:
+  base_url:      "https://api.minimaxi.chat/v1"
+  default_model: "MiniMax-M2"
+  env_vars:      ["MINIMAX_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    true
+    supports_thinking:  false
+    max_context:        1000000
+
+perplexity:
+  base_url:      "https://api.perplexity.ai"
+  default_model: "sonar-pro"
+  env_vars:      ["PERPLEXITY_API_KEY", "PPLX_API_KEY"]
+  capabilities:
+    supports_tools:     false
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        200000
+
+fireworks:
+  base_url:      "https://api.fireworks.ai/inference/v1"
+  default_model: "accounts/fireworks/models/llama-v3p3-70b-instruct"
+  env_vars:      ["FIREWORKS_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        131072
+
+cerebras:
+  base_url:      "https://api.cerebras.ai/v1"
+  default_model: "llama-3.3-70b"
+  env_vars:      ["CEREBRAS_API_KEY"]
+  capabilities:
+    supports_tools:     true
+    supports_streaming: true
+    supports_vision:    false
+    supports_thinking:  false
+    max_context:        65536
