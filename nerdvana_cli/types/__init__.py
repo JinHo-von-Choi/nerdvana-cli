@@ -48,6 +48,7 @@ class ToolResult:
     tool_use_id: str
     content: str
     is_error: bool = False
+    tokens:   int  = 0  # input+output tokens consumed by this tool call (0 = unknown)
 
 
 @dataclass

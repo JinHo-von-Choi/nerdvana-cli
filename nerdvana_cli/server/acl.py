@@ -166,10 +166,19 @@ class ACLManager:
             reason  = f"tool '{tool_name}' not in any of roles {roles} for '{client_identity}'",
         )
 
-    def _effective_roles(self, client_identity: str) -> list[str]:
-        """Return effective roles for *client_identity*.
+    def effective_roles(self, client_identity: str) -> list[str]:
+        """Return effective roles for *client_identity* (public API).
 
         Unknown clients receive [``read-only``] (v3.1 §3.1).
+        """
+        self._ensure_loaded()
+        return self._effective_roles(client_identity)
+
+    def _effective_roles(self, client_identity: str) -> list[str]:
+        """Internal implementation — callers within this module use this directly.
+
+        Delegates to the loaded ``_client_roles`` mapping with a default of
+        ``[read-only]`` for unknown identities (v3.1 §3.1).
         """
         # Exact match
         if client_identity in self._client_roles:

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging as _logging
 import sys
 import time
 from pathlib import Path
@@ -34,6 +35,7 @@ from nerdvana_cli.core.tool import BaseTool, ToolContext
 from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.auth import AuthManager, AuthResult
+from nerdvana_cli.server.quota import QuotaExceeded, QuotaPolicyResolver, QuotaStore
 
 # ---------------------------------------------------------------------------
 # Per-request auth context — propagated from HTTP middleware to dispatch
@@ -83,6 +85,58 @@ class _BearerAuthMiddleware(BaseHTTPMiddleware):
         finally:
             _request_auth.reset(token)
         return response
+
+
+_quota_log = _logging.getLogger("nerdvana.quota")
+
+
+class _QuotaErrorMiddleware(BaseHTTPMiddleware):
+    """Convert ``QuotaExceeded`` exceptions into HTTP 429 responses.
+
+    Known limitation (mcp==1.27.0): the MCP lowlevel server wraps all tool
+    exceptions inside ``call_tool`` (``server.py`` line ~583:
+    ``except Exception as e: return self._make_error_result(str(e))``).
+    ``QuotaExceeded`` is therefore serialised as ``isError:true`` in a 200 MCP
+    response body before it can reach this ASGI middleware layer.
+    HTTP clients receive a 200 with ``isError:true`` instead of a 429.
+
+    Operators can detect this scenario by searching logs for the structured
+    entry ``event=quota_exceeded_swallowed_by_fastmcp``.
+
+    The ``_dispatch`` method raises ``QuotaExceeded`` before calling FastMCP's
+    tool execution path when the quota check fires.  FastMCP's tool handler
+    wrapper catches it there and emits the structured warning below.
+    See ``docs/mcp-quota.md`` — "Known limitation" section.
+
+    If a future ``mcp`` release exposes ``raise_exceptions=True`` in the
+    Streamable-HTTP path, this middleware will intercept correctly without
+    any code changes.
+    """
+
+    async def dispatch(self, request: Request, call_next: Any) -> Any:
+        from starlette.responses import JSONResponse
+
+        try:
+            return await call_next(request)
+        except QuotaExceeded as exc:
+            # Reached only when mcp stops swallowing tool exceptions.
+            _quota_log.warning(
+                "quota_exceeded",
+                extra={
+                    "event":       "quota_exceeded",
+                    "limit":       exc.limit_name,
+                    "retry_after": exc.retry_after_seconds,
+                },
+            )
+            return JSONResponse(
+                {
+                    "error":                "quota_exceeded",
+                    "limit":                exc.limit_name,
+                    "retry_after_seconds":  exc.retry_after_seconds,
+                },
+                status_code = 429,
+                headers     = {"Retry-After": str(exc.retry_after_seconds)},
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -144,18 +198,20 @@ class NerdvanaMcpServer:
     def __init__(
         self,
         *,
-        allow_write:   bool              = False,
-        transport:     str               = "stdio",
-        host:          str               = "127.0.0.1",
-        port:          int               = 10830,
-        tls_cert:      Path | None       = None,
-        tls_ca:        Path | None       = None,
-        auth_manager:  AuthManager | None  = None,
-        acl_manager:   ACLManager  | None  = None,
-        audit_logger:  AuditLogger | None  = None,
+        allow_write:      bool                     = False,
+        transport:        str                      = "stdio",
+        host:             str                      = "127.0.0.1",
+        port:             int                      = 10830,
+        tls_cert:         Path | None              = None,
+        tls_ca:           Path | None              = None,
+        auth_manager:     AuthManager | None       = None,
+        acl_manager:      ACLManager  | None       = None,
+        audit_logger:     AuditLogger | None       = None,
+        quota_resolver:   QuotaPolicyResolver | None = None,
+        quota_store:      QuotaStore | None        = None,
         # Phase H extensions — external project subprocess support
-        project_path:  Path | None       = None,
-        mode:          str  | None       = None,
+        project_path:     Path | None              = None,
+        mode:             str  | None              = None,
     ) -> None:
         self.allow_write   = allow_write
         self.transport     = transport
@@ -167,9 +223,12 @@ class NerdvanaMcpServer:
         self.project_path  = project_path
         self.mode          = mode
 
-        self._auth:  AuthManager  = auth_manager  or AuthManager()
-        self._acl:   ACLManager   = acl_manager   or ACLManager()
-        self._audit: AuditLogger  = audit_logger  or AuditLogger()
+        self._auth:           AuthManager          = auth_manager   or AuthManager()
+        self._acl:            ACLManager           = acl_manager    or ACLManager()
+        self._audit:          AuditLogger          = audit_logger   or AuditLogger()
+        # Quota: empty resolver → unconstrained policy → no enforcement until configured.
+        self._quota_resolver: QuotaPolicyResolver  = quota_resolver or QuotaPolicyResolver()
+        self._quota_store:    QuotaStore           = quota_store    or QuotaStore()
 
         self._fmcp: FastMCP = FastMCP(
             name  = "nerdvana",
@@ -462,8 +521,8 @@ class NerdvanaMcpServer:
         start_ms = int(time.monotonic() * 1000)
         try:
             # ACL check
-            decision = self._acl.check(client_identity, tool_name)
-            if not decision.allowed:
+            acl_decision = self._acl.check(client_identity, tool_name)
+            if not acl_decision.allowed:
                 self._audit.record(
                     client_identity = client_identity,
                     transport       = self.transport,
@@ -472,10 +531,54 @@ class NerdvanaMcpServer:
                     decision        = "denied",
                     duration_ms     = int(time.monotonic() * 1000) - start_ms,
                 )
-                raise PermissionError(f"ACL denied: {decision.reason}")
+                raise PermissionError(f"ACL denied: {acl_decision.reason}")
 
-            # Execute
-            result = await self._execute_tool(tool_name, args)
+            # Quota check — resolve policy then evaluate.
+            # ACLManager.effective_roles() provides the public roles API used here.
+            quota_policy   = self._quota_resolver.resolve(client_identity, roles=self._acl.effective_roles(client_identity))
+            quota_decision = self._quota_store.check(client_identity, quota_policy)
+            if not quota_decision.allowed:
+                self._audit.record(
+                    client_identity = client_identity,
+                    transport       = self.transport,
+                    tool_name       = tool_name,
+                    args            = args,
+                    decision        = "denied",
+                    duration_ms     = int(time.monotonic() * 1000) - start_ms,
+                    error_class     = f"quota_denied:{quota_decision.limit_name}",
+                )
+                # Structured warning so operators can detect swallowed-exception
+                # scenarios (mcp==1.27.0 converts this to isError:true/200 over HTTP).
+                # grep logs for event=quota_exceeded_swallowed_by_fastmcp.
+                if self.transport == "http":
+                    _quota_log.warning(
+                        "quota_exceeded_swallowed_by_fastmcp",
+                        extra={
+                            "event":       "quota_exceeded_swallowed_by_fastmcp",
+                            "tenant":      client_identity,
+                            "tool":        tool_name,
+                            "limit":       quota_decision.limit_name,
+                            "retry_after": quota_decision.retry_after_seconds,
+                            "note":        "mcp==1.27.0 serialises QuotaExceeded as isError:true/HTTP-200; "
+                                           "see docs/mcp-quota.md#known-limitation",
+                        },
+                    )
+                raise QuotaExceeded(
+                    reason               = quota_decision.reason,
+                    retry_after_seconds  = quota_decision.retry_after_seconds,
+                    limit_name           = quota_decision.limit_name,
+                )
+
+            # Execute — release the quota slot in the finally block.
+            # _call_tool_raw returns a ToolResult so tokens can be extracted
+            # before conversion to str.  On error raw_result stays None and
+            # we release with tokens=0.
+            raw_result: Any = None
+            try:
+                raw_result = await self._call_tool_raw(tool_name, args)
+            finally:
+                tokens_used = getattr(raw_result, "tokens", 0) if raw_result is not None else 0
+                self._quota_store.release(client_identity, tokens=tokens_used)
 
             self._audit.record(
                 client_identity = client_identity,
@@ -485,9 +588,9 @@ class NerdvanaMcpServer:
                 decision        = "allowed",
                 duration_ms     = int(time.monotonic() * 1000) - start_ms,
             )
-            return str(result)
+            return str(raw_result.content)
 
-        except PermissionError:
+        except (PermissionError, QuotaExceeded):
             raise
         except Exception as exc:
             self._audit.record(
@@ -501,22 +604,23 @@ class NerdvanaMcpServer:
             )
             raise
 
-    async def _execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
-        """Execute the named nerdvana tool via ToolRegistry lookup.
+    async def _call_tool_raw(self, tool_name: str, args: dict[str, Any]) -> Any:
+        """Execute the named tool and return the raw ``ToolResult`` (with tokens).
 
-        Looks up the tool in the pre-built ``_tool_map``, validates and parses
-        ``args`` via ``BaseTool.parse_args``, then delegates to
-        ``BaseTool.call``.  The raw ``ToolResult.content`` string is returned.
+        Internal method used by ``_dispatch`` so it can read ``ToolResult.tokens``
+        before converting the result to ``str``.  All validation logic lives here;
+        ``_execute_tool`` delegates to this and converts to ``str`` for callers
+        that expect a plain string (tests, legacy call sites).
 
         Raises
         ------
         KeyError
-            When *tool_name* is not present in the tool map (no LSP, or
-            write tool requested while allow_write=False already checked by
-            ``_check_write_confirm``).
+            When *tool_name* is not present in the tool map.
         ValueError
-            When argument validation fails (``BaseTool.validate_input``).
+            When argument validation fails.
         """
+        from nerdvana_cli.types import ToolResult as _ToolResult
+
         tool = self._tool_map.get(tool_name)
         if tool is None:
             available = sorted(self._tool_map)
@@ -535,10 +639,33 @@ class NerdvanaMcpServer:
         result = await tool.call(parsed, ctx, can_use_tool=None)
 
         if result.is_error:
-            # Surface tool errors as structured error payloads rather than
-            # opaque strings so that MCP clients can detect failure.
-            return json.dumps({"error": result.content})
-        return result.content
+            # Wrap JSON error payload in a ToolResult so tokens is accessible.
+            return _ToolResult(
+                tool_use_id = result.tool_use_id,
+                content     = json.dumps({"error": result.content}),
+                is_error    = True,
+                tokens      = getattr(result, "tokens", 0),
+            )
+        return result
+
+    async def _execute_tool(self, tool_name: str, args: dict[str, Any]) -> str:
+        """Execute the named nerdvana tool via ToolRegistry lookup.
+
+        Looks up the tool in the pre-built ``_tool_map``, validates and parses
+        ``args`` via ``BaseTool.parse_args``, then delegates to
+        ``BaseTool.call``.  The ``ToolResult.content`` string is returned.
+
+        Raises
+        ------
+        KeyError
+            When *tool_name* is not present in the tool map (no LSP, or
+            write tool requested while allow_write=False already checked by
+            ``_check_write_confirm``).
+        ValueError
+            When argument validation fails (``BaseTool.validate_input``).
+        """
+        result = await self._call_tool_raw(tool_name, args)
+        return str(result.content)
 
     # ------------------------------------------------------------------
     # Entry points
@@ -594,7 +721,8 @@ class NerdvanaMcpServer:
         protected = Starlette(
             routes=[Mount("/", app=starlette_app)],
         )
-        # Inject the auth middleware
+        # Inject middlewares (outermost first: quota error → auth).
+        protected.add_middleware(_QuotaErrorMiddleware)
         protected.add_middleware(_BearerAuthMiddleware, auth_manager=self._auth)
         config = uvicorn.Config(
             app       = protected,
