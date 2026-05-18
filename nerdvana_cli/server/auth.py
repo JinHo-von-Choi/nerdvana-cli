@@ -2,7 +2,11 @@
 
 Three transport modes:
   - HTTP:  Authorization: Bearer <api_key>  →  sha256 hash match vs mcp_keys.yml
-  - stdio: Unix socket at /tmp/nerdvana-mcp-<uid>.sock — UID equality check
+  - stdio: process-inheritance trust — identity is the UID of the running
+           server process (the parent harness fork/exec'd us, so it shares
+           our credentials). MCP stdio uses stdin/stdout pipes; no peer
+           socket exists, so no external auth handshake is possible or
+           needed.
   - mTLS:  peer certificate CN used as client_identity
 
 YAML schema for ~/.nerdvana/mcp_keys.yml:
@@ -13,6 +17,7 @@ YAML schema for ~/.nerdvana/mcp_keys.yml:
 
 작성자: 최진호
 작성일: 2026-04-18
+수정일: 2026-05-18
 """
 
 from __future__ import annotations
@@ -20,7 +25,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
-import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -154,48 +158,21 @@ class AuthManager:
     # ------------------------------------------------------------------
 
     def authenticate_stdio(self, socket_path: Path | None = None) -> AuthResult:
-        """Verify that the Unix socket is owned by the current user.
+        """Authenticate the local stdio caller via process-inheritance trust.
+
+        MCP stdio transport is a stdin/stdout pipe between the parent harness
+        and this server process. The OS guarantees the child inherits the
+        parent's UID via execve, so the running UID *is* the authenticated
+        identity. There is no peer socket to inspect.
 
         Parameters
         ----------
         socket_path:
-            Override the default socket path for testing.  When *None* the
-            canonical path ``/tmp/nerdvana-mcp-<uid>.sock`` is used.
-
-        Returns
-        -------
-        AuthResult — authenticated when socket file mode is 0600 and the
-        owning UID matches ``os.getuid()``.
+            Accepted for backward compatibility with prior socket-based
+            implementation. Ignored.
         """
-        uid  = os.getuid()
-        path = socket_path or Path(
-            os.environ.get("XDG_RUNTIME_DIR", "/tmp")
-        ) / f"nerdvana-mcp-{uid}.sock"
-
-        if not path.exists():
-            return AuthResult(
-                authenticated   = False,
-                client_identity = "",
-                reason          = "socket_not_found",
-            )
-
-        st   = path.stat()
-        mode = stat.S_IMODE(st.st_mode)
-
-        if st.st_uid != uid:
-            return AuthResult(
-                authenticated   = False,
-                client_identity = "",
-                reason          = "uid_mismatch",
-            )
-
-        if mode != 0o600:
-            return AuthResult(
-                authenticated   = False,
-                client_identity = "",
-                reason          = "insecure_socket_permissions",
-            )
-
+        del socket_path  # unused, retained for signature compatibility
+        uid = os.getuid()
         return AuthResult(
             authenticated   = True,
             client_identity = f"local-uid-{uid}",
