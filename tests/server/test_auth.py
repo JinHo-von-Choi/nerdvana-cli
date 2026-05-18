@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import os
-import stat
 from pathlib import Path
 
 import pytest
@@ -85,36 +84,23 @@ def test_bearer_key_with_sha256_prefix(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# stdio / Unix socket tests
+# stdio (process-inheritance) tests
 # ---------------------------------------------------------------------------
 
 
-def test_stdio_socket_not_found(tmp_path, auth):
-    """Missing socket file must return authenticated=False."""
-    result = auth.authenticate_stdio(socket_path=tmp_path / "nonexistent.sock")
-    assert not result.authenticated
-    assert result.reason == "socket_not_found"
-
-
-def test_stdio_socket_correct_permissions(tmp_path, auth):
-    """Socket with 0600 permissions and matching UID must authenticate."""
-    sock = tmp_path / "test.sock"
-    sock.touch()
-    os.chmod(sock, 0o600)
-    # Ownership is current user by default after touch — UID matches.
-    result = auth.authenticate_stdio(socket_path=sock)
+def test_stdio_authenticates_running_uid(auth):
+    """stdio auth returns the running process UID as identity."""
+    result = auth.authenticate_stdio()
     assert result.authenticated
-    assert str(os.getuid()) in result.client_identity
+    assert result.client_identity == f"local-uid-{os.getuid()}"
+    assert "read-only" in result.roles
 
 
-def test_stdio_socket_wrong_permissions(tmp_path, auth):
-    """Socket with 0644 permissions must be rejected."""
-    sock = tmp_path / "open.sock"
-    sock.touch()
-    os.chmod(sock, 0o644)
-    result = auth.authenticate_stdio(socket_path=sock)
-    assert not result.authenticated
-    assert result.reason == "insecure_socket_permissions"
+def test_stdio_ignores_socket_path_argument(tmp_path, auth):
+    """socket_path parameter is retained for compatibility but ignored."""
+    result = auth.authenticate_stdio(socket_path=tmp_path / "anything.sock")
+    assert result.authenticated
+    assert result.client_identity == f"local-uid-{os.getuid()}"
 
 
 # ---------------------------------------------------------------------------

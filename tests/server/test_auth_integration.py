@@ -16,7 +16,6 @@ Verifies that:
 from __future__ import annotations
 
 import os
-import stat
 from pathlib import Path
 
 import pytest
@@ -171,58 +170,21 @@ def test_bearer_auth_invalid_key(auth_manager_with_key) -> None:
 
 
 # ---------------------------------------------------------------------------
-# stdio transport — UID authentication
+# stdio transport — process-inheritance authentication
 # ---------------------------------------------------------------------------
 
 
-def test_stdio_verify_fails_when_socket_missing(stdio_server, tmp_path) -> None:
-    """_verify_stdio_auth must raise when the Unix socket does not exist."""
-    # authenticate_stdio checks the canonical path by default; we override via monkeypatch
-    import nerdvana_cli.server.auth as auth_mod
-    uid = os.getuid()
-    missing_sock = tmp_path / f"nerdvana-mcp-{uid}.sock"
-    # Socket does not exist → authenticate_stdio returns socket_not_found
-    result = stdio_server._auth.authenticate_stdio(socket_path=missing_sock)
-    assert result.authenticated is False
-    assert result.reason == "socket_not_found"
-
-
-def test_stdio_verify_fails_wrong_permissions(stdio_server, tmp_path) -> None:
-    """_verify_stdio_auth must fail when socket permissions are not 0600."""
-    uid       = os.getuid()
-    sock_path = tmp_path / f"nerdvana-mcp-{uid}.sock"
-    sock_path.touch()
-    os.chmod(sock_path, 0o644)  # too permissive
-    result = stdio_server._auth.authenticate_stdio(socket_path=sock_path)
-    assert result.authenticated is False
-    assert result.reason == "insecure_socket_permissions"
-
-
-def test_stdio_verify_succeeds(stdio_server, tmp_path) -> None:
-    """_verify_stdio_auth must succeed for a correctly-owned, 0600 socket."""
-    uid       = os.getuid()
-    sock_path = tmp_path / f"nerdvana-mcp-{uid}.sock"
-    sock_path.touch()
-    os.chmod(sock_path, 0o600)
-    result = stdio_server._auth.authenticate_stdio(socket_path=sock_path)
+def test_stdio_auth_returns_running_uid(stdio_server) -> None:
+    """authenticate_stdio resolves identity from the running UID."""
+    result = stdio_server._auth.authenticate_stdio()
     assert result.authenticated is True
-    assert result.client_identity == f"local-uid-{uid}"
+    assert result.client_identity == f"local-uid-{os.getuid()}"
 
 
-def test_stdio_server_verify_sets_identity(stdio_server, tmp_path) -> None:
-    """_verify_stdio_auth must set _stdio_identity on success."""
-    uid       = os.getuid()
-    sock_path = tmp_path / f"nerdvana-mcp-{uid}.sock"
-    sock_path.touch()
-    os.chmod(sock_path, 0o600)
-    # Monkeypatch _auth.authenticate_stdio to use our test socket path
-    original = stdio_server._auth.authenticate_stdio
-    stdio_server._auth.authenticate_stdio = lambda: original(socket_path=sock_path)  # type: ignore[assignment]
-    try:
-        stdio_server._verify_stdio_auth()
-    finally:
-        stdio_server._auth.authenticate_stdio = original  # type: ignore[assignment]
-    assert stdio_server._stdio_identity == f"local-uid-{uid}"
+def test_stdio_server_verify_sets_identity(stdio_server) -> None:
+    """_verify_stdio_auth must set _stdio_identity from the running UID."""
+    stdio_server._verify_stdio_auth()
+    assert stdio_server._stdio_identity == f"local-uid-{os.getuid()}"
 
 
 # ---------------------------------------------------------------------------

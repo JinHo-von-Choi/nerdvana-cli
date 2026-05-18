@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-19
+
 ### Added
 
 - Moonshot AI (Kimi) provider: OpenAI-compatible API via `https://api.moonshot.ai/v1`. Default model: `kimi-k2-instruct`. API key: `MOONSHOT_API_KEY` or `KIMI_API_KEY`.
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - `nerdvana_cli/providers/base.py`: per-provider capabilities, base URLs, default models, and env-var names now loaded from `nerdvana_cli/providers/variants.yml`. Public dict names (`PROVIDER_CAPABILITIES`, `DEFAULT_BASE_URLS`, `DEFAULT_MODELS`, `PROVIDER_KEY_ENVVARS`) preserved for backwards compatibility.
 - `nerdvana_cli/server/__init__.py`: `NerdvanaMcpServer` exposed via PEP 562 `__getattr__` so `nerdvana hook` and `nerdvana admin acl` work without the `[mcp]` extras installed.
 - `nerdvana_cli/server/mcp_server.py`: `_execute_tool` split into `_call_tool_raw` (returns `ToolResult`) and a string-wrapper `_execute_tool`.
+- `nerdvana_cli/server/auth.py`: `authenticate_stdio` resolves the client identity from the running process UID. MCP stdio transport communicates over inherited stdin/stdout pipes, so the running UID is the only meaningful identity; the prior filesystem-path probe is removed. The `socket_path` parameter is retained for signature compatibility and ignored.
 - `pyproject.toml` and `NIRNA.md`: provider count updated to 21.
 
 ### Removed
