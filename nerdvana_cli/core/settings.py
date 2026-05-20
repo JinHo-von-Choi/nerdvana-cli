@@ -79,7 +79,15 @@ class NerdvanaSettings(BaseSettings):
 
     @classmethod
     def load(cls, config_path: str | None = None) -> NerdvanaSettings:
-        settings = cls()
+        try:
+            settings = cls()
+        except Exception:
+            # env_file=".env" is resolved relative to the current working
+            # directory, so an unrelated, malformed, or unreadable .env can
+            # abort startup. Retry with dotenv loading disabled; real
+            # environment variables (NERDVANA_*) still apply and a genuine
+            # config error will re-raise here.
+            settings = cls(_env_file=None)  # type: ignore[call-arg]
 
         paths_to_check = [
             config_path,
