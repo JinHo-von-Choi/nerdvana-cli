@@ -32,3 +32,15 @@ def test_openai_gpt41_gets_1m(tmp_path):
 def test_session_config_compact_max_failures_default():
     from nerdvana_cli.core.settings import SessionConfig
     assert SessionConfig().compact_max_failures == 3
+
+
+def test_load_skips_unreadable_env(tmp_path, monkeypatch):
+    # A malformed .env in the working directory must not abort load().
+    (tmp_path / ".env").write_text("\x00\xff not a dotenv \x00 = =\n", encoding="latin-1")
+    monkeypatch.chdir(tmp_path)
+    config = {"model": {"provider": "anthropic", "model": "claude-sonnet-4-20250514", "api_key": "test"}}
+    path = tmp_path / "config.yml"
+    path.write_text(yaml.dump(config))
+    from nerdvana_cli.core.settings import NerdvanaSettings
+    s = NerdvanaSettings.load(config_path=str(path))
+    assert s.model.model == "claude-sonnet-4-20250514"
