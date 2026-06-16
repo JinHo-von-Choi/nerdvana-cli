@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- Swarm/team task output and auto-generated plan text no longer include the subagent token count alongside the response text.
+
 ## [1.3.0] - 2026-05-19
 
 ### Added
