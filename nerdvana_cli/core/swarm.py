@@ -66,7 +66,7 @@ async def run_swarm(config: SwarmConfig) -> dict[str, str]:
         )
 
         try:
-            output             = await run_subagent(sub_config, abort)
+            output, _          = await run_subagent(sub_config, abort)
             task_state.status  = TaskStatus.COMPLETED
             task_state.output  = output
             return agent_id, output

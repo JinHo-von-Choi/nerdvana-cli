@@ -277,7 +277,8 @@ class AgentLoop:
                              prompt=f"Create an implementation plan for the following task:\n\n{prompt}",
                              settings=child, registry=reg)
         try:
-            return await run_subagent(cfg, asyncio.Event())
+            output, _ = await run_subagent(cfg, asyncio.Event())
+            return output
         except Exception as exc:  # noqa: BLE001
             return f"[plan agent error] {exc}"
 

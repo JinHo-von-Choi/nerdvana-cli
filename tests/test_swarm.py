@@ -20,7 +20,7 @@ async def test_swarm_runs_all_tasks_in_parallel() -> None:
 
     async def _fake_subagent(config, abort):
         execution_order.append(config.agent_id)
-        return f"result from {config.agent_id}"
+        return f"result from {config.agent_id}", 0
 
     tasks  = [
         SwarmTask(name="worker-1", prompt="task 1"),
@@ -49,7 +49,7 @@ async def test_swarm_marks_tasks_completed() -> None:
     task_registry = TaskRegistry()
 
     async def _fake_subagent(config, abort):
-        return "done"
+        return "done", 0
 
     tasks  = [SwarmTask(name="w1", prompt="p1"), SwarmTask(name="w2", prompt="p2")]
     config = SwarmConfig(
@@ -74,7 +74,7 @@ async def test_swarm_handles_partial_failure() -> None:
     async def _failing(config, abort):
         if "worker-2" in config.agent_id:
             raise RuntimeError("worker-2 failed")
-        return "ok"
+        return "ok", 0
 
     tasks  = [SwarmTask(name="worker-1", prompt="p1"), SwarmTask(name="worker-2", prompt="p2")]
     config = SwarmConfig(
