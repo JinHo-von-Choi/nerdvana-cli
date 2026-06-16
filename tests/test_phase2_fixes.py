@@ -245,7 +245,7 @@ class TestUnknownAgentRejection:
         with patch(
             "nerdvana_cli.tools.agent_tool.run_subagent",
             new_callable=AsyncMock,
-            return_value="output",
+            return_value=("output", 100),
         ):
             result = await tool.call(
                 AgentToolArgs(prompt="explore", subagent_type="Explore"),

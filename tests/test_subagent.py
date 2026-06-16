@@ -29,7 +29,7 @@ async def test_run_subagent_returns_output() -> None:
         "nerdvana_cli.core.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
-        result = await run_subagent(config, abort)
+        result, _ = await run_subagent(config, abort)
 
     assert result == "hello world"
 
@@ -57,7 +57,7 @@ async def test_run_subagent_filters_protocol_markers() -> None:
         "nerdvana_cli.core.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
-        result = await run_subagent(config, abort)
+        result, _ = await run_subagent(config, abort)
 
     assert "\x00TOOL" not in result
     assert "output line" in result
@@ -87,6 +87,6 @@ async def test_run_subagent_respects_abort() -> None:
         "nerdvana_cli.core.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
-        result = await run_subagent(config, abort)
+        result, _ = await run_subagent(config, abort)
 
     assert "[aborted]" in result
