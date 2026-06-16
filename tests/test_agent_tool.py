@@ -35,7 +35,7 @@ async def test_agent_tool_foreground_returns_output() -> None:
     with patch(
         "nerdvana_cli.tools.agent_tool.run_subagent",
         new_callable=AsyncMock,
-        return_value="agent output",
+        return_value=("agent output", 100),
     ):
         result = await tool.call(
             AgentToolArgs(prompt="do a task"),
@@ -55,7 +55,7 @@ async def test_agent_tool_background_returns_task_id() -> None:
     ctx           = ToolContext(cwd=".", task_registry=task_registry)
 
     async def _noop(*_a, **_kw):
-        return "done"
+        return "done", 0
 
     with patch("nerdvana_cli.tools.agent_tool.run_subagent", side_effect=_noop):
         result = await tool.call(
@@ -79,7 +79,7 @@ async def test_agent_tool_marks_task_completed() -> None:
     with patch(
         "nerdvana_cli.tools.agent_tool.run_subagent",
         new_callable=AsyncMock,
-        return_value="result",
+        return_value=("result", 100),
     ):
         await tool.call(
             AgentToolArgs(prompt="task"),
