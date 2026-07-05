@@ -168,7 +168,7 @@ async def handle_activity(app: NerdvanaApp, args: str) -> None:
         app._add_chat_message(f"[yellow]Config save failed: {save_err}[/yellow]")
 
     try:
-        from nerdvana_cli.ui.app import ActivityIndicator
+        from nerdvana_cli.ui.widgets import ActivityIndicator
         widget = app.query_one("#activity-indicator", ActivityIndicator)
         widget.styles.display = "block" if new_value else "none"
     except Exception:

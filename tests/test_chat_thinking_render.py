@@ -29,7 +29,8 @@ def _get_markup(widget: object) -> str:
 
 def _make_app() -> MagicMock:
     """Return a minimal NerdvanaApp stub with the real _add_chat_message logic."""
-    from nerdvana_cli.ui.app import ChatMessage, NerdvanaApp, StreamingOutput
+    from nerdvana_cli.ui.app import NerdvanaApp
+    from nerdvana_cli.ui.widgets import ChatMessage, StreamingOutput
 
     # We test only the logic of _add_chat_message — no Textual event loop needed.
     # Patch query_one to capture mounted widgets.
