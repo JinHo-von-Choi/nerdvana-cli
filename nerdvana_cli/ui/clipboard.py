@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -14,8 +17,8 @@ def copy_to_clipboard(text: str) -> bool:
         import pyperclip
         pyperclip.copy(text)
         return True
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("pyperclip copy failed: %s", exc)
 
     if sys.platform == "linux":
         # Wayland — preferred on modern Linux when running under a Wayland session
@@ -26,8 +29,8 @@ def copy_to_clipboard(text: str) -> bool:
                 )
                 if proc.returncode == 0:
                     return True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("wl-copy failed: %s", exc)
 
         # X11 fallback
         for cmd in ("xclip -selection clipboard", "xsel --clipboard --input"):
@@ -36,21 +39,22 @@ def copy_to_clipboard(text: str) -> bool:
                 try:
                     proc = subprocess.run(cmd.split(), input=text.encode(), capture_output=True, timeout=5)
                     return proc.returncode == 0
-                except Exception:
+                except Exception as exc:
+                    logger.debug("%s failed: %s", binary, exc)
                     continue
 
     if sys.platform == "darwin":
         try:
             proc = subprocess.run(["pbcopy"], input=text.encode(), capture_output=True, timeout=5)
             return proc.returncode == 0
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("pbcopy failed: %s", exc)
 
     if shutil.which("clip.exe"):
         try:
             proc = subprocess.run(["clip.exe"], input=text.encode(), capture_output=True, timeout=5)
             return proc.returncode == 0
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("clip.exe failed: %s", exc)
 
     return False
