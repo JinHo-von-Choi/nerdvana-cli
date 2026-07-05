@@ -28,7 +28,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore[import-untyped,unused-ignore]
 
 # ---------------------------------------------------------------------------
 # Data classes

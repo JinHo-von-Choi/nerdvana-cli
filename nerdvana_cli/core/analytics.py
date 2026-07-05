@@ -88,7 +88,7 @@ class PricingTable:
 
     def _load(self, path: Path) -> None:
         try:
-            import yaml  # type: ignore[import-untyped]
+            import yaml  # type: ignore[import-untyped,unused-ignore]
             with open(path) as f:
                 raw: dict[str, Any] = yaml.safe_load(f) or {}
             for provider, models in raw.items():

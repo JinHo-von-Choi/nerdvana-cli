@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]  # noqa: F401
+    import yaml  # type: ignore[import-untyped,unused-ignore]  # noqa: F401
 except ImportError:  # pragma: no cover
     yaml = None
 

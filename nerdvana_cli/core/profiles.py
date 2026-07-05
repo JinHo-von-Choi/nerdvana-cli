@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore[import-untyped,unused-ignore]
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.tool import BaseTool, ToolRegistry

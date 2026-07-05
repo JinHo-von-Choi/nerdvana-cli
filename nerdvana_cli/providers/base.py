@@ -139,7 +139,7 @@ def _load_variants() -> dict[str, dict[str, Any]]:
     """Load provider variant metadata from ``variants.yml`` (single source of truth)."""
     from pathlib import Path
 
-    import yaml  # type: ignore[import-untyped]
+    import yaml  # type: ignore[import-untyped,unused-ignore]
 
     with Path(__file__).with_name("variants.yml").open(encoding="utf-8") as fh:
         data: dict[str, dict[str, Any]] = yaml.safe_load(fh) or {}
