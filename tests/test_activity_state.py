@@ -73,7 +73,7 @@ class TestBash:
 class TestFileTools:
     @pytest.mark.parametrize("tool", ["FileRead", "FileWrite", "FileEdit"])
     def test_absolute_path_shortened(self, tool: str) -> None:
-        label, detail = summarize_tool_call(tool, {"file_path": "/home/nirna/job/nerdvana-cli/nerdvana_cli/core/agent_loop.py"})
+        label, detail = summarize_tool_call(tool, {"file_path": "/workspace/nerdvana-cli/nerdvana_cli/core/agent_loop.py"})
         assert label  == tool
         assert detail == "core/agent_loop.py"
 
