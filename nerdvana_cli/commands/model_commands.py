@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 async def handle_model(app: NerdvanaApp, args: str) -> None:
     """Handle /model command — show or switch the current model."""
     if args:
-        from nerdvana_cli.ui.app import StatusBar
+        from nerdvana_cli.ui.widgets import StatusBar
 
         # Invariant: /model is a model-only operation. Provider and base_url
         # are owned by /provider; re-detecting here would corrupt state when
@@ -59,7 +59,7 @@ async def handle_models(app: NerdvanaApp, args: str) -> None:
     """Handle /models command — list available models for the current provider."""
     from textual.widgets.option_list import Option
 
-    from nerdvana_cli.ui.app import ModelSelector
+    from nerdvana_cli.ui.widgets import ModelSelector
 
     app._add_chat_message("[dim]Fetching models...[/dim]")
     try:
@@ -115,7 +115,7 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
 
     from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, DEFAULT_MODELS, ProviderName
     from nerdvana_cli.providers.factory import create_provider
-    from nerdvana_cli.ui.app import ModelSelector, StatusBar
+    from nerdvana_cli.ui.widgets import ModelSelector, StatusBar
 
     app._add_chat_message(f"[dim]Switching to {provider_name}...[/dim]")
 
@@ -246,7 +246,7 @@ async def handle_provider(app: NerdvanaApp, args: str) -> None:
     from textual.widgets.option_list import Option
 
     from nerdvana_cli.providers.base import DEFAULT_MODELS, ProviderName
-    from nerdvana_cli.ui.app import ProviderSelector
+    from nerdvana_cli.ui.widgets import ProviderSelector
 
     prov_selector = app.query_one("#provider-selector", ProviderSelector)
     prov_selector.clear_options()
