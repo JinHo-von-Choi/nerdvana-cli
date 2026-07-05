@@ -223,7 +223,7 @@ class QuotaPolicyResolver:
         """Load from a YAML file. Returns an empty resolver if the file is absent."""
         if not path.is_file():
             return cls()
-        import yaml  # type: ignore[import-untyped]
+        import yaml  # type: ignore[import-untyped,unused-ignore]
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         return cls.from_dict(data)
 

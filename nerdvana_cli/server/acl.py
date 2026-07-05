@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore[import-untyped,unused-ignore]
 
 # ---------------------------------------------------------------------------
 # Built-in defaults (v3 §7.2)

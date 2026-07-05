@@ -6,7 +6,7 @@ import os
 from collections.abc import Sequence
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore[import-untyped,unused-ignore]
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
