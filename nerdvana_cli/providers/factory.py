@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 from rich.console import Console
@@ -19,6 +20,8 @@ from nerdvana_cli.providers.base import (
 )
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 from nerdvana_cli.providers.openai_provider import OpenAIProvider
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -97,7 +100,12 @@ def create_provider(
         temperature=temperature,
     )
 
-    provider_cls = _PROVIDER_CLASSES.get(provider, OpenAIProvider)
+    provider_cls = _PROVIDER_CLASSES.get(provider)
+    if provider_cls is None:
+        logger.warning(
+            "Provider %s is not registered in _PROVIDER_CLASSES; using OpenAIProvider", provider.value
+        )
+        provider_cls = OpenAIProvider
     return provider_cls(config)
 
 
