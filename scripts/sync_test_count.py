@@ -53,9 +53,9 @@ _CHANGELOG_TOTAL_RE = re.compile(
 
 
 def _collect_test_count() -> int:
-    """Run pytest --collect-only -q and parse the collected count."""
+    """Run pytest --collect-only -q in the uv environment and parse the collected count."""
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        ["uv", "run", "pytest", "--collect-only", "-q"],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
