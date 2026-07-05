@@ -51,6 +51,9 @@ htmlcov/
 .claude/
 CLAUDE.md
 
+# Serena
+.serena/
+
 # Git worktrees
 .worktrees/
 
