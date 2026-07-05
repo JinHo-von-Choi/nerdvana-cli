@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- Bash tool subprocesses receive a filtered environment: variables whose names match credential patterns (`API_KEY`, `SECRET`, `PASSW`, `CREDENTIAL`, standalone `TOKEN` segments) are omitted.
+- LSP client file reads run in a worker thread instead of the event loop.
+- Ruff CI gate covers `tests/` in addition to `nerdvana_cli/`.
+
 ### Fixed
 
 - Swarm/team task output and auto-generated plan text no longer include the subagent token count alongside the response text.
+- Command modules import UI widgets from `nerdvana_cli.ui.widgets`, restoring a clean strict-mypy run.
+- `create_provider` logs a warning when a provider is missing from the class registry before falling back to the OpenAI-compatible implementation.
+- Clipboard backend failures are logged at debug level instead of being silently discarded.
 
 ## [1.3.0] - 2026-05-19
 
