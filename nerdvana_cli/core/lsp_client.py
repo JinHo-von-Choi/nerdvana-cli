@@ -179,7 +179,7 @@ class LspClient:
                 "newName":      new_name,
             },
         )
-        return _apply_workspace_edit(result, cwd=self._project_root)
+        return await asyncio.to_thread(_apply_workspace_edit, result, cwd=self._project_root)
 
     async def shutdown_server(self, ext: str) -> None:
         """shutdown request → exit notification → 2 s grace → SIGKILL."""
@@ -230,8 +230,7 @@ class LspClient:
         if abs_path in self._open_files:
             return
         try:
-            with open(abs_path, encoding="utf-8") as f:
-                text = f.read()
+            text = await asyncio.to_thread(Path(abs_path).read_text, encoding="utf-8")
         except OSError:
             return
 
