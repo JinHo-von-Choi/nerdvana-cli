@@ -10,6 +10,15 @@ from typing import Any, ClassVar
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
+_SENSITIVE_ENV = re.compile(r"(?i)(api[_-]?key|secret|passw|credential|(^|_)token($|_))")
+
+
+def _build_env(cwd: str) -> dict[str, str]:
+    """Build the subprocess environment: credential-named variables are omitted."""
+    env = {k: v for k, v in os.environ.items() if not _SENSITIVE_ENV.search(k)}
+    env["PWD"] = cwd
+    return env
+
 
 class BashArgs:
     def __init__(self, command: str, timeout: int = 120, description: str = ""):
@@ -149,7 +158,7 @@ Examples:
         on_progress: Any = None,
     ) -> ToolResult:
         try:
-            env = {**os.environ, "PWD": context.cwd}
+            env = _build_env(context.cwd)
             proc = await asyncio.create_subprocess_shell(
                 args.command,
                 stdout=asyncio.subprocess.PIPE,
