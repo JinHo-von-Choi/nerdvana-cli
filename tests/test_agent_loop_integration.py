@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop, CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
+from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX, AgentLoop
 from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
@@ -275,7 +275,6 @@ async def test_unknown_tool_returns_error():
 async def test_sticky_session_context_includes_project_snapshot(tmp_path):
     """After one run() cycle, _sticky_session_context must contain project snapshot."""
     import subprocess
-    from pathlib import Path
 
     (tmp_path / "pyproject.toml").write_text(
         '[project]\nname = "myapp"\nversion = "0.1.0"\n'

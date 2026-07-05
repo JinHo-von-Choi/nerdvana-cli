@@ -17,7 +17,6 @@ import pytest
 
 from nerdvana_cli.core.memories import MemoriesManager, MemoryEntry, MemoryScope
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

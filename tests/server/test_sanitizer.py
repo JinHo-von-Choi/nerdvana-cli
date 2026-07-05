@@ -13,10 +13,7 @@ Coverage:
 
 from __future__ import annotations
 
-import pytest
-
-from nerdvana_cli.server.sanitizer import MAX_LENGTH, SanitizeResult, sanitize
-
+from nerdvana_cli.server.sanitizer import MAX_LENGTH, sanitize
 
 # ---------------------------------------------------------------------------
 # Gate-1: blacklist tagging

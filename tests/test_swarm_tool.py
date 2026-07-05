@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from nerdvana_cli.core.settings    import NerdvanaSettings
-from nerdvana_cli.core.task_state  import TaskRegistry
-from nerdvana_cli.core.tool        import ToolContext
+import pytest
+
+from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.task_state import TaskRegistry
+from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.swarm_tool import SwarmTool
 
 

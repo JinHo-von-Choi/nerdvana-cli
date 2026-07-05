@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.main import _APPROVAL_MODE_MAP
 
 
@@ -40,8 +38,12 @@ class TestPlanningGateCompat:
     """Ensure planning_gate=true in settings maps to default_mode=planning."""
 
     def test_planning_gate_compat(self) -> None:
+        import os
+        import tempfile
+
+        import yaml
+
         from nerdvana_cli.core.settings import NerdvanaSettings
-        import yaml, os, tempfile
 
         cfg = {"session": {"planning_gate": True}}
         with tempfile.NamedTemporaryFile(

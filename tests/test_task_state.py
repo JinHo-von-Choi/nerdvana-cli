@@ -1,5 +1,5 @@
 import asyncio
-import pytest
+
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 
 

@@ -17,13 +17,12 @@ import pytest
 
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentTypeRegistry
-from nerdvana_cli.core.compact import CompactionState, ai_compact, _messages_to_text
+from nerdvana_cli.core.compact import CompactionState, _messages_to_text, ai_compact
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.mcp.config import McpServerConfig
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 from nerdvana_cli.types import Message, PermissionBehavior, Role
-
 
 # ---------------------------------------------------------------------------
 # M1: MCP client _write_message is now async with drain()

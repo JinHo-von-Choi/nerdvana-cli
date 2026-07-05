@@ -9,17 +9,15 @@ M7: Gemini _convert_schema handles nested schemas
 
 from __future__ import annotations
 
-import re
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from nerdvana_cli.core.agent_loop import (
-    AgentLoop,
     CONTEXT_USAGE_PREFIX,
     TOOL_DONE_PREFIX,
     TOOL_STATUS_PREFIX,
+    AgentLoop,
 )
 from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.tool import ToolRegistry
@@ -218,6 +216,7 @@ async def test_c3_fallback_restores_original_model():
         loop = AgentLoop(settings=settings, registry=registry)
         chunks = await _collect(loop, "test")
 
+    assert "OK from fallback" in "".join(chunks)
     # Model should be restored to original, not stuck on fallback
     assert settings.model.model == "claude-opus-4-6"
 
@@ -252,7 +251,6 @@ async def test_c3_model_not_mutated_on_normal_exit():
 
 def test_c5_gemini_tool_id_has_uuid_suffix():
     """Gemini tool_use_id format includes a unique suffix."""
-    from nerdvana_cli.providers.gemini_provider import GeminiProvider
 
     # Just verify the format by checking the pattern exists in the source
     # Since we can't easily instantiate GeminiProvider without credentials,

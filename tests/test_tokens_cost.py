@@ -1,6 +1,7 @@
 """Tests for /tokens command with accumulated cost extension."""
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -41,7 +42,8 @@ class TestHandleTokensCost:
 
     @pytest.mark.asyncio
     async def test_shows_cost_when_available(self, tmp_path: Path) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from nerdvana_cli.commands.session_commands import handle_tokens
         from nerdvana_cli.core.analytics import AnalyticsReader, AnalyticsWriter
 
@@ -49,7 +51,7 @@ class TestHandleTokensCost:
         db = tmp_path / "analytics.sqlite"
         w  = AnalyticsWriter(db_path=db, enabled=True)
         w.start_session("cost-sess")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         w.record_tool_call(
             tool_name    = "Bash",
             start_ts     = ts,

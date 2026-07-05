@@ -56,6 +56,7 @@ def test_console_stderr_no_file_kwarg() -> None:
     permanent: using Console(stderr=True) instead.
     """
     import sys
+
     from rich.console import Console
     c = Console()
     with pytest.raises(TypeError):
@@ -74,7 +75,6 @@ def test_main_module_console_stderr_attribute() -> None:
     """main.py must expose a console_stderr instance bound to stderr=True."""
     from nerdvana_cli import main as main_mod
     assert hasattr(main_mod, "console_stderr"), "console_stderr not defined in main.py"
-    import io
     from rich.console import Console
     # Verify it is a Console instance and its _file is stderr-backed
     assert isinstance(main_mod.console_stderr, Console)

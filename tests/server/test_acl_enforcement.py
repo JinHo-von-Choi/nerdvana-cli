@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.server.acl import ACLManager, ACLDecision
+from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

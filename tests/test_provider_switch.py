@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.providers.base import BaseProvider, ModelInfo
 from nerdvana_cli.core.setup import load_config, save_config
-
+from nerdvana_cli.providers.base import ModelInfo
 
 # ---------------------------------------------------------------------------
 # Stub providers
@@ -121,9 +120,9 @@ def test_save_load_config_preserves_api_keys(tmp_path):
     }
 
     save_config(original, path=config_path)
-    loaded = load_config() if False else __import__("yaml").safe_load(
-        open(config_path, encoding="utf-8").read()
-    ) or {}
+    with open(config_path, encoding="utf-8") as f:
+        raw = f.read()
+    loaded = load_config() if False else __import__("yaml").safe_load(raw) or {}
 
     assert "api_keys" in loaded, "저장 후 로드된 config에 api_keys 키가 없다"
     assert loaded["api_keys"]["anthropic"] == "sk-ant-test-key"

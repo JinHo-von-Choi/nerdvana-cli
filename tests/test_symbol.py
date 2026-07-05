@@ -11,14 +11,10 @@ from __future__ import annotations
 import pytest
 
 from nerdvana_cli.core.symbol import (
-    LanguageServerSymbol,
-    Location,
-    LspSymbolError,
     NamePathResolver,
     SymbolDictGrouper,
     _sym_from_dict,
 )
-
 
 # ---------------------------------------------------------------------------
 # NamePathResolver — 5 test cases

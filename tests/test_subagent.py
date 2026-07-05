@@ -1,9 +1,10 @@
 import asyncio
-import pytest
 from unittest.mock import MagicMock, patch
 
-from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+import pytest
+
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
 from nerdvana_cli.core.tool import ToolRegistry
 
 

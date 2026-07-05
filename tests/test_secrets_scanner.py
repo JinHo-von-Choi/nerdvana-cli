@@ -8,10 +8,7 @@ Date:   2026-04-18
 
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.tools.memory_tools import _scan_secrets
-
 
 # ---------------------------------------------------------------------------
 # Pattern 1: OpenAI/Anthropic key

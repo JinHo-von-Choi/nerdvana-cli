@@ -1,10 +1,7 @@
 """Tests for context block splitting and summarization."""
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.core.compact import (
-    _extractive_summary_simple,
     compact_with_blocks,
     split_into_blocks,
     summarize_block,

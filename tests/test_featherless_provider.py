@@ -1,8 +1,6 @@
 """Tests for Featherless AI provider integration."""
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.providers.base import (
     DEFAULT_BASE_URLS,
     DEFAULT_MODELS,
