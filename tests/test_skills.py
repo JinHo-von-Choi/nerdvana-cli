@@ -1,5 +1,5 @@
-import pytest
 from nerdvana_cli.core.skills import Skill, SkillLoader
+
 
 def test_parse_skill_file(tmp_path):
     f = tmp_path / "review.md"

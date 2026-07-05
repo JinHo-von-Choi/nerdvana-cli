@@ -2,8 +2,9 @@ from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 
 
 def test_task_panel_import() -> None:
-    from nerdvana_cli.ui.task_panel import TaskPanel
     from textual.widget import Widget
+
+    from nerdvana_cli.ui.task_panel import TaskPanel
     assert issubclass(TaskPanel, Widget)
 
 

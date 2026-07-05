@@ -33,7 +33,7 @@ jobs:
         run: uv sync --extra dev --extra mcp
 
       - name: Ruff
-        run: uv run ruff check nerdvana_cli/
+        run: uv run ruff check nerdvana_cli/ tests/
 
       - name: Mypy
         run: uv run mypy nerdvana_cli/ --ignore-missing-imports

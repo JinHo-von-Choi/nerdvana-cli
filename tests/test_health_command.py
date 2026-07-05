@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -27,7 +27,7 @@ def db_writer(tmp_path: Path):
     from nerdvana_cli.core.analytics import AnalyticsWriter
     w = AnalyticsWriter(db_path=tmp_path / "analytics.sqlite", enabled=True)
     w.start_session("health-test-sess")
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     for i in range(5):
         w.record_tool_call(
             tool_name    = "Bash",

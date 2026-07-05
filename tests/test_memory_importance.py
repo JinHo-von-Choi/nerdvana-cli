@@ -4,9 +4,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import pytest
-
-from nerdvana_cli.core.memories import MemoryEntry, MemoryScope, MemoriesManager
+from nerdvana_cli.core.memories import MemoriesManager, MemoryEntry, MemoryScope
 
 
 class TestMemoryImportance:

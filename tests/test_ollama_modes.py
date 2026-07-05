@@ -1,8 +1,6 @@
 """Tests for Ollama deployment mode configuration."""
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.providers.base import (
     DEFAULT_BASE_URLS,
     ProviderName,

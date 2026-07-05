@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -19,7 +18,6 @@ from nerdvana_cli.core.profiles import (
     ProfileManager,
 )
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolRegistry
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

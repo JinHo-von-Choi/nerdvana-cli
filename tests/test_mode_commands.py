@@ -6,13 +6,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from nerdvana_cli.commands.profile_commands import handle_context, handle_mode
 from nerdvana_cli.core.profiles import ProfileManager
-
 
 # ---------------------------------------------------------------------------
 # Helpers

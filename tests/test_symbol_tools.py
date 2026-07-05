@@ -11,11 +11,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nerdvana_cli.core.code_editor import StalePreviewError, UnknownPreviewError
 from nerdvana_cli.core.symbol import LanguageServerSymbol, Location, LspSymbolError
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.symbol_tools import (
@@ -36,7 +35,6 @@ from nerdvana_cli.tools.symbol_tools import (
     SymbolOverviewArgs,
     SymbolOverviewTool,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -1,9 +1,6 @@
 """Tests for DashboardTab widget and helper functions."""
 from __future__ import annotations
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Pure helper function tests (no Textual runtime needed)
 # ---------------------------------------------------------------------------
@@ -63,31 +60,37 @@ class TestBar:
 class TestDashboardTabImport:
     def test_dashboard_tab_is_widget(self) -> None:
         from textual.widget import Widget
+
         from nerdvana_cli.ui.dashboard_tab import DashboardTab
         assert issubclass(DashboardTab, Widget)
 
     def test_session_header_is_static(self) -> None:
         from textual.widgets import Static
+
         from nerdvana_cli.ui.dashboard_tab import SessionHeader
         assert issubclass(SessionHeader, Static)
 
     def test_tool_heatmap_is_static(self) -> None:
         from textual.widgets import Static
+
         from nerdvana_cli.ui.dashboard_tab import ToolHeatmap
         assert issubclass(ToolHeatmap, Static)
 
     def test_failure_rate_panel_is_static(self) -> None:
         from textual.widgets import Static
+
         from nerdvana_cli.ui.dashboard_tab import FailureRatePanel
         assert issubclass(FailureRatePanel, Static)
 
     def test_token_sparkline_is_static(self) -> None:
         from textual.widgets import Static
+
         from nerdvana_cli.ui.dashboard_tab import TokenSparkline
         assert issubclass(TokenSparkline, Static)
 
     def test_health_footer_is_static(self) -> None:
         from textual.widgets import Static
+
         from nerdvana_cli.ui.dashboard_tab import HealthFooter
         assert issubclass(HealthFooter, Static)
 

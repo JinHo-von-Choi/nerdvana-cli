@@ -20,7 +20,6 @@ import pytest
 
 from nerdvana_cli.server.hook_bridge import HookBridge, read_hook_payload, write_hook_response
 
-
 # ---------------------------------------------------------------------------
 # read_hook_payload
 # ---------------------------------------------------------------------------
@@ -83,11 +82,11 @@ class TestHookBridgeDispatch:
 
     def test_cli_hook_name_injection(self, bridge: HookBridge) -> None:
         """CLI passes hook name via payload when hook_event_name absent."""
-        from nerdvana_cli.server.hook_bridge import run_hook
-        import io, json
+        import io
+        import json
         stdin_data = json.dumps({"tool_name": "Edit"}) + "\n"
-        stdin      = io.StringIO(stdin_data)
-        stdout     = io.StringIO()
+        _ = io.StringIO(stdin_data)
+        _ = io.StringIO()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db = Path(tmpdir) / "audit.sqlite"

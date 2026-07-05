@@ -1,4 +1,4 @@
-from nerdvana_cli.providers.base import resolve_context_window, ProviderName
+from nerdvana_cli.providers.base import ProviderName, resolve_context_window
 
 
 def test_anthropic_default():

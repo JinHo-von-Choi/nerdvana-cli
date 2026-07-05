@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import pytest
 from pathlib import Path
 
+import pytest
+
 from nerdvana_cli.core.team import (
-    Mailbox,
     TeammateMessage,
     get_inbox_path,
     read_inbox,
@@ -52,9 +51,10 @@ def test_get_inbox_path_structure(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 import asyncio
-from nerdvana_cli.core.task_state  import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.core.team        import TeamRegistry
-from nerdvana_cli.core.tool        import ToolContext
+
+from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
+from nerdvana_cli.core.team import TeamRegistry
+from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.team_tools import (
     SendMessageTool,
     TaskGetTool,

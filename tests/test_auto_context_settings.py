@@ -1,5 +1,4 @@
 import yaml
-import pytest
 
 
 def test_auto_applies_provider_context(tmp_path):

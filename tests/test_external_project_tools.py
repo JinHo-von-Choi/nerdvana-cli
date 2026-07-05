@@ -6,9 +6,8 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -20,7 +19,6 @@ from nerdvana_cli.tools.external_project_tools import (
     QueryExternalProjectTool,
     RegisterExternalProjectTool,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -178,7 +176,7 @@ async def test_query_timeout_is_isolated(
     registry.add(ExternalProject(name="slow", path=str(tmp_path)))
 
     worker = MagicMock(spec=ExternalWorker)
-    worker.send_query = AsyncMock(side_effect=asyncio.TimeoutError())
+    worker.send_query = AsyncMock(side_effect=TimeoutError())
 
     tool = QueryExternalProjectTool(registry=registry, worker=worker)
     from nerdvana_cli.tools.external_project_tools import QueryExternalProjectArgs

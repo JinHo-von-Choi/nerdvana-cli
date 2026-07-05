@@ -14,13 +14,9 @@ from __future__ import annotations
 
 import os
 import stat
-from pathlib import Path
-
-import pytest
 
 from nerdvana_cli.server.audit import AuditLogger, _ensure_db_file_permissions
 from nerdvana_cli.server.sanitizer import SanitizerAudit
-
 
 # ---------------------------------------------------------------------------
 # _ensure_db_file_permissions

@@ -20,7 +20,6 @@ import pytest
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.core.tool_executor import ToolExecutor
 
-
 # ---------------------------------------------------------------------------
 # _ask_user_permission unit tests
 # ---------------------------------------------------------------------------
@@ -163,7 +162,7 @@ async def test_run_batch_ask_non_tty_returns_error() -> None:
 
     fake_call = {"id": "tc-001", "name": "_TestAskTool", "input": {}}
     context   = ToolContext()
-    state     = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
+    _         = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     with patch.object(sys.stdin, "isatty", return_value=False):
         results = await executor.run_batch([fake_call], context=context)
@@ -199,7 +198,7 @@ async def test_run_batch_ask_tty_yes_proceeds() -> None:
 
     fake_call = {"id": "tc-002", "name": "_TestAskToolY", "input": {}}
     context   = ToolContext()
-    state     = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
+    _         = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
@@ -238,7 +237,7 @@ async def test_run_batch_deny_unchanged() -> None:
 
     fake_call = {"id": "tc-003", "name": "_TestDenyTool", "input": {}}
     context   = ToolContext()
-    state     = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
+    _         = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     with patch.object(executor, "_ask_user_permission") as mock_ask:
         results = await executor.run_batch([fake_call], context=context)

@@ -20,7 +20,6 @@ import pytest
 from nerdvana_cli.core.external_projects import ExternalProject
 from nerdvana_cli.server.external_worker import ExternalSession, ExternalWorker
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -139,7 +138,7 @@ async def test_shutdown_sigterm_fallback(worker: ExternalWorker, project: Extern
         nonlocal call_count
         call_count += 1
         if call_count <= 1:
-            raise asyncio.TimeoutError
+            raise TimeoutError
         return 0
 
     mock_proc.wait = AsyncMock(side_effect=_wait_side_effect)
@@ -202,9 +201,11 @@ async def test_send_query_timeout(worker: ExternalWorker, project: ExternalProje
         shutdown_timeout = 0.05,
         kill_timeout     = 0.05,
     )
-    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)):
-        with pytest.raises(asyncio.TimeoutError):
-            await fast_worker.send_query(project, "slow query")
+    with (
+        patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)),
+        pytest.raises(asyncio.TimeoutError),
+    ):
+        await fast_worker.send_query(project, "slow query")
 
     # Session must have been removed from active list after timeout.
     assert project not in [s.project for s in fast_worker.list_active()]

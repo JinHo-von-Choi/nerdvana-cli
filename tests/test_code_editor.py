@@ -10,8 +10,6 @@ applied directly to temporary files.
 from __future__ import annotations
 
 import hashlib
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -23,7 +21,6 @@ from nerdvana_cli.core.code_editor import (
     UnknownPreviewError,
     _sha256,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

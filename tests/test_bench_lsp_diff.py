@@ -16,8 +16,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 _SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_lsp_diff.py"
 
 

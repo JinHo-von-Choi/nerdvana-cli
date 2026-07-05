@@ -1,9 +1,16 @@
 from __future__ import annotations
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from nerdvana_cli.core.compact import (
-    CompactionState, ai_compact, _messages_to_text, _extract_summary,
-    MAX_CONSECUTIVE_FAILURES, FALLBACK_PROMPT,
+    FALLBACK_PROMPT,
+    MAX_CONSECUTIVE_FAILURES,
+    CompactionState,
+    _extract_summary,
+    _messages_to_text,
+    ai_compact,
 )
 from nerdvana_cli.types import Message, Role
 
@@ -25,7 +32,8 @@ def test_circuit_opens_after_max_failures():
 
 def test_circuit_resets_on_success():
     s = CompactionState()
-    s.record_failure(); s.record_failure()
+    s.record_failure()
+    s.record_failure()
     s.record_success()
     assert s.consecutive_failures == 0
     assert not s.is_circuit_open

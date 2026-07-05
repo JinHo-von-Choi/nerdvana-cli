@@ -1,5 +1,5 @@
+from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentTypeRegistry
-from nerdvana_cli.agents.builtin  import BUILTIN_AGENTS
 
 
 def test_builtin_agents_are_registered() -> None:
@@ -15,13 +15,13 @@ def test_agent_type_registry_unknown_returns_none() -> None:
     assert reg.get("nonexistent") is None
 
 
-import asyncio
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from nerdvana_cli.core.settings    import NerdvanaSettings
-from nerdvana_cli.core.task_state  import TaskRegistry, TaskStatus
-from nerdvana_cli.core.tool        import ToolContext
+import pytest
+
+from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 
 

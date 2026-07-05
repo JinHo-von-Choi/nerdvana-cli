@@ -5,8 +5,6 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
-import pytest
-
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.user_hooks import load_user_hooks
 
@@ -88,8 +86,9 @@ def test_session_start_context_injection_has_no_third_party_guidance():
     session config). Anything tied to a particular MCP server, memory
     backend, or user convention belongs in a user hook.
     """
-    from nerdvana_cli.core.builtin_hooks import session_start_context_injection
     import inspect
+
+    from nerdvana_cli.core.builtin_hooks import session_start_context_injection
 
     src = inspect.getsource(session_start_context_injection)
     # No hardcoded MCP tool names

@@ -10,7 +10,6 @@ subprocess (a tiny echo server) to verify the full stdio MCP round-trip.
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 import textwrap
 from pathlib import Path
@@ -20,7 +19,6 @@ import pytest
 
 from nerdvana_cli.core.external_projects import ExternalProject
 from nerdvana_cli.server.external_worker import ExternalSession, ExternalWorker
-
 
 # ---------------------------------------------------------------------------
 # Minimal echo server (runs as a subprocess)

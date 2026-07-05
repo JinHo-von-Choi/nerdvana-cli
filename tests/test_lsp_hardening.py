@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -19,11 +17,9 @@ from nerdvana_cli.core.lsp_client import (
     DEFAULT_LSP_INIT_TIMEOUT,
     LSP_INIT_TIMEOUTS,
     LspClient,
-    LspError,
     _apply_workspace_edit,
     _init_timeout_for,
 )
-
 
 # ---------------------------------------------------------------------------
 # 1. rootUri is a valid file:// URI derived from project_root
@@ -35,7 +31,7 @@ async def test_initialize_sends_file_uri_root():
     """_initialize() must set rootUri to a file:// URI matching project_root."""
     client = LspClient(project_root="/tmp/my_project")
 
-    sent_params: dict = {}
+    _: dict = {}
 
     async def fake_read_response(proc, req_id, timeout=30.0):
         return {"jsonrpc": "2.0", "id": req_id, "result": {}}

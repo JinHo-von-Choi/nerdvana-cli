@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from nerdvana_cli.core.agent_loop import compact_messages, estimate_tokens
-from nerdvana_cli.core.compact import CompactionState, ai_compact, FALLBACK_PROMPT
+from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.types import Message, Role
 
 

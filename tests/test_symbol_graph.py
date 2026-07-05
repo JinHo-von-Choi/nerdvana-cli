@@ -10,15 +10,11 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from nerdvana_cli.core.symbol import (
     LanguageServerSymbol,
     Location,
-    _sym_from_dict,
 )
-from nerdvana_cli.core.symbol_graph import SymbolEdge, SymbolGraph, SymbolNode
-
+from nerdvana_cli.core.symbol_graph import SymbolGraph
 
 # ---------------------------------------------------------------------------
 # Helpers

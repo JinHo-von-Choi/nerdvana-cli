@@ -1,6 +1,7 @@
+from unittest.mock import MagicMock
+
 from nerdvana_cli.core.builtin_hooks import session_start_context_injection
 from nerdvana_cli.core.hooks import HookContext, HookEvent
-from unittest.mock import MagicMock
 
 
 def test_injects_tool_list():

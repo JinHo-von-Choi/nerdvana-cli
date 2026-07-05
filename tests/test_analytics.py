@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -95,7 +94,7 @@ class TestAnalyticsWriter:
 
     def test_record_tool_call_success(self, writer, tmp_db: Path) -> None:
         writer.start_session("sess-003")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         writer.record_tool_call(
             tool_name    = "Bash",
             start_ts     = ts,
@@ -115,7 +114,7 @@ class TestAnalyticsWriter:
 
     def test_record_tool_call_failure(self, writer, tmp_db: Path) -> None:
         writer.start_session("sess-004")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         writer.record_tool_call(
             tool_name   = "FileWrite",
             start_ts    = ts,
@@ -131,7 +130,7 @@ class TestAnalyticsWriter:
 
     def test_cost_computed_on_write(self, writer, tmp_db: Path) -> None:
         writer.start_session("sess-005")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         # claude-sonnet-4-6: input $3/1k, output $15/1k
         writer.record_tool_call(
             tool_name    = "Ask",
@@ -171,8 +170,8 @@ class TestAnalyticsReader:
 
     def test_summary_with_data(self, writer, reader, tmp_db: Path) -> None:
         writer.start_session("sess-r1")
-        ts = datetime.now(timezone.utc).isoformat()
-        for i in range(3):
+        ts = datetime.now(UTC).isoformat()
+        for _i in range(3):
             writer.record_tool_call(
                 tool_name="Bash", start_ts=ts, duration_ms=100, success=True
             )
@@ -181,7 +180,7 @@ class TestAnalyticsReader:
 
     def test_session_cost_query(self, writer, reader) -> None:
         writer.start_session("sess-cost")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         writer.record_tool_call(
             tool_name    = "Ask",
             start_ts     = ts,
@@ -198,7 +197,7 @@ class TestAnalyticsReader:
 
     def test_recent_tool_buckets(self, writer, reader) -> None:
         writer.start_session("sess-buckets")
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         writer.record_tool_call(tool_name="Bash",    start_ts=ts, duration_ms=50, success=True)
         writer.record_tool_call(tool_name="Bash",    start_ts=ts, duration_ms=60, success=True)
         writer.record_tool_call(tool_name="FileRead", start_ts=ts, duration_ms=30, success=True)

@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-
 from nerdvana_cli.core.tool import ToolCategory, ToolRegistry, ToolSideEffect
 from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
 from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
 from nerdvana_cli.tools.search_tools import GlobTool, GrepTool
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -151,10 +148,9 @@ def test_filter_tags_all_lsp_symbol_returns_symbol_tools() -> None:
 
 def test_filter_requires_confirmation_includes_taskstop_and_lsp_rename() -> None:
     """TaskStop and lsp_rename both set requires_confirmation=True."""
-    from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team import TeamRegistry
     from unittest.mock import MagicMock
 
+    from nerdvana_cli.core.task_state import TaskRegistry
     from nerdvana_cli.tools.lsp import LspRenameTool
     from nerdvana_cli.tools.team_tools import TaskStopTool
 
@@ -194,9 +190,9 @@ def test_filter_tags_any_uses_or_semantics() -> None:
 def test_filter_no_args_returns_all_tools() -> None:
     """filter() with no arguments must return the full tool list."""
     registry = _make_meta_registry()
-    assert set(t.name for t in registry.filter()) == set(
+    assert {t.name for t in registry.filter()} == {
         t.name for t in registry.all_tools()
-    )
+    }
 
 
 # ---------------------------------------------------------------------------

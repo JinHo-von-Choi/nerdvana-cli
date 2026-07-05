@@ -94,11 +94,11 @@ def test_dead_get_permission_behavior_absent_query() -> None:
 async def test_executor_denies_ask_in_non_tty() -> None:
     """ToolExecutor must deny an ASK tool when stdin is not a TTY (CI/pipe)."""
     import sys
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import MagicMock, patch
 
-    from nerdvana_cli.core.tool_executor import ToolExecutor
-    from nerdvana_cli.core.tool import ToolRegistry
     from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.tool import ToolRegistry
+    from nerdvana_cli.core.tool_executor import ToolExecutor
 
     # Build a minimal registry with RegisterExternalProjectTool (ASK).
     reg  = ToolRegistry()
@@ -115,7 +115,7 @@ async def test_executor_denies_ask_in_non_tty() -> None:
         "input": {"name": "x", "path": "/tmp"},
     }
     context = ToolContext()
-    state   = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
+    _       = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
     # Ensure stdin.isatty() returns False (non-interactive).
     with patch.object(sys.stdin, "isatty", return_value=False):
@@ -131,8 +131,7 @@ async def test_executor_denies_ask_in_non_tty() -> None:
 async def test_executor_allows_ask_when_user_confirms() -> None:
     """ToolExecutor must proceed when user types 'y' at the ASK prompt (TTY)."""
     import sys
-    from pathlib import Path
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import MagicMock, patch
 
     from nerdvana_cli.core.external_projects import ExternalProjectRegistry
     from nerdvana_cli.core.loop_state import LoopState
@@ -156,7 +155,7 @@ async def test_executor_allows_ask_when_user_confirms() -> None:
             "input": {"name": "proj", "path": tmpdir},
         }
         context = ToolContext()
-        state   = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
+        _       = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
         # Simulate interactive TTY with user typing "y".
         with (
