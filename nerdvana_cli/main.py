@@ -21,6 +21,7 @@ from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.tools.registry import create_tool_registry
 
 app = typer.Typer(
@@ -39,13 +40,19 @@ console        = Console()
 console_stderr = Console(stderr=True)
 
 
-def _maybe_show_update_notice() -> None:
+def _maybe_show_update_notice(target: Console | None = None) -> None:
     """Print a single dim line if a newer release is available.
 
     Uses a 24-hour cache and a 5s HTTP timeout. Silent on every failure mode
     (offline, rate-limit, malformed cache). Suppressed when
     `NERDVANA_NO_UPDATE_CHECK=1` or `session.update_check` is False.
+
+    Args:
+        target: Console to print on. Defaults to stdout, which is correct only
+            while stdout carries human-readable output. Callers that hand
+            stdout to a machine-readable protocol pass ``console_stderr``.
     """
+    out = target if target is not None else console
     try:
         import asyncio as _asyncio
 
@@ -65,7 +72,7 @@ def _maybe_show_update_notice() -> None:
 
         result = _asyncio.run(cached_or_check(__version__))
         if result and result.get("version"):
-            console.print(
+            out.print(
                 format_update_notice(__version__, result["version"], result.get("url", "")),
                 highlight=False,
             )
@@ -96,7 +103,20 @@ _APPROVAL_MODE_MAP: dict[str, tuple[str, str]] = {
 }
 
 
-@app.callback(invoke_without_command=True)
+# Provider names shown in --help are derived from the enum the CLI validates
+# against, so the help text cannot drift away from what --provider accepts.
+_SUPPORTED_PROVIDERS: tuple[str, ...] = tuple(p.value for p in ProviderName)
+
+_MAIN_HELP: str = (
+    "NerdVana CLI, an AI-powered development tool.\n\n"
+    f"Supported providers ({len(_SUPPORTED_PROVIDERS)}): "
+    f"{', '.join(_SUPPORTED_PROVIDERS)}.\n\n"
+    "Run without subcommands to start interactive REPL mode. "
+    "First run triggers the interactive setup wizard."
+)
+
+
+@app.callback(invoke_without_command=True, help=_MAIN_HELP)
 def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", "-v", help="Show version"),
@@ -117,14 +137,10 @@ def main(
         help="Skip the startup new-version check for this run.",
     ),
 ) -> None:
-    """NerdVana CLI — AI-powered development tool.
+    """Root callback.
 
-    Supports 21 AI platforms: Anthropic, OpenAI, Gemini, Groq, OpenRouter, xAI,
-    Ollama, vLLM, DeepSeek, Mistral, Cohere, Together AI, ZAI, Featherless AI,
-    Moonshot AI (Kimi), Fireworks AI, Cerebras, Perplexity, SambaNova, NovitaAI, MiMo.
-
-    Run without subcommands to start interactive REPL mode.
-    First run triggers interactive setup wizard.
+    The user-facing text, including the provider list, is supplied through
+    ``_MAIN_HELP`` so that it is generated from :class:`ProviderName`.
     """
     if no_update_check:
         os.environ["NERDVANA_NO_UPDATE_CHECK"] = "1"
@@ -133,6 +149,13 @@ def main(
         console.print(f"[bold]NerdVana CLI[/bold] v{__version__}")
         _maybe_show_update_notice()
         raise typer.Exit()
+
+    if ctx.invoked_subcommand is not None:
+        # A subcommand owns stdout from here on, and `serve --transport stdio`
+        # speaks JSON-RPC there: a notice printed on stdout would corrupt the
+        # first frame. Subcommands therefore get the notice on stderr.
+        _maybe_show_update_notice(console_stderr)
+        return
 
     _maybe_show_update_notice()
 
@@ -367,6 +390,7 @@ def serve(
     host:        str  = typer.Option("127.0.0.1", "--host",        help="HTTP bind address"),
     allow_write: bool = typer.Option(False,        "--allow-write", help="Enable write tools"),
     tls_cert:    str  = typer.Option("",           "--tls-cert",    help="TLS certificate file (PEM)"),
+    tls_key:     str  = typer.Option("",           "--tls-key",     help="TLS private key file (PEM); omit only when the certificate bundles it"),
     tls_ca:      str  = typer.Option("",           "--tls-ca",      help="CA certificate for mTLS"),
     project:     str  = typer.Option("",           "--project",     help="Project root directory (Phase H)"),
     mode:        str  = typer.Option("",           "--mode",        help="Profile mode name to activate (Phase H)"),
@@ -380,11 +404,12 @@ def serve(
         nerdvana serve                                              # stdio (default)
         nerdvana serve --transport http --port 10830
         nerdvana serve --transport http --allow-write
+        nerdvana serve --transport http --tls-cert server.crt --tls-key server.key
         nerdvana serve --project /path/to/lib --mode query         # Phase H external query
     """
     from pathlib import Path as _Path
 
-    from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
+    from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, TlsConfigurationError
 
     if transport not in ("stdio", "http"):
         console.print(f"[red]Error: unknown transport '{transport}'. Use 'stdio' or 'http'.[/red]")
@@ -402,16 +427,21 @@ def serve(
             console.print(f"[red]Error: --project path does not exist: {project_path}[/red]")
             raise typer.Exit(1)
 
-    server = NerdvanaMcpServer(
-        allow_write  = allow_write,
-        transport    = transport,
-        host         = host,
-        port         = port,
-        tls_cert     = _Path(tls_cert) if tls_cert else None,
-        tls_ca       = _Path(tls_ca)   if tls_ca  else None,
-        project_path = project_path,
-        mode         = mode or None,
-    )
+    try:
+        server = NerdvanaMcpServer(
+            allow_write  = allow_write,
+            transport    = transport,
+            host         = host,
+            port         = port,
+            tls_cert     = _Path(tls_cert) if tls_cert else None,
+            tls_key      = _Path(tls_key)  if tls_key  else None,
+            tls_ca       = _Path(tls_ca)   if tls_ca  else None,
+            project_path = project_path,
+            mode         = mode or None,
+        )
+    except TlsConfigurationError as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(1) from exc
 
     if transport == "http":
         console_stderr.print(

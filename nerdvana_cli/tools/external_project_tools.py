@@ -11,6 +11,9 @@ Provides three MCP-visible tools that allow the agent to:
 
 from __future__ import annotations
 
+import errno
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +22,12 @@ from nerdvana_cli.core.external_projects import ExternalProject, ExternalProject
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.server.external_worker import ExternalWorker
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
+from nerdvana_cli.utils.path import safe_open_fd, validate_path
+
+# Optional hard containment root. When set, a registered project path must
+# resolve to a directory inside it; when unset only the structural rules in
+# RegisterExternalProjectTool._safe_resolve apply.
+BOUNDARY_ROOT_ENV_VAR = "NERDVANA_EXTERNAL_PROJECTS_ROOT"
 
 # ---------------------------------------------------------------------------
 # ListQueryableProjects
@@ -79,8 +88,10 @@ class RegisterExternalProjectTool(BaseTool[RegisterExternalProjectArgs]):
     name             = "RegisterExternalProject"
     description_text = (
         "Register an external project so it can be queried via QueryExternalProject. "
-        "The path must be an existing directory. Symlink traversal outside the "
-        "target directory is blocked for safety."
+        "The path must resolve to an existing real directory: the filesystem root is "
+        "rejected, and a symlinked target directory is rejected instead of followed. "
+        f"When ${BOUNDARY_ROOT_ENV_VAR} is set the path must also resolve inside that "
+        "root, and every path component is opened without following symlinks."
     )
     input_schema: dict[str, Any] = {
         "type": "object",
@@ -107,8 +118,13 @@ class RegisterExternalProjectTool(BaseTool[RegisterExternalProjectArgs]):
     is_concurrency_safe = False
     args_class       = RegisterExternalProjectArgs
 
-    def __init__(self, registry: ExternalProjectRegistry | None = None) -> None:
-        self._registry = registry if registry is not None else ExternalProjectRegistry()
+    def __init__(
+        self,
+        registry:     ExternalProjectRegistry | None = None,
+        allowed_root: str | Path | None              = None,
+    ) -> None:
+        self._registry     = registry if registry is not None else ExternalProjectRegistry()
+        self._allowed_root = allowed_root
 
     async def call(
         self,
@@ -119,7 +135,7 @@ class RegisterExternalProjectTool(BaseTool[RegisterExternalProjectArgs]):
     ) -> ToolResult:
         # Resolve and validate path.
         try:
-            resolved = self._safe_resolve(args.path)
+            resolved = self._safe_resolve(args.path, self._allowed_root)
         except (ValueError, OSError) as exc:
             return ToolResult(
                 tool_use_id="",
@@ -144,34 +160,87 @@ class RegisterExternalProjectTool(BaseTool[RegisterExternalProjectArgs]):
         return PermissionResult(behavior=PermissionBehavior.ASK)
 
     @staticmethod
-    def _safe_resolve(raw_path: str) -> Path:
-        """Resolve *raw_path* and guard against path traversal.
+    def _boundary_root(allowed_root: str | Path | None = None) -> Path | None:
+        """Return the configured containment root, or *None* when unset.
 
-        Rules:
-        - The path must exist and be a directory.
-        - Symlinks are resolved; the resolved canonical path must point to an
-          existing directory (no dangling symlinks accepted).
+        The explicit constructor argument wins; otherwise the
+        ``NERDVANA_EXTERNAL_PROJECTS_ROOT`` environment variable is consulted.
+        """
+        raw = allowed_root if allowed_root is not None else os.environ.get(BOUNDARY_ROOT_ENV_VAR, "")
+        text = str(raw).strip()
+        if not text:
+            return None
+        return Path(text).expanduser()
 
-        Returns the resolved ``Path`` on success.
-        Raises ``ValueError`` when the path is invalid or unsafe.
+    @classmethod
+    def _safe_resolve(cls, raw_path: str, allowed_root: str | Path | None = None) -> Path:
+        """Resolve *raw_path* to a directory that is safe to hand a query subprocess.
+
+        A registered path becomes the working directory of a read-capable
+        subprocess, so resolution enforces an actual boundary:
+
+        - The filesystem root is never registrable; a project always has a
+          parent directory that acts as the walk base.
+        - The final component is opened with ``O_NOFOLLOW`` from that base, so
+          a symlinked target directory is rejected rather than followed, and
+          the directory check runs on the opened descriptor rather than on a
+          separate stat that a race could invalidate.
+        - When a containment root is configured, the canonical path must stay
+          inside it (:func:`validate_path`) and every component below the root
+          is walked with ``O_NOFOLLOW`` (:func:`safe_open_fd`).
+
+        Returns the canonical ``Path`` on success.
+        Raises ``ValueError`` when the path is invalid or outside the boundary.
         """
         candidate = Path(raw_path).expanduser()
+        candidate = Path(os.path.abspath(candidate))
+
+        if not candidate.name:
+            raise ValueError(f"The filesystem root cannot be registered: {raw_path}")
 
         if not candidate.exists():
             raise ValueError(f"Path does not exist: {raw_path}")
         if not candidate.is_dir():
             raise ValueError(f"Path is not a directory: {raw_path}")
 
-        # Resolve symlinks to the canonical path.
+        root = cls._boundary_root(allowed_root)
+        if root is None:
+            base     = os.path.realpath(candidate.parent)
+            relative = candidate.name
+        else:
+            base = os.path.realpath(root)
+            if not os.path.isdir(base):
+                raise ValueError(f"Configured external project root is not a directory: {root}")
+
+            relative = os.path.relpath(os.path.realpath(candidate), base)
+            if relative == os.curdir:
+                raise ValueError(
+                    f"The external project root itself cannot be registered: {raw_path}"
+                )
+            error = validate_path(relative, base)
+            if error is not None:
+                raise ValueError(
+                    f"Path resolves outside the allowed external project root {base}: {raw_path}"
+                )
+
         try:
-            resolved = candidate.resolve(strict=True)
+            fd = safe_open_fd(relative, base, os.O_RDONLY)
+        except PermissionError as exc:
+            raise ValueError(f"Path is not registrable: {raw_path}: {exc}") from exc
         except OSError as exc:
-            raise ValueError(f"Cannot resolve path {raw_path}: {exc}") from exc
+            if exc.errno == errno.ELOOP:
+                raise ValueError(
+                    f"Symlinked path component is not allowed: {raw_path}"
+                ) from exc
+            raise ValueError(f"Cannot open path {raw_path}: {exc}") from exc
 
-        if not resolved.is_dir():
-            raise ValueError(f"Resolved path is not a directory: {resolved}")
+        try:
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise ValueError(f"Path is not a directory: {raw_path}")
+        finally:
+            os.close(fd)
 
-        return resolved
+        return Path(os.path.join(base, relative))
 
 
 # ---------------------------------------------------------------------------

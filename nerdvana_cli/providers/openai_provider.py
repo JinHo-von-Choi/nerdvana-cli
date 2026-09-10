@@ -20,6 +20,25 @@ except ImportError:  # pragma: no cover – runtime guard in _get_client
 console = Console()
 
 
+_UNSUPPORTED_PARAM_STATUS = frozenset({400, 422})
+
+
+def _is_stream_options_unsupported(exc: BaseException) -> bool:
+    """Report whether an endpoint rejected the request over ``stream_options``.
+
+    Only two shapes mean the parameter is unsupported: the client refusing the
+    keyword outright (``TypeError``) and the endpoint rejecting the request
+    body, which the openai SDK raises as ``BadRequestError`` (400) or
+    ``UnprocessableEntityError`` (422). The status is read off the exception so
+    any OpenAI-compatible SDK is covered. Authentication, rate limit and server
+    failures are excluded on purpose: resending those bills a second request
+    and buries the status that actually needs to reach the caller.
+    """
+    if isinstance(exc, TypeError):
+        return True
+    return getattr(exc, "status_code", None) in _UNSUPPORTED_PARAM_STATUS
+
+
 def _safe_str(value: Any) -> str:
     """Safely convert any value to string, handling encoding errors."""
     if value is None:
@@ -106,7 +125,9 @@ class OpenAIProvider:
                     **create_kwargs,
                     stream_options={"include_usage": True},
                 )
-            except Exception:
+            except Exception as exc:
+                if not _is_stream_options_unsupported(exc):
+                    raise
                 # Fallback without stream_options
                 stream = await client.chat.completions.create(**create_kwargs)
 

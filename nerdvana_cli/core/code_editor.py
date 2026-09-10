@@ -138,14 +138,14 @@ class CodeEditor:
         diff_lines:   list[str]      = []
 
         for abs_path, new_text in new_contents.items():
-            # Read current file content (may not exist for new files)
-            try:
-                with open(abs_path, encoding="utf-8") as fh:
-                    original = fh.read()
-            except FileNotFoundError:
-                original = ""
+            # Fingerprint and validation must observe the same bytes. Reading
+            # in text mode would translate CRLF to LF and re-encoding that
+            # text yields a digest the raw-byte check in apply() can never
+            # reproduce; a file that has not been touched would read as stale.
+            raw      = _read_bytes(abs_path)
+            original = "" if raw is None else raw.decode("utf-8", errors="replace")
 
-            target_files[abs_path] = _sha256(original.encode())
+            target_files[abs_path] = _digest(raw)
 
             # Unified diff
             rel = _rel_path(abs_path, self._project_root)
@@ -441,13 +441,30 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _current_sha256(abs_path: str) -> str:
-    """Read file and return SHA256; return empty string if unreadable."""
+# Digest recorded for a path that does not exist (or cannot be read) at the
+# time it is fingerprinted. It must be distinct from any real file digest so
+# that "absent then, absent now" compares equal while "absent then, present
+# now" compares stale.
+_ABSENT_DIGEST = ""
+
+
+def _read_bytes(abs_path: str) -> bytes | None:
+    """Return raw file bytes, or None when the file is absent or unreadable."""
     try:
         with open(abs_path, "rb") as fh:
-            return _sha256(fh.read())
+            return fh.read()
     except OSError:
-        return ""
+        return None
+
+
+def _digest(data: bytes | None) -> str:
+    """SHA256 of raw bytes; the absent sentinel when there are none."""
+    return _ABSENT_DIGEST if data is None else _sha256(data)
+
+
+def _current_sha256(abs_path: str) -> str:
+    """Read file and return SHA256; return the absent sentinel if unreadable."""
+    return _digest(_read_bytes(abs_path))
 
 
 def _gen_preview_id(length: int = 12) -> str:

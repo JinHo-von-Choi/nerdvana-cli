@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
@@ -41,6 +43,11 @@ class ToolExecutor:
         "SafeDeleteSymbol",
     })
 
+    # Argument attributes that carry the file an edit tool is about to change,
+    # in resolution order. File tools expose ``path``; symbol tools expose
+    # ``relative_path``.
+    _EDIT_PATH_ATTRS: tuple[str, ...] = ("path", "relative_path", "file_path")
+
     def __init__(
         self,
         registry:           ToolRegistry,
@@ -66,46 +73,48 @@ class ToolExecutor:
 
         Unknown tools produce an error ToolResult inline — they do not raise.
         """
-        serial_calls:     list[tuple[dict[str, Any], Any]] = []
-        concurrent_calls: list[tuple[dict[str, Any], Any]] = []
+        # Each entry carries the position it came from, so scheduling a call
+        # into the concurrent group cannot move its result in the reply.
+        serial_calls:     list[tuple[int, dict[str, Any], Any]] = []
+        concurrent_calls: list[tuple[int, dict[str, Any], Any]] = []
 
-        for call in calls:
+        for index, call in enumerate(calls):
             tool = self._registry.get(call["name"])
             if tool is None:
                 # Produce inline error; will be appended later by caller
-                serial_calls.append((call, None))
+                serial_calls.append((index, call, None))
             elif tool.is_concurrency_safe:
-                concurrent_calls.append((call, tool))
+                concurrent_calls.append((index, call, tool))
             else:
-                serial_calls.append((call, tool))
+                serial_calls.append((index, call, tool))
 
-        results: list[ToolResult] = []
+        slots: list[ToolResult | None] = [None] * len(calls)
 
-        for call, tool in serial_calls:
+        for index, call, tool in serial_calls:
             if tool is None:
-                results.append(
-                    ToolResult(
-                        tool_use_id = call["id"],
-                        content     = f"Unknown tool: {call['name']}",
-                        is_error    = True,
-                    )
+                slots[index] = ToolResult(
+                    tool_use_id = call["id"],
+                    content     = f"Unknown tool: {call['name']}",
+                    is_error    = True,
                 )
                 continue
             result = await self._run_single(call, tool, context)
-            results.append(result)
+            slots[index] = result
             self._record_reminder(call, result)
+            self._fire_after_tool(call, result)
 
         if concurrent_calls:
             tasks = [
                 self._run_single(call, tool, context)
-                for call, tool in concurrent_calls
+                for _, call, tool in concurrent_calls
             ]
             concurrent_results = await asyncio.gather(*tasks)
-            results.extend(concurrent_results)
-            for (call, _), result in zip(concurrent_calls, concurrent_results, strict=False):
+            for (index, call, _), result in zip(concurrent_calls, concurrent_results, strict=False):
+                slots[index] = result
                 self._record_reminder(call, result)
+                self._fire_after_tool(call, result)
 
-        return results
+        return [result for result in slots if result is not None]
 
     async def _run_single(
         self,
@@ -171,13 +180,12 @@ class ToolExecutor:
                 is_error    = True,
             )
 
-        # Pre-edit checkpoint (opt-in, silently skipped when unavailable)
+        # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
         if (
             self._checkpoint_manager is not None
             and tool_use["name"] in self._EDIT_TOOL_NAMES
         ):
-            with contextlib.suppress(Exception):
-                self._checkpoint_manager.before_edit(tool_use["name"])
+            self._capture_checkpoint(tool_use["name"], parsed_args)
 
         import time
         from datetime import UTC, datetime
@@ -187,32 +195,60 @@ class ToolExecutor:
         exc_class: str | None = None
         success   = True
 
+        result_text = ""
+
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
             result.content     = tool.truncate_result(result.content)
             if result.is_error:
                 success = False
+            result_text = result.content
             return result
         except Exception as exc:  # noqa: BLE001
-            success   = False
-            exc_class = type(exc).__name__
+            success     = False
+            exc_class   = type(exc).__name__
+            result_text = f"Tool execution error: {exc}"
             return ToolResult(
                 tool_use_id = tool_id,
-                content     = f"Tool execution error: {exc}",
+                content     = result_text,
                 is_error    = True,
             )
         finally:
             if self._analytics_writer is not None:
-                duration_ms = int((time.perf_counter() - t0) * 1000)
+                duration_ms        = int((time.perf_counter() - t0) * 1000)
+                provider, model    = self._model_identity()
                 with contextlib.suppress(Exception):
                     self._analytics_writer.record_tool_call(
-                        tool_name   = tool_use["name"],
-                        start_ts    = start_ts,
-                        duration_ms = duration_ms,
-                        success     = success,
-                        error_class = exc_class,
+                        tool_name     = tool_use["name"],
+                        start_ts      = start_ts,
+                        duration_ms   = duration_ms,
+                        success       = success,
+                        error_class   = exc_class,
+                        provider      = provider,
+                        model         = model,
+                        # The call arguments were produced by the model, and the
+                        # result is fed back to it, so each side is priced the
+                        # way the provider bills it. The count stays local: a
+                        # finished tool must not wait on a counting API.
+                        input_tokens  = estimate_tokens(result_text),
+                        output_tokens = estimate_tokens(json.dumps(tool_input, ensure_ascii=False, default=str)),
                     )
+
+    def _model_identity(self) -> tuple[str | None, str | None]:
+        """Provider and model names to attribute a tool call to.
+
+        Either side is None when settings carry no usable string, which keeps a
+        stand-in settings object from writing a placeholder into the price
+        columns that the cost report reads.
+        """
+        model_cfg = getattr(self._settings, "model", None)
+        provider  = getattr(model_cfg, "provider", None)
+        model     = getattr(model_cfg, "model", None)
+        return (
+            provider if isinstance(provider, str) and provider else None,
+            model    if isinstance(model,    str) and model    else None,
+        )
 
     async def _ask_user_permission(self, tool_name: str, message: str) -> bool:
         """Prompt the user for explicit confirmation when a tool returns ASK.
@@ -257,6 +293,76 @@ class ToolExecutor:
             "ALLOW" if granted else "DENY",
         )
         return granted
+
+    def _fire_after_tool(self, call: dict[str, Any], result: ToolResult) -> None:
+        """Fire AFTER_TOOL hooks for a completed tool call.
+
+        This path returns tool results, not conversation messages, so a hook
+        that asks for an injection cannot be honoured here. That is reported
+        rather than dropped in silence.
+        """
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+
+        hook_ctx = HookContext(
+            event       = HookEvent.AFTER_TOOL,
+            settings    = self._settings,
+            tool_name   = call["name"],
+            tool_input  = call.get("input") or {},
+            tool_result = result,
+        )
+        for hr in self._hooks.fire(hook_ctx):
+            if hr.inject_messages:
+                logger.warning(
+                    "AFTER_TOOL hook requested %d message injection(s) after %s; "
+                    "the tool execution path cannot deliver them",
+                    len(hr.inject_messages),
+                    call["name"],
+                )
+
+    def _capture_checkpoint(self, tool_name: str, parsed_args: Any) -> None:
+        """Snapshot the files *tool_name* is about to change.
+
+        Passing the edit targets is what arms undo: ``before_edit`` copies
+        nothing when it receives no path. Every failure below is logged instead
+        of suppressed, because an undo facility that captures nothing while
+        appearing armed is the data-loss risk it exists to remove.
+        """
+        if self._checkpoint_manager is None:
+            return
+
+        try:
+            if not getattr(parsed_args, "apply", True):
+                # Preview-only symbol edit: nothing on disk changes.
+                return
+            targets = self._edit_targets(parsed_args)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "checkpoint: could not read the edit targets of %s (%s); "
+                "undo will not cover this edit",
+                tool_name,
+                exc,
+            )
+            return
+
+        if not targets:
+            logger.warning(
+                "checkpoint: %s exposed no edit target; undo will not cover this edit",
+                tool_name,
+            )
+            return
+
+        try:
+            self._checkpoint_manager.before_edit(tool_name, targets)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("checkpoint: capture failed before %s: %s", tool_name, exc)
+
+    def _edit_targets(self, parsed_args: Any) -> list[str]:
+        """Return the file paths carried by a parsed edit-tool argument object."""
+        for attr in self._EDIT_PATH_ATTRS:
+            value = getattr(parsed_args, attr, None)
+            if isinstance(value, str) and value.strip():
+                return [value]
+        return []
 
     def _record_reminder(self, call: dict[str, Any], result: ToolResult) -> None:
         """Record a completed tool call into the context reminder, if present."""

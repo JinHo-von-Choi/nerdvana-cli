@@ -98,7 +98,7 @@ class SymbolOverviewTool(BaseTool[SymbolOverviewArgs]):
         "properties": {
             "relative_path": {
                 "type":        "string",
-                "description": "Path to the source file (relative to project root or absolute)",
+                "description": "Path to the source file, relative to the project root",
             },
             "depth": {
                 "type":        "integer",

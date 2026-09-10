@@ -137,7 +137,7 @@ def _pricing_status(provider: str, model: str) -> str:
     info = pt._prices.get(provider.lower(), {}).get(model.lower(), {})  # noqa: SLF001
     if not info:
         return "unknown"
-    if info.get("input_per_1k", 0.0) == 0.0 and info.get("output_per_1k", 0.0) == 0.0:
+    if info.get("input_per_1m", 0.0) == 0.0 and info.get("output_per_1m", 0.0) == 0.0:
         return "tbd"
     return "ok"
 

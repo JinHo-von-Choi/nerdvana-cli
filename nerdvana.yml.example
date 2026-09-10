@@ -1,8 +1,8 @@
 # NerdVana CLI Configuration
-# Copy to ~/.config/nerdvana-cli/config.yml or ./nerdvana.yml
+# Copy to ~/.nerdvana/config.yml or ./nerdvana.yml
 
 model:
-  # Provider: anthropic, openai, gemini, groq, openrouter, xai, ollama, vllm, deepseek, mistral, cohere, together, zai, featherless, xiaomi_mimo, moonshot, dashscope
+  # Provider: anthropic, openai, gemini, groq, openrouter, xai, ollama, vllm, deepseek, mistral, cohere, together, zai, featherless, xiaomi_mimo, moonshot, dashscope, minimax, perplexity, fireworks, cerebras
   # Leave empty to auto-detect from model name
   provider: ""
 
@@ -10,13 +10,13 @@ model:
   # Anthropic: claude-sonnet-4-20250514, claude-opus-4-20250514
   # OpenAI: gpt-4.1, gpt-4o, o3
   # Gemini: gemini-2.5-flash, gemini-2.5-pro
-  # Groq: llama-3.3-70b-versatile, mixtral-8x7b-32768
+  # Groq: llama-3.3-70b-versatile, llama-3.1-8b-instant
   # Ollama: qwen3, llama3:70b, gemma2:9b
-  # DeepSeek: deepseek-chat, deepseek-reasoner
-  # Mistral: mistral-medium-latest, codestral-latest
+  # DeepSeek: deepseek-flash, deepseek-v4-pro
+  # Mistral: mistral-medium-3-5, mistral-large-latest, codestral-latest
   # Featherless: featherless-llama-3-70b
   # Xiaomi MiMo: mimo-v2.5-pro, mimo-v2-omni, mimo-v2-flash
-  # Moonshot AI (Kimi): kimi-k2-instruct, kimi-latest, moonshot-v1-128k
+  # Moonshot AI (Kimi): kimi-k3 (kimi-k2-instruct, kimi-latest, moonshot-v1-* are retired upstream)
   # Alibaba DashScope (Qwen): qwen3-coder-plus, qwen-max, qwen-turbo
   # MiniMax: MiniMax-M2, abab6.5s-chat
   # Perplexity: sonar-pro, sonar-reasoning-pro
@@ -36,6 +36,11 @@ model:
   # Xiaomi MiMo: MIMO_API_KEY or XIAOMI_API_KEY
   # Moonshot AI (Kimi): MOONSHOT_API_KEY or KIMI_API_KEY
   # Alibaba DashScope (Qwen): DASHSCOPE_API_KEY or ALIBABA_API_KEY
+  # ZAI (GLM): ZHIPUAI_API_KEY
+  # Cohere: CO_API_KEY
+  # Together AI: TOGETHER_API_KEY
+  # OpenRouter: OPENROUTER_API_KEY
+  # xAI (Grok): XAI_API_KEY
   # MiniMax: MINIMAX_API_KEY
   # Perplexity: PERPLEXITY_API_KEY or PPLX_API_KEY
   # Fireworks AI: FIREWORKS_API_KEY
@@ -94,6 +99,9 @@ session:
   default_context: standalone
   # Default runtime mode name (interactive, planning, etc.)
   default_mode: interactive
+  # Check GitHub Releases for a newer version on startup (cached 24h).
+  # Also disabled by --no-update-check or NERDVANA_NO_UPDATE_CHECK=1.
+  update_check: true
 
 checkpoint:
   enabled: true
@@ -104,6 +112,15 @@ hooks:
     - "builtin:context_injection"
   before_tool: []
   after_tool: []
+  # Run <cwd>/.nerdvana/hooks/*.py. Opting in is not sufficient on its own:
+  # each file must also match an approved digest in ~/.nerdvana/trusted_hooks.json.
+  # See docs/hooks.md.
+  allow_project_hooks: false
+
+# Register ListQueryableProjects / RegisterExternalProject / QueryExternalProject.
+# They hand a registered directory to a read-capable subprocess, so the family
+# stays unregistered until this is turned on.
+external_projects_enabled: false
 
 parism:
   # Use Parism for structured shell output (requires Node.js)
@@ -114,3 +131,6 @@ parism:
   format: json
   # Fallback to raw Bash when Parism is unavailable
   fallback_to_bash: true
+
+# Web search: the WebSearch tool reads BRAVE_API_KEY from the environment and
+# raises at call time when it is unset. There is no config key for it.

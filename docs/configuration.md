@@ -3,21 +3,34 @@
 NerdVana CLI reads configuration from, in order of decreasing priority:
 
 1. Command-line flags (`--config`, `--provider`, `--model`, `--max-tokens`, `--cwd`, `--verbose`)
-2. Environment variables (prefix `NERDVANA_`, plus provider-specific API keys)
-3. Config file from `--config <path>`
-4. `$NERDVANA_CONFIG` environment variable
-5. `./nerdvana.yml` (current working directory)
-6. `./nerdvana.yaml` (current working directory)
-7. `~/.config/nerdvana-cli/config.yml`
+2. Environment variables (the `NERDVANA_` names listed below, plus provider-specific API keys)
+3. The config file
+
+`NerdvanaSettings.load` walks these candidate files in order and stops at the
+first one that exists:
+
+1. the path given to `--config`
+2. `$NERDVANA_CONFIG`
+3. `./nerdvana.yml`
+4. `./nerdvana.yaml`
+5. `~/.nerdvana/config.yml`
+6. `~/.config/nerdvana-cli/config.yml`, the pre-migration location, still read so an
+   un-migrated install keeps working
+
+Only that one file is read. Keys absent from it fall back to the schema
+defaults below, never to a lower-priority file.
 
 ## Environment variables
 
 | Variable | Purpose |
 |----------|---------|
-| `NERDVANA_PROVIDER` | Provider name override |
-| `NERDVANA_MODEL` | Model name override |
-| `NERDVANA_MAX_TOKENS` | Max tokens per response |
 | `NERDVANA_CONFIG` | Path to YAML config file |
+| `NERDVANA_HOME` | Install root (read-only at runtime); default `~/.nerdvana-cli` |
+| `NERDVANA_DATA_HOME` | User data root; default `~/.nerdvana` |
+| `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | Register the external project tools (`external_projects_enabled` without a config file) |
+| `NERDVANA_EXTERNAL_PROJECTS_ROOT` | Boundary root the external project tools may not escape |
+| `NERDVANA_CWD` | Working directory override |
+| `NERDVANA_VERBOSE` | Verbose output |
 | `NERDVANA_NO_UPDATE_CHECK` | Set to `1` to disable the startup version check (same effect as `--no-update-check`) |
 | `ANTHROPIC_API_KEY` | Anthropic Claude |
 | `OPENAI_API_KEY` | OpenAI (also used by vLLM and Ollama as fallback) |
@@ -40,6 +53,13 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `PERPLEXITY_API_KEY` | Perplexity (`PPLX_API_KEY` accepted as fallback) |
 | `FIREWORKS_API_KEY` | Fireworks AI |
 | `CEREBRAS_API_KEY` | Cerebras |
+| `BRAVE_API_KEY` | Brave Search, used by the `WebSearch` tool. Without it `WebSearch` raises at call time; every other tool is unaffected. |
+
+`provider` and `model` have no environment override. The `NERDVANA_` prefix
+covers the scalar settings only: the nested blocks (`model`, `session`,
+`permissions`, `parism`, `hooks`, `checkpoint`) would have to be supplied as
+whole JSON documents, so use `--provider` / `--model`, the `/provider` and
+`/model` REPL commands, or the config file instead.
 
 ## `nerdvana.yml` schema
 
@@ -103,8 +123,16 @@ NerdVana CLI reads configuration from, in order of decreasing priority:
 | `session_start` | list[str] | `["builtin:context_injection"]` | Hook handler IDs |
 | `before_tool` | list[str] | `[]` | |
 | `after_tool` | list[str] | `[]` | |
+| `allow_project_hooks` | bool | `false` | Permit `<cwd>/.nerdvana/hooks/*.py` to run. Off by default, and an opt-in alone is not enough: each file must also match an approved SHA-256 digest. See [hooks.md](hooks.md). |
 
 Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) are auto-registered in `AgentLoop.__init__` and are not listed here.
+
+### Top-level keys
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `external_projects_enabled` | bool | `false` | Register `ListQueryableProjects`, `RegisterExternalProject`, and `QueryExternalProject`. These hand a registered directory to a read-capable subprocess, so the family stays unregistered until this is set. |
+| `model_history` | dict[str, str] | `{}` | Per-provider last-used model, written by `/model` and `/provider`. |
 
 ### MCP server quota
 
@@ -140,7 +168,7 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 
 ### Pricing maintenance
 
-`nerdvana_cli/providers/pricing.yml` stores USD/1k-token estimates used for cost reporting. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
+`nerdvana_cli/providers/pricing.yml` stores rates as USD per 1,000,000 tokens under the keys `input_per_1m` and `output_per_1m`, which is the unit vendors publish, so a value can be copied from a source table without conversion. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
 
 Scanning for stale entries:
 
@@ -232,6 +260,15 @@ session:
   default_mode: interactive
   show_activity: true
   update_check: true
+
+hooks:
+  session_start:
+    - builtin:context_injection
+  before_tool: []
+  after_tool: []
+  allow_project_hooks: false
+
+external_projects_enabled: false
 
 parism:
   enabled: true

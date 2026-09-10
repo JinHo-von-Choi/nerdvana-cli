@@ -11,10 +11,14 @@ Provides:
 """
 from __future__ import annotations
 
+import os
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from nerdvana_cli.utils.path import validate_path
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.lsp_client import LspClient
@@ -312,11 +316,11 @@ def _sym_from_dict(
 def _flatten(symbols: list[LanguageServerSymbol]) -> list[LanguageServerSymbol]:
     """Yield all symbols and their descendants in DFS order."""
     result: list[LanguageServerSymbol] = []
-    stack = list(symbols)
+    stack: deque[LanguageServerSymbol] = deque(symbols)
     while stack:
-        sym = stack.pop(0)
+        sym = stack.popleft()
         result.append(sym)
-        stack[:0] = sym.children   # prepend children (BFS-ish order)
+        stack.extendleft(reversed(sym.children))   # prepend children, order kept
     return result
 
 
@@ -440,13 +444,31 @@ class LanguageServerSymbolRetriever:
     # -- internal --
 
     def _resolve(self, path: str) -> str:
-        """Resolve relative path against project_root if not absolute."""
-        p = Path(path)
-        if p.is_absolute():
-            return str(p)
-        if self._project_root:
-            return str(Path(self._project_root) / p)
-        return str(p.resolve())
+        """Resolve *path* against the project root and refuse anything outside it.
+
+        Absolute inputs are rewritten relative to the root before the check, so
+        an absolute path that names a file inside the workspace still works
+        while one that points elsewhere is rejected. Parent traversals and
+        symlinks that leave the root are rejected too, because the comparison
+        runs on the fully resolved path.
+
+        Containment is delegated to
+        :func:`nerdvana_cli.utils.path.validate_path`, the same boundary the
+        file tools use.
+
+        Raises:
+            SymbolPathBoundaryError: *path* resolves outside the project root.
+        """
+        root      = os.path.realpath(self._project_root or os.getcwd())
+        candidate = path
+        if os.path.isabs(candidate):
+            candidate = os.path.relpath(os.path.realpath(candidate), root)
+
+        error = validate_path(candidate, root)
+        if error:
+            raise SymbolPathBoundaryError(f"{error} (project root: {root})")
+
+        return os.path.realpath(os.path.join(root, candidate))
 
     async def _request_document_symbols(
         self,
@@ -475,3 +497,7 @@ class LanguageServerSymbolRetriever:
 
 class LspSymbolError(Exception):
     """Raised when a symbol query cannot be completed."""
+
+
+class SymbolPathBoundaryError(LspSymbolError):
+    """Raised when a requested path resolves outside the project root."""

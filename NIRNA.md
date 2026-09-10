@@ -4,13 +4,13 @@
 - Install: `pip install -e ".[all]"` (all providers) or `pip install -e ".[anthropic]"` (specific)
 - One-line install: `curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash`
 - Dev install: `pip install -e ".[dev]"`
-- Test: `pytest` (pytest-asyncio auto mode, 1614 tests)
+- Test: `pytest` (pytest-asyncio auto mode, 1931 tests; `python scripts/sync_test_count.py` keeps this number honest)
 - Lint: `ruff check .` (line-length 120, 0 violations)
 - Format: `ruff format .`
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)
 
 ## Architecture
-- 21 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 18, Anthropic/Gemini separate)
+- 21 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 19, Anthropic/Gemini separate)
 - Tool pipeline: parse_args -> check_permissions (ALLOW/DENY/ASK) -> validate_input -> call
 - Concurrency: read-only tools parallel (asyncio.gather), write tools serial
 - Session: JSONL append-only logs, messages recorded after API response
@@ -61,12 +61,15 @@
 - Rich markup in tool_info must be escaped with replace("[", "\\[")
 
 ## Env Vars & Setup
-- API keys: provider-specific env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
-- Config search: --config flag -> NERDVANA_CONFIG env -> ./nerdvana.yml -> ~/.config/nerdvana-cli/config.yml
+- API keys: provider-specific env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.); BRAVE_API_KEY for WebSearch
+- NERDVANA_ env vars actually read: NERDVANA_HOME (install root), NERDVANA_DATA_HOME (user data root),
+  NERDVANA_CONFIG, NERDVANA_NO_UPDATE_CHECK, NERDVANA_RESUME, NERDVANA_EXTERNAL_PROJECTS_ROOT.
+  provider/model/max_tokens have no env override: env_prefix reaches nested models as JSON only.
+- Config search: --config flag -> NERDVANA_CONFIG env -> ./nerdvana.yml -> ./nerdvana.yaml -> ~/.nerdvana/config.yml -> ~/.config/nerdvana-cli/config.yml (legacy)
 - Config file permissions: 0o600 (API key protection)
 - First-run: auto-triggers interactive setup wizard if no config/API key
 - Parism: optional Node.js dependency, falls back to Bash if unavailable
-- MCP servers: .mcp.json (project) + ~/.config/nerdvana-cli/mcp.json (global)
+- MCP servers: .mcp.json (project) + ~/.nerdvana/mcp.json (global), both keyed on mcpServers
 
 ## Context Window
 - Auto-resolved per model via MODEL_CONTEXT_WINDOWS in providers/base.py
@@ -75,19 +78,28 @@
 - Compaction at compact_threshold (default 0.8): drops oldest messages, keeps recent 10
 
 ## Skills
-- Built-in: /review, /debug, /explain (nerdvana_cli/skills/)
-- Global: ~/.config/nerdvana-cli/skills/*.md
+- Built-in: /review, /debug, /explain, /compress-context (nerdvana_cli/skills/)
+- Global: ~/.nerdvana/skills/*.md
 - Project: .nerdvana/skills/*.md (highest priority, overrides same-name)
 - Format: YAML frontmatter (name, description, trigger) + markdown body
 - Activation: /trigger injects skill body into next system prompt (one-shot)
 
 ## Slash Commands
-/clear, /exit, /help, /init, /mcp, /model, /models, /provider, /q, /quit, /skills, /tokens, /tools, /update, /<skill-trigger>
+Defined in ui/widgets/command_menu.py (SLASH_COMMANDS):
+/help, /clear, /init, /model, /models, /provider, /mode, /context, /mcp, /tokens, /skills, /tools,
+/update, /memories, /undo, /redo, /checkpoints, /route-knowledge, /dashboard, /health, /thinking,
+/activity, /quit
+Aliases: /setup (= /init), /exit and /q (= /quit). /<skill-trigger> activates a loaded skill.
+
+## CLI Surface
+- Top level: run, setup, providers, version, serve, doctor, cost
+- Groups: session (list/resume/purge), mcp (list/add/remove), skill (list/show/install/remove),
+  memory (list/add/remove/purge), hook (pre-tool-use/post-tool-use/prompt-submit/list), admin acl (list/add/revoke)
 
 ## Gotchas
 - Provider auto-detection by model name prefix (claude- -> Anthropic, gpt- -> OpenAI, deepseek -> DeepSeek)
 - prompts.py "Tool Usage Judgment" section prevents infinite tool loops on simple questions
-- NIRNA.md 3-tier loading: global (~/.config/nerdvana-cli/) < project (NIRNA.md) < local (NIRNA.local.md)
+- NIRNA.md 3-tier loading: global (~/.nerdvana/NIRNA.md) < project (NIRNA.md) < local (NIRNA.local.md)
 - NIRNA.md is a LOCAL file. Use FileRead to view it, NOT MCP tools
 - Ollama/vLLM: no API key needed, but local servers must be running
 - ProviderConfig.__repr__ masks API key (first 4 + **** + last 4)
@@ -102,3 +114,6 @@
 - AgentTool reloads .nerdvana/agents/*.yml on each session start; edits to YAML require restart, not just rerun
 - LSP tools silently skip (return empty result) when no language server is configured or the LspClient handshake fails — never raise to the agent loop
 - HookContext.stop_reason defaults to None; ralph_loop_check only considers an iteration "stuck" when stop_reason == "end_turn" with no tool calls, not on other terminations
+- Project hooks (<cwd>/.nerdvana/hooks/) need hooks.allow_project_hooks AND a matching SHA-256 in ~/.nerdvana/trusted_hooks.json; global hooks (~/.nerdvana/hooks/) need neither
+- External project tools stay unregistered unless external_projects_enabled is true
+- pricing.yml is USD per 1,000,000 tokens (input_per_1m / output_per_1m), not per 1k

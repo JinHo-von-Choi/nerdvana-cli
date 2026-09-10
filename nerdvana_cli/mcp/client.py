@@ -55,6 +55,7 @@ class McpClient:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                limit=_MAX_RESPONSE_BYTES,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
@@ -63,13 +64,18 @@ class McpClient:
 
         self._reader_task = asyncio.create_task(self._read_loop())
 
-        result = await self._send_request("initialize", {
-            "protocolVersion": _MCP_PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": {"name": "nerdvana-cli", "version": "0.1.1"},
-        })
+        try:
+            result = await self._send_request("initialize", {
+                "protocolVersion": _MCP_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {"name": "nerdvana-cli", "version": "0.1.1"},
+            })
+            await self._send_notification("notifications/initialized", {})
+        except BaseException:
+            await self._teardown_stdio()
+            self._fail_pending(f"MCP handshake with '{self._config.name}' failed")
+            raise
 
-        await self._send_notification("notifications/initialized", {})
         self._connected = True
         return result
 
@@ -109,34 +115,56 @@ class McpClient:
 
     async def disconnect(self) -> None:
         """Gracefully shut down the MCP server connection."""
-        if not self._connected:
-            return
-
         self._connected = False
 
         if self._http_client:
             await self._http_client.aclose()
             self._http_client = None
 
-        if self._process and self._process.stdin:
-            self._process.stdin.close()
+        await self._teardown_stdio()
 
-        if self._reader_task and not self._reader_task.done():
-            self._reader_task.cancel()
+        self._fail_pending("Connection closed")
+
+    async def _teardown_stdio(self) -> None:
+        """Release the subprocess and reader task.
+
+        Driven by the resources that were actually created rather than by the
+        `_connected` flag, so a handshake that never completed still reclaims
+        the child process and its reader task.
+        """
+        process     = self._process
+        reader_task = self._reader_task
+
+        self._process     = None
+        self._reader_task = None
+
+        if process is not None and process.stdin is not None:
+            with contextlib.suppress(Exception):
+                process.stdin.close()
+
+        if reader_task is not None and not reader_task.done():
+            reader_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await self._reader_task
+                await reader_task
 
-        if self._process:
-            try:
-                self._process.terminate()
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
-            except (TimeoutError, ProcessLookupError):
-                self._process.kill()
-            self._process = None
+        if process is None or process.returncode is not None:
+            return
 
+        with contextlib.suppress(ProcessLookupError):
+            process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+        except TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            with contextlib.suppress(Exception):
+                await process.wait()
+
+    def _fail_pending(self, reason: str) -> None:
+        """Resolve every in-flight request with an error instead of letting it time out."""
         for future in self._pending.values():
             if not future.done():
-                future.set_exception(RuntimeError("Connection closed"))
+                future.set_exception(RuntimeError(reason))
         self._pending.clear()
 
     async def list_tools(self) -> list[dict[str, Any]]:
@@ -210,6 +238,12 @@ class McpClient:
 
         if self._http_client:
             return await self._http_send_request(message)
+
+        if self._reader_task is not None and self._reader_task.done():
+            raise RuntimeError(
+                f"MCP connection to '{self._config.name}' is closed; "
+                f"cannot send '{method}'"
+            )
 
         loop   = asyncio.get_event_loop()
         future: asyncio.Future[dict[str, Any]] = loop.create_future()
@@ -334,10 +368,20 @@ class McpClient:
     async def _read_loop(self) -> None:
         """Continuously read JSON-RPC responses from subprocess stdout."""
         assert self._process and self._process.stdout
+        stdout = self._process.stdout
 
         try:
             while True:
-                line = await self._process.stdout.readline()
+                try:
+                    line = await stdout.readline()
+                except ValueError:
+                    logger.error(
+                        "MCP server '%s' sent a line over the %d byte read limit; "
+                        "the stream position is lost, marking the connection dead",
+                        self._config.name,
+                        _MAX_RESPONSE_BYTES,
+                    )
+                    break
                 if not line:
                     break
 
@@ -376,3 +420,8 @@ class McpClient:
             pass
         except Exception:
             logger.exception("MCP read loop error")
+        finally:
+            self._connected = False
+            self._fail_pending(
+                f"MCP connection to '{self._config.name}' closed before a response arrived"
+            )

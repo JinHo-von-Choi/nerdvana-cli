@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import IO
 
 from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.utils.path import validate_path
 
 # ---------------------------------------------------------------------------
 # Scope enum
@@ -59,13 +60,26 @@ class MemoryEntry:
 # Helpers
 # ---------------------------------------------------------------------------
 
-_SAFE_NAME    = re.compile(r"^[A-Za-z0-9_./-]+$")
-_DOTDOT_GUARD = re.compile(r"(^|/)\.\.(/|$)")
+_SAFE_NAME     = re.compile(r"^[A-Za-z0-9_./-]+$")
+_DOTDOT_GUARD  = re.compile(r"(^|/)\.\.(/|$)")
+_ABSOLUTE_NAME = re.compile(r"^(?:[/\\]|[A-Za-z]:)")
 
 
 def _validate_name(name: str) -> None:
-    """Raise ValueError if *name* contains unsafe characters or path traversal."""
-    if not name or not _SAFE_NAME.match(name):
+    """Raise ValueError if *name* cannot serve as a relative memory path.
+
+    This inspects the raw string only and is a fast reject, not the boundary.
+    A name that passes here may still resolve outside its base directory
+    through a symlink, so :func:`_memory_path` re-checks the joined path.
+    """
+    if not name:
+        raise ValueError("Memory name must not be empty.")
+    if _ABSOLUTE_NAME.match(name):
+        raise ValueError(
+            f"Memory name {name!r} is invalid: absolute paths, UNC shares and "
+            "drive-letter prefixes are not allowed."
+        )
+    if not _SAFE_NAME.match(name):
         raise ValueError(
             f"Memory name {name!r} is invalid. "
             "Use only letters, digits, dot, underscore, hyphen, and slash."
@@ -77,11 +91,26 @@ def _validate_name(name: str) -> None:
 
 
 def _memory_path(base_dir: Path, name: str) -> Path:
-    """Resolve *name* (possibly slash-namespaced) to an absolute Path."""
+    """Resolve *name* (possibly slash-namespaced) to a path inside *base_dir*.
+
+    Args:
+        base_dir: Scope root that the returned path must stay under.
+        name:     Memory name, optionally slash-namespaced.
+
+    Returns:
+        The absolute path of the backing ``.md`` file.
+
+    Raises:
+        ValueError: *name* is malformed, or the joined path resolves outside
+            *base_dir*. The second case covers symlinked components, which
+            no amount of string inspection can detect.
+    """
     _validate_name(name)
-    if not name.endswith(".md"):
-        name = name + ".md"
-    return base_dir / name
+    filename = name if name.endswith(".md") else name + ".md"
+    escape = validate_path(filename, str(base_dir))
+    if escape is not None:
+        raise ValueError(f"Memory name {name!r} is invalid: {escape}")
+    return base_dir / filename
 
 
 def _locked_read(fp: IO[str]) -> str:

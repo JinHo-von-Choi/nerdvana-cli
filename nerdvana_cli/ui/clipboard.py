@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def copy_to_clipboard(text: str) -> bool:
     """Copy text to system clipboard. Returns True on success."""
     try:
-        import pyperclip
+        import pyperclip  # type: ignore[import-untyped,unused-ignore]
         pyperclip.copy(text)
         return True
     except Exception as exc:

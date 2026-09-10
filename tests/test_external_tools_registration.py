@@ -2,7 +2,8 @@
 
 Verifies M-1 fix: ListQueryableProjectsTool, RegisterExternalProjectTool,
 and QueryExternalProjectTool must appear in the registry returned by
-create_tool_registry().  Prior to the fix all three were absent.
+create_tool_registry() once external project support is enabled. Prior to the
+fix all three were absent. A caller that passes no settings gets none of them.
 
 작성자: 최진호
 작성일: 2026-04-18
@@ -15,9 +16,15 @@ import pytest
 from nerdvana_cli.tools.registry import create_tool_registry
 
 
+class _EnabledSettings:
+    """Settings carrying the external-project opt-in these tests assume."""
+
+    external_projects_enabled = True
+
+
 @pytest.fixture()
 def registry():
-    return create_tool_registry()
+    return create_tool_registry(settings=_EnabledSettings())
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +105,14 @@ def test_tools_absent_when_external_projects_disabled() -> None:
         external_projects_enabled = False
 
     reg = create_tool_registry(settings=_FakeSettings())
+    assert reg.get("ListQueryableProjects")   is None
+    assert reg.get("RegisterExternalProject") is None
+    assert reg.get("QueryExternalProject")    is None
+
+
+def test_tools_absent_when_no_settings_are_supplied() -> None:
+    """A caller with no settings carries no opt-in, so the gate stays closed."""
+    reg = create_tool_registry()
     assert reg.get("ListQueryableProjects")   is None
     assert reg.get("RegisterExternalProject") is None
     assert reg.get("QueryExternalProject")    is None

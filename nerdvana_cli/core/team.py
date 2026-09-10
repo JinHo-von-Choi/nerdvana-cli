@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,7 +50,7 @@ async def write_to_inbox(inbox_path: str, msg: TeammateMessage) -> None:
     messages = await read_inbox(inbox_path)
     messages.append(msg)
     data = [asdict(m) for m in messages]
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 async def read_inbox(inbox_path: str) -> list[TeammateMessage]:
@@ -55,8 +58,34 @@ async def read_inbox(inbox_path: str) -> list[TeammateMessage]:
     path = Path(inbox_path)
     if not path.exists():
         return []
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     return [TeammateMessage(**m) for m in raw]
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write *text* to *path* through a temporary file in the same directory.
+
+    The content is flushed to stable storage before ``os.replace`` moves it
+    over the target, so an interrupted write leaves the previous inbox intact
+    rather than a truncated file that would fail to parse and drop every
+    message it held.
+    """
+    fd, tmp_name = tempfile.mkstemp(
+        prefix = f".{path.name}.",
+        suffix = ".tmp",
+        dir    = str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, path)
+        tmp_name = ""
+    finally:
+        if tmp_name:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_name)
 
 
 # ---------------------------------------------------------------------------

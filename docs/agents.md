@@ -52,8 +52,12 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 
 ## Custom agent types
 
-Drop YAML files into `.nerdvana/agents/` in your project root. Each file
+Drop YAML files into `<cwd>/.nerdvana/agents/` in your project root. Each file
 defines one agent type.
+
+`AgentTool` reads that project directory only. `~/.nerdvana/agents/` is created
+alongside the other user-data directories and is reserved for a future global
+scope; definitions placed there are not loaded today.
 
 ### File format
 

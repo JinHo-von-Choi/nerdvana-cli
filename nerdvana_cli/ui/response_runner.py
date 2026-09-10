@@ -68,11 +68,27 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
             )
             await asyncio.sleep(0.5)
 
-    timer_task = asyncio.create_task(_update_thinking_timer())
+    timer_task  = asyncio.create_task(_update_thinking_timer())
+    accumulated = ""
+
+    def _teardown() -> None:
+        """Stop the timer and clear every in-progress marker from the UI.
+
+        Runs on the cancellation path as well as the error path, so a worker
+        that is torn down mid-stream cannot leave the timer task alive or the
+        streaming and tool-status widgets stuck in their active state.
+        """
+        nonlocal timer_running
+        timer_running = False
+        timer_task.cancel()
+        with contextlib.suppress(Exception):
+            tool_status.remove_class("active")
+        with contextlib.suppress(Exception):
+            streaming.remove_class("active")
+            streaming.reset()
 
     try:
-        accumulated = ""
-        chat_frame  = app.query_one("#chat-frame", VerticalScroll)
+        chat_frame = app.query_one("#chat-frame", VerticalScroll)
 
         assert app._agent_loop is not None
 
@@ -147,12 +163,18 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
             tools      = len(app._agent_loop.registry.all_tools()),
             parism     = app.parism_client is not None,
         )
+    except asyncio.CancelledError:
+        # CancelledError derives from BaseException, so the handler below never
+        # sees it. Without this branch a cancelled worker leaks the timer task,
+        # leaves the widgets marked active forever, and throws away everything
+        # the model had already streamed.
+        _teardown()
+        if accumulated.strip():
+            with contextlib.suppress(Exception):
+                app._add_chat_message(accumulated, raw_text=accumulated)
+        raise
     except Exception as e:
-        timer_running = False
-        timer_task.cancel()
-        tool_status.remove_class("active")
-        streaming.remove_class("active")
-        streaming.update("")
+        _teardown()
         app._add_chat_message(f"\n[bold red]Error: {e}[/bold red]")
     finally:
         app._is_generating = False

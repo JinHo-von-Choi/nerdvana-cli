@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerdvana-cli"
-version = "1.4.0"
+version = "1.5.0"
 description = "AI-powered CLI development tool — supports 21 AI platforms"
 readme = "README.md"
 license = {text = "MIT"}
@@ -37,23 +37,29 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# All providers — installs everything
+# Provider SDK ceilings bound one failure only: a new major of anthropic,
+# openai, google-genai or mcp arriving at install time and changing an API the
+# adapters call. They are not reproducibility. Two installs a week apart still
+# resolve to different minors, and a minor of a 0.x SDK can break just as hard
+# as a major. Raise a ceiling deliberately, after the adapter is exercised
+# against the new major, rather than by widening it to unblock a resolve.
+# All providers, installs everything
 all = [
-    "anthropic>=0.39.0",
-    "openai>=1.50.0",
-    "google-genai>=0.4.0",
-    "mcp>=1.0.0",
+    "anthropic>=0.39.0,<1.0",
+    "openai>=1.50.0,<3.0",
+    "google-genai>=0.4.0,<2.0",
+    "mcp>=1.0.0,<2.0",
 ]
 # Individual providers
-anthropic = ["anthropic>=0.39.0"]
-openai = ["openai>=1.50.0"]
-gemini = ["google-genai>=0.4.0"]
-mcp = ["mcp>=1.0.0"]
+anthropic = ["anthropic>=0.39.0,<1.0"]
+openai = ["openai>=1.50.0,<3.0"]
+gemini = ["google-genai>=0.4.0,<2.0"]
+mcp = ["mcp>=1.0.0,<2.0"]
 # Development
 dev = [
-    "anthropic>=0.39.0",
-    "openai>=1.50.0",
-    "google-genai>=0.4.0",
+    "anthropic>=0.39.0,<1.0",
+    "openai>=1.50.0,<3.0",
+    "google-genai>=0.4.0,<2.0",
     "tiktoken>=0.7.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -94,6 +100,7 @@ markers = [
     "lsp_integration: Tests requiring actual language server processes (pyright, typescript-language-server)",
     "slow: Tests taking > 1 second",
     "live: Live API smoke tests requiring provider env keys (skipped without keys)",
+    "security: Boundary and trust checks that reproduce a specific escape or bypass",
 ]
 
 [tool.mypy]

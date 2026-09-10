@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
+import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +45,39 @@ from nerdvana_cli.ui.widgets import (
 )
 from nerdvana_cli.utils.path import safe_open_fd, validate_path
 
+logger = logging.getLogger(__name__)
+
 _MAX_EDITOR_FILE_BYTES = 1_000_000
+
+
+def make_activity_change_callback(
+    app:           Any,
+    ui_thread_id:  int,
+) -> Callable[[ActivityState], None]:
+    """Build the callback AgentLoop uses to publish activity-state changes.
+
+    The agent loop runs as a Textual async worker, so it shares the thread that
+    owns the event loop. ``call_from_thread`` refuses to run there and raises,
+    which is why the indicator stayed frozen. The caller's thread is compared
+    against *ui_thread_id* and the widget is written directly when they match.
+
+    A failure here is logged rather than raised: the loop's activity dispatch
+    swallows exceptions, so an unlogged one would be undiagnosable.
+    """
+
+    def on_activity_change(state: ActivityState) -> None:
+        def apply() -> None:
+            app.query_one("#activity-indicator", ActivityIndicator).state = state
+
+        try:
+            if threading.get_ident() == ui_thread_id:
+                apply()
+            else:
+                app.call_from_thread(apply)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("activity indicator update failed: %s", exc)
+
+    return on_activity_change
 
 
 class NerdvanaApp(App[object]):
@@ -186,12 +221,7 @@ class NerdvanaApp(App[object]):
         )
         session  = SessionStorage()
 
-        def _on_activity_change(state: ActivityState) -> None:
-            self.call_from_thread(
-                lambda: self.query_one(
-                    "#activity-indicator", ActivityIndicator
-                ).__setattr__("state", state)
-            )
+        _on_activity_change = make_activity_change_callback(self, threading.get_ident())
 
         self._agent_loop = AgentLoop(
             settings           = self.settings,

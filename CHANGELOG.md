@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-11
+
+### Changed
+
+- Pricing rates in `providers/pricing.yml` are declared per 1,000,000 tokens (`input_per_1m` / `output_per_1m`) and `estimate_cost` divides accordingly. Vendors publish per-million rates, so the file now reads directly against their tables. Every provider snapshot was refreshed; entries whose rate could not be read from an official source carry an inline note saying so.
+- Anthropic entries include the Claude 5 models. Retired ids across several providers are annotated rather than silently carried.
+- Project-local hooks under `<cwd>/.nerdvana/hooks` require both an opt-in (`hooks.allow_project_hooks`, default off) and a recorded SHA-256 approval of the file. Global hooks are unaffected. Approve with `nerdvana_cli.core.user_hooks.trust_project_hook`.
+- External project tools register only when `external_projects_enabled` is true. The setting is now a declared field and defaults to false.
+- Edit checkpoints copy the files an edit will touch instead of stashing the repository. Unstaged and untracked work stays in the working tree. `undo` and `redo` operate on those copies. Copies are capped at 5 MiB per file and 64 paths per edit, and reclaimed after seven days. Checkpoint entries left by earlier builds are listed as `legacy-stash` and never removed automatically.
+- Symbol tools resolve paths against the project root and refuse targets outside it.
+- `acl add` and `acl revoke` write `mcp_acl.yml` and exit non-zero when the write fails. A restart is required for a running server to pick the change up.
+- `serve` accepts `--tls-key` and passes the TLS material to the HTTP server. Startup is refused when TLS arguments are given but cannot be applied, including under stdio.
+- Tool results come back in the order the calls were given, regardless of which ran concurrently.
+- `_git_info` caches per working directory for 30 seconds and refreshes off the event loop.
+- Symbol edit tools share one base class and run their file access on a worker thread.
+- Provider SDK dependencies carry upper bounds.
+- CI runs mypy without `--ignore-missing-imports` and on a daily schedule in addition to push and pull request.
+
+### Added
+
+- `scripts/check_docs_consistency.py` and `tests/docs/` verify documented environment variables, tool names and counts, provider counts, paths and subcommands against the code.
+- `security` pytest marker for boundary reproduction tests; run them with `pytest -m security`.
+- Analytics rows are recorded for tool calls with provider, model and token counts, so `nerdvana cost` and the dashboard read populated data.
+- `AFTER_TOOL` and `BEFORE_API_CALL` hooks fire from the tool executor and the agent loop. Messages a `BEFORE_API_CALL` handler injects reach the same request.
+- Coverage for `ui/response_runner.py`, `ui/command_dispatcher.py` and `commands/memory_commands.py`.
+
+### Fixed
+
+- MCP stdio responses larger than the previous reader limit no longer leave the connection in a state where later requests wait for the full timeout. A failed `connect` reclaims the subprocess and reader task.
+- Multi-line LSP edits keep the text following the end position. File URIs are percent-decoded, and files that cannot be opened are reported rather than skipped silently.
+- Concurrent LSP requests are serialised, and responses whose id does not match the caller are held for their own caller instead of being dropped.
+- Preview fingerprints and their validation read the same bytes, so unchanged CRLF files and new files no longer report a stale preview.
+- `Grep` opens files through the same guarded path helper the file tools use.
+- The update notice is printed after subcommand dispatch and goes to stderr under `serve`, leaving stdout to JSON-RPC.
+- Naive compaction drops tool results whose originating call is no longer present.
+- The `stream_options` retry in the OpenAI provider is limited to the responses that indicate the parameter is unsupported, so authentication and rate limit failures surface once.
+- Gemini tool calls carry their identifier through the streaming path, and tool names resolve from a recorded mapping rather than being parsed back out of the identifier.
+- Cancelling a generation stops its timer task, clears the streaming and tool status state, and commits the text received so far.
+- Context profile names are validated and resolved through `core/paths`, so `NERDVANA_DATA_HOME` is honoured.
+- Memory names cannot resolve outside the memory directory.
+- File writes replace their target atomically.
+- `hook-bridge` denies a prompt submission when the sanitizer rejects it.
+- The wrapper written by `install.sh` keeps the `NERDVANA_HOME` chosen at install time.
+
 ## [1.4.0] - 2026-07-05
 
 ### Changed

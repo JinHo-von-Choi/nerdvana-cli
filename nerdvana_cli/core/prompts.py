@@ -6,9 +6,12 @@ and composed dynamically based on active tools and configuration.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import platform
 import subprocess
+import threading
+import time
 from typing import Any
 
 from nerdvana_cli.core.nirnamd import format_nirna_for_prompt, load_nirna_files
@@ -230,10 +233,86 @@ def _output_efficiency_section() -> str:
     )
 
 
+# Git state is read once per cache window instead of once per turn.
+#
+# _collect_git_info spawns five subprocesses, which costs tens of milliseconds
+# on a cold page cache and blocks whichever thread calls it. The prompt builder
+# runs on the event-loop thread, so an uncached call stalls the whole UI on
+# every turn. The cache below makes that cost land once per
+# _GIT_CACHE_TTL_SECONDS; a stale entry is served as-is and refreshed on a
+# worker thread, so the loop thread never waits again for a given directory.
+
+_GIT_CACHE_TTL_SECONDS = 30.0
+
+_git_cache:      dict[str, tuple[float, dict[str, str]]] = {}
+_git_refreshing: set[str]                                = set()
+_git_cache_lock                                          = threading.Lock()
+
+
+def clear_git_info_cache() -> None:
+    """Drop every cached git snapshot. Intended for tests and cwd switches."""
+    with _git_cache_lock:
+        _git_cache.clear()
+        _git_refreshing.clear()
+
+
 def _git_info(cwd: str) -> dict[str, str]:
+    """Return a cached git snapshot for *cwd*, refreshing stale entries off-thread."""
+    key = os.path.abspath(cwd or ".")
+    now = time.monotonic()
+
+    with _git_cache_lock:
+        entry = _git_cache.get(key)
+        if entry is not None and now - entry[0] < _GIT_CACHE_TTL_SECONDS:
+            return dict(entry[1])
+        needs_refresh = entry is not None and key not in _git_refreshing
+        if needs_refresh:
+            _git_refreshing.add(key)
+
+    if entry is None:
+        return dict(_store_git_info(key))
+
+    if needs_refresh:
+        threading.Thread(
+            target = _refresh_git_info,
+            args   = (key,),
+            name   = "nerdvana-git-info",
+            daemon = True,
+        ).start()
+    return dict(entry[1])
+
+
+def _store_git_info(key: str) -> dict[str, str]:
+    """Collect a fresh snapshot for *key* and publish it to the cache."""
+    info = _collect_git_info(key)
+    with _git_cache_lock:
+        _git_cache[key] = (time.monotonic(), info)
+    return info
+
+
+def _refresh_git_info(key: str) -> None:
+    """Worker-thread entry point for a stale cache entry."""
+    try:
+        _store_git_info(key)
+    finally:
+        with _git_cache_lock:
+            _git_refreshing.discard(key)
+
+
+async def warm_git_info(cwd: str) -> None:
+    """Fill the git cache from a worker thread before a prompt is built.
+
+    Callers running on an event loop should await this once per turn so the
+    very first ``build_system_prompt`` for a directory does not run its
+    subprocesses on the loop thread.
+    """
+    await asyncio.to_thread(_git_info, cwd)
+
+
+def _collect_git_info(cwd: str) -> dict[str, str]:
     """Return git branch, status summary, main branch, recent commits.
 
-    All failures return empty strings. Never raise. Never block.
+    All failures return empty strings. Never raise.
     """
     def _run(*args: str) -> str:
         try:

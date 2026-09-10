@@ -70,6 +70,9 @@ CREATE TABLE IF NOT EXISTS sessions (
 class PricingTable:
     """Loads provider/model pricing from ``providers/pricing.yml``.
 
+    Rates are USD per 1,000,000 tokens (``input_per_1m`` / ``output_per_1m``),
+    matching how vendors publish them.
+
     Provides ``estimate_cost(provider, model, input_tokens, output_tokens)``.
     Falls back to 0.0 when a model is not in the table.
     """
@@ -115,8 +118,8 @@ class PricingTable:
         info = self._prices.get(provider.lower(), {}).get(model.lower(), {})
         if not info:
             return 0.0
-        input_cost  = info.get("input_per_1k",  0.0) * input_tokens  / 1000.0
-        output_cost = info.get("output_per_1k", 0.0) * output_tokens / 1000.0
+        input_cost  = info.get("input_per_1m",  0.0) * input_tokens  / 1_000_000.0
+        output_cost = info.get("output_per_1m", 0.0) * output_tokens / 1_000_000.0
         return input_cost + output_cost
 
     def known_providers(self) -> list[str]:
