@@ -35,10 +35,12 @@ CHANGELOG = REPO_ROOT / "CHANGELOG.md"
 #   "===... 465 tests collected in 1.71s ===..."
 _COLLECTED_RE = re.compile(r"(\d+)\s+tests collected")
 
-# NIRNA.md target: "(pytest-asyncio auto mode, 272 tests)"
-# Captures the prefix "pytest-asyncio auto mode, " and the old count.
+# NIRNA.md target: "(pytest-asyncio auto mode, 272 tests)" and any variant that
+# continues past the count, such as "..., 272 tests; see scripts/...)".
+# Anchoring on the closing paren silently stopped matching once that sentence
+# grew, which left the count drifting while this script reported no change.
 _NIRNA_RE = re.compile(
-    r"(\(pytest-asyncio auto mode, )(\d+)( tests\))",
+    r"(\(pytest-asyncio auto mode, )(\d+)( tests)",
     re.ASCII,
 )
 
