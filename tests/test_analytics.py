@@ -7,6 +7,14 @@ from pathlib import Path
 
 import pytest
 
+# Fixed synthetic rates, in the same USD-per-1M unit the real table uses.
+# The cost tests below check that a cost is computed and summed, not what any
+# real model charges, so they must not read providers/pricing.yml.
+SYNTHETIC_PRICING = """\
+acme:
+  m1: {input_per_1m: 2.0, output_per_1m: 4.0}
+"""
+
 
 @pytest.fixture
 def tmp_db(tmp_path: Path) -> Path:
@@ -14,9 +22,18 @@ def tmp_db(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def writer(tmp_db: Path):
+def synthetic_pricing(tmp_path: Path):
+    """PricingTable backed by rates no pricing refresh will move."""
+    from nerdvana_cli.core.analytics import PricingTable
+    pricing_path = tmp_path / "pricing.yml"
+    pricing_path.write_text(SYNTHETIC_PRICING, encoding="utf-8")
+    return PricingTable(pricing_path=pricing_path)
+
+
+@pytest.fixture
+def writer(tmp_db: Path, synthetic_pricing):
     from nerdvana_cli.core.analytics import AnalyticsWriter
-    return AnalyticsWriter(db_path=tmp_db, enabled=True)
+    return AnalyticsWriter(db_path=tmp_db, pricing_table=synthetic_pricing, enabled=True)
 
 
 @pytest.fixture
@@ -100,8 +117,8 @@ class TestAnalyticsWriter:
             start_ts     = ts,
             duration_ms  = 120,
             success      = True,
-            provider     = "anthropic",
-            model        = "claude-sonnet-4-6",
+            provider     = "acme",
+            model        = "m1",
             input_tokens = 100,
             output_tokens= 50,
         )
@@ -131,22 +148,22 @@ class TestAnalyticsWriter:
     def test_cost_computed_on_write(self, writer, tmp_db: Path) -> None:
         writer.start_session("sess-005")
         ts = datetime.now(UTC).isoformat()
-        # claude-sonnet-4-6: input $3/1k, output $15/1k
+        # acme/m1: input $2/1M, output $4/1M
         writer.record_tool_call(
             tool_name    = "Ask",
             start_ts     = ts,
             duration_ms  = 200,
             success      = True,
-            provider     = "anthropic",
-            model        = "claude-sonnet-4-6",
-            input_tokens = 1000,
-            output_tokens= 500,
+            provider     = "acme",
+            model        = "m1",
+            input_tokens = 1_000_000,
+            output_tokens= 500_000,
         )
         conn = sqlite3.connect(str(tmp_db))
         row  = conn.execute("SELECT cost_usd FROM tool_calls WHERE session_id='sess-005'").fetchone()
         conn.close()
-        # 1000*3/1000 + 500*15/1000 = 3 + 7.5 = 10.5
-        assert abs(row[0] - 10.5) < 0.001
+        # 1M*2/1M + 500k*4/1M = 2 + 2 = 4
+        assert abs(row[0] - 4.0) < 0.001
 
     def test_disabled_writer_no_writes(self, tmp_db: Path) -> None:
         from nerdvana_cli.core.analytics import AnalyticsWriter
@@ -186,14 +203,14 @@ class TestAnalyticsReader:
             start_ts     = ts,
             duration_ms  = 100,
             success      = True,
-            provider     = "anthropic",
-            model        = "claude-sonnet-4-6",
-            input_tokens = 1000,
+            provider     = "acme",
+            model        = "m1",
+            input_tokens = 1_000_000,
             output_tokens= 0,
         )
         cost = reader.session_cost("sess-cost")
-        # 1000 input tokens * $3/1k = $3
-        assert abs(cost - 3.0) < 0.001
+        # 1M input tokens * $2/1M = $2
+        assert abs(cost - 2.0) < 0.001
 
     def test_recent_tool_buckets(self, writer, reader) -> None:
         writer.start_session("sess-buckets")

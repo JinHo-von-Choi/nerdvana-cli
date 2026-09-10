@@ -70,14 +70,16 @@ def create_tool_registry(
         from nerdvana_cli.tools.swarm_tool import SwarmTool
         registry.register(SwarmTool(settings=settings, task_registry=_task_reg))
 
-    # Phase H: external project tools (always registered; subprocess-isolated)
+    # Phase H: external project tools, gated on an explicit opt-in. A caller
+    # that carries no setting gets the closed state, so a missing switch can
+    # never widen what a session may reach.
     from nerdvana_cli.tools.external_project_tools import (
         ListQueryableProjectsTool,
         QueryExternalProjectTool,
         RegisterExternalProjectTool,
     )
 
-    _ext_projects_enabled = getattr(settings, "external_projects_enabled", True) if settings else True
+    _ext_projects_enabled = bool(getattr(settings, "external_projects_enabled", False)) if settings else False
     if _ext_projects_enabled:
         registry.register(ListQueryableProjectsTool())
         registry.register(RegisterExternalProjectTool())

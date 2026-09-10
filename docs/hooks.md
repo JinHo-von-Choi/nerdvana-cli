@@ -111,14 +111,42 @@ Fires on `stop_reason == "end_turn"` and scans the most recent assistant message
 NerdVana CLI auto-loads any `*.py` file from these directories on every
 `AgentLoop` initialization:
 
-| Path | Scope |
-|------|-------|
-| `~/.config/nerdvana-cli/hooks/` | Global — applies to every project |
-| `<cwd>/.nerdvana/hooks/` | Project-local — checked in or per-project |
+| Path | Scope | Runs by default |
+|------|-------|-----------------|
+| `~/.nerdvana/hooks/` | Global, applies to every project | Yes |
+| `<cwd>/.nerdvana/hooks/` | Project-local | No, see below |
 
 Files starting with `_` are skipped. Failures (import errors, missing
 `register`, register raising) are logged and skipped — they never crash
 the agent loop.
+
+### Project-local hooks are opt-in and per-file approved
+
+A project hook is arbitrary Python carried by a repository, so cloning an
+untrusted repository must not be enough to execute it. Both conditions have
+to hold before one runs:
+
+1. `hooks.allow_project_hooks: true` in the active config file. Without it
+   every file under `<cwd>/.nerdvana/hooks/` is skipped with a log line
+   naming the setting.
+2. The file's SHA-256 digest matches the digest recorded for that exact
+   absolute path in `~/.nerdvana/trusted_hooks.json`. A hook with no record,
+   or one whose bytes changed since approval, is skipped as unapproved.
+
+Approval is bound to the bytes present at the moment it is granted, so any
+later edit, yours or a `git pull`'s, revokes it until it is granted again.
+Record an approval with:
+
+```python
+from pathlib import Path
+from nerdvana_cli.core.user_hooks import trust_project_hook
+
+trust_project_hook(Path(".nerdvana/hooks/my_hook.py"))
+```
+
+`revoke_project_hook(path)` drops one approval; deleting
+`~/.nerdvana/trusted_hooks.json` drops all of them. Global hooks live under
+your own data directory and are subject to neither condition.
 
 ### Module contract
 

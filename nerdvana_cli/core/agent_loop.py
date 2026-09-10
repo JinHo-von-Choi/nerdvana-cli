@@ -11,12 +11,14 @@ import json
 import logging
 import math
 import re
+import uuid
 from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from nerdvana_cli.core.activity_state import ActivityState
+from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
@@ -96,6 +98,24 @@ def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
     return early + recent
 
 
+def _drop_orphan_tool_results(msgs: list[Any]) -> list[Any]:
+    """Remove tool results whose originating tool_use is no longer in *msgs*.
+
+    Truncation can cut an assistant message that requested tools while keeping
+    the results it produced. Providers reject a tool_result that has no
+    matching tool_use, so the widowed results are dropped here.
+    """
+    known_ids: set[str] = set()
+    kept: list[Any] = []
+    for msg in msgs:
+        if msg.role == Role.ASSISTANT and msg.tool_uses:
+            known_ids.update(str(tu.get("id", "")) for tu in msg.tool_uses)
+        elif msg.role == Role.TOOL and str(msg.tool_use_id or "") not in known_ids:
+            continue
+        kept.append(msg)
+    return kept
+
+
 class AgentLoop:
     """Orchestrates provider calls, tool execution, and session recording."""
 
@@ -108,6 +128,8 @@ class AgentLoop:
         team_registry:       Any = None,
         on_activity_change:  Callable[[ActivityState], None] | None = None,
         on_thinking_chunk:   Callable[[str], None] | None = None,
+        analytics_writer:    AnalyticsWriter | None = None,
+        pricing_table:       PricingTable | None = None,
     ) -> None:
         self.settings             = settings
         self.registry             = registry
@@ -158,12 +180,22 @@ class AgentLoop:
             per_session_max = _cp_max,
             enabled         = _cp_enabled,
         )
+        self._pricing_table     = pricing_table or PricingTable()
+        self._analytics_writer  = analytics_writer or AnalyticsWriter(pricing_table=self._pricing_table)
+        self._analytics_writer.start_session(
+            session_id = self.session.session_id,
+            mode       = self.settings.model.provider or None,
+            context    = self.settings.cwd or None,
+        )
+        self._usage_input_total  = 0
+        self._usage_output_total = 0
         self.tool_executor = ToolExecutor(
             registry            = self.registry,
             hooks               = self.hooks,
             settings            = self.settings,
             reminder            = self._reminder,
             checkpoint_manager  = self._checkpoint_manager,
+            analytics_writer    = self._analytics_writer,
         )
         self.loop_hook_engine = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
         from nerdvana_cli.core.activity_hooks import register_activity_hooks
@@ -174,9 +206,53 @@ class AgentLoop:
         for key, value in kwargs.items():
             setattr(self.activity_state, key, value)
         if self._on_activity_change is not None:
-            import contextlib
-            with contextlib.suppress(Exception):
+            try:
                 self._on_activity_change(self.activity_state)
+            except Exception:  # noqa: BLE001
+                # A broken indicator must never abort a turn, but a failure that
+                # leaves no trace hides itself for as long as nobody looks.
+                logger.warning("activity change callback failed", exc_info=True)
+
+    def _record_session_totals(self) -> None:
+        """Refresh the analytics session row with cumulative tokens and cost.
+
+        Called at the end of every turn: the loop has no shutdown of its own,
+        so the row is kept current rather than written once at exit.
+        """
+        cost = self._pricing_table.estimate_cost(
+            self.settings.model.provider or "",
+            self.settings.model.model or "",
+            self._usage_input_total,
+            self._usage_output_total,
+        )
+        self._analytics_writer.end_session(
+            token_total = self._usage_input_total + self._usage_output_total,
+            cost_total  = cost,
+        )
+
+    def _fire_before_api_call(self, tools: list[Any]) -> bool:
+        """Run BEFORE_API_CALL handlers just before a provider request goes out.
+
+        Returns True when a handler injected messages, in which case the caller
+        rebuilds the provider payload so the injection reaches this same call.
+        """
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        ctx = HookContext(
+            event    = HookEvent.BEFORE_API_CALL,
+            settings = self.settings,
+            tools    = tools,
+            messages = self.state.messages,
+            extra    = {"agent_loop": self},
+        )
+        injected = False
+        for hr in self.hooks.fire(ctx):
+            for msg in hr.inject_messages:
+                content = msg.get("content")
+                if not content:
+                    continue
+                self.state.messages.append(Message(role=Role.USER, content=str(content)))
+                injected = True
+        return injected
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
         pname = ProviderName(self.settings.model.provider) if self.settings.model.provider else None
@@ -266,6 +342,7 @@ class AgentLoop:
                 yield event
         finally:
             self.settings.model.extended_thinking = original_et
+            self._record_session_totals()
 
     async def _run_plan_agent(self, prompt: str) -> str:
         from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
@@ -303,7 +380,7 @@ class AgentLoop:
                 self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
-        self.state.messages = compact_messages(self.state.messages, thr)
+        self.state.messages = _drop_orphan_tool_results(compact_messages(self.state.messages, thr))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
 
     def _handle_max_tokens_stop(self) -> bool:
@@ -372,9 +449,10 @@ class AgentLoop:
             self.session.record_assistant_message(asst_text, tool_uses)
         for tu in tool_uses:
             yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
+        names_by_id = {tu["id"]: tu["name"] for tu in tool_uses}
         results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
-        for i, tr in enumerate(results):
-            tname = tool_uses[i]['name'] if i < len(tool_uses) else 'unknown'
+        for tr in results:
+            tname = names_by_id.get(tr.tool_use_id, "unknown")
             yield f"{TOOL_DONE_PREFIX}{tname} [{'error' if tr.is_error else 'done'}]"
         self.state.messages.append(Message(
             role      = Role.ASSISTANT,
@@ -389,7 +467,7 @@ class AgentLoop:
                 is_error    = tr.is_error,
             ))
             self.session.record_tool_result(
-                tool_name   = tr.tool_use_id.split(":")[0] if ":" in tr.tool_use_id else "unknown",
+                tool_name   = names_by_id.get(tr.tool_use_id, "unknown"),
                 tool_use_id = tr.tool_use_id,
                 content     = tr.content,
                 is_error    = tr.is_error,
@@ -420,6 +498,8 @@ class AgentLoop:
                     self.console.print(f"[dim]Turn {state.iteration} — {len(self.state.messages)} messages[/dim]")
 
                 messages = self._to_provider_messages()
+                if self._fire_before_api_call(tools):
+                    messages = self._to_provider_messages()
                 try:
                     asst_text       = ""
                     thinking_buffer = ""
@@ -441,11 +521,16 @@ class AgentLoop:
                                 with _cl.suppress(Exception):
                                     self._on_thinking_chunk(thinking_buffer)
                         elif ev.type == "tool_use_complete":
-                            tool_uses.append({"id": ev.tool_use_id or f"call_{len(tool_uses)}",
-                                              "name": ev.tool_name, "input": ev.tool_input_complete or {}})
+                            tool_uses.append({
+                                "id": ev.tool_use_id or f"call_{ev.tool_name}_{uuid.uuid4().hex[:8]}",
+                                "name": ev.tool_name,
+                                "input": ev.tool_input_complete or {},
+                            })
                         elif ev.type == "usage" and ev.usage:
                             self.state.usage.input_tokens  = ev.usage.get("input_tokens", 0)
                             self.state.usage.output_tokens = ev.usage.get("output_tokens", 0)
+                            self._usage_input_total  += self.state.usage.input_tokens
+                            self._usage_output_total += self.state.usage.output_tokens
                         elif ev.type == "done":
                             stop = ev.stop_reason
                             if stop == "max_tokens":
@@ -505,6 +590,7 @@ class AgentLoop:
     ) -> AsyncGenerator[str, None]:
         """Non-streaming fallback when provider streaming fails."""
         for _ in range(10):
+            self._fire_before_api_call(tools)
             try:
                 result = await self.provider.send(system_prompt, self._to_provider_messages(), tools)
             except Exception as e:
@@ -519,6 +605,8 @@ class AgentLoop:
             if usage:
                 self.state.usage.input_tokens  = usage.get("input_tokens", 0)
                 self.state.usage.output_tokens = usage.get("output_tokens", 0)
+                self._usage_input_total  += self.state.usage.input_tokens
+                self._usage_output_total += self.state.usage.output_tokens
             if tool_uses:
                 self.state.messages.append(Message(role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses))
                 if content:

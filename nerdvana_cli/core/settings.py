@@ -56,6 +56,10 @@ class HookConfig(BaseModel):
     session_start: list[str] = Field(default_factory=lambda: ["builtin:context_injection"])
     before_tool: list[str] = Field(default_factory=list)
     after_tool: list[str] = Field(default_factory=list)
+    # Project-local hooks (<cwd>/.nerdvana/hooks/*.py) execute code carried
+    # by the repository, so they stay off until the user opts in and
+    # approves each file's digest. See core.user_hooks.
+    allow_project_hooks: bool = False
 
 
 class CheckpointConfig(BaseModel):
@@ -73,6 +77,10 @@ class NerdvanaSettings(BaseSettings):
     hooks: HookConfig = Field(default_factory=HookConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
+    # External project tools hand a registered directory to a read-capable
+    # subprocess, so the whole family stays off until the user opts in.
+    # See tools.external_project_tools.
+    external_projects_enabled: bool = False
     cwd: str = "."
     verbose: bool = False
     config_path: str = ""
@@ -118,6 +126,8 @@ class NerdvanaSettings(BaseSettings):
                     settings.hooks = HookConfig(**data["hooks"])
                 if "checkpoint" in data:
                     settings.checkpoint = CheckpointConfig(**data["checkpoint"])
+                if "external_projects_enabled" in data:
+                    settings.external_projects_enabled = bool(data["external_projects_enabled"])
                 if "model_history" in data and isinstance(data["model_history"], dict):
                     settings.model_history = {
                         str(k): str(v) for k, v in data["model_history"].items()

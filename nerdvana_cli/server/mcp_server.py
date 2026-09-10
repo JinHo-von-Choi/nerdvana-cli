@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextvars
 import json
 import logging as _logging
+import ssl
 import sys
 import time
 from pathlib import Path
@@ -166,6 +167,20 @@ _WRITE_TOOLS: frozenset[str] = frozenset({
 
 
 # ---------------------------------------------------------------------------
+# TLS configuration
+# ---------------------------------------------------------------------------
+
+
+class TlsConfigurationError(RuntimeError):
+    """Raised when TLS material is supplied but cannot be wired to the socket.
+
+    Startup aborts instead of degrading to plaintext: an operator who passes
+    certificate options believes the transport is encrypted, and a silently
+    ignored option would put bearer tokens on the wire in the clear.
+    """
+
+
+# ---------------------------------------------------------------------------
 # NerdvanaMcpServer
 # ---------------------------------------------------------------------------
 
@@ -184,9 +199,14 @@ class NerdvanaMcpServer:
     port:
         Listen port for HTTP transport.
     tls_cert:
-        Path to TLS certificate file (PEM).  Enables mTLS when set.
+        Path to the server certificate (PEM).  Enables TLS on the http
+        transport.  May be a bundle that also carries the private key.
+    tls_key:
+        Path to the private key (PEM).  Required unless ``tls_cert`` already
+        contains the key.
     tls_ca:
-        Path to CA certificate for peer verification.
+        Path to CA certificate for peer verification.  Setting it turns on
+        client-certificate verification (mTLS).
     auth_manager:
         Injected AuthManager (default: ``AuthManager()``).
     acl_manager:
@@ -203,6 +223,7 @@ class NerdvanaMcpServer:
         host:             str                      = "127.0.0.1",
         port:             int                      = 10830,
         tls_cert:         Path | None              = None,
+        tls_key:          Path | None              = None,
         tls_ca:           Path | None              = None,
         auth_manager:     AuthManager | None       = None,
         acl_manager:      ACLManager  | None       = None,
@@ -218,10 +239,19 @@ class NerdvanaMcpServer:
         self.host          = host
         self.port          = port
         self.tls_cert      = tls_cert
+        self.tls_key       = tls_key
         self.tls_ca        = tls_ca
         # Phase H: working directory override and mode name.
         self.project_path  = project_path
         self.mode          = mode
+
+        # uvicorn ssl_* parameters, materialised from the TLS inputs above.
+        # Left at the plaintext defaults only when no TLS option was supplied.
+        self._ssl_certfile:  str | None = None
+        self._ssl_keyfile:   str | None = None
+        self._ssl_ca_certs:  str | None = None
+        self._ssl_cert_reqs: int        = ssl.CERT_NONE
+        self._configure_tls()
 
         self._auth:           AuthManager          = auth_manager   or AuthManager()
         self._acl:            ACLManager           = acl_manager    or ACLManager()
@@ -243,6 +273,83 @@ class NerdvanaMcpServer:
         self._tool_map: dict[str, BaseTool[Any]] = {}
         self._build_tool_map()
         self._register_tools()
+
+    # ------------------------------------------------------------------
+    # TLS wiring: validated at construction, applied in _run_http
+    # ------------------------------------------------------------------
+
+    def _configure_tls(self) -> None:
+        """Validate the TLS inputs and derive the uvicorn ssl_* parameters.
+
+        Every failure path raises :class:`TlsConfigurationError`.  There is
+        deliberately no branch that keeps the supplied material unused and
+        falls back to a plaintext listener.
+        """
+        supplied: dict[str, Path | None] = {
+            "--tls-cert": self.tls_cert,
+            "--tls-key":  self.tls_key,
+            "--tls-ca":   self.tls_ca,
+        }
+        given = {flag: path for flag, path in supplied.items() if path is not None}
+        if not given:
+            return
+
+        flags = ", ".join(sorted(given))
+
+        if self.transport != "http":
+            raise TlsConfigurationError(
+                f"{flags} supplied but transport is {self.transport!r}. "
+                "TLS terminates a network socket and has no meaning on stdio; "
+                "start with --transport http or drop the TLS options."
+            )
+
+        if self.tls_cert is None:
+            raise TlsConfigurationError(
+                f"{flags} supplied without --tls-cert. "
+                "A server certificate is required to serve over TLS."
+            )
+
+        for flag, path in given.items():
+            self._require_readable(flag, path)
+
+        if self.tls_key is None and not self._contains_private_key(self.tls_cert):
+            raise TlsConfigurationError(
+                f"certificate {self.tls_cert} carries no private key and no key "
+                "file was supplied. Pass the private key (--tls-key) or point "
+                "--tls-cert at a PEM bundle holding both the certificate and "
+                "its key."
+            )
+
+        self._ssl_certfile = str(self.tls_cert)
+        self._ssl_keyfile  = str(self.tls_key) if self.tls_key is not None else None
+
+        if self.tls_ca is not None:
+            self._ssl_ca_certs  = str(self.tls_ca)
+            # A CA without CERT_REQUIRED verifies nothing: peers that present no
+            # certificate would still be admitted, which is not mTLS.
+            self._ssl_cert_reqs = ssl.CERT_REQUIRED
+
+    @staticmethod
+    def _require_readable(flag: str, path: Path) -> None:
+        """Fail fast when TLS material is missing or unreadable."""
+        try:
+            with path.open("rb"):
+                pass
+        except OSError as exc:
+            raise TlsConfigurationError(
+                f"{flag} {path} cannot be read: {exc.strerror or exc}"
+            ) from exc
+
+    @staticmethod
+    def _contains_private_key(path: Path) -> bool:
+        """Report whether a PEM file embeds a private key block."""
+        try:
+            blob = path.read_bytes()
+        except OSError as exc:
+            raise TlsConfigurationError(
+                f"{path} cannot be read: {exc.strerror or exc}"
+            ) from exc
+        return b"PRIVATE KEY-----" in blob
 
     # ------------------------------------------------------------------
     # Tool map — live BaseTool instances for _execute_tool routing
@@ -725,10 +832,14 @@ class NerdvanaMcpServer:
         protected.add_middleware(_QuotaErrorMiddleware)
         protected.add_middleware(_BearerAuthMiddleware, auth_manager=self._auth)
         config = uvicorn.Config(
-            app       = protected,
-            host      = self.host,
-            port      = self.port,
-            log_level = "warning",
+            app           = protected,
+            host          = self.host,
+            port          = self.port,
+            log_level     = "warning",
+            ssl_certfile  = self._ssl_certfile,
+            ssl_keyfile   = self._ssl_keyfile,
+            ssl_ca_certs  = self._ssl_ca_certs,
+            ssl_cert_reqs = self._ssl_cert_reqs,
         )
         server = uvicorn.Server(config)
         await server.serve()

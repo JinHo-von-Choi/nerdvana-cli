@@ -84,11 +84,6 @@ info "Installing dependencies..."
 # --- shell integration ------------------------------------------------------
 
 SHELL_NAME=$(basename "${SHELL:-/bin/bash}")
-WRAPPER=$(cat <<'WRAPPER_EOF'
-#!/usr/bin/env bash
-exec "$HOME/.nerdvana-cli/.venv/bin/nerdvana" "$@"
-WRAPPER_EOF
-)
 
 # Determine bin directory
 USER_BIN=""
@@ -104,11 +99,13 @@ if [ -z "$USER_BIN" ]; then
     mkdir -p "$USER_BIN"
 fi
 
-# Write wrapper scripts
+# Write wrapper scripts. $VENV_DIR is expanded here, at install time, so a
+# custom $NERDVANA_HOME survives into the wrapper instead of being overwritten
+# by the default location.
 for cmd in nerdvana nc; do
     cat > "$USER_BIN/$cmd" <<WRAPPER_SCRIPT
 #!/usr/bin/env bash
-exec "\$HOME/.nerdvana-cli/.venv/bin/$cmd" "\$@"
+exec "$VENV_DIR/bin/$cmd" "\$@"
 WRAPPER_SCRIPT
     chmod +x "$USER_BIN/$cmd"
 done

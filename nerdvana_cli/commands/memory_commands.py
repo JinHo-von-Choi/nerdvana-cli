@@ -1,7 +1,7 @@
 """Memory and checkpoint slash command handlers — Phase E.
 
 Commands:
-  /undo           — Restore pre-edit state via git stash pop
+  /undo           — Restore the previous pre-edit checkpoint
   /redo           — Re-apply last undone checkpoint
   /checkpoints    — List session checkpoints
   /memories       — List project memories (with optional --stale flag)
@@ -51,8 +51,13 @@ async def handle_redo(app: NerdvanaApp, args: str) -> None:
 # /checkpoints
 # ---------------------------------------------------------------------------
 
+# CheckpointEntry.kind for a git stash an earlier build left behind. Such a row
+# is informational: undo never consumes it, so the listing has to say so.
+_LEGACY_STASH_KIND = "legacy-stash"
+
+
 async def handle_checkpoints(app: NerdvanaApp, args: str) -> None:
-    """Handle /checkpoints — list session-owned git stash checkpoints."""
+    """Handle /checkpoints — list this session's restorable checkpoints."""
     cp = getattr(app, "_checkpoint_manager", None)
     if cp is None:
         app._add_chat_message("[yellow]Checkpoint manager not available.[/yellow]")
@@ -64,7 +69,10 @@ async def handle_checkpoints(app: NerdvanaApp, args: str) -> None:
 
     lines = [f"[bold]Session checkpoints ({len(entries)})[/bold]"]
     for e in reversed(entries):  # newest first
-        lines.append(f"  {e.stash_ref:<14}  edit #{e.edit_id:<4}")
+        row = f"  {e.checkpoint_id:<14}  edit #{e.edit_id:<4}"
+        if e.kind == _LEGACY_STASH_KIND:
+            row += "  [yellow]git stash from an earlier build; /undo skips it[/yellow]"
+        lines.append(row)
     app._add_chat_message("\n".join(lines))
 
 
@@ -126,15 +134,26 @@ _EXPERIENCE_PATTERNS = re.compile(
 )
 
 
-def _classify_scope(content: str) -> str:
-    """Return the best-guess MemoryScope value for *content*."""
-    scores = {
+# MemoryScope.AGENT_EXPERIENCE. WriteMemory rejects it: those memories live in
+# AnchorMind, so the suggestion has to point there instead of at a call that
+# always fails.
+_AGENT_EXPERIENCE = "agent_experience"
+
+
+def _score_scopes(content: str) -> dict[str, int]:
+    """Return the per-scope pattern-hit counts for *content*."""
+    return {
         "project_rule":      len(_RULE_PATTERNS.findall(content)),
         "project_knowledge": len(_KNOWLEDGE_PATTERNS.findall(content)),
         "user_global":       len(_PREFERENCE_PATTERNS.findall(content)),
-        "agent_experience":  len(_EXPERIENCE_PATTERNS.findall(content)),
+        _AGENT_EXPERIENCE:   len(_EXPERIENCE_PATTERNS.findall(content)),
     }
-    best = max(scores, key=lambda k: scores[k])
+
+
+def _classify_scope(content: str) -> str:
+    """Return the best-guess MemoryScope value for *content*."""
+    scores = _score_scopes(content)
+    best   = max(scores, key=lambda k: scores[k])
     if scores[best] == 0:
         return "project_knowledge"  # safe default
     return best
@@ -157,28 +176,35 @@ async def handle_route_knowledge(app: NerdvanaApp, args: str) -> None:
             "  project_rule      — rules for the codebase (must/shall/forbidden)\n"
             "  project_knowledge — build/structure/architecture facts\n"
             "  user_global       — personal preferences and style\n"
-            "  agent_experience  — errors and solutions (AnchorMind)"
+            "  agent_experience  — errors and solutions, recorded through\n"
+            "                      AnchorMind rather than WriteMemory"
         )
         return
 
     suggested = _classify_scope(content)
 
     # Show scores for transparency
-    scores = {
-        "project_rule":      len(_RULE_PATTERNS.findall(content)),
-        "project_knowledge": len(_KNOWLEDGE_PATTERNS.findall(content)),
-        "user_global":       len(_PREFERENCE_PATTERNS.findall(content)),
-        "agent_experience":  len(_EXPERIENCE_PATTERNS.findall(content)),
-    }
+    scores = _score_scopes(content)
     score_lines = "\n".join(
         f"  {'>' if k == suggested else ' '} {k:<22}  score={v}"
         for k, v in scores.items()
     )
 
+    if suggested == _AGENT_EXPERIENCE:
+        action = (
+            "This content belongs to AnchorMind, which owns experience memories.\n"
+            "WriteMemory does not store this scope. Record it with:\n"
+            "  mcp__anchormind__remember(type='error', content='...')"
+        )
+    else:
+        action = (
+            "To store, call:\n"
+            f"  WriteMemory(name='<name>', content='...', scope='{suggested}')"
+        )
+
     msg = (
         f"[bold]Suggested scope:[/bold] [green]{suggested}[/green]\n\n"
         f"Scores:\n{score_lines}\n\n"
-        "To store, call:\n"
-        f"  WriteMemory(name='<name>', content='...', scope='{suggested}')"
+        f"{action}"
     )
     app._add_chat_message(msg)

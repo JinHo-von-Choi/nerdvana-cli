@@ -2,19 +2,102 @@
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import hashlib
 import os
+import stat
 from typing import Any, ClassVar
+from uuid import uuid4
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.path import safe_makedirs, safe_open_fd, validate_path
 
+_O_DIRECTORY: int = getattr(os, "O_DIRECTORY", 0)
+_O_NOFOLLOW:  int = getattr(os, "O_NOFOLLOW", 0)
+
 
 def _is_symlink_block_error(exc: OSError) -> bool:
     """Return True when an OSError indicates a blocked symlink traversal."""
     return exc.errno in (errno.ELOOP, errno.EMLINK)
+
+
+def _open_parent_dir_fd(relative_path: str, cwd: str) -> int:
+    """Open the directory holding ``relative_path`` and return its descriptor.
+
+    The walk goes through :func:`safe_open_fd`, so every component is opened
+    with ``O_NOFOLLOW`` and a symlinked directory raises ``OSError(ELOOP)``.
+    A path with no directory part resolves to ``cwd`` itself.
+
+    The caller owns the descriptor and must close it.
+    """
+    parent_rel = os.path.dirname(relative_path)
+    if not parent_rel:
+        return os.open(cwd, os.O_RDONLY | _O_DIRECTORY)
+    return safe_open_fd(parent_rel, cwd, os.O_RDONLY | _O_DIRECTORY)
+
+
+def _target_stat(base: str, dir_fd: int, relative_path: str) -> os.stat_result | None:
+    """Return ``lstat`` of ``base`` inside ``dir_fd``, or None when absent.
+
+    Raises ``OSError(ELOOP)`` when the name is a symbolic link, so that a
+    rename can never take the place of a link that points elsewhere.
+    """
+    try:
+        info = os.lstat(base, dir_fd=dir_fd)
+    except FileNotFoundError:
+        return None
+    if stat.S_ISLNK(info.st_mode):
+        raise OSError(errno.ELOOP, "Symbolic link blocked", relative_path)
+    return info
+
+
+def _create_temp_sibling(base: str, dir_fd: int) -> tuple[int, str]:
+    """Create an exclusive temporary file beside ``base`` inside ``dir_fd``."""
+    name = f".{base}.{uuid4().hex}.tmp"
+    fd   = os.open(
+        name,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_NOFOLLOW,
+        0o644,
+        dir_fd=dir_fd,
+    )
+    return fd, name
+
+
+def _atomic_write(relative_path: str, cwd: str, content: str) -> None:
+    """Replace ``relative_path`` with ``content`` in a single rename.
+
+    The payload lands in a temporary file created in the destination
+    directory, is flushed to stable storage, and only then takes the place of
+    the target through ``os.replace``.  An interrupted or failed write
+    therefore leaves the previous file whole instead of truncated.
+
+    Containment is preserved: the directory chain is walked with
+    ``O_NOFOLLOW``, the rename is issued against that directory descriptor so
+    no component is resolved a second time, and a symlink sitting at the
+    target name is rejected rather than replaced.  Permission bits of an
+    existing file are carried over to the replacement.
+    """
+    base     = os.path.basename(relative_path)
+    dir_fd   = _open_parent_dir_fd(relative_path, cwd)
+    tmp_name : str | None = None
+    try:
+        existing = _target_stat(base, dir_fd, relative_path)
+        fd, tmp_name = _create_temp_sibling(base, dir_fd)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            if existing is not None:
+                os.fchmod(fh.fileno(), stat.S_IMODE(existing.st_mode))
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, base, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
+    finally:
+        if tmp_name is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_name, dir_fd=dir_fd)
+        os.close(dir_fd)
 
 
 def _hash4(line: str) -> str:
@@ -205,11 +288,7 @@ WARNING: This replaces the entire file content."""
             try:
                 if parent_rel:
                     safe_makedirs(parent_rel, context.cwd)
-                fd = safe_open_fd(
-                    args.path,
-                    context.cwd,
-                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-                )
+                _atomic_write(args.path, context.cwd, args.content)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
@@ -218,8 +297,6 @@ WARNING: This replaces the entire file content."""
                         is_error=True,
                     )
                 raise
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(args.content)
 
             context.file_state[args.path] = args.content
             return ToolResult(tool_use_id="", content=f"Successfully wrote {args.path} ({len(args.content)} chars)")
@@ -348,11 +425,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 raw_lines[target_idx] = args.new_string
                 new_content = "".join(raw_lines)
                 try:
-                    write_fd = safe_open_fd(
-                        args.path,
-                        context.cwd,
-                        os.O_WRONLY | os.O_TRUNC,
-                    )
+                    _atomic_write(args.path, context.cwd, new_content)
                 except OSError as exc:
                     if _is_symlink_block_error(exc):
                         return ToolResult(
@@ -361,8 +434,6 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                             is_error=True,
                         )
                     raise
-                with os.fdopen(write_fd, "w", encoding="utf-8") as f:
-                    f.write(new_content)
                 context.file_state[args.path] = new_content
                 return ToolResult(
                     tool_use_id="",
@@ -385,11 +456,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 count = 1
 
             try:
-                write_fd = safe_open_fd(
-                    args.path,
-                    context.cwd,
-                    os.O_WRONLY | os.O_TRUNC,
-                )
+                _atomic_write(args.path, context.cwd, new_content)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
@@ -398,8 +465,6 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                         is_error=True,
                     )
                 raise
-            with os.fdopen(write_fd, "w", encoding="utf-8") as f:
-                f.write(new_content)
 
             context.file_state[args.path] = new_content
             return ToolResult(tool_use_id="", content=f"Replaced {count} occurrence(s) in {args.path}")

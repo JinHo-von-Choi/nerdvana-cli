@@ -5,13 +5,29 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
-from nerdvana_cli.core.user_hooks import load_user_hooks
+from nerdvana_cli.core.user_hooks import load_user_hooks, trust_project_hook
+
+
+class _StubHookConfig:
+    def __init__(self, allow_project_hooks: bool):
+        self.allow_project_hooks = allow_project_hooks
 
 
 class _StubSettings:
-    def __init__(self, cwd: str):
-        self.cwd = cwd
+    def __init__(self, cwd: str, allow_project_hooks: bool = False):
+        self.cwd   = cwd
+        self.hooks = _StubHookConfig(allow_project_hooks)
+
+
+@pytest.fixture
+def isolated_data_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep the hook approval record out of the real user data directory."""
+    data_home = tmp_path / "data-home"
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(data_home))
+    return data_home
 
 
 def test_load_user_hooks_returns_empty_when_no_dirs(tmp_path: Path):
@@ -22,7 +38,7 @@ def test_load_user_hooks_returns_empty_when_no_dirs(tmp_path: Path):
     assert not engine.has_handlers(HookEvent.SESSION_START)
 
 
-def test_load_user_hooks_loads_project_hook(tmp_path: Path):
+def test_load_user_hooks_loads_project_hook(tmp_path: Path, isolated_data_home: Path):
     hook_dir = tmp_path / ".nerdvana" / "hooks"
     hook_dir.mkdir(parents=True)
     (hook_dir / "my_hook.py").write_text(textwrap.dedent('''
@@ -35,8 +51,10 @@ def test_load_user_hooks_loads_project_hook(tmp_path: Path):
             engine.register(HookEvent.SESSION_START, _h)
     '''))
 
+    trust_project_hook(hook_dir / "my_hook.py")
+
     engine = HookEngine()
-    settings = _StubSettings(cwd=str(tmp_path))
+    settings = _StubSettings(cwd=str(tmp_path), allow_project_hooks=True)
     loaded = load_user_hooks(engine, settings)
 
     assert len(loaded) == 1
@@ -59,7 +77,7 @@ def test_load_user_hooks_skips_underscore_files(tmp_path: Path):
     assert loaded == []
 
 
-def test_load_user_hooks_swallows_register_failure(tmp_path: Path):
+def test_load_user_hooks_swallows_register_failure(tmp_path: Path, isolated_data_home: Path):
     hook_dir = tmp_path / ".nerdvana" / "hooks"
     hook_dir.mkdir(parents=True)
     (hook_dir / "bad.py").write_text(textwrap.dedent('''
@@ -67,8 +85,12 @@ def test_load_user_hooks_swallows_register_failure(tmp_path: Path):
             raise RuntimeError("intentional")
     '''))
 
+    # Approve the hook so it reaches register(); the point of this test is
+    # the exception handling, not the trust gate.
+    trust_project_hook(hook_dir / "bad.py")
+
     engine = HookEngine()
-    settings = _StubSettings(cwd=str(tmp_path))
+    settings = _StubSettings(cwd=str(tmp_path), allow_project_hooks=True)
     loaded = load_user_hooks(engine, settings)
     # bad hook is skipped, no exception escapes
     assert loaded == []

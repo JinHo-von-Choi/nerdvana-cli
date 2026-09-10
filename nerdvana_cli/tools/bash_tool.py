@@ -10,11 +10,47 @@ from typing import Any, ClassVar
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
-_SENSITIVE_ENV = re.compile(r"(?i)(api[_-]?key|secret|passw|credential|(^|_)token($|_))")
+# Name patterns for environment variables withheld from the subprocess.
+#
+# This is a mitigation, not a boundary. A command can still print a secret it
+# reads from a file, from a credential helper, or from a variable whose name
+# matches nothing here. What makes name matching worth doing at all is that
+# os.environ is finite and enumerable, unlike shell syntax (see the note on
+# _DANGEROUS_PATTERNS below): the cost of widening the pattern is bounded and
+# the residual gap is a naming gap, not an infinite grammar.
+#
+# The list is deliberately name-based rather than an allowlist. An allowlist of
+# permitted variables was tried on 2026-07-05 and withdrawn: it broke build
+# tools and every workflow that passes custom variables through, which is most
+# of them. Segment anchors ((^|[_-]) ... ([_-]|$)) keep ordinary variables such
+# as PATH and TOKENIZERS_PARALLELISM out of the match.
+_SENSITIVE_ENV = re.compile(
+    r"""(?ix)
+    (?: api[_-]?key
+      | (?:^|[_-]) key (?:[_-]|$)
+      | private[_-]?key
+      | access[_-]?key
+      | secret
+      | passw
+      | passphrase
+      | credential
+      | (?:^|[_-]) token (?:[_-]|$)
+      | (?:^|[_-]) pat (?:[_-]|$)
+      | (?:^|[_-]) (?:pem|dsn|bearer|authorization) (?:[_-]|$)
+      | (?:^|[_-]) (?:database|db|redis|mongo|mongodb|postgres|postgresql|mysql|amqp|rabbitmq)
+        [_-]? (?:url|uri|dsn|conn|connection(?:[_-]?string)?)
+      )
+    """
+)
 
 
 def _build_env(cwd: str) -> dict[str, str]:
-    """Build the subprocess environment: credential-named variables are omitted."""
+    """Build the subprocess environment with credential-named variables removed.
+
+    Mitigation only. It narrows accidental exposure of key material and
+    connection strings; it does not contain a command that is trying to read
+    a secret. Containment is the approval mode and the sandbox.
+    """
     env = {k: v for k, v in os.environ.items() if not _SENSITIVE_ENV.search(k)}
     env["PWD"] = cwd
     return env
@@ -35,6 +71,16 @@ Use this for running shell commands, scripts, and programs.
 Commands run in the current working directory.
 Long-running commands will be terminated after the timeout.
 Output is captured (stdout + stderr).
+
+This tool screens commands against a list of destructive patterns and
+withholds credential-named environment variables. Both are mitigations that
+catch obvious mistakes, not a security boundary: a shell can express the same
+effect in unbounded ways (a here-document, a script written to disk and then
+run, a pipe into an interpreter), so a denial here means the pattern list
+recognised the command, and an approval means only that it did not. What
+actually constrains this tool is the approval mode in force and the sandbox
+the process runs in. Treat every command as if it will run with the caller's
+full privileges, because it will.
 
 Examples:
 - ls -la
@@ -58,6 +104,16 @@ Examples:
     tags: ClassVar[frozenset[str]]  = frozenset({"shell"})
     requires_confirmation          = False
 
+    # Destructive-command screen.
+    #
+    # Enumeration cannot decide this. The shell's input space is adversarial
+    # and unbounded: `python3 - <<EOF`, writing a script and running `bash
+    # x.sh`, and `cat p.py | python3` all reach the same interpreter without
+    # matching anything below, and each new pattern invites another spelling.
+    # These entries therefore stop accidents and typos, and nothing more.
+    # Do not add patterns here believing it closes a hole; the boundary is
+    # the approval mode plus the sandbox, and this list only decides whether
+    # the operator is asked loudly or quietly.
     _DANGEROUS_PATTERNS: list[re.Pattern[str]] = [
         re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+[/~*]"),
         re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+\*"),

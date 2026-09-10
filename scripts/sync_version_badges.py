@@ -28,6 +28,9 @@ TARGET_FILES = [
     REPO_ROOT / "README.ko.md",
 ]
 
+# Matches the version stated as Korean prose in README.ko.md, which carries no badge.
+_PROSE_RE = re.compile(r"(판올림\s+)(\d+\.\d+\.\d+)")
+
 # Matches the version segment inside a shields.io badge URL.
 # Group 1 captures the old version string.
 _BADGE_RE = re.compile(
@@ -76,7 +79,19 @@ def _process_file(
             print(f"{path.name}: drift detected ({old_version} != {new_version})")
         return str(m.group(1)) + new_version + str(m.group(3))
 
-    replaced = _BADGE_RE.sub(_replacer, original)
+    def _prose_replacer(m: re.Match[str]) -> str:
+        nonlocal changed
+        old_version: str = str(m.group(2))
+        if old_version == new_version:
+            return str(m.group(0))
+        changed = True
+        if not check:
+            print(f"{path.name}: {old_version} -> {new_version}")
+        else:
+            print(f"{path.name}: drift detected ({old_version} != {new_version})")
+        return str(m.group(1)) + new_version
+
+    replaced = _PROSE_RE.sub(_prose_replacer, _BADGE_RE.sub(_replacer, original))
 
     if changed and not check:
         path.write_text(replaced, encoding="utf-8")

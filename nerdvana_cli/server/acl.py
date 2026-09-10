@@ -22,8 +22,12 @@ Unknown clients receive the ``read-only`` role (v3.1 §3.1).
 
 from __future__ import annotations
 
+import contextlib
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
@@ -63,6 +67,14 @@ _DEFAULT_ROLE = "read-only"
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
+
+class ACLPersistenceError(RuntimeError):
+    """Raised when an ACL mutation cannot be persisted to ``mcp_acl.yml``.
+
+    Callers must treat this as a failed mutation: the on-disk ACL still grants
+    whatever it granted before, so no success may be reported to the operator.
+    """
 
 
 @dataclass
@@ -119,8 +131,7 @@ class ACLManager:
         if not self._acl_path.exists():
             return
 
-        with self._acl_path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh) or {}
+        data = self._read_document()
 
         # Roles override (merge with defaults — file wins per role)
         roles_raw = data.get("roles") or {}
@@ -140,6 +151,87 @@ class ACLManager:
     def _ensure_loaded(self) -> None:
         if not self._loaded:
             self.load()
+
+    def _read_document(self) -> dict[str, Any]:
+        """Return the raw YAML mapping, or ``{}`` when absent or non-mapping."""
+        if not self._acl_path.exists():
+            return {}
+
+        with self._acl_path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+
+        return data if isinstance(data, dict) else {}
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
+    def save(self) -> None:
+        """Write the current client→roles mapping back to ``mcp_acl.yml``.
+
+        Only the ``clients`` section is rewritten; every other key present in
+        the file (role overrides included) is carried over untouched, so an
+        admin mutation never silently drops unrelated configuration.
+
+        Raises
+        ------
+        ACLPersistenceError
+            When the file cannot be read back or written.  The caller must not
+            report success in that case.
+        """
+        self._ensure_loaded()
+
+        try:
+            document = self._read_document()
+        except (OSError, yaml.YAMLError) as exc:
+            raise ACLPersistenceError(
+                f"cannot read ACL file '{self._acl_path}': {exc}"
+            ) from exc
+
+        document["clients"] = {
+            name: {"roles": list(roles)}
+            for name, roles in sorted(self._client_roles.items())
+        }
+        self._write_document(document)
+
+    def _write_document(self, document: dict[str, Any]) -> None:
+        """Atomically replace the ACL file with *document*.
+
+        The payload is serialized into a temporary file inside the destination
+        directory, flushed to stable storage, then moved over the target with
+        ``os.replace``.  A crash or a full disk therefore leaves the previous
+        ACL intact rather than a truncated file that would fail open.
+        """
+        target:   Path       = self._acl_path
+        tmp_name: str | None = None
+
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(
+                prefix = f".{target.name}.",
+                suffix = ".tmp",
+                dir    = str(target.parent),
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                yaml.safe_dump(
+                    document,
+                    fh,
+                    allow_unicode     = True,
+                    sort_keys         = False,
+                    default_flow_style = False,
+                )
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_name, target)
+            tmp_name = None
+        except (OSError, yaml.YAMLError) as exc:
+            raise ACLPersistenceError(
+                f"cannot write ACL file '{target}': {exc}"
+            ) from exc
+        finally:
+            if tmp_name is not None:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_name)
 
     # ------------------------------------------------------------------
     # Decision
@@ -199,20 +291,59 @@ class ACLManager:
     # ------------------------------------------------------------------
 
     def revoke(self, key_prefix: str) -> list[str]:
-        """Remove all clients whose name starts with *key_prefix*.
+        """Remove all clients whose name starts with *key_prefix* and persist.
 
-        Returns the list of removed client names.
+        Returns the list of removed client names.  When no client matches, the
+        ACL file is left byte-for-byte untouched.
+
+        Raises
+        ------
+        ACLPersistenceError
+            When the removal cannot be written to disk.  The in-memory mapping
+            is restored so it keeps matching the file that still governs the
+            running server.
         """
         self._ensure_loaded()
         removed = [k for k in self._client_roles if k.startswith(key_prefix)]
+        if not removed:
+            return []
+
+        previous = {k: list(self._client_roles[k]) for k in removed}
         for k in removed:
             del self._client_roles[k]
+
+        try:
+            self.save()
+        except ACLPersistenceError:
+            self._client_roles.update(previous)
+            raise
+
         return removed
 
     def add_client(self, client_name: str, roles: list[str]) -> None:
-        """Register (or overwrite) *client_name* → *roles* mapping."""
+        """Register (or overwrite) *client_name* → *roles* mapping and persist.
+
+        Raises
+        ------
+        ACLPersistenceError
+            When the assignment cannot be written to disk.  The in-memory
+            mapping is rolled back to its previous state.
+        """
         self._ensure_loaded()
-        self._client_roles[str(client_name)] = [str(r) for r in roles]
+        name   = str(client_name)
+        had    = name in self._client_roles
+        before = list(self._client_roles[name]) if had else []
+
+        self._client_roles[name] = [str(r) for r in roles]
+
+        try:
+            self.save()
+        except ACLPersistenceError:
+            if had:
+                self._client_roles[name] = before
+            else:
+                del self._client_roles[name]
+            raise
 
     def list_clients(self) -> dict[str, list[str]]:
         """Return a copy of the client→roles mapping."""

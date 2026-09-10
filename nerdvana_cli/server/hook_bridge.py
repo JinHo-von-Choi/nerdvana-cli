@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS hooks (
 );
 """
 
+_PROMPT_REJECTED_REASON = (
+    "Prompt rejected: the structural gate detected embedded instruction or "
+    "tool-definition markup. Resubmit without the embedded block."
+)
+
 
 # ---------------------------------------------------------------------------
 # HookBridge
@@ -150,6 +155,10 @@ class HookBridge:
 
         Sanitises the incoming prompt text and injects AnchorMind context
         (placeholder) when ``anchormind_inject`` is enabled.
+
+        A gate-2 rejection denies the submission.  Stripping the payload and
+        letting the prompt through cannot prove the removal was complete, so
+        the gate fails closed and the reason is handed back to the caller.
         """
         prompt = payload.get("prompt", "")
 
@@ -157,12 +166,19 @@ class HookBridge:
 
         self._record_sanitize(result, hook_name="prompt-submit", original_len=len(prompt))
 
+        if result.rejected:
+            return make_response(
+                permission_decision="deny",
+                additional_context=_PROMPT_REJECTED_REASON,
+            )
+
         # AnchorMind recall injection (placeholder)
         injected = self._maybe_anchormind_context("prompt-submit")
         if injected:
-            inj_result = sanitize(injected)
-            injected   = "" if inj_result.rejected else inj_result.text
-            self._record_sanitize(inj_result, hook_name="prompt-submit", original_len=len(injected))
+            inj_result   = sanitize(injected)
+            original_len = len(injected)
+            injected     = "" if inj_result.rejected else inj_result.text
+            self._record_sanitize(inj_result, hook_name="prompt-submit", original_len=original_len)
 
         return make_response(additional_context=injected)
 

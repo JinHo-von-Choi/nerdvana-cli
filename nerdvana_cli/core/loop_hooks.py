@@ -1,8 +1,10 @@
 """Recovery hook engine for the agent loop.
 
-Wraps the general HookEngine to provide typed on_api_call / on_tool_result /
-on_turn_end entry points. Extracted from AgentLoop as part of Phase 0A
-(T-0A-05).
+Wraps the general HookEngine to provide typed on_api_call / on_turn_end entry
+points. Extracted from AgentLoop as part of Phase 0A (T-0A-05).
+
+AFTER_TOOL is not dispatched here. It is fired by ToolExecutor, on the path
+that actually runs tools, so the handlers see every real tool result.
 """
 
 from __future__ import annotations
@@ -78,30 +80,6 @@ class LoopHookEngine:
         new_stop = stop_reason or state.stop_reason
         new_state = state.evolve(stop_reason=new_stop)
         return new_state, inject
-
-    def on_tool_result(
-        self,
-        state:  LoopState,
-        result: Any,
-    ) -> LoopState:
-        """Fire AFTER_TOOL hooks for a completed tool result.
-
-        Args:
-            state:  Current LoopState.
-            result: A ToolResult instance.
-
-        Returns:
-            Possibly evolved LoopState.
-        """
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
-
-        hook_ctx = HookContext(
-            event       = HookEvent.AFTER_TOOL,
-            settings    = self._settings,
-            tool_result = result,
-        )
-        self._hooks.fire(hook_ctx)
-        return state
 
     def on_turn_end(self, state: LoopState) -> LoopState:
         """Called when the loop is about to return (end_turn path).

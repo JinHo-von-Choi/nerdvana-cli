@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -13,6 +14,30 @@ try:
     from google.genai import Client as _GenaiClient
 except ImportError:  # pragma: no cover – runtime guard in _get_client
     _GenaiClient = None  # type: ignore[assignment,misc]
+
+
+TOOL_USE_ID_PATTERN = re.compile(r"^call_(?P<name>.+)_[0-9a-f]{8}$")
+
+
+def make_tool_use_id(tool_name: str) -> str:
+    """Build a tool_use_id of the form ``call_<tool name>_<8 hex chars>``.
+
+    Gemini returns no identifier for a function call, so the client owns the
+    value end to end. The nonce keeps repeated calls to the same tool distinct
+    and the embedded name is a last-resort source for the function name when a
+    tool result arrives with no other provenance.
+    """
+    return f"call_{tool_name}_{uuid.uuid4().hex[:8]}"
+
+
+def tool_name_from_id(tool_use_id: str) -> str:
+    """Recover the tool name embedded in a tool_use_id, or "" when there is none.
+
+    The nonce is a fixed-width hex run anchored at the end, so tool names that
+    themselves contain underscores survive the round trip.
+    """
+    match = TOOL_USE_ID_PATTERN.match(tool_use_id)
+    return match.group("name") if match else ""
 
 
 class GeminiProvider:
@@ -98,9 +123,11 @@ class GeminiProvider:
                                     yield ProviderEvent(type="content_delta", content=part.text)
                                 elif part.function_call:
                                     args = dict(part.function_call.args) if part.function_call.args else {}
+                                    fn_name = part.function_call.name or ""
                                     yield ProviderEvent(
                                         type="tool_use_complete",
-                                    tool_name=part.function_call.name or "",
+                                        tool_use_id=make_tool_use_id(fn_name),
+                                        tool_name=fn_name,
                                         tool_input_complete=args,
                                     )
 
@@ -160,10 +187,11 @@ class GeminiProvider:
                                 content += part.text
                             elif part.function_call:
                                 args = dict(part.function_call.args) if part.function_call.args else {}
+                                fn_name = part.function_call.name or ""
                                 tool_uses.append(
                                     {
-                                        "id": f"call_{part.function_call.name}_{uuid.uuid4().hex[:8]}",
-                                        "name": part.function_call.name,
+                                        "id": make_tool_use_id(fn_name),
+                                        "name": fn_name,
                                         "input": args,
                                     }
                                 )
@@ -204,9 +232,27 @@ class GeminiProvider:
         except Exception:
             return []
 
+    @staticmethod
+    def _resolve_tool_name(source: dict[str, Any], tool_use_id: str, names_by_id: dict[str, str]) -> str:
+        """Resolve the function name a tool result belongs to.
+
+        Gemini requires the declared function name on every functionResponse.
+        Sources are tried in order of trustworthiness: a name carried on the
+        result itself, the name recorded when the matching call was converted,
+        then the name embedded in the tool_use_id.
+        """
+        explicit = source.get("tool_name") or source.get("name")
+        if isinstance(explicit, str) and explicit:
+            return explicit
+        mapped = names_by_id.get(tool_use_id, "")
+        if mapped:
+            return mapped
+        return tool_name_from_id(tool_use_id) or "unknown"
+
     def _convert_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert messages to Gemini format."""
         contents = []
+        names_by_id: dict[str, str] = {}
 
         for msg in messages:
             role = msg.get("role", "user")
@@ -214,7 +260,7 @@ class GeminiProvider:
 
             if role == "tool":
                 tool_id = msg.get("tool_use_id", "")
-                tool_name = tool_id.split(":")[0] if ":" in tool_id else tool_id
+                tool_name = self._resolve_tool_name(msg, tool_id, names_by_id)
                 contents.append(
                     {
                         "role": "user",
@@ -235,6 +281,7 @@ class GeminiProvider:
                 if isinstance(content, list):
                     for item in content:
                         if item.get("type") == "tool_use":
+                            self._register_call(item.get("id", ""), item["name"], names_by_id)
                             parts.append(
                                 {
                                     "functionCall": {
@@ -246,6 +293,18 @@ class GeminiProvider:
                         elif item.get("type") == "text":
                             parts.append({"text": item["text"]})
 
+                for tool_use in msg.get("tool_uses", []):
+                    call_name = tool_use.get("name", "")
+                    self._register_call(tool_use.get("id", ""), call_name, names_by_id)
+                    parts.append(
+                        {
+                            "functionCall": {
+                                "name": call_name,
+                                "args": tool_use.get("input", {}),
+                            }
+                        }
+                    )
+
                 contents.append({"role": "model", "parts": parts if parts else [{"text": ""}]})
             elif role == "user":
                 if isinstance(content, list):
@@ -255,7 +314,9 @@ class GeminiProvider:
                             parts_u.append(
                                 {
                                     "functionResponse": {
-                                        "name": item.get("name", "unknown"),
+                                        "name": self._resolve_tool_name(
+                                            item, item.get("tool_use_id", ""), names_by_id
+                                        ),
                                         "response": {"result": item.get("content", "")},
                                     }
                                 }
@@ -269,6 +330,12 @@ class GeminiProvider:
                 contents.append({"role": "user", "parts": [{"text": str(content)}]})
 
         return contents
+
+    @staticmethod
+    def _register_call(tool_use_id: str, tool_name: str, names_by_id: dict[str, str]) -> None:
+        """Record the name of a converted function call for later result pairing."""
+        if tool_use_id and tool_name:
+            names_by_id[tool_use_id] = tool_name
 
     def _convert_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Convert OpenAI-style JSON schema to Gemini format (recursive)."""

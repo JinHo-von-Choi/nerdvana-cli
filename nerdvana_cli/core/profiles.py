@@ -26,6 +26,9 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
+from nerdvana_cli.core import paths
+from nerdvana_cli.utils.path import validate_path
+
 if TYPE_CHECKING:
     from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 
@@ -298,21 +301,38 @@ class ProfileManager:
         data = self._read_yaml(name, kind)
         return cls.from_dict(name, data)
 
+    def _profile_dirs(self, kind: str) -> list[Path]:
+        """Return the searchable directories for *kind*, highest priority first."""
+        if kind == "contexts":
+            return [paths.project_contexts_dir(self._cwd), paths.user_contexts_dir()]
+        if kind == "modes":
+            return [paths.project_modes_dir(self._cwd), paths.user_modes_dir()]
+        raise ValueError(f"Unknown profile kind: {kind}")
+
+    def _profile_filename(self, name: str, kind: str) -> str:
+        """Return ``<name>.yml`` after proving the name cannot escape its directory.
+
+        Profile names arrive straight from ``/context <name>`` and ``/mode <name>``,
+        so an unchecked name would let the caller read any YAML on the filesystem.
+        """
+        filename = f"{name}.yml"
+        base     = self._profile_dirs(kind)[0]
+        if not name.strip() or validate_path(filename, str(base)) is not None:
+            raise ValueError(f"Invalid profile name: {name!r}")
+        return filename
+
     def _read_yaml(self, name: str, kind: str) -> dict[str, Any]:
         """Return the raw YAML dict for *name* from the highest-priority source.
 
         Resolution order (first found wins):
           1. <cwd>/.nerdvana/<kind>/<name>.yml
-          2. ~/.nerdvana/<kind>/<name>.yml
+          2. <user data home>/<kind>/<name>.yml
           3. Built-in package resources
         """
-        filename = f"{name}.yml"
-        candidates: list[Path | None] = [
-            Path(self._cwd) / ".nerdvana" / kind / filename,
-            Path.home() / ".nerdvana" / kind / filename,
-        ]
-        for candidate in candidates:
-            if candidate and candidate.exists():
+        filename = self._profile_filename(name, kind)
+        for directory in self._profile_dirs(kind):
+            candidate = directory / filename
+            if candidate.exists():
                 with candidate.open() as fh:
                     return yaml.safe_load(fh) or {}
 
@@ -338,15 +358,9 @@ class ProfileManager:
         """Collect all profile names visible from any source tier."""
         names: set[str] = set()
 
-        # Project-local
-        proj_dir = Path(self._cwd) / ".nerdvana" / kind
-        if proj_dir.is_dir():
-            names.update(p.stem for p in proj_dir.glob("*.yml"))
-
-        # User-global
-        user_dir = Path.home() / ".nerdvana" / kind
-        if user_dir.is_dir():
-            names.update(p.stem for p in user_dir.glob("*.yml"))
+        for directory in self._profile_dirs(kind):
+            if directory.is_dir():
+                names.update(p.stem for p in directory.glob("*.yml"))
 
         # Built-in
         builtin_dir = Path(__file__).parent.parent / "resources" / "profiles" / kind

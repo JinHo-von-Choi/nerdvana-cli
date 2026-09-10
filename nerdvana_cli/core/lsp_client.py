@@ -6,13 +6,19 @@ Requires no external LSP library; pure Python + asyncio.
 from __future__ import annotations
 
 import asyncio
+import atexit
+import contextlib
 import json
+import logging
 import os
 import shutil
+import signal
 from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.utils.path import safe_open_fd
+
+logger = logging.getLogger(__name__)
 
 _EXT_SERVERS: dict[str, list[str]] = {
     ".py":  ["pyright", "pylsp"],
@@ -50,6 +56,38 @@ _CAPABILITIES: dict[str, Any] = {
 }
 
 
+# Responses whose id belongs to another (usually timed out) request are parked
+# here rather than dropped.  The cap bounds the memory a misbehaving server can
+# pin; eviction is oldest-first and always logged.
+MAX_PARKED_RESPONSES: int = 32
+
+_KILL_SIGNAL: int = int(getattr(signal, "SIGKILL", signal.SIGTERM))
+
+# Every spawned language server is tracked here so interpreter exit can reclaim
+# the ones whose owner never called close().
+_LIVE_PROCS: set[asyncio.subprocess.Process] = set()
+_EXIT_HOOK_INSTALLED: bool = False
+
+
+def _reap_live_procs() -> None:
+    """Kill every language server still running at interpreter exit."""
+    while _LIVE_PROCS:
+        proc = _LIVE_PROCS.pop()
+        if proc.returncode is not None:
+            continue
+        with contextlib.suppress(OSError):
+            os.kill(proc.pid, _KILL_SIGNAL)
+
+
+def _track_proc(proc: asyncio.subprocess.Process) -> None:
+    """Register *proc* for exit-time reclamation, installing the hook once."""
+    global _EXIT_HOOK_INSTALLED
+    if not _EXIT_HOOK_INSTALLED:
+        atexit.register(_reap_live_procs)
+        _EXIT_HOOK_INSTALLED = True
+    _LIVE_PROCS.add(proc)
+
+
 class LspError(Exception):
     """Raised when an LSP server interaction fails unrecoverably."""
 
@@ -68,6 +106,10 @@ class LspClient:
         self._req_id:       int       = 0
         self._disabled:     set[str]  = set()
         self._open_files:   dict[str, int] = {}  # abs_path -> version
+        self._locks:        dict[str, asyncio.Lock] = {}   # ext -> stdio lock
+        self._parked:       dict[
+            asyncio.subprocess.Process, dict[int, dict[str, Any]]
+        ] = {}
 
     # -- Public API --
 
@@ -183,33 +225,42 @@ class LspClient:
 
     async def shutdown_server(self, ext: str) -> None:
         """shutdown request → exit notification → 2 s grace → SIGKILL."""
-        proc = self._procs.pop(ext, None)
-        if proc is None or proc.returncode is not None:
-            return
-        if proc.stdin is None or proc.stdin.is_closing():
-            proc.kill()
-            return
+        async with self._lock_for(ext):
+            proc = self._procs.pop(ext, None)
+            if proc is None:
+                return
+            self._parked.pop(proc, None)
+            _LIVE_PROCS.discard(proc)
+            if proc.returncode is not None:
+                return
+            if proc.stdin is None or proc.stdin.is_closing():
+                proc.kill()
+                return
 
-        try:  # 1. shutdown request
-            self._req_id += 1
-            rid = self._req_id
-            m   = json.dumps({"jsonrpc": "2.0", "id": rid, "method": "shutdown", "params": None})
-            proc.stdin.write((f"Content-Length: {len(m)}\r\n\r\n" + m).encode())
-            await proc.stdin.drain()
-            await asyncio.wait_for(self._read_response(proc, rid, timeout=5.0), timeout=5.0)
-        except Exception:
-            pass
-        try:  # 2. exit notification
-            e = json.dumps({"jsonrpc": "2.0", "method": "exit", "params": None})
-            proc.stdin.write((f"Content-Length: {len(e)}\r\n\r\n" + e).encode())
-            await proc.stdin.drain()
-            proc.stdin.close()
-        except Exception:
-            pass
-        try:  # 3. 2 s grace, then SIGKILL
-            await asyncio.wait_for(proc.wait(), timeout=2.0)
-        except TimeoutError:
-            proc.kill()
+            try:  # 1. shutdown request
+                self._req_id += 1
+                rid = self._req_id
+                m   = json.dumps(
+                    {"jsonrpc": "2.0", "id": rid, "method": "shutdown", "params": None}
+                )
+                proc.stdin.write((f"Content-Length: {len(m)}\r\n\r\n" + m).encode())
+                await proc.stdin.drain()
+                await asyncio.wait_for(
+                    self._read_response(proc, rid, timeout=5.0), timeout=5.0
+                )
+            except Exception:
+                pass
+            try:  # 2. exit notification
+                e = json.dumps({"jsonrpc": "2.0", "method": "exit", "params": None})
+                proc.stdin.write((f"Content-Length: {len(e)}\r\n\r\n" + e).encode())
+                await proc.stdin.drain()
+                proc.stdin.close()
+            except Exception:
+                pass
+            try:  # 3. 2 s grace, then SIGKILL
+                await asyncio.wait_for(proc.wait(), timeout=2.0)
+            except TimeoutError:
+                proc.kill()
 
     async def close(self) -> None:
         """Shut down all running language server processes."""
@@ -224,41 +275,58 @@ class LspClient:
 
     # -- Internal --
 
+    def _lock_for(self, ext: str) -> asyncio.Lock:
+        """Return the stdio lock guarding the server that handles *ext*.
+
+        One language server process serves one extension, and its stdin/stdout
+        pair is a single ordered channel: a write must stay paired with the read
+        that consumes its reply, and two coroutines may never await the same
+        StreamReader at once.  Every path that touches the pipes takes this lock.
+        """
+        lock = self._locks.get(ext)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[ext] = lock
+        return lock
+
     async def _ensure_open(self, ext: str, file_path: str) -> None:
         """Send textDocument/didOpen once; subsequent calls are no-ops."""
         abs_path = str(Path(file_path).resolve())
-        if abs_path in self._open_files:
-            return
-        try:
-            text = await asyncio.to_thread(Path(abs_path).read_text, encoding="utf-8")
-        except OSError:
-            return
+        async with self._lock_for(ext):
+            if abs_path in self._open_files:
+                return
+            try:
+                text = await asyncio.to_thread(
+                    Path(abs_path).read_text, encoding="utf-8"
+                )
+            except OSError:
+                return
 
-        lang_id = _ext_to_language_id(Path(file_path).suffix)
-        uri     = Path(abs_path).as_uri()
-        version = 1
-        self._open_files[abs_path] = version
+            lang_id = _ext_to_language_id(Path(file_path).suffix)
+            uri     = Path(abs_path).as_uri()
+            version = 1
+            self._open_files[abs_path] = version
 
-        notif = json.dumps({
-            "jsonrpc": "2.0",
-            "method":  "textDocument/didOpen",
-            "params":  {
-                "textDocument": {
-                    "uri":        uri,
-                    "languageId": lang_id,
-                    "version":    version,
-                    "text":       text,
-                }
-            },
-        })
-        nh = f"Content-Length: {len(notif)}\r\n\r\n"
-        try:
-            proc = await self._get_proc(ext)
-            assert proc.stdin is not None
-            proc.stdin.write((nh + notif).encode())
-            await proc.stdin.drain()
-        except LspError:
-            self._open_files.pop(abs_path, None)
+            notif = json.dumps({
+                "jsonrpc": "2.0",
+                "method":  "textDocument/didOpen",
+                "params":  {
+                    "textDocument": {
+                        "uri":        uri,
+                        "languageId": lang_id,
+                        "version":    version,
+                        "text":       text,
+                    }
+                },
+            })
+            nh = f"Content-Length: {len(notif)}\r\n\r\n"
+            try:
+                proc = await self._get_proc(ext)
+                assert proc.stdin is not None
+                proc.stdin.write((nh + notif).encode())
+                await proc.stdin.drain()
+            except LspError:
+                self._open_files.pop(abs_path, None)
 
     async def _request(
         self, ext: str, method: str, params: dict[str, Any],
@@ -268,18 +336,19 @@ class LspClient:
         if ext in self._disabled:
             raise LspError(f"LSP server for {ext!r} is disabled (previous crash)")
 
-        proc = await self._get_proc(ext)
-        self._req_id += 1
-        req_id = self._req_id
+        async with self._lock_for(ext):
+            proc = await self._get_proc(ext)
+            self._req_id += 1
+            req_id = self._req_id
 
-        msg  = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
-        body = json.dumps(msg)
-        header = f"Content-Length: {len(body)}\r\n\r\n"
-        assert proc.stdin is not None
-        proc.stdin.write((header + body).encode())
-        await proc.stdin.drain()
+            msg  = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+            body = json.dumps(msg)
+            header = f"Content-Length: {len(body)}\r\n\r\n"
+            assert proc.stdin is not None
+            proc.stdin.write((header + body).encode())
+            await proc.stdin.drain()
 
-        response = await self._read_response(proc, req_id, timeout=timeout)
+            response = await self._read_response(proc, req_id, timeout=timeout)
         if "error" in response:
             raise LspError(f"LSP error: {response['error']}")
         return response.get("result")
@@ -290,8 +359,19 @@ class LspClient:
         req_id:  int,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> dict[str, Any]:
-        """Read next LSP message from stdout, skipping notifications."""
+        """Read the response carrying *req_id*, parking the ones that are not.
+
+        Callers hold the per-extension stdio lock, so only one coroutine ever
+        awaits this StreamReader.  A response belonging to another id (a request
+        that timed out earlier, for instance) is kept in a bounded buffer and
+        handed to its own caller instead of being thrown away mid-stream.
+        """
         assert proc.stdout is not None
+        parked   = self._parked.setdefault(proc, {})
+        buffered = parked.pop(req_id, None)
+        if buffered is not None:
+            return buffered
+
         while True:
             header_line = await asyncio.wait_for(
                 proc.stdout.readline(), timeout=timeout
@@ -307,9 +387,12 @@ class LspClient:
             )
             msg = json.loads(raw)
             if msg.get("method"):
-                continue  # notification, skip
-            if msg.get("id") == req_id:
+                continue  # notification or server-initiated request
+            msg_id = msg.get("id")
+            if msg_id == req_id:
                 return dict(msg)
+            if isinstance(msg_id, int):
+                _park_response(parked, msg_id, dict(msg))
 
     async def _get_proc(self, ext: str) -> asyncio.subprocess.Process:
         """Return running process for ext, starting one if needed."""
@@ -318,6 +401,8 @@ class LspClient:
             if proc.returncode is None:
                 return proc
             del self._procs[ext]
+            self._parked.pop(proc, None)
+            _LIVE_PROCS.discard(proc)
         try:
             proc = await self._start_server(ext)
             self._procs[ext] = proc
@@ -338,6 +423,7 @@ class LspClient:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
+                _track_proc(proc)
                 return proc
         raise LspError(f"No LSP binary found for extension {ext!r}")
 
@@ -395,8 +481,30 @@ def _path_to_uri(path: str) -> str:
 
 
 def _uri_to_path(uri: str) -> str:
-    from urllib.parse import urlparse
-    return urlparse(uri).path
+    """Convert a ``file://`` URI back into a filesystem path.
+
+    ``Path.as_uri()`` percent-encodes every byte outside the unreserved set, so
+    spaces and non-ASCII names come back as ``%20`` and ``%ED%95%9C`` escapes.
+    Feeding those to ``open()`` looks for a file that does not exist, which is
+    why the escapes have to be undone here.
+    """
+    from urllib.parse import unquote, urlparse
+    return unquote(urlparse(uri).path)
+
+
+def _park_response(
+    parked: dict[int, dict[str, Any]],
+    msg_id: int,
+    msg:    dict[str, Any],
+) -> None:
+    """Store an out-of-order response, evicting the oldest when full."""
+    while len(parked) >= MAX_PARKED_RESPONSES:
+        oldest = next(iter(parked))
+        del parked[oldest]
+        logger.warning(
+            "LSP response buffer full; discarding parked response id=%s", oldest
+        )
+    parked[msg_id] = msg
 
 
 _LANG_IDS: dict[str, str] = {
@@ -425,7 +533,7 @@ def _apply_workspace_edit(
 ) -> dict[str, Any]:
     """Apply WorkspaceEdit; prefers documentChanges over legacy changes map."""
     if not edit:
-        return {"changed_files": [], "diffs": []}
+        return {"changed_files": [], "skipped_files": [], "diffs": []}
 
     edit_pairs: list[tuple[str, list[dict[str, Any]]]] = []
 
@@ -440,12 +548,17 @@ def _apply_workspace_edit(
             edit_pairs.append((uri, text_edits))
 
     changed: list[str] = []
+    skipped: list[str] = []
     for uri, text_edits in edit_pairs:
         path = _uri_to_path(uri)
         try:
             with open(path, encoding="utf-8") as f:
                 original = f.readlines()
-        except OSError:
+        except OSError as exc:
+            logger.warning(
+                "Workspace edit not applied to %s (from %s): %s", path, uri, exc
+            )
+            skipped.append(path)
             continue
 
         for te in sorted(
@@ -465,32 +578,37 @@ def _apply_workspace_edit(
                 line_text    = original[sl]
                 original[sl] = line_text[:sc] + new_text + line_text[ec:]
             else:
-                first    = original[sl][:sc] + new_text
-                original = original[:sl] + [first] + original[el + 1:]
+                head     = original[sl][:sc]
+                tail     = original[el][ec:] if el < len(original) else ""
+                original = original[:sl] + [head + new_text + tail] + original[el + 1:]
 
         content = "".join(original).encode("utf-8")
         _write_file(path, content, cwd=cwd)
         changed.append(path)
 
-    return {"changed_files": changed, "diffs": []}
+    return {"changed_files": changed, "skipped_files": skipped, "diffs": []}
 
 
 def _write_file(path: str, content: bytes, cwd: str | None) -> None:
-    """Write via safe_open_fd when path is inside cwd; plain open otherwise."""
-    if cwd:
-        try:
-            abs_path = os.path.realpath(path)
-            abs_cwd  = os.path.realpath(cwd)
-            if abs_path.startswith(abs_cwd + os.sep) or abs_path == abs_cwd:
-                rel = os.path.relpath(abs_path, abs_cwd)
-                fd  = safe_open_fd(
-                    rel, abs_cwd, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                )
-                with os.fdopen(fd, "wb") as fh:
-                    fh.write(content)
-                return
-        except (PermissionError, OSError):
-            pass
+    """Write *path* through the symlink-hardened opener rooted at *cwd*.
 
-    with open(path, "wb") as fh:
+    There is no unhardened fallback: a target that resolves outside the root,
+    or whose components cannot be walked with ``O_NOFOLLOW``, is an error and
+    nothing is written.
+
+    Raises:
+        PermissionError: *path* resolves outside *cwd*.
+        OSError: A path component is a symlink, or the open fails.
+    """
+    root     = os.path.realpath(cwd or os.getcwd())
+    abs_path = os.path.realpath(path)
+    if abs_path != root and not abs_path.startswith(root + os.sep):
+        raise PermissionError(
+            f"Refusing to write outside the project root: {path} "
+            f"(project root: {root})"
+        )
+
+    rel = os.path.relpath(abs_path, root)
+    fd  = safe_open_fd(rel, root, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+    with os.fdopen(fd, "wb") as fh:
         fh.write(content)

@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    # Daily run so time-based checks (pricing snapshot TTL) surface on
+    # their own, without waiting for the next commit to land.
+    - cron: "17 3 * * *"
 
 env:
   UV_SYSTEM_PYTHON: "1"
@@ -36,7 +40,7 @@ jobs:
         run: uv run ruff check nerdvana_cli/ tests/
 
       - name: Mypy
-        run: uv run mypy nerdvana_cli/ --ignore-missing-imports
+        run: uv run mypy nerdvana_cli/
 
       - name: Pytest
         run: uv run pytest -m "not lsp_integration and not live" -q --continue-on-collection-errors

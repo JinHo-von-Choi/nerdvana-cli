@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
-from nerdvana_cli.utils.path import validate_path
+from nerdvana_cli.utils.path import safe_open_fd, validate_path
 
 
 class GlobArgs:
@@ -151,15 +151,24 @@ Examples:
                     filepath = os.path.join(root, name)
                     rel_path = os.path.relpath(filepath, context.cwd)
 
+                    # Open through the O_NOFOLLOW walk so a symlink planted
+                    # inside cwd cannot make the reader follow it out of the
+                    # sandbox. A symlinked component raises ELOOP and the
+                    # entry is skipped, exactly as an unreadable file is.
                     try:
-                        with open(filepath, encoding="utf-8", errors="replace") as f:
+                        fd = safe_open_fd(rel_path, context.cwd, os.O_RDONLY)
+                    except OSError:
+                        continue
+
+                    try:
+                        with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
                             for line_num, line in enumerate(f, 1):
                                 if regex.search(line):
                                     match_count += 1
                                     files_with_matches.add(rel_path)
                                     if match_count <= 100:
                                         results.append(f"{rel_path}:{line_num}: {line.rstrip()}")
-                    except (PermissionError, OSError):
+                    except OSError:
                         continue
 
             if match_count == 0:
