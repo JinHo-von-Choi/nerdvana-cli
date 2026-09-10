@@ -173,6 +173,9 @@ nerdvana providers
 | `nerdvana hook post-tool-use` | Handle a post-tool-use hook event |
 | `nerdvana hook prompt-submit` | Handle a prompt-submit hook event |
 | `nerdvana hook list` | List all supported hook event types |
+| `nerdvana hook trust <path>` | Approve a project-local hook so it may run |
+| `nerdvana hook revoke <path>` | Drop the approval recorded for a project-local hook |
+| `nerdvana hook trusted` | List approved project hooks and flag ones whose contents changed |
 
 `nerdvana hook list` works without the `[mcp]` extras installed — the server package is loaded lazily. See [`docs/hooks.md`](docs/hooks.md) for the full event reference.
 

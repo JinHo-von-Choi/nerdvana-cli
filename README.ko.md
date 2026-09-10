@@ -158,6 +158,9 @@ nerdvana providers
 | `nerdvana hook post-tool-use` | post-tool-use 훅 이벤트 처리 |
 | `nerdvana hook prompt-submit` | prompt-submit 훅 이벤트 처리 |
 | `nerdvana hook list` | 지원하는 훅 이벤트 타입 목록 표시 |
+| `nerdvana hook trust <경로>` | 프로젝트 로컬 훅을 승인해 실행 가능하게 함 |
+| `nerdvana hook revoke <경로>` | 프로젝트 로컬 훅의 승인 기록 해제 |
+| `nerdvana hook trusted` | 승인된 프로젝트 훅 목록과 내용이 바뀐 항목 표시 |
 
 ### ACL 관리 (`nerdvana admin acl ...`)
 

@@ -135,18 +135,21 @@ to hold before one runs:
 
 Approval is bound to the bytes present at the moment it is granted, so any
 later edit, yours or a `git pull`'s, revokes it until it is granted again.
-Record an approval with:
 
-```python
-from pathlib import Path
-from nerdvana_cli.core.user_hooks import trust_project_hook
-
-trust_project_hook(Path(".nerdvana/hooks/my_hook.py"))
+```console
+$ nerdvana hook trust .nerdvana/hooks/my_hook.py
+$ nerdvana hook trusted
+$ nerdvana hook revoke .nerdvana/hooks/my_hook.py
 ```
 
-`revoke_project_hook(path)` drops one approval; deleting
-`~/.nerdvana/trusted_hooks.json` drops all of them. Global hooks live under
-your own data directory and are subject to neither condition.
+`nerdvana hook trusted` lists every approval and marks the ones whose file
+changed or disappeared since it was granted. Deleting
+`~/.nerdvana/trusted_hooks.json` drops all of them at once. The same
+operations are available as `trust_project_hook` and `revoke_project_hook`
+in `nerdvana_cli.core.user_hooks`.
+
+Global hooks live under your own data directory and are subject to neither
+condition.
 
 ### Module contract
 

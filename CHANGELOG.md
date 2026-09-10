@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- `nerdvana hook trust <path>`, `nerdvana hook revoke <path>` and `nerdvana hook trusted` manage project-hook approvals from the command line. `trusted` flags entries whose file changed or is gone.
 - `scripts/check_docs_consistency.py` and `tests/docs/` verify documented environment variables, tool names and counts, provider counts, paths and subcommands against the code.
 - `security` pytest marker for boundary reproduction tests; run them with `pytest -m security`.
 - Analytics rows are recorded for tool calls with provider, model and token counts, so `nerdvana cost` and the dashboard read populated data.
