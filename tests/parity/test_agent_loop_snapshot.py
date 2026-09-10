@@ -26,7 +26,7 @@ def run_loop(loop: Any, prompt: str) -> list[str]:
         async for chunk in loop.run(prompt):
             chunks.append(chunk)
 
-    asyncio.get_event_loop().run_until_complete(_inner())
+    asyncio.run(_inner())
     return chunks
 
 
@@ -192,7 +192,7 @@ def test_scenario_05_session_resume(
     mock_1 = ProviderMock(fixtures / "provider_mock_scenario_05.json")
     loop_1.provider = mock_1  # type: ignore[assignment]
 
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         _run_gen(loop_1, "First session prompt.")
     )
 
@@ -236,7 +236,7 @@ def test_scenario_05_session_resume(
     # Inject prior conversation into resumed loop's state
     loop_2.state.messages.extend(loop_1.state.messages)
 
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         _run_gen(loop_2, "Resume: continue from where we left off.")
     )
 
