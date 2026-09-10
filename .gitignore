@@ -59,6 +59,10 @@ CLAUDE.md
 
 # Planning / temp docs
 Requirements.md
+GATES.md
+.unlazy/
+.unlazy-hook-state.json
+IT_Briefing_AI_LLM_2026-07-08.md
 docs/plans/
 docs/superpowers/
 .nerdvana/
