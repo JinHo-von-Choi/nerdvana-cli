@@ -54,7 +54,7 @@ def _make_settings(tmp_dir: str, fallback_models: list[str] | None = None) -> Ne
 
 
 def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 async def _collect(loop: AgentLoop, prompt: str) -> list[str]:

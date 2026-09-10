@@ -296,9 +296,22 @@ class TestStdioTransportStdoutHygiene:
 
 class TestServeTlsKeyOption:
     def test_tls_key_option_is_exposed(self) -> None:
-        result = runner.invoke(app, ["serve", "--help"])
-        assert result.exit_code == 0
-        assert "--tls-key" in result.output.replace("\n", " ")
+        """Read the registered parameter rather than the rendered help.
+
+        Rich wraps and truncates option names to the terminal width, so
+        asserting against printed help passes locally and fails on a narrow
+        CI terminal for reasons that have nothing to do with the option.
+        """
+        import click
+        import typer.main
+
+        command = typer.main.get_command(app)
+        assert isinstance(command, click.Group)
+        serve = command.get_command(click.Context(command), "serve")
+        assert serve is not None
+
+        option_names = {opt for param in serve.params for opt in param.opts}
+        assert "--tls-key" in option_names
 
     def test_split_cert_and_key_are_accepted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from nerdvana_cli.server import mcp_server
