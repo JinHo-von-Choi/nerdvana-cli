@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core import paths, setup
 from nerdvana_cli.core.setup import (
     get_config_path,
     has_config_file,
@@ -220,3 +220,47 @@ def test_run_setup_ollama_cloud_mode_uses_env_key(
     assert result["model"]["base_url"] == "https://ollama.com/v1"
     assert result["model"]["api_key"] == "cloud-key"
     assert result["model"]["model"] == "gpt-oss:120b"
+
+
+def test_build_providers_display_covers_all_enum_members() -> None:
+    from nerdvana_cli.providers.base import ProviderName
+
+    display = setup.build_providers_display()
+    names = [row[0] for row in display]
+    assert len(names) == len(set(names))
+    assert set(names) == {p.value for p in ProviderName}
+    assert len(display) == 21
+
+
+def test_build_providers_display_preserves_legacy_indices() -> None:
+    display = setup.build_providers_display()
+    assert display[0][0] == "anthropic"
+    assert display[1][0] == "openai"
+    assert display[8][0] == "ollama"
+    assert display[9][0] == "vllm"
+    assert display[14][0] == "zai"
+    assert display[15][0] == "moonshot"
+
+
+def test_build_providers_display_pulls_defaults_from_base() -> None:
+    from nerdvana_cli.providers.base import DEFAULT_MODELS, ProviderName
+
+    display = setup.build_providers_display()
+    by_name = {row[0]: row for row in display}
+    assert by_name["anthropic"][2] == DEFAULT_MODELS[ProviderName.ANTHROPIC]
+    assert by_name["cerebras"][2] == DEFAULT_MODELS[ProviderName.CEREBRAS]
+    assert by_name["anthropic"][3] == "ANTHROPIC_API_KEY"
+    assert by_name["ollama"][3] == "(no key needed)"
+    assert by_name["vllm"][3] == "(no key needed)"
+
+
+def test_build_providers_display_capability_annotation() -> None:
+    display = setup.build_providers_display()
+    by_name = {row[0]: row for row in display}
+    caps = by_name["anthropic"][1]
+    assert "tools" in caps
+    assert "thinking" in caps
+    assert "vision" in caps
+    caps_groq = by_name["groq"][1]
+    assert "tools" in caps_groq
+    assert "vision" not in caps_groq

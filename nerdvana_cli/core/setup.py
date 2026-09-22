@@ -13,7 +13,12 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from nerdvana_cli.core import paths
-from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS, ProviderName
+from nerdvana_cli.providers.base import (
+    DEFAULT_MODELS,
+    PROVIDER_CAPABILITIES,
+    PROVIDER_KEY_ENVVARS,
+    ProviderName,
+)
 
 console = Console()
 
@@ -59,6 +64,67 @@ def save_config(config: dict[str, Any], path: str = "") -> str:
     return path
 
 
+_PROVIDER_LABELS: dict[str, str] = {
+    "anthropic": "Anthropic (Claude)",
+    "openai": "OpenAI (GPT/o-series)",
+    "gemini": "Google Gemini",
+    "groq": "Groq (Fast LLM)",
+    "openrouter": "OpenRouter (Many)",
+    "xai": "xAI (Grok)",
+    "ollama": "Ollama (Local)",
+    "vllm": "vLLM (Local)",
+    "deepseek": "DeepSeek",
+    "mistral": "Mistral AI",
+    "cohere": "Cohere",
+    "together": "Together AI",
+    "zai": "Z.AI (GLM)",
+    "featherless": "Featherless AI",
+    "xiaomi_mimo": "Xiaomi MiMo",
+    "moonshot": "Moonshot (Kimi)",
+    "dashscope": "DashScope (Qwen)",
+    "minimax": "MiniMax",
+    "perplexity": "Perplexity (Sonar)",
+    "fireworks": "Fireworks AI",
+    "cerebras": "Cerebras",
+}
+
+_WIZARD_ORDER: tuple[str, ...] = (
+    "anthropic", "openai", "gemini", "groq", "openrouter", "xai",
+    "featherless", "xiaomi_mimo", "ollama", "vllm",
+    "deepseek", "mistral", "cohere", "together", "zai",
+    "moonshot", "dashscope", "minimax", "perplexity", "fireworks", "cerebras",
+)
+
+_NO_KEY_LABEL = "(no key needed)"
+
+
+def build_providers_display() -> list[tuple[str, str, str, str]]:
+    """Build wizard rows (name, label+caps, default_model, key_env) from base.py."""
+    rows: list[tuple[str, str, str, str]] = []
+    for name in _WIZARD_ORDER:
+        provider = ProviderName(name)
+        caps = PROVIDER_CAPABILITIES.get(provider, {})
+        tags = [
+            tag
+            for tag, on in (
+                ("tools", caps.get("supports_tools")),
+                ("vision", caps.get("supports_vision")),
+                ("thinking", caps.get("supports_thinking")),
+            )
+            if on
+        ]
+        label = _PROVIDER_LABELS.get(name, name.title())
+        if tags:
+            label = f"{label} [{', '.join(tags)}]"
+        if provider in (ProviderName.OLLAMA, ProviderName.VLLM):
+            key_env = _NO_KEY_LABEL
+        else:
+            envs = PROVIDER_KEY_ENVVARS.get(provider, [])
+            key_env = envs[0] if envs else "(none)"
+        rows.append((name, label, DEFAULT_MODELS.get(provider, ""), key_env))
+    return rows
+
+
 def _resolve_default_provider_index(
     saved_provider: str,
     providers_display: Sequence[tuple[str, ...]],
@@ -93,23 +159,7 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
     console.print("[bold]Step 1: Select AI Provider[/bold]")
     console.print()
 
-    providers_display = [
-        ("anthropic", "Anthropic (Claude)", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
-        ("openai", "OpenAI (GPT/o-series)", "gpt-4.1", "OPENAI_API_KEY"),
-        ("gemini", "Google Gemini", "gemini-2.5-flash", "GEMINI_API_KEY"),
-        ("groq", "Groq (Fast LLM)", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
-        ("openrouter", "OpenRouter (Many)", "anthropic/claude-sonnet-4", "OPENROUTER_API_KEY"),
-        ("xai", "xAI (Grok)", "grok-3", "XAI_API_KEY"),
-        ("featherless", "Featherless AI", "featherless-llama-3-70b", "FEATHERLESS_API_KEY"),
-        ("xiaomi_mimo", "Xiaomi MiMo", "mimo-v2.5-pro", "MIMO_API_KEY"),
-        ("ollama", "Ollama (Local)", "qwen3", "(no key needed)"),
-        ("vllm", "vLLM (Local)", "Qwen/Qwen3-32B", "(no key needed)"),
-        ("deepseek", "DeepSeek", "deepseek-chat", "DEEPSEEK_API_KEY"),
-        ("mistral", "Mistral AI", "mistral-medium-latest", "MISTRAL_API_KEY"),
-        ("cohere", "Cohere", "command-r-plus", "CO_API_KEY"),
-        ("together", "Together AI", "meta-llama/Llama-3.3-70B-Instruct-Turbo", "TOGETHER_API_KEY"),
-        ("zai", "Z.AI (GLM)", "glm-4.7", "ZHIPUAI_API_KEY"),
-    ]
+    providers_display = build_providers_display()
 
     table = Table(title="Available Providers")
     table.add_column("#", style="dim", width=3)
