@@ -10,6 +10,7 @@ Exit codes:
 """
 
 import argparse
+import datetime
 import re
 import subprocess
 import sys
@@ -38,7 +39,7 @@ def _write_baseline(path: Path, total: int) -> None:
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped.startswith("# Updated:"):
-                lines.append("# Updated: 2026-04-29")
+                lines.append(f"# Updated: {datetime.date.today().isoformat()}")
             elif stripped.startswith("total:"):
                 lines.append(f"total: {total}")
             else:
@@ -46,7 +47,7 @@ def _write_baseline(path: Path, total: int) -> None:
     else:
         lines = [
             "# Test collection baseline for nerdvana-cli",
-            "# Updated: 2026-04-29",
+            f"# Updated: {datetime.date.today().isoformat()}",
             "# Source: uv run pytest --collect-only -m \"not lsp_integration and not live\" -q",
             f"total: {total}",
         ]

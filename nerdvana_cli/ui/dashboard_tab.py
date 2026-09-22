@@ -272,22 +272,22 @@ class DashboardTab(Widget):
         try:
             header = self.query_one("#dash-header", SessionHeader)
             header.update_info(**kwargs)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("dashboard set_session_info failed: %s", exc)
 
     def push_token_count(self, tokens: int) -> None:
         try:
             sparkline = self.query_one("#dash-sparkline", TokenSparkline)
             sparkline.push(tokens)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("dashboard push_token_count failed: %s", exc)
 
     def append_log(self, line: str) -> None:
         try:
             log = self.query_one("#dash-log", Log)
             log.write_line(line)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("dashboard append_log failed: %s", exc)
 
     def toggle(self) -> None:
         """Show/hide the dashboard."""

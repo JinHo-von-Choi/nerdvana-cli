@@ -323,8 +323,8 @@ class AgentLoop:
                 _s = format_snapshot(await collect_snapshot(self.settings.cwd or "."))
                 if _s.strip():
                     _p.append(_s)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("context snapshot skipped: %s", exc)
             for _hr in self.hooks.fire(HookContext(event=HookEvent.SESSION_START, settings=self.settings, tools=tools)):
                 if _hr.system_prompt_append:
                     _p.append(_hr.system_prompt_append)
