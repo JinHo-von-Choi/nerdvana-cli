@@ -140,6 +140,36 @@ nerdvana run "refactor this code" --provider deepseek
 nerdvana providers
 ```
 
+## Headless Runs
+
+`nerdvana run` runs one prompt and exits, which is what scripts, CI jobs and programs that embed the agent need.
+
+```bash
+nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-cost-usd 2 --output-format json
+```
+
+| Option | Meaning |
+|-|-|
+| `--output-format text\|json\|stream-json` | `text` (default) streams for a person to read. `json` prints one result object at the end. `stream-json` prints one JSON event per line and ends with the same result object. In both JSON formats stdout carries only JSON; notices go to stderr. |
+| `--max-turns N` | Stop after N model turns. |
+| `--max-cost-usd X` | Stop once the estimated cost of the run reaches X USD (needs a known price for the model). |
+| `--approval-mode default\|auto_edit\|yolo\|plan` | Permission preset. Without a terminal a confirmation is refused, so unattended runs that write files usually need `yolo`. |
+
+Exit codes: `0` success, `1` the run failed (provider error, unexpected error), `2` invalid options or configuration (a missing API key included), `3` a turn or cost limit stopped the run.
+
+The result object (`schema_version` 1; fields are only ever added):
+
+```json
+{"type": "result", "schema_version": 1, "subtype": "success", "is_error": false,
+ "result": "final answer text", "session_id": "ab12cd34", "provider": "anthropic",
+ "model": "claude-sonnet-5-5", "num_turns": 4, "duration_ms": 18234, "total_cost_usd": 0.0421,
+ "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000}}
+```
+
+`subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
+
+`stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `compaction` and `context` (percent of the window used).
+
 ## CLI Subcommands
 
 ### Main commands

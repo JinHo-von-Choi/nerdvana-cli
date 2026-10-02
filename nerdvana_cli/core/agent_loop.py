@@ -230,6 +230,9 @@ class AgentLoop:
             mode       = self.settings.model.provider or None,
             context    = self.settings.cwd or None,
         )
+        self.last_stop                = "completed"
+        self.turns_used               = 0
+        self._cost_limit_warned       = False
         self._usage_input_total       = 0
         self._usage_output_total      = 0
         self._usage_cache_read_total  = 0
@@ -279,6 +282,37 @@ class AgentLoop:
         self._usage_cache_write_total += current.cache_creation_tokens
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
+
+    def usage_summary(self) -> dict[str, int]:
+        """Token totals for every provider request made so far in this session."""
+        return {
+            "input_tokens":       self._usage_input_total,
+            "output_tokens":      self._usage_output_total,
+            "cache_read_tokens":  self._usage_cache_read_total,
+            "cache_write_tokens": self._usage_cache_write_total,
+        }
+
+    def _over_cost_limit(self) -> str:
+        """The stop notice when ``session.max_cost_usd`` is spent, else an empty string."""
+        limit = self.settings.session.max_cost_usd
+        if limit <= 0:
+            return ""
+        spent = self.session_cost_usd()
+        if spent < limit:
+            return ""
+        return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
+
+    def _cost_limit_unenforceable(self) -> bool:
+        """True once per loop when a cost limit is set but the model has no known price."""
+        if self._cost_limit_warned or self.settings.session.max_cost_usd <= 0:
+            return False
+        provider = self.settings.model.provider or ""
+        model    = self.settings.model.model or ""
+        if self._pricing_table.has_price(provider, model):
+            return False
+        self._cost_limit_warned = True
+        logger.warning("cost limit set but %s/%s has no price; only the turn limit applies", provider, model)
+        return True
 
     def session_cost_usd(self) -> float:
         """Estimated USD cost of every provider request made so far in this session."""
@@ -397,6 +431,8 @@ class AgentLoop:
             yield "[dim cyan][Ultrawork mode: autonomous tool-use guidance ON][/dim cyan]\n"
 
         self._turn += 1
+        self.last_stop  = "completed"
+        self.turns_used = 0
         self._todo_guard.reset()
         self._end_turn_nudges = 0
         reminder = self._reminder.build(turn=self._turn)
@@ -618,8 +654,20 @@ class AgentLoop:
             while True:
                 state = state.evolve(iteration=state.iteration + 1)
                 if state.iteration > self.settings.session.max_turns:
+                    self.last_stop = "max_turns"
                     yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
                     return
+                self.turns_used = state.iteration
+                over_budget = self._over_cost_limit()
+                if over_budget:
+                    self.last_stop = "max_cost"
+                    yield over_budget
+                    return
+                if self._cost_limit_unenforceable():
+                    yield (
+                        f"\n[yellow]Cost limit ${self.settings.session.max_cost_usd:.2f} is not enforced: "
+                        f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"
+                    )
 
                 self._report_background_tasks()
                 max_ctx  = self.settings.session.max_context_tokens
@@ -684,6 +732,7 @@ class AgentLoop:
                             stop = ev.stop_reason
                             if stop == "max_tokens":
                                 if not self._handle_max_tokens_stop():
+                                    self.last_stop = "max_tokens"
                                     yield "\n\n[bold red]Max tokens reached.[/bold red]"
                                     return
                                 break
@@ -754,6 +803,7 @@ class AgentLoop:
                         self._switch_model(action.provider, action.model)
                         yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
                         continue
+                    self.last_stop = "provider_error"
                     if from_event:
                         yield f"\n[bold red]Provider error: {e}[/bold red]"
                         return

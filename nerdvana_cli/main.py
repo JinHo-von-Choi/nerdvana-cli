@@ -90,7 +90,7 @@ def _maybe_show_update_notice(target: Console | None = None) -> None:
         pass
 
 
-def _run_migration_once() -> None:
+def _run_migration_once(out: Console | None = None) -> None:
     """Run one-shot data migration from legacy locations to ~/.nerdvana/.
 
     Called once on startup, right after settings are loaded. Any failure is
@@ -98,9 +98,9 @@ def _run_migration_once() -> None:
     """
     try:
         if _migrate_run():
-            console.print("[dim]Migrated user data to ~/.nerdvana/ (one-time)[/dim]")
+            (out or console).print("[dim]Migrated user data to ~/.nerdvana/ (one-time)[/dim]")
     except Exception as e:
-        console.print(f"[yellow]Migration warning: {e}[/yellow]")
+        (out or console).print(f"[yellow]Migration warning: {e}[/yellow]")
 
 
 # Approval-mode → (mode, trust_level) mapping (Codex-style, Phase F §6.3)
@@ -307,12 +307,43 @@ def run(
     model: str = typer.Option("", "--model", "-m", help="Model name"),
     provider: str = typer.Option("", "--provider", "-p", help="AI provider"),
     max_tokens: int = typer.Option(0, "--max-tokens", help="Max tokens"),
+    output_format: str = typer.Option(
+        "text",
+        "--output-format",
+        help="text (default), json (one result object at the end) or stream-json (one event per line)",
+    ),
+    max_turns: int = typer.Option(0, "--max-turns", help="Stop after this many model turns (0 = config value)"),
+    max_cost_usd: float = typer.Option(0.0, "--max-cost-usd", help="Stop once the estimated cost reaches this many USD (0 = no limit)"),
+    approval_mode: str = typer.Option("", "--approval-mode", help="Preset mode: default | auto_edit | yolo | plan"),
 ) -> None:
-    """Run a single prompt non-interactively."""
+    """Run a single prompt non-interactively.
+
+    Exit codes: 0 success, 1 the run failed, 2 invalid configuration or options,
+    3 a turn or cost limit stopped the run.
+    """
+    import time
+
+    from nerdvana_cli.core.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
+
+    if output_format not in FORMATS:
+        console_stderr.print(f"[red]Error: --output-format must be one of {', '.join(FORMATS)}.[/red]")
+        raise typer.Exit(EXIT_CONFIG)
+    resolved_approval = approval_mode.strip().lower()
+    if resolved_approval and resolved_approval not in _APPROVAL_MODE_MAP:
+        console_stderr.print(f"[red]Error: --approval-mode must be one of {', '.join(_APPROVAL_MODE_MAP)}.[/red]")
+        raise typer.Exit(EXIT_CONFIG)
+
+    def _write(text: str) -> None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    reporter = RunReporter(output_format, _write, console)
+    outcome  = RunResult()
+
     settings = _load_settings(config or None)
     for warning in settings.load_warnings:
         console_stderr.print(f"[dim yellow]Config: {warning.format()}[/dim yellow]")
-    _run_migration_once()
+    _run_migration_once(console_stderr if reporter.machine_readable else None)
     settings.cwd = cwd or os.getcwd()
     settings.verbose = verbose
     if model:
@@ -321,6 +352,12 @@ def run(
         settings.model.provider = provider
     if max_tokens:
         settings.model.max_tokens = max_tokens
+    if max_turns > 0:
+        settings.session.max_turns = max_turns
+    if max_cost_usd > 0:
+        settings.session.max_cost_usd = max_cost_usd
+    if resolved_approval:
+        settings.session.default_mode = _APPROVAL_MODE_MAP[resolved_approval][0]
 
     from nerdvana_cli.providers import ProviderName, detect_provider
     from nerdvana_cli.providers.factory import resolve_api_key
@@ -334,9 +371,13 @@ def run(
     if not settings.model.api_key:
         settings.model.api_key = resolve_api_key(prov)
 
+    outcome.provider = settings.model.provider
+    outcome.model    = settings.model.model
+
     if not settings.model.api_key and prov not in (ProviderName.OLLAMA, ProviderName.VLLM):
-        console.print(f"[red]Error: No API key found for {prov.value}.[/red]")
-        raise typer.Exit(1)
+        outcome.stop = "config"
+        reporter.failure(outcome, f"No API key found for {prov.value}.")
+        raise typer.Exit(EXIT_CONFIG)
 
     from nerdvana_cli.core.task_state import TaskRegistry
 
@@ -352,16 +393,33 @@ def run(
         session       = session,
         task_registry = task_registry,
     )
+    outcome.session_id = session.session_id
+    started            = time.monotonic()
 
     async def _run() -> None:
-        async for chunk in loop.run(prompt):
-            console.print(chunk, end="")
-        console.print()
+        reporter.start(session.session_id, settings.model.provider, settings.model.model)
+        try:
+            async for chunk in loop.run(prompt):
+                reporter.chunk(chunk)
+        except Exception as exc:  # noqa: BLE001
+            if not reporter.machine_readable:
+                raise
+            outcome.stop  = "error"
+            outcome.error = f"{type(exc).__name__}: {exc}"
+        else:
+            outcome.stop = loop.last_stop
+        outcome.turns       = loop.turns_used
+        outcome.cost_usd    = loop.session_cost_usd()
+        outcome.usage       = loop.usage_summary()
+        outcome.duration_ms = int((time.monotonic() - started) * 1000)
+        reporter.finish(outcome)
 
     try:
         asyncio.run(_run())
     finally:
         loop.close_session("exit")
+    if outcome.exit_code:
+        raise typer.Exit(outcome.exit_code)
 
 
 @app.command()

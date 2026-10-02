@@ -140,6 +140,10 @@ class PricingTable:
         output_cost = info.get("output_per_1m", 0.0) * output_tokens / 1_000_000.0
         return input_cost + output_cost
 
+    def has_price(self, provider: str, model: str) -> bool:
+        """True when the table has a rate for *model* under *provider*."""
+        return bool(self._prices.get(provider.lower(), {}).get(model.lower()))
+
     def known_providers(self) -> list[str]:
         return list(self._prices.keys())
 

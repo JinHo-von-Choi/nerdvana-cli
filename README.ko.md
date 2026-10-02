@@ -124,6 +124,36 @@ nerdvana run "이 코드 리팩터링" --provider deepseek
 nerdvana providers
 ```
 
+## 헤드리스 실행
+
+`nerdvana run`은 프롬프트 하나를 실행하고 끝납니다. 스크립트, CI, 에이전트를 내장하는 프로그램에서 쓰는 방식입니다.
+
+```bash
+nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns 30 --max-cost-usd 2 --output-format json
+```
+
+| 옵션 | 의미 |
+|-|-|
+| `--output-format text\|json\|stream-json` | `text`(기본)는 사람이 읽는 스트림입니다. `json`은 끝에 결과 객체 하나를 출력합니다. `stream-json`은 한 줄에 이벤트 하나를 출력하고 같은 결과 객체로 끝납니다. 두 JSON 형식에서 stdout에는 JSON만 나가고 안내 문구는 stderr로 갑니다. |
+| `--max-turns N` | 모델 턴이 N번이 되면 멈춥니다. |
+| `--max-cost-usd X` | 실행의 추정 비용이 X달러에 이르면 멈춥니다(모델의 가격을 알아야 동작). |
+| `--approval-mode default\|auto_edit\|yolo\|plan` | 권한 프리셋입니다. 터미널이 없으면 확인 요청이 거부되므로, 파일을 쓰는 무인 실행은 대개 `yolo`가 필요합니다. |
+
+종료 코드: `0` 성공, `1` 실행 실패(제공자 오류, 예기치 않은 오류), `2` 옵션이나 설정 오류(API 키 없음 포함), `3` 턴 또는 비용 한도로 중단.
+
+결과 객체(`schema_version` 1, 필드는 추가만 하고 바꾸지 않음):
+
+```json
+{"type": "result", "schema_version": 1, "subtype": "success", "is_error": false,
+ "result": "최종 답변", "session_id": "ab12cd34", "provider": "anthropic",
+ "model": "claude-sonnet-5-5", "num_turns": 4, "duration_ms": 18234, "total_cost_usd": 0.0421,
+ "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000}}
+```
+
+`subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
+
+`stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `compaction`, `context`(창 사용률)입니다.
+
 ## CLI 서브명령어
 
 ### 메인 명령어
