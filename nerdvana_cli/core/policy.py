@@ -12,8 +12,9 @@ sub-agents and background tasks all reach the same decision for the same call:
   3. tool's own verdict is DENY                          -> DENY
   4. ``permissions.always_allow`` pattern match          -> ALLOW
   5. trust level of the active mode profile:
-       strict   : WRITE / DESTRUCTIVE tools              -> ASK
-       balanced : DESTRUCTIVE tools                      -> at least ASK
+       strict   : WRITE / DESTRUCTIVE tools, and the above -> ASK
+       balanced : DESTRUCTIVE tools and tools declaring
+                  ``requires_confirmation``              -> at least ASK
        yolo     : ASK                                    -> ALLOW
   6. otherwise the tool's own verdict
 """
@@ -118,9 +119,9 @@ class PermissionPolicy:
             return PermissionResult(PermissionBehavior.ALLOW, verdict.message, verdict.updated_input)
         if verdict.behavior == PermissionBehavior.ALLOW:
             asks = (
-                category in _MUTATING_CATEGORIES
-                if self.trust_level == "strict"
-                else category == ToolCategory.DESTRUCTIVE
+                category == ToolCategory.DESTRUCTIVE
+                or bool(getattr(tool, "requires_confirmation", False))
+                or (self.trust_level == "strict" and category in _MUTATING_CATEGORIES)
             )
             if asks:
                 return PermissionResult(

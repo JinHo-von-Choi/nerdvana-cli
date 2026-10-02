@@ -14,6 +14,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.policy import PermissionPolicy
+from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -130,6 +131,18 @@ class ToolExecutor:
 
         tool_input = tool_use["input"]
         tool_id    = tool_use["id"]
+
+        problems = validate_arguments(
+            tool.input_schema or {},
+            tool_input,
+            reject_unknown = getattr(tool, "reject_unknown_args", True),
+        )
+        if problems:
+            return ToolResult(
+                tool_use_id = tool_id,
+                content     = f"Invalid tool input: {'; '.join(problems)}",
+                is_error    = True,
+            )
 
         try:
             parsed_args = tool.parse_args(tool_input)

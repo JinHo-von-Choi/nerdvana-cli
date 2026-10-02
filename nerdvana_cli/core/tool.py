@@ -66,6 +66,8 @@ class BaseTool(ABC, Generic[T]):
     side_effects:          ClassVar[ToolSideEffect]  = ToolSideEffect.NONE
     tags:                  ClassVar[frozenset[str]]  = frozenset()
     requires_confirmation: ClassVar[bool]            = False
+    # Arguments outside ``input_schema`` are rejected unless the schema says otherwise.
+    reject_unknown_args:   ClassVar[bool]            = True
 
     @property
     def is_read_only(self) -> bool:

@@ -23,6 +23,8 @@ class McpToolAdapter(BaseTool[dict[str, Any]]):
     side_effects:          ClassVar[ToolSideEffect] = ToolSideEffect.EXTERNAL
     tags:                  ClassVar[frozenset[str]] = frozenset({"mcp"})
     requires_confirmation: ClassVar[bool]           = False
+    # The remote server owns its schema; extra keys are its call to make.
+    reject_unknown_args:   ClassVar[bool]           = False
 
     def __init__(
         self,
