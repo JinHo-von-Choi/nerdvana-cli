@@ -348,7 +348,7 @@ def run(
         task_registry = task_registry,
         team_registry = team_registry,
     )
-    session = SessionStorage()
+    session = SessionStorage(persist=settings.session.persist)
     loop    = AgentLoop(
         settings      = settings,
         registry      = registry,

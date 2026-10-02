@@ -25,6 +25,7 @@ from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.tool import AskUserCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderName
@@ -285,6 +286,15 @@ class AgentLoop:
         return create_provider(provider=pname, model=self.settings.model.model, api_key=self.settings.model.api_key,
             base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature)
 
+    def restore_history(self) -> int:
+        """Load this session's recorded conversation into the live history.
+
+        Returns the number of messages restored.
+        """
+        restored = self.session.load_messages()
+        self.state.messages.extend(restored)
+        return len(restored)
+
     def reset_session(self) -> None:
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
         self._dir_rules.reset()
@@ -510,6 +520,7 @@ class AgentLoop:
             team_registry = self._team_registry,
             ask_user      = self._on_ask_user,
         )
+        tool_ctx.state["session_id"] = self.session.session_id
         state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
         orig_model = self.settings.model.model
         try:
@@ -540,7 +551,11 @@ class AgentLoop:
                     thinking_buffer = ""
                     tool_uses: list[dict[str, Any]] = []
 
-                    async for ev in self.provider.stream(system_prompt, messages, tools):
+                    async for ev in guarded_stream(
+                        self.provider.stream(system_prompt, messages, tools),
+                        idle  = self.settings.session.stream_idle_timeout,
+                        total = self.settings.session.stream_total_timeout,
+                    ):
                         if ev.type == "content_delta":
                             self._set_activity(
                                 phase="streaming",

@@ -76,6 +76,10 @@ class SessionConfig(BaseModel):
     default_mode:    str = "interactive"
     show_activity:   bool = True
     update_check:    bool = True  # startup new-version check (cached, 24h TTL)
+    # Provider stream limits in seconds; 0 disables. Idle is the longest gap
+    # between two events, total the longest single response.
+    stream_idle_timeout:  float = 300.0
+    stream_total_timeout: float = 3600.0
 
 
 class ParismConfig(BaseModel):
