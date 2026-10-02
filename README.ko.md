@@ -186,7 +186,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana version` | 버전 표시 |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
-| `nerdvana cost` | 지정 기간의 토큰 사용량과 USD 비용 집계 |
+| `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준) |
 
 ### 세션 기록 (`nerdvana session ...`)
 

@@ -49,7 +49,12 @@ def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
             known.update(str(tu.get("id", "")) for tu in uses)
             content = str(entry.get("content", ""))
             if content or uses:
-                messages.append(Message(role=Role.ASSISTANT, content=content, tool_uses=uses))
+                messages.append(Message(
+                    role            = Role.ASSISTANT,
+                    content         = content,
+                    tool_uses       = uses,
+                    provider_blocks = list(entry.get("provider_blocks") or []),
+                ))
         elif kind == "tool_result":
             tool_use_id = str(entry.get("tool_use_id", ""))
             if tool_use_id not in known:
@@ -91,8 +96,16 @@ class SessionStorage:
     def record_user_message(self, content: str) -> None:
         self.record("user", {"content": content})
 
-    def record_assistant_message(self, content: str, tool_uses: list[dict[str, Any]] | None = None) -> None:
-        self.record("assistant", {"content": content, "tool_uses": tool_uses or []})
+    def record_assistant_message(
+        self,
+        content:         str,
+        tool_uses:       list[dict[str, Any]] | None = None,
+        provider_blocks: list[dict[str, Any]] | None = None,
+    ) -> None:
+        data: dict[str, Any] = {"content": content, "tool_uses": tool_uses or []}
+        if provider_blocks:
+            data["provider_blocks"] = provider_blocks
+        self.record("assistant", data)
 
     def record_tool_result(self, tool_name: str, tool_use_id: str, content: str, is_error: bool = False) -> None:
         self.record(

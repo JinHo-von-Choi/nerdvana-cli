@@ -168,7 +168,7 @@ class _Turn:
     tool_uses:       list[dict[str, Any]]         = field(default_factory=list)
     seen_calls:      set[tuple[str, str, str]]    = field(default_factory=set)
 
-    def add_call(self, call_id: str, name: str, arguments: dict[str, Any] | None) -> None:
+    def add_call(self, call_id: str, name: str, arguments: dict[str, Any] | None, thought_signature: str = "") -> None:
         """Collect a tool call, keeping ids unique and dropping a repeated copy.
 
         A provider may echo a call it already sent (same id, name and arguments),
@@ -176,6 +176,8 @@ class _Turn:
         fresh id because providers reject a request holding two calls with one id.
         """
         call: dict[str, Any] = {"id": call_id or "", "name": name, "input": arguments or {}}
+        if thought_signature:
+            call["thought_signature"] = thought_signature
         signature = (call["id"], call["name"], json.dumps(call["input"], sort_keys=True, default=str))
         if signature in self.seen_calls:
             return
@@ -326,6 +328,7 @@ class AgentLoop:
         self._usage_output_total      += current.output_tokens
         self._usage_cache_read_total  += current.cache_read_tokens
         self._usage_cache_write_total += current.cache_creation_tokens
+        self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage)
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
 
@@ -663,7 +666,7 @@ class AgentLoop:
         self.last_thinking = thinking_buffer
         if asst_text:
             self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text, provider_blocks=list(provider_blocks or [])))
-            self.session.record_assistant_message(asst_text)
+            self.session.record_assistant_message(asst_text, provider_blocks=provider_blocks)
         from nerdvana_cli.core.hooks import HookContext, HookEvent
         ctx = HookContext(
             event       = HookEvent.AFTER_API_CALL,
@@ -693,8 +696,7 @@ class AgentLoop:
         consumes; mutates ``self.state.messages`` and records each tool result
         in the session log.
         """
-        if asst_text:
-            self.session.record_assistant_message(asst_text, tool_uses)
+        self.session.record_assistant_message(asst_text, tool_uses, provider_blocks)
         for tu in tool_uses:
             yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
         names_by_id = {tu["id"]: tu["name"] for tu in tool_uses}
@@ -866,7 +868,7 @@ class AgentLoop:
             elif ev.type == "provider_block" and ev.block:
                 turn.provider_blocks.append(ev.block)
             elif ev.type == "tool_use_complete":
-                turn.add_call(ev.tool_use_id, ev.tool_name, ev.tool_input_complete)
+                turn.add_call(ev.tool_use_id, ev.tool_name, ev.tool_input_complete, ev.tool_signature)
             elif ev.type == "usage" and ev.usage:
                 self._apply_usage(ev.usage, turn.sent_count)
             elif ev.type == "done":
@@ -1005,13 +1007,12 @@ class AgentLoop:
                     role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses,
                     provider_blocks=list(result.get("provider_blocks") or []),
                 ))
-                if content:
-                    self.session.record_assistant_message(content, tool_uses)
+                self.session.record_assistant_message(content, tool_uses, result.get("provider_blocks"))
                 for tr in await self.tool_executor.run_batch(tool_uses, context):
                     self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
                 self.state.messages.extend(_hook_injection_messages(self.tool_executor))
                 continue
             if content:
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=content))
-                self.session.record_assistant_message(content)
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=content, provider_blocks=list(result.get("provider_blocks") or [])))
+                self.session.record_assistant_message(content, provider_blocks=result.get("provider_blocks"))
             return

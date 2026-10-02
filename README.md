@@ -202,7 +202,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana version` | Show version |
 | `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |
-| `nerdvana cost` | Aggregate token usage and USD cost over a time window |
+| `nerdvana cost` | Aggregate token usage, cached tokens and USD cost over a time window, from the usage each request reported |
 
 ### Session transcripts (`nerdvana session ...`)
 

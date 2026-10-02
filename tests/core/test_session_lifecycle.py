@@ -56,6 +56,17 @@ def test_restore_marks_results_cut_by_the_transcript_cap() -> None:
     assert "truncated" in str(messages_from_transcript(entries)[1].content)
 
 
+def test_restore_brings_back_provider_blocks_and_a_tool_only_turn_survives_the_round_trip(tmp_path: Path) -> None:
+    block   = {"type": "thinking", "thinking": "plan", "signature": "sig"}
+    storage = SessionStorage(session_id="blocks", storage_dir=str(tmp_path))
+    storage.record_user_message("go")
+    storage.record_assistant_message("", [{"id": "t1", "name": "FileRead", "input": {}}], [block])
+    storage.record_tool_result("FileRead", "t1", "body")
+    messages = messages_from_transcript(storage.replay())
+    assert [m.role for m in messages] == [Role.USER, Role.ASSISTANT, Role.TOOL]
+    assert messages[1].provider_blocks == [block]
+
+
 def test_restore_ignores_non_message_events() -> None:
     entries = [{"type": "compaction", "tokens_before": 9}, {"type": "system", "subtype": "x"}]
     assert messages_from_transcript(entries) == []

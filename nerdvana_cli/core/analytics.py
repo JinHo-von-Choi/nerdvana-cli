@@ -51,6 +51,21 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 CREATE INDEX IF NOT EXISTS idx_tool_calls_session ON tool_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_ts      ON tool_calls(start_ts);
 
+CREATE TABLE IF NOT EXISTS api_calls (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id         TEXT,
+    ts                 TEXT    NOT NULL,
+    provider           TEXT,
+    model              TEXT,
+    input_tokens       INTEGER DEFAULT 0,
+    output_tokens      INTEGER DEFAULT 0,
+    cache_read_tokens  INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0,
+    cost_usd           REAL    DEFAULT 0.0
+);
+CREATE INDEX IF NOT EXISTS idx_api_calls_session ON api_calls(session_id);
+CREATE INDEX IF NOT EXISTS idx_api_calls_ts      ON api_calls(ts);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id          TEXT    PRIMARY KEY,
     started_at  TEXT    NOT NULL,
@@ -272,6 +287,26 @@ class AnalyticsWriter:
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: end_session error: %s", exc)
 
+    def record_api_call(self, provider: str, model: str, usage: dict[str, int]) -> None:
+        """Persist the usage the provider reported for one request, cached tokens included."""
+        if not self._enabled:
+            return
+        read, write = usage.get("cache_read_tokens", 0), usage.get("cache_write_tokens", 0)
+        inputs, outputs = usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+        cost = self._pricing.estimate_cost(provider, model, inputs, outputs, read, write)
+        with self._lock:
+            try:
+                with _connect(self._db_path) as conn:
+                    conn.execute(
+                        """INSERT INTO api_calls
+                           (session_id, ts, provider, model, input_tokens, output_tokens,
+                            cache_read_tokens, cache_write_tokens, cost_usd)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (self._session_id, datetime.now(UTC).isoformat(), provider, model, inputs, outputs, read, write, cost),
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("analytics: record_api_call error: %s", exc)
+
     # ------------------------------------------------------------------
     # Tool call recording
     # ------------------------------------------------------------------
@@ -419,9 +454,14 @@ class AnalyticsReader:
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
-                    "SELECT SUM(cost_usd) AS total FROM tool_calls WHERE session_id=?",
+                    "SELECT SUM(cost_usd) AS total, COUNT(*) AS n FROM api_calls WHERE session_id=?",
                     (session_id,),
                 ).fetchone()
+                if not row["n"]:
+                    row = conn.execute(
+                        "SELECT SUM(cost_usd) AS total FROM tool_calls WHERE session_id=?",
+                        (session_id,),
+                    ).fetchone()
             return float(row["total"] or 0.0)
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: session_cost error: %s", exc)

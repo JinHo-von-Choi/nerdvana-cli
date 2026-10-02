@@ -231,3 +231,25 @@ async def test_ultrawork_rebuilds_the_provider_and_restores_it_afterwards(monkey
     assert built[0] is True
     assert built[-1] is False
     assert loop.settings.model.extended_thinking is False
+
+
+async def test_a_tool_turn_without_text_is_recorded_with_its_thinking_blocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from nerdvana_cli.core.session import messages_from_transcript
+
+    provider = _Script([
+        [
+            ProviderEvent(type="provider_block", block=THINKING),
+            ProviderEvent(type="tool_use_complete", tool_use_id="c1", tool_name="Echo", tool_input_complete={}),
+            ProviderEvent(type="done", stop_reason="tool_use"),
+        ],
+        [ProviderEvent(type="content_delta", content="done"), ProviderEvent(type="done", stop_reason="end_turn")],
+    ])
+    loop = _loop(monkeypatch, tmp_path, provider)
+
+    async for _ in loop.run("go"):
+        pass
+
+    restored = messages_from_transcript(loop.session.replay())
+    assert [m.role for m in restored] == [Role.USER, Role.ASSISTANT, Role.TOOL, Role.ASSISTANT]
+    assert restored[1].provider_blocks == [THINKING]
+    assert restored[1].tool_uses[0]["id"] == "c1"

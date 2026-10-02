@@ -72,52 +72,104 @@ def load_usage_rows(
     if not db_path.exists():
         return []
 
+    if by == "provider":
+        select_cols = "COALESCE(provider, '(unknown)') AS provider, '' AS model"
+        group_by    = "provider"
+    else:
+        select_cols = "COALESCE(provider, '(unknown)') AS provider, COALESCE(model, '(unknown)') AS model"
+        group_by    = "provider, model"
+
     try:
         conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=10)
         conn.row_factory = sqlite3.Row
-
-        if by == "provider":
-            group_cols  = "COALESCE(provider, '(unknown)') AS provider"
-            group_by    = "provider"
-            select_cols = f"{group_cols}, '' AS model"
-        else:
-            select_cols = (
-                "COALESCE(provider, '(unknown)') AS provider, "
-                "COALESCE(model, '(unknown)') AS model"
+        try:
+            has_api = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='api_calls'").fetchone() is not None
+            merged  = _merge_usage(
+                _aggregate(conn, _API_CALLS_SQL, select_cols, group_by, cutoff, has_api) if has_api else [],
+                _aggregate(conn, _TOOL_CALLS_SQL, select_cols, group_by, cutoff, has_api),
             )
-            group_by = "provider, model"
-
-        params: list[Any] = []
-        where   = ""
-        if cutoff is not None:
-            where  = "WHERE start_ts >= ?"
-            params.append(cutoff.isoformat())
-
-        sql = f"""
-            SELECT {select_cols},
-                   SUM(input_tokens)  AS input_tokens,
-                   SUM(output_tokens) AS output_tokens,
-                   SUM(cost_usd)      AS cost_usd
-            FROM tool_calls
-            {where}
-            GROUP BY {group_by}
-            ORDER BY cost_usd DESC, input_tokens DESC
-        """
-        rows = conn.execute(sql, params).fetchall()
-        conn.close()
+        finally:
+            conn.close()
     except (sqlite3.Error, OSError):
         return []
+    return sorted(merged, key=lambda r: (-r["cost_usd"], -r["input_tokens"]))
 
+
+# Per-request usage the provider reported. Sessions recorded before it existed only have
+# per-tool-call figures, so those are read for the sessions with no per-request rows.
+_API_CALLS_SQL = """
+    SELECT {select_cols},
+           SUM(input_tokens)       AS input_tokens,
+           SUM(output_tokens)      AS output_tokens,
+           SUM(cache_read_tokens)  AS cache_read_tokens,
+           SUM(cache_write_tokens) AS cache_write_tokens,
+           SUM(cost_usd)           AS cost_usd
+    FROM api_calls
+    {where}
+    GROUP BY {group_by}
+"""
+_TOOL_CALLS_SQL = """
+    SELECT {select_cols},
+           SUM(input_tokens)  AS input_tokens,
+           SUM(output_tokens) AS output_tokens,
+           0                  AS cache_read_tokens,
+           0                  AS cache_write_tokens,
+           SUM(cost_usd)      AS cost_usd
+    FROM tool_calls
+    {where}
+    GROUP BY {group_by}
+"""
+_LEGACY_ONLY = "session_id IS NULL OR session_id NOT IN (SELECT DISTINCT session_id FROM api_calls WHERE session_id IS NOT NULL)"
+
+
+def _aggregate(
+    conn:        sqlite3.Connection,
+    template:    str,
+    select_cols: str,
+    group_by:    str,
+    cutoff:      datetime | None,
+    has_api:     bool,
+) -> list[dict[str, Any]]:
+    """Run one usage query; with per-request rows present, tool-call rows only fill in sessions that have none."""
+    api     = template is _API_CALLS_SQL
+    clauses = []
+    params: list[Any] = []
+    if cutoff is not None:
+        clauses.append("ts >= ?" if api else "start_ts >= ?")
+        params.append(cutoff.isoformat())
+    if not api and has_api:
+        clauses.append(f"({_LEGACY_ONLY})")
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    try:
+        rows = conn.execute(template.format(select_cols=select_cols, where=where, group_by=group_by), params).fetchall()
+    except sqlite3.OperationalError:
+        return []
     return [
         {
-            "provider":      row["provider"],
-            "model":         row["model"],
-            "input_tokens":  int(row["input_tokens"]  or 0),
-            "output_tokens": int(row["output_tokens"] or 0),
-            "cost_usd":      float(row["cost_usd"]    or 0.0),
+            "provider":           row["provider"],
+            "model":              row["model"],
+            "input_tokens":       int(row["input_tokens"]       or 0),
+            "output_tokens":      int(row["output_tokens"]      or 0),
+            "cache_read_tokens":  int(row["cache_read_tokens"]  or 0),
+            "cache_write_tokens": int(row["cache_write_tokens"] or 0),
+            "cost_usd":           float(row["cost_usd"]         or 0.0),
         }
         for row in rows
     ]
+
+
+def _merge_usage(*groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Add up rows that share a provider and model across the query results."""
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    for group in groups:
+        for row in group:
+            key = (row["provider"], row["model"])
+            if key not in merged:
+                merged[key] = dict(row)
+                continue
+            for field in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd"):
+                merged[key][field] += row[field]
+    return list(merged.values())
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +209,7 @@ def build_cost_report(
         ``rows``           — per-group detail rows (sorted by cost desc).
         ``total_input``    — aggregate input token count.
         ``total_output``   — aggregate output token count.
+        ``total_cache_read`` / ``total_cache_write`` — tokens served from or written to the prompt cache.
         ``total_cost_usd`` — aggregate USD cost.
         ``warning_count``  — number of rows whose pricing is unknown or TBD.
         ``since``          — the raw --since argument.
@@ -172,6 +225,8 @@ def build_cost_report(
             "rows":  [],
             "total_input":    0,
             "total_output":   0,
+            "total_cache_read":  0,
+            "total_cache_write": 0,
             "total_cost_usd": 0.0,
             "warning_count":  0,
             "since":          since,
@@ -183,38 +238,19 @@ def build_cost_report(
     path  = db_path or _analytics_db_path()
     raw   = load_usage_rows(path, cutoff, by)
 
-    rows:          list[dict[str, Any]] = []
-    total_input    = 0
-    total_output   = 0
-    total_cost_usd = 0.0
-    warning_count  = 0
-
-    for r in raw:
-        provider = r["provider"]
-        model    = r["model"]
-
-        status = "ok" if by == "provider" else _pricing_status(provider, model)
-        if status != "ok":
-            warning_count += 1
-
-        total_input    += r["input_tokens"]
-        total_output   += r["output_tokens"]
-        total_cost_usd += r["cost_usd"]
-
-        rows.append({
-            "provider":      provider,
-            "model":         model,
-            "input_tokens":  r["input_tokens"],
-            "output_tokens": r["output_tokens"],
-            "cost_usd":      r["cost_usd"],
-            "status":        status,
-        })
+    rows: list[dict[str, Any]] = [
+        {**r, "status": "ok" if by == "provider" else _pricing_status(r["provider"], r["model"])}
+        for r in raw
+    ]
+    warning_count = sum(1 for row in rows if row["status"] != "ok")
 
     return {
         "rows":           rows,
-        "total_input":    total_input,
-        "total_output":   total_output,
-        "total_cost_usd": total_cost_usd,
+        "total_input":    sum(r["input_tokens"] for r in rows),
+        "total_output":   sum(r["output_tokens"] for r in rows),
+        "total_cache_read":  sum(r["cache_read_tokens"] for r in rows),
+        "total_cache_write": sum(r["cache_write_tokens"] for r in rows),
+        "total_cost_usd": sum(r["cost_usd"] for r in rows),
         "warning_count":  warning_count,
         "since":          since,
         "by":             by,
@@ -261,6 +297,8 @@ def render_cost_table(report: dict[str, Any]) -> None:
     table.add_column("Model",        style="")
     table.add_column("Input",        justify="right")
     table.add_column("Output",       justify="right")
+    table.add_column("Cache read",   justify="right")
+    table.add_column("Cache write",  justify="right")
     table.add_column("Cost (USD)",   justify="right")
 
     for row in rows:
@@ -270,6 +308,8 @@ def render_cost_table(report: dict[str, Any]) -> None:
             row["model"],
             _fmt_tokens(row["input_tokens"]),
             _fmt_tokens(row["output_tokens"]),
+            _fmt_tokens(row["cache_read_tokens"]),
+            _fmt_tokens(row["cache_write_tokens"]),
             cost_str,
         )
 
@@ -280,6 +320,8 @@ def render_cost_table(report: dict[str, Any]) -> None:
         "",
         f"[bold]{_fmt_tokens(report['total_input'])}[/bold]",
         f"[bold]{_fmt_tokens(report['total_output'])}[/bold]",
+        f"[bold]{_fmt_tokens(report['total_cache_read'])}[/bold]",
+        f"[bold]{_fmt_tokens(report['total_cache_write'])}[/bold]",
         f"[bold]{total_cost_str}[/bold]",
         end_section=False,
     )

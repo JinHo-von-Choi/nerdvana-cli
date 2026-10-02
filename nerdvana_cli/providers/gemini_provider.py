@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 import uuid
 from collections.abc import AsyncIterator, Sequence
@@ -23,6 +25,33 @@ TOOL_USE_ID_PATTERN = re.compile(r"^call_(?P<name>.+)_[0-9a-f]{8}$")
 def _gemini_int(value: Any) -> int:
     """*value* as a non-negative int, 0 for anything that is not a number."""
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+# Documented stand-in for history that carries no signature (a session resumed from older
+# versions, or calls made by another provider); Gemini 3 models reject a function call without one.
+_UNVERIFIED_SIGNATURE = b"skip_thought_signature_validator"
+
+
+def _encode_signature(part: Any) -> str:
+    """The thought signature of a streamed or returned part as base64 text, empty when absent."""
+    raw = getattr(part, "thought_signature", None)
+    return base64.b64encode(raw).decode("ascii") if isinstance(raw, bytes) and raw else ""
+
+
+def _read_call(part: Any) -> tuple[str, dict[str, Any], str]:
+    """Name, arguments and thought signature of a part holding a function call."""
+    call = part.function_call
+    return call.name or "", dict(call.args) if call.args else {}, _encode_signature(part)
+
+
+def _decode_signature(text: Any) -> bytes | None:
+    """The bytes behind a stored signature, None when there is none or it is not valid base64."""
+    if not text or not isinstance(text, str):
+        return None
+    try:
+        return base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        return None
 
 
 def _usage_dict(usage_metadata: Any) -> dict[str, int]:
@@ -143,13 +172,13 @@ class GeminiProvider:
                                 if part.text:
                                     yield ProviderEvent(type="content_delta", content=part.text)
                                 elif part.function_call:
-                                    args = dict(part.function_call.args) if part.function_call.args else {}
-                                    fn_name = part.function_call.name or ""
+                                    fn_name, args, signature = _read_call(part)
                                     yield ProviderEvent(
                                         type="tool_use_complete",
                                         tool_use_id=make_tool_use_id(fn_name),
                                         tool_name=fn_name,
                                         tool_input_complete=args,
+                                        tool_signature=signature,
                                     )
 
             if usage_metadata is not None:
@@ -209,13 +238,13 @@ class GeminiProvider:
                             if part.text:
                                 content += part.text
                             elif part.function_call:
-                                args = dict(part.function_call.args) if part.function_call.args else {}
-                                fn_name = part.function_call.name or ""
+                                fn_name, args, signature = _read_call(part)
                                 tool_uses.append(
                                     {
                                         "id": make_tool_use_id(fn_name),
                                         "name": fn_name,
                                         "input": args,
+                                        **({"thought_signature": signature} if signature else {}),
                                     }
                                 )
 
@@ -269,7 +298,7 @@ class GeminiProvider:
 
     def _convert_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert messages to Gemini format."""
-        contents = []
+        contents: list[dict[str, Any]] = []
         names_by_id: dict[str, str] = {}
 
         for msg in messages:
@@ -279,19 +308,17 @@ class GeminiProvider:
             if role == "tool":
                 tool_id = msg.get("tool_use_id", "")
                 tool_name = self._resolve_tool_name(msg, tool_id, names_by_id)
-                contents.append(
-                    {
-                        "role": "user",
-                        "parts": [
-                            {
-                                "functionResponse": {
-                                    "name": tool_name,
-                                    "response": {"result": content, "is_error": msg.get("is_error", False)},
-                                }
-                            }
-                        ],
+                response_part = {
+                    "functionResponse": {
+                        "name": tool_name,
+                        "response": {"result": content, "is_error": msg.get("is_error", False)},
                     }
-                )
+                }
+                last = contents[-1] if contents else None
+                if last and last["role"] == "user" and all("functionResponse" in part for part in last["parts"]):
+                    last["parts"].append(response_part)
+                else:
+                    contents.append({"role": "user", "parts": [response_part]})
             elif role == "assistant":
                 parts: list[dict[str, Any]] = []
                 if isinstance(content, str) and content:
@@ -311,17 +338,16 @@ class GeminiProvider:
                         elif item.get("type") == "text":
                             parts.append({"text": item["text"]})
 
-                for tool_use in msg.get("tool_uses", []):
+                for index, tool_use in enumerate(msg.get("tool_uses", [])):
                     call_name = tool_use.get("name", "")
                     self._register_call(tool_use.get("id", ""), call_name, names_by_id)
-                    parts.append(
-                        {
-                            "functionCall": {
-                                "name": call_name,
-                                "args": tool_use.get("input", {}),
-                            }
-                        }
-                    )
+                    part: dict[str, Any] = {"functionCall": {"name": call_name, "args": tool_use.get("input", {})}}
+                    signature = _decode_signature(tool_use.get("thought_signature"))
+                    if signature is None and index == 0 and self.config.model.startswith("gemini-3"):
+                        signature = _UNVERIFIED_SIGNATURE
+                    if signature is not None:
+                        part["thoughtSignature"] = signature
+                    parts.append(part)
 
                 contents.append({"role": "model", "parts": parts if parts else [{"text": ""}]})
             elif role == "user":

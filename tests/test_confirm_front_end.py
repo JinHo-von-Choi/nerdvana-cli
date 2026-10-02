@@ -248,3 +248,13 @@ async def test_concurrent_requests_are_served_one_after_another() -> None:
         await pilot.pause()
         assert (await first, await second) == (False, True)
 
+
+
+def test_escape_is_left_to_an_open_modal() -> None:
+    from types import SimpleNamespace
+
+    from nerdvana_cli.ui.app import NerdvanaApp
+    from nerdvana_cli.ui.widgets.confirm_screen import ConfirmScreen
+
+    modal_app = SimpleNamespace(screen=ConfirmScreen("Bash", "rm x"))
+    assert NerdvanaApp.check_action(modal_app, "focus_input", ()) is False  # type: ignore[arg-type]
