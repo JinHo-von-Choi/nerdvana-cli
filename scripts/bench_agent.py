@@ -282,8 +282,8 @@ def run_attempt(task: Task, number: int, options: argparse.Namespace, root: Path
         report           = parse_result(agent.stdout)
         result.exit_code = agent.returncode
         result.stop      = str(report.get("subtype", ""))
-        result.turns     = int(report.get("turns", 0) or 0)
-        result.cost_usd  = float(report.get("cost_usd", 0.0) or 0.0)
+        result.turns     = int(report.get("num_turns", 0) or 0)
+        result.cost_usd  = float(report.get("total_cost_usd", 0.0) or 0.0)
         if not report:
             result.error = f"no result object in the output (exit {agent.returncode}): {agent.stderr.strip()[-300:]}"
     except subprocess.TimeoutExpired:
