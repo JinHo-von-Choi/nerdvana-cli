@@ -4,6 +4,7 @@ Discovery order (ascending priority):
 1. ~/.nerdvana/NIRNA.md              (global user instructions)
 2. <cwd>/NIRNA.md                    (project instructions, checked in)
 3. <cwd>/NIRNA.local.md              (local instructions, gitignored)
+4. <cwd>/AGENTS.md, <cwd>/CLAUDE.md  (appended after the NIRNA.md tiers)
 """
 
 from __future__ import annotations
@@ -12,6 +13,9 @@ import os
 from dataclasses import dataclass
 
 from nerdvana_cli.core import paths
+
+MAX_INSTRUCTION_BYTES = 50_000
+COMPAT_RULE_FILENAMES = ("AGENTS.md", "CLAUDE.md")
 
 
 @dataclass
@@ -67,6 +71,16 @@ def load_nirna_files(
             content=_read_file(local_path),
         ))
 
+    for name in COMPAT_RULE_FILENAMES:
+        compat_path = os.path.join(cwd, name)
+        content     = read_rule_file(compat_path, cwd)
+        if content:
+            files.append(NirnaFile(
+                path=compat_path,
+                type="project",
+                content=content,
+            ))
+
     return files
 
 
@@ -83,7 +97,28 @@ def format_nirna_for_prompt(files: list[NirnaFile]) -> str | None:
     return header + "\n\n".join(sections)
 
 
-def _read_file(path: str, max_bytes: int = 50_000) -> str:
+def is_within_root(path: str, root: str) -> bool:
+    """Return True when *path* resolves, after symlinks, to *root* or below it."""
+    resolved_root = os.path.realpath(root)
+    resolved_path = os.path.realpath(path)
+    try:
+        return os.path.commonpath([resolved_root, resolved_path]) == resolved_root
+    except ValueError:
+        return False
+
+
+def read_rule_file(path: str, root: str) -> str:
+    """Read a rule file that must resolve inside *root*.
+
+    Returns an empty string when the file is missing, unreadable, empty, or
+    its symlink-resolved path lies outside *root*.
+    """
+    if not os.path.isfile(path) or not is_within_root(path, root):
+        return ""
+    return _read_file(path, MAX_INSTRUCTION_BYTES)
+
+
+def _read_file(path: str, max_bytes: int = MAX_INSTRUCTION_BYTES) -> str:
     try:
         with open(path, encoding="utf-8") as f:
             return f.read(max_bytes)
