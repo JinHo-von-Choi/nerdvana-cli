@@ -362,7 +362,7 @@ class AgentLoop:
         original_et = self.settings.model.extended_thinking
         if _is_ultrawork(prompt):
             self.settings.model.extended_thinking = True
-            yield "[dim cyan][Ultrawork mode: extended thinking ON][/dim cyan]\n"
+            yield "[dim cyan][Ultrawork mode: autonomous tool-use guidance ON][/dim cyan]\n"
 
         self._turn += 1
         self._todo_guard.reset()
