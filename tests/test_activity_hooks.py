@@ -13,7 +13,7 @@ from nerdvana_cli.core.activity_hooks import (
 from nerdvana_cli.core.activity_state import ActivityState, summarize_tool_call
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.hooks import HookContext, HookEvent
-from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig
+from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig, SkillsConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
 # ---------------------------------------------------------------------------
@@ -25,6 +25,7 @@ def _make_settings(provider: str = "anthropic", model: str = "test-model") -> Ne
     settings = MagicMock(spec=NerdvanaSettings)
     settings.model   = ModelConfig(provider=provider, model=model, api_key="test-key")
     settings.session = SessionConfig()
+    settings.skills  = SkillsConfig()
     settings.cwd     = "/tmp"
     settings.verbose = False
     return settings

@@ -163,7 +163,10 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_API_CALL, ralph_loop_check)
         self.hooks.register(HookEvent.AFTER_TOOL, json_parse_recovery)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
-        self.skill_loader = SkillLoader(project_dir=settings.cwd)
+        self.skill_loader = SkillLoader(
+            project_dir=settings.cwd,
+            include_claude_skills=settings.skills.include_claude_skills,
+        )
         self.skill_loader.load_all()
         self._active_skill: str | None = None
         self._role_prompt = role_prompt

@@ -101,7 +101,7 @@ class CheckpointConfig(BaseModel):
 
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
 })
 
@@ -172,6 +172,12 @@ def _build_section(
     return cls()
 
 
+class SkillsConfig(BaseModel):
+    # Also scan ~/.claude/skills and <cwd>/.claude/skills, one tier below
+    # the matching nerdvana skill directories. See core.skills.
+    include_claude_skills: bool = False
+
+
 class NerdvanaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NERDVANA_", env_file=".env", extra="ignore")
 
@@ -181,6 +187,7 @@ class NerdvanaSettings(BaseSettings):
     parism: ParismConfig = Field(default_factory=ParismConfig)
     hooks: HookConfig = Field(default_factory=HookConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
+    skills: SkillsConfig = Field(default_factory=SkillsConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.
@@ -251,6 +258,8 @@ class NerdvanaSettings(BaseSettings):
                     settings.hooks = _build_section(HookConfig, "hooks", data["hooks"], warnings, _HOOKS_STRICT_FIELDS)
                 if "checkpoint" in data:
                     settings.checkpoint = _build_section(CheckpointConfig, "checkpoint", data["checkpoint"], warnings)
+                if "skills" in data:
+                    settings.skills = _build_section(SkillsConfig, "skills", data["skills"], warnings)
                 if "external_projects_enabled" in data:
                     settings.external_projects_enabled = _strict_bool(
                         "external_projects_enabled", data["external_projects_enabled"],
