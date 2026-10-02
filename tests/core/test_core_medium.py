@@ -112,6 +112,12 @@ class _FakeApp:
     def _add_chat_message(self, text: str, raw_text: str | None = None, thinking: str = "") -> None:
         self.messages.append(text)
 
+    def call_later(self, callback: Any, *args: Any) -> bool:
+        return True
+
+    def _wake_for_background(self) -> None:
+        return None
+
     def _update_context_usage(self, pct: int) -> None:
         return None
 
