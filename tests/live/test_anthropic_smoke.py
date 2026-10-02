@@ -32,3 +32,35 @@ def test_smoke_anthropic() -> None:
         assert content, f"no content in response: {response!r}"
 
     asyncio.run(_call())
+
+
+class _EchoSpec:
+    name             = "echo"
+    description_text = "Echo the given text back."
+    input_schema     = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+
+
+@pytest.mark.live
+def test_smoke_anthropic_tool_round_trip() -> None:
+    """A tool call and its result survive the history conversion on the next request."""
+
+    async def _call() -> None:
+        provider = create_provider(provider="anthropic", max_tokens=200)
+        history: list[dict[str, object]] = [
+            {"role": "user", "content": "Call the echo tool with the text hello, then stop."},
+        ]
+        first = await asyncio.wait_for(
+            provider.send(system_prompt="Use the tool when asked.", messages=history, tools=[_EchoSpec()]),
+            timeout=LIVE_TIMEOUT,
+        )
+        tool_uses = first.get("tool_uses") or []
+        assert tool_uses, f"model did not call the tool: {first!r}"
+        history.append({"role": "assistant", "content": first.get("content", ""), "tool_uses": tool_uses})
+        history.append({"role": "tool", "content": "hello", "tool_use_id": tool_uses[0]["id"]})
+        second = await asyncio.wait_for(
+            provider.send(system_prompt="Use the tool when asked.", messages=history, tools=[_EchoSpec()]),
+            timeout=LIVE_TIMEOUT,
+        )
+        assert not second.get("is_error"), f"second request rejected: {second!r}"
+
+    asyncio.run(_call())

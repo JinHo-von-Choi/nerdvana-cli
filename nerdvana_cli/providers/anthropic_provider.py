@@ -232,26 +232,50 @@ class AnthropicProvider:
             return []
 
     def _convert_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Convert internal messages to Anthropic API format."""
-        api_messages = []
+        """Convert internal messages to the Anthropic Messages API format.
+
+        An assistant turn becomes a text block (only when non-empty) followed by
+        one ``tool_use`` block per requested call. Tool results become
+        ``tool_result`` blocks of a user message, and every adjacent run of
+        user-side content (results, then injected notes) is merged into a single
+        user message, which is what the API requires for parallel calls.
+        """
+        api_messages: list[dict[str, Any]] = []
+
+        def _append(role: str, blocks: list[dict[str, Any]]) -> None:
+            if not blocks:
+                return
+            if api_messages and api_messages[-1]["role"] == role:
+                api_messages[-1]["content"].extend(blocks)
+            else:
+                api_messages.append({"role": role, "content": list(blocks)})
+
         for msg in messages:
-            role = msg.get("role", "user")
+            role    = msg.get("role", "user")
             content = msg.get("content", "")
 
             if role == "tool":
-                api_messages.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": msg.get("tool_use_id", ""),
-                                "content": content,
-                                "is_error": msg.get("is_error", False),
-                            }
-                        ],
-                    }
-                )
+                _append("user", [{
+                    "type":        "tool_result",
+                    "tool_use_id": msg.get("tool_use_id", ""),
+                    "content":     content if isinstance(content, str) else str(content),
+                    "is_error":    bool(msg.get("is_error", False)),
+                }])
+            elif role == "assistant":
+                blocks: list[dict[str, Any]] = []
+                if isinstance(content, str) and content.strip():
+                    blocks.append({"type": "text", "text": content})
+                for tool_use in msg.get("tool_uses") or []:
+                    blocks.append({
+                        "type":  "tool_use",
+                        "id":    tool_use.get("id", ""),
+                        "name":  tool_use.get("name", ""),
+                        "input": tool_use.get("input") or {},
+                    })
+                _append("assistant", blocks)
             else:
-                api_messages.append({"role": role, "content": content})
+                if isinstance(content, list):
+                    _append("user", [dict(block) for block in content if isinstance(block, dict)])
+                elif isinstance(content, str) and content.strip():
+                    _append("user", [{"type": "text", "text": content}])
         return api_messages
