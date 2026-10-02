@@ -285,7 +285,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 
 ## Built-in Tools
 
-The registry assembles 31 built-in tools. Bash, file, search, task, web, agent,
+The registry assembles 32 built-in tools. Bash, file, search, task, web, agent,
 and team tools are always present. `Parism` appears when the bundled Parism MCP
 package is reachable. The LSP and symbol tools appear only when a compatible
 language server is installed; with none detected they are simply omitted from
@@ -301,6 +301,7 @@ the registry. The three external project tools stay unregistered until
 | `Glob` | Read | File pattern matching |
 | `Grep` | Read | Content search with regex |
 | `TodoWrite` | Write | Maintain the task list the agent works through |
+| `AskUser` | Meta | Ask the user a clarifying question with 2-4 suggested options plus free text; errors when no user is reachable (one-shot runs, MCP server, subagents) |
 | `WebFetch` | Read | Fetch a URL and return its readable text |
 | `WebSearch` | Read | Brave Search query; raises at call time when `BRAVE_API_KEY` is unset |
 | `Parism` | Write | Structured shell execution with JSON output (44 whitelisted commands) |
