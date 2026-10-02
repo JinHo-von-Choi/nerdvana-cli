@@ -199,6 +199,7 @@ class ToolExecutor:
             )
         if perm_result.behavior == PermissionBehavior.ASK:
             granted = await self._ask_user_permission(
+                context   = context,
                 tool_name = tool_use["name"],
                 message   = perm_result.message,
             )
@@ -315,10 +316,17 @@ class ToolExecutor:
             model    if isinstance(model,    str) and model    else None,
         )
 
-    async def _ask_user_permission(self, tool_name: str, message: str) -> bool:
+    async def _ask_user_permission(
+        self,
+        tool_name: str,
+        message:   str,
+        context:   ToolContext | None = None,
+    ) -> bool:
         """Prompt the user for explicit confirmation when a tool returns ASK.
 
         Behaviour:
+        - A front end that supplied ``context.confirm`` (the TUI) decides; the
+          terminal is never touched, because a full-screen app owns it.
         - Interactive TTY: prints a y/N prompt and reads a single line.
           Accepts "y" or "yes" (case-insensitive); everything else is DENY.
           An empty reply defaults to N (fail-safe).
@@ -328,6 +336,16 @@ class ToolExecutor:
         Returns True only when the user explicitly confirms with y/yes.
         """
         import sys
+
+        confirm = getattr(context, "confirm", None)
+        if confirm is not None:
+            try:
+                granted = bool(await confirm(tool_name, message))
+            except Exception:  # noqa: BLE001
+                logger.exception("confirmation front end failed for %s; denying", tool_name)
+                granted = False
+            logger.info("ASK permission for %s via front end: %s", tool_name, "ALLOW" if granted else "DENY")
+            return granted
 
         prompt_text = (
             f"\n[permission] {tool_name}: {message}\n"

@@ -37,7 +37,7 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
-from nerdvana_cli.core.tool import AskUserCallback, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
@@ -160,6 +160,7 @@ class AgentLoop:
         pricing_table:       PricingTable | None = None,
         role_prompt:         str = "",
         on_ask_user:         AskUserCallback | None = None,
+        on_confirm:          ConfirmCallback | None = None,
     ) -> None:
         self.settings             = settings
         self.registry             = registry
@@ -171,6 +172,7 @@ class AgentLoop:
         self._on_activity_change  = on_activity_change
         self._on_thinking_chunk   = on_thinking_chunk
         self._on_ask_user         = on_ask_user
+        self._on_confirm          = on_confirm
         self.last_thinking:  str  = ""
         from nerdvana_cli.core.builtin_hooks import (
             DirectoryRuleInjector,
@@ -569,6 +571,7 @@ class AgentLoop:
             cwd           = self.settings.cwd,
             task_registry = self._task_registry,
             ask_user      = self._on_ask_user,
+            confirm       = self._on_confirm,
         )
         tool_ctx.state["session_id"] = self.session.session_id
         state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)

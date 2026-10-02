@@ -38,6 +38,7 @@ from nerdvana_cli.ui.widgets import (
     AskUserScreen,
     ChatMessage,
     CommandMenu,
+    ConfirmScreen,
     ModelSelector,
     MultilineAwareInput,
     ProviderSelector,
@@ -176,6 +177,7 @@ class NerdvanaApp(App[object]):
         self.mcp_manager    = mcp_manager
         self._agent_loop: AgentLoop | None = None
         self._is_generating = False
+        self._confirm_lock  = asyncio.Lock()
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
         self._sidebar_user_visible: bool | None = None  # None = follow auto rule
@@ -225,6 +227,23 @@ class NerdvanaApp(App[object]):
         self.push_screen(AskUserScreen(question, options), _on_dismiss)
         return await answer
 
+    async def _confirm_prompt(self, tool_name: str, message: str) -> bool:
+        """Ask the user to allow a tool call through a modal.
+
+        Registered as the agent loop's ``on_confirm`` hook. Requests are served
+        one at a time, so a sub-agent asking while another prompt is open waits
+        its turn instead of stacking dialogs.
+        """
+        async with self._confirm_lock:
+            decision: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
+
+            def _on_dismiss(result: bool | None) -> None:
+                if not decision.done():
+                    decision.set_result(bool(result))
+
+            self.push_screen(ConfirmScreen(tool_name, message), _on_dismiss)
+            return await decision
+
     def _on_background_task_finished(self, task: TaskState) -> None:
         """Defer the wake-up so it runs after the finishing task returns."""
         self.call_later(self._wake_for_background)
@@ -267,6 +286,7 @@ class NerdvanaApp(App[object]):
             task_registry      = self._task_registry,
             on_activity_change = _on_activity_change,
             on_ask_user        = self._ask_user_prompt,
+            on_confirm         = self._confirm_prompt,
         )
         if resume_id:
             restored = self._agent_loop.restore_history()

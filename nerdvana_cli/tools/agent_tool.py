@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.types import ToolResult
@@ -143,6 +143,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
             registry      = child_registry,
             max_turns     = agent_defn.max_turns,
             system_prompt = agent_defn.system_prompt,
+            confirm       = label_confirm(context.confirm, task_id),
         )
 
         if args.run_in_background:

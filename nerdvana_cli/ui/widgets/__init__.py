@@ -15,6 +15,7 @@ from nerdvana_cli.ui.widgets.activity_indicator import ActivityIndicator
 from nerdvana_cli.ui.widgets.ask_user_screen import AskUserScreen
 from nerdvana_cli.ui.widgets.chat_message import ChatMessage
 from nerdvana_cli.ui.widgets.command_menu import SLASH_COMMANDS, CommandMenu
+from nerdvana_cli.ui.widgets.confirm_screen import ConfirmScreen
 from nerdvana_cli.ui.widgets.model_selector import ModelSelector
 from nerdvana_cli.ui.widgets.multiline_input import MultilineAwareInput
 from nerdvana_cli.ui.widgets.provider_selector import ProviderSelector
@@ -27,6 +28,7 @@ __all__ = [
     "AskUserScreen",
     "ChatMessage",
     "CommandMenu",
+    "ConfirmScreen",
     "ModelSelector",
     "MultilineAwareInput",
     "ProviderSelector",

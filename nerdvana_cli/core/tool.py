@@ -21,6 +21,10 @@ T = TypeVar("T")
 # resolves to the user's answer, or None when the user dismissed the prompt.
 AskUserCallback = Callable[[str, list[str]], Awaitable[str | None]]
 
+# Permission confirmation hook: receives the tool name and the reason it needs
+# approval, and resolves to True only when the user allowed the call.
+ConfirmCallback = Callable[[str, str], Awaitable[bool]]
+
 # Directory where full outputs are kept when a result is truncated. Set by the
 # tool executor for the duration of one call; unset means no copy is kept.
 TOOL_OUTPUT_DIR: ContextVar[str | None] = ContextVar("tool_output_dir", default=None)
@@ -73,6 +77,7 @@ class ToolContext:
         max_result_size: int  = 500_000,
         task_registry:   Any  = None,
         ask_user:        AskUserCallback | None = None,
+        confirm:         ConfirmCallback | None = None,
     ) -> None:
         self.cwd             = cwd
         self.max_result_size = max_result_size
@@ -80,6 +85,7 @@ class ToolContext:
         self.state:          dict[str, Any] = {}
         self.task_registry                  = task_registry
         self.ask_user                       = ask_user
+        self.confirm                        = confirm
 
 
 class BaseTool(ABC, Generic[T]):
