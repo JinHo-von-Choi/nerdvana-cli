@@ -4,7 +4,7 @@
 - Install: `pip install -e ".[all]"` (all providers) or `pip install -e ".[anthropic]"` (specific)
 - One-line install: `curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash`
 - Dev install: `pip install -e ".[dev]"`
-- Test: `pytest` (pytest-asyncio auto mode, 2401 tests; `python scripts/sync_test_count.py` keeps this number honest)
+- Test: `pytest` (pytest-asyncio auto mode, 2446 tests; `python scripts/sync_test_count.py` keeps this number honest)
 - Lint: `ruff check .` (line-length 120, 0 violations)
 - Format: `ruff format .`
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)
@@ -18,6 +18,7 @@
 - TUI: Textual App (ui/app.py) with ChatMessage widgets (click-to-copy), AgentLoop is backend
 - MCP: config -> client -> tools -> manager, stdio + HTTP transport, failure isolation per server
 - Parism: structured shell output via MCP, falls back silently to Bash on failure
+- Custom commands: core/user_commands.py (markdown templates under commands/ directories, `$ARGUMENTS` and `$1`..`$9`); command hooks: core/command_hooks.py (hooks.yml shell commands, exit code 2 blocks, project files need the project-hook opt-in and approved digest)
 - Hooks: HookEngine with SESSION_START/SESSION_END/BEFORE_TOOL/AFTER_TOOL/BEFORE_API_CALL/AFTER_API_CALL events, builtin context injection, directory rule injection (AGENTS.md/CLAUDE.md/NIRNA.md in subdirectories on first touch)
 - Skills: markdown-based prompt plugins (.nerdvana/skills/*.md), /trigger activation
 - Agents: 6 builtin types (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) dispatched via AgentTool with their own system prompt and max_turns; allowed_tools filters the parent session's tools per agent ("@read" admits READ/SYMBOLIC tools); sub-agents run under a per-provider concurrency bound

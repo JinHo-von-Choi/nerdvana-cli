@@ -62,6 +62,9 @@ class _App:
     def exit(self) -> None:
         self.exited = True
 
+    def _user_commands(self) -> list[Any]:
+        return []
+
     def _add_chat_message(self, message: str, **kwargs: Any) -> None:
         self.messages.append(message)
 

@@ -232,6 +232,7 @@ class AgentLoop:
             session_start_memory_hint,
         )
         from nerdvana_cli.core.checkpoint import CheckpointManager
+        from nerdvana_cli.core.command_hooks import load_command_hooks
         from nerdvana_cli.core.context_reminder import ContextReminder
         from nerdvana_cli.core.hooks import HookEngine, HookEvent
         from nerdvana_cli.core.skills import SkillLoader
@@ -245,6 +246,7 @@ class AgentLoop:
         self._dir_rules = DirectoryRuleInjector()
         self.hooks.register(HookEvent.AFTER_TOOL, self._dir_rules.handle)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
+        self._command_hooks   = load_command_hooks(self.hooks, settings)
         self.skill_loader = SkillLoader(
             project_dir=settings.cwd,
             include_claude_skills=settings.skills.include_claude_skills,

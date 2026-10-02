@@ -7,6 +7,7 @@ import contextlib
 import logging
 import os
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState
+from nerdvana_cli.core.user_commands import UserCommand, UserCommandLoader
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.editor_pane import EditorPane, language_for_path
@@ -178,6 +180,8 @@ class NerdvanaApp(App[object]):
         self._agent_loop: AgentLoop | None = None
         self._is_generating = False
         self._confirm_lock  = asyncio.Lock()
+        self._commands_cache:   list[UserCommand] = []
+        self._commands_scanned: float             = float("-inf")
         self._pending_provider: str = ""  # provider name awaiting API key input
         self._task_registry = TaskRegistry()
         self._sidebar_user_visible: bool | None = None  # None = follow auto rule
@@ -448,6 +452,28 @@ class NerdvanaApp(App[object]):
 
         self._generate_response(user_text)
 
+    def _user_commands(self) -> list[UserCommand]:
+        """The user's command templates, rescanned at most every two seconds."""
+        now = time.monotonic()
+        if now - self._commands_scanned > 2.0:
+            self._commands_cache   = UserCommandLoader(project_dir=self.settings.cwd or ".").list_commands()
+            self._commands_scanned = now
+        return self._commands_cache
+
+    def _start_prompt(self, shown: str, prompt: str) -> None:
+        """Send *prompt* as if the user had typed *shown*, queueing it behind a running response."""
+        if self._is_generating:
+            if self._agent_loop is not None:
+                self._agent_loop.queue_input(prompt)
+                self._add_chat_message(
+                    f"\n[bold green]> {escape(shown)}[/bold green] [dim](queued, applied at the next step)[/dim]",
+                    raw_text=shown,
+                )
+            return
+        self._add_chat_message(f"\n[bold green]> {escape(shown)}[/bold green]", raw_text=shown)
+        self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
+        self._generate_response(prompt)
+
     def _after_response(self) -> None:
         """Pick up what accumulated while a response was being generated."""
         self._drain_queued_input()
@@ -576,6 +602,10 @@ class NerdvanaApp(App[object]):
                     if skill.trigger not in _seen and (query == "/" or skill.trigger.startswith(query)):
                         menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
                         _seen.add(skill.trigger)
+                for command in self._user_commands():
+                    if command.trigger not in _seen and (query == "/" or command.trigger.startswith(query)):
+                        menu.add_option(Option(f"{command.trigger}  {command.description}", id=command.trigger))
+                        _seen.add(command.trigger)
             if menu.option_count > 0:
                 menu.add_class("visible")
             else:

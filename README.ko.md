@@ -14,7 +14,8 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 - **서브에이전트와 백그라운드 작업**: `Agent` / `Swarm`이 서브에이전트를 각자의 시스템 프롬프트, 턴 한도, 도구 범위로 실행합니다. 제공자당 동시 실행 수는 `session.max_parallel_agents`로 묶입니다. 백그라운드 작업이 끝나면 결과가 모델에게 자동으로 전달되고, 쉬고 있던 세션은 스스로 깨어나 결과를 검토합니다.
 - **복구와 완주**: 제공자 실패를 분류해 백오프로 재시도한 뒤 다른 모델이나 제공자로 넘어갑니다. 컨텍스트 초과는 압축 후 재시도하고, 멈춘 스트림은 시간 제한으로 끊습니다. 열린 todo 항목이 있으면 진척이 멈출 때까지 작업을 이어 갑니다. [자동 복구](#자동-복구) 참고.
 - **권한 정책**: `--approval-mode`, `permissions.mode`, `always_allow`, `always_deny`가 서브에이전트를 포함한 모든 도구 호출에 적용됩니다. [권한과 승인 모드](#권한과-승인-모드) 참고.
-- **되묻기**: `AskUser` 도구로 모델이 추측 대신 사용자에게 묻습니다.
+- **되묻기**: `AskUser` 도구로 모델이 추측 대신 사용자에게 묻습니다. 에이전트가 일하는 동안 입력한 글은 다음 단계에 반영되고, 파일 변경 확인에는 diff가 표시됩니다.
+- **사용자 명령과 훅**: 마크다운 명령 템플릿과 셸 명령 훅. [사용자 명령과 명령 훅](#사용자-명령과-명령-훅) 참고.
 - **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 `SKILL.md` 디렉터리 형식도 지원합니다.
 - **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
 - **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알린다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끈다.
@@ -123,6 +124,24 @@ nerdvana run "이 코드 리팩터링" --provider deepseek
 # 모든 제공자 목록 보기
 nerdvana providers
 ```
+
+## 사용자 명령과 명령 훅
+
+**명령.** `~/.nerdvana/commands/` 또는 `<프로젝트>/.nerdvana/commands/` 아래의 마크다운 파일이 슬래시 명령이 됩니다. `review.md`는 `/review`, `git/commit.md`는 `/git:commit`입니다. 입력하면 파일 내용이 프롬프트로 전송되고, `$ARGUMENTS`는 명령 뒤에 친 전체 텍스트로, `$1`~`$9`는 각 단어로 바뀝니다(공백이 든 단어는 따옴표로 묶음). 자리표시자가 없으면 인자를 본문 뒤에 붙입니다. YAML 머리말의 `description:`은 명령 메뉴에 표시됩니다. 같은 이름이면 프로젝트 파일이 전역 파일을 대체하고, 내장 명령과 스킬이 항상 우선합니다.
+
+**명령 훅.** `~/.nerdvana/hooks.yml`과 `<프로젝트>/.nerdvana/hooks.yml`이 에이전트 이벤트마다 셸 명령을 실행합니다.
+
+```yaml
+hooks:
+  - event: before_tool        # before_tool, after_tool, session_start, session_end
+    match: "Bash"             # 도구 이름 glob (before_tool, after_tool), 기본 "*"
+    command: "scripts/check-command.sh"
+    timeout: 5                # 초, 1~30
+```
+
+명령은 프로젝트 디렉터리에서 실행되고 stdin으로 JSON 객체 하나(`event`, `tool_name`, `tool_input`, `cwd`, `after_tool`이면 `tool_result`)를 받으며, `NERDVANA_HOOK_EVENT`와 `NERDVANA_TOOL_NAME`이 설정됩니다. 종료 코드 `0`은 계속 진행합니다. 종료 코드 `2`는 `before_tool` 호출을 막고 명령의 출력을 모델에게 알리며, `after_tool`이면 출력을 메시지로 모델에게 전달합니다. 그 밖의 종료 코드, 시간 초과, 시작하지 못한 명령은 기록만 하고 무시하므로 고장 난 훅이 에이전트를 멈추지 않습니다. 훅이 도는 동안 에이전트가 기다리므로 빠르게 유지하세요.
+
+프로젝트의 `hooks.yml`은 저장소에 딸린 셸 명령을 실행하므로 프로젝트 파이썬 훅과 같은 규칙을 따릅니다. `hooks.allow_project_hooks: true`와 승인된 해시(`nerdvana hook trust <경로>`)가 필요하고, 파일을 고치면 승인이 취소됩니다.
 
 ## 헤드리스 실행
 

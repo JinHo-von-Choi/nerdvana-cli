@@ -32,7 +32,8 @@
 - **Sub-agents and background work**: `Agent` and `Swarm` run sub-agents with their own system prompt, turn limit and tool scope, at most `session.max_parallel_agents` per provider. Finished background agents are reported to the model automatically, and an idle session wakes up to review them.
 - **Recovery and completion**: provider failures are classified and retried with backoff, then fall back across models or providers; a too-long context is compacted and retried; stalled streams time out. Open todo items keep the agent working until it stops making progress. See [Self-Recovery](#self-recovery).
 - **Permission policy**: `--approval-mode`, `permissions.mode`, `always_allow` and `always_deny` apply to every tool call, including sub-agents. See [Permissions and Approval Modes](#permissions-and-approval-modes).
-- **Clarifying questions**: the `AskUser` tool lets the model ask instead of guessing.
+- **Clarifying questions**: the `AskUser` tool lets the model ask instead of guessing. Text you type while the agent is working is applied at its next step, and a confirmation for a file change shows the diff.
+- **Your own commands and hooks**: markdown command templates and shell command hooks. See [Custom Commands and Command Hooks](#custom-commands-and-command-hooks).
 - **Claude Code compatible instructions**: root `AGENTS.md` and `CLAUDE.md` load after `NIRNA.md`; rule files in subdirectories are injected when a file there is first touched. Skills may be `SKILL.md` directories.
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
@@ -139,6 +140,24 @@ nerdvana run "refactor this code" --provider deepseek
 # List all providers
 nerdvana providers
 ```
+
+## Custom Commands and Command Hooks
+
+**Commands.** A markdown file under `~/.nerdvana/commands/` or `<project>/.nerdvana/commands/` becomes a slash command: `review.md` is `/review`, and `git/commit.md` is `/git:commit`. Typing it sends the file's text as the prompt, with `$ARGUMENTS` replaced by what you typed after the command and `$1` to `$9` by its words (quote a word that contains spaces). Without a placeholder the arguments are appended to the text. An optional `description:` in YAML frontmatter shows in the command menu. A project file replaces a global one of the same name; built-in commands and skills always win.
+
+**Command hooks.** `~/.nerdvana/hooks.yml`, and `<project>/.nerdvana/hooks.yml`, run shell commands on agent events:
+
+```yaml
+hooks:
+  - event: before_tool        # before_tool, after_tool, session_start or session_end
+    match: "Bash"             # tool name glob (before_tool and after_tool), default "*"
+    command: "scripts/check-command.sh"
+    timeout: 5                # seconds, 1 to 30
+```
+
+The command runs in the project directory and receives one JSON object on stdin (`event`, `tool_name`, `tool_input`, `cwd`, and `tool_result` for `after_tool`); `NERDVANA_HOOK_EVENT` and `NERDVANA_TOOL_NAME` are set. Exit code `0` carries on. Exit code `2` blocks a `before_tool` call and tells the model the command's output, or passes an `after_tool` command's output to the model as a message. Any other exit code, a timeout, or a command that cannot start is logged and ignored, so a broken hook never stops the agent. The agent waits for a hook while it runs, so keep them fast.
+
+A project `hooks.yml` runs shell commands that come with the repository, so it follows the rules of project Python hooks: it needs `hooks.allow_project_hooks: true` and an approved digest (`nerdvana hook trust <path>`), and editing the file revokes the approval.
 
 ## Headless Runs
 
