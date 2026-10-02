@@ -111,8 +111,8 @@ def test_the_worst_case_spend_is_the_sum_of_the_ceilings_times_attempts() -> Non
 
 
 def test_the_result_object_is_found_among_other_output() -> None:
-    out = 'noise\n{"type": "assistant"}\n{"type": "result", "turns": 3}\n'
-    assert bench.parse_result(out) == {"type": "result", "turns": 3}
+    out = 'noise\n{"type": "assistant"}\n{"type": "result", "num_turns": 3}\n'
+    assert bench.parse_result(out) == {"type": "result", "num_turns": 3}
     assert bench.parse_result("nothing here") == {}
 
 
@@ -123,9 +123,9 @@ def test_the_result_object_is_found_among_other_output() -> None:
 FIXER = (
     "import json, pathlib\n"
     "p = pathlib.Path('calc.py'); p.write_text(p.read_text().replace('range(start, stop)', 'range(start, stop + 1)'))\n"
-    "print(json.dumps({'type': 'result', 'subtype': 'success', 'turns': 2, 'cost_usd': 0.25}))\n"
+    "print(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 2, 'total_cost_usd': 0.25}))\n"
 )
-IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 'turns': 1, 'cost_usd': 0.1}))\n"
+IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 1, 'total_cost_usd': 0.1}))\n"
 
 
 def _options() -> argparse.Namespace:
