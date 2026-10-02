@@ -66,6 +66,9 @@ class Message:
     tool_use_id: str | None = None
     is_error: bool = False
     tool_uses: list[dict[str, Any]] = field(default_factory=list)
+    # Content blocks a provider needs echoed back unchanged on later requests, such as
+    # Anthropic thinking blocks with their signatures. Opaque to everything but that provider.
+    provider_blocks: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

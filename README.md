@@ -522,8 +522,8 @@ model:
   fallback_models:           # tried in order once retries are spent
     - claude-opus-5-5
     - openai:gpt-4.1         # provider:model switches provider
-  extended_thinking: false   # adds autonomous tool-use guidance to the prompt; provider-side thinking is not sent yet
-  thinking_budget: 8192      # reserved; not sent to providers yet
+  extended_thinking: false   # thinking on Anthropic models where it is optional (Claude 5 models think by default)
+  thinking_budget: 8192      # token budget on models that take a manual budget (Haiku 4.5)
 
 permissions:
   mode: default              # default, accept-edits, bypass, plan

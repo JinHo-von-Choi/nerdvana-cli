@@ -28,6 +28,8 @@ def message_tokens(messages: Sequence[Any]) -> int:
         total  += approx_tokens(content if isinstance(content, str) else json.dumps(content, ensure_ascii=False))
         if message.tool_uses:
             total += approx_tokens(json.dumps(message.tool_uses, ensure_ascii=False))
+        if getattr(message, "provider_blocks", None):
+            total += approx_tokens(json.dumps(message.provider_blocks, ensure_ascii=False))
     return total
 
 

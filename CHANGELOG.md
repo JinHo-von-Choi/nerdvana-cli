@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `nerdvana run` reports results as `--output-format text|json|stream-json` and stops at `--max-turns` or `--max-cost-usd`. Exit codes: 0 completed, 1 provider error, 2 missing credentials or invalid usage, 3 limit reached.
+- Anthropic requests cache the prompt prefix (`model.prompt_caching`, on by default). Cached reads and writes are counted separately in usage, cost estimates and the analytics store; `session.max_cost_usd` stops a run at a spending limit.
+- Text typed while the agent works is delivered at its next step instead of waiting for the turn to end.
+- Tool permission prompts open as a modal and show the diff of a file change before it is approved.
+- Custom slash commands from `~/.nerdvana/commands/*.md` and `<project>/.nerdvana/commands/*.md` (`$ARGUMENTS`, `$1` to `$9`, optional frontmatter description), and shell command hooks from `hooks.yml` for `before_tool`, `after_tool`, `session_start` and `session_end`. A project `hooks.yml` loads only with `hooks.allow_project_hooks` and an approved digest.
+- Thinking on Anthropic models: Claude 5 models run with adaptive thinking, `model.extended_thinking` and `ultrawork` enable it where it is optional, `model.thinking_budget` applies to manual-budget models, and `model.show_thinking` requests summaries. Thinking blocks are returned unchanged with tool results, which the API requires to keep thinking active across tool turns.
+
+### Changed
+
+- The default model is `claude-sonnet-5-5`; `claude-sonnet-4-20250514` is retired. Context windows of 1M tokens are recognised for the models that have them, and `pricing.yml` carries cache rates and the Claude 5 entries.
+- `FileRead` reports a binary file by type and size instead of decoding it.
+- The agent loop and tool executor are split into single-purpose steps, and a contract test keeps function length from growing.
+
+### Fixed
+
+- Anthropic tool calls are sent as `tool_use` blocks and their results merged into one user message.
+- Duplicate tool call ids no longer reach the API: a stream stops after its tool-use stop, OpenAI-compatible streams emit each call once and keep parallel calls apart, repeated ids are renamed, and ids are repaired before each request.
+- Gemini token usage is reported from the stream.
+
 ## [1.6.0] - 2026-10-03
 
 ### Added
