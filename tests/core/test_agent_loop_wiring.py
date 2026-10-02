@@ -406,3 +406,56 @@ async def test_tool_round_trip_still_produces_the_same_transcript(
     tool_messages = [msg for msg in loop.state.messages if msg.role == Role.TOOL]
     assert tool_messages[0].content == "echo:hi"
     assert not tool_messages[0].is_error
+
+
+async def test_several_tool_uses_in_one_turn_each_get_exactly_one_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path:    Path,
+    pricing:     PricingTable,
+) -> None:
+    """Every tool_use of a multi-call turn is answered once, under its own id."""
+    calls = {"call_Echo_0000aaa1": "a", "call_Echo_0000aaa2": "b", "call_Echo_0000aaa3": "c"}
+    turn  = [
+        ProviderEvent(type="tool_use_complete", tool_use_id=tid, tool_name="Echo", tool_input_complete={"text": text})
+        for tid, text in calls.items()
+    ]
+    sequences = [
+        [*turn, ProviderEvent(type="done", stop_reason="tool_use")],
+        [ProviderEvent(type="content_delta", content="done"), ProviderEvent(type="done", stop_reason="end_turn")],
+    ]
+    writer = _writer(tmp_path, pricing)
+    loop   = _build_loop(monkeypatch, tmp_path, _RecordingProvider(sequences), writer, pricing, [_EchoTool()])
+
+    await _drain(loop)
+
+    tool_messages = [msg for msg in loop.state.messages if msg.role == Role.TOOL]
+    answered      = {str(msg.tool_use_id): msg.content for msg in tool_messages}
+    assert len(tool_messages) == len(calls)
+    assert answered == {tid: f"echo:{text}" for tid, text in calls.items()}
+    assert _orphans(loop.state.messages) == []
+
+
+async def test_max_tokens_stop_injects_a_continuation_and_the_loop_resumes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path:    Path,
+    pricing:     PricingTable,
+) -> None:
+    """A max_tokens stop is followed by an injected user turn and a second call."""
+    sequences = [
+        [ProviderEvent(type="content_delta", content="partial"), ProviderEvent(type="done", stop_reason="max_tokens")],
+        [ProviderEvent(type="content_delta", content="resumed"), ProviderEvent(type="done", stop_reason="end_turn")],
+    ]
+    provider = _RecordingProvider(sequences)
+    writer   = _writer(tmp_path, pricing)
+    loop     = _build_loop(monkeypatch, tmp_path, provider, writer, pricing)
+
+    chunks = await _drain(loop, "write a long answer")
+
+    continuations = [
+        msg for msg in loop.state.messages
+        if msg.role == Role.USER and str(msg.content).startswith("Context limit reached")
+    ]
+    assert len(continuations) == 1
+    assert "write a long answer" in str(continuations[0].content)
+    assert len(provider.payloads) == 2
+    assert "resumed" in "".join(chunks)
