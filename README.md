@@ -28,14 +28,17 @@
 - **Interactive REPL** — conversational coding with streaming output and a live TaskPanel for background agents
 - **Non-interactive mode** — single prompt execution for scripting
 - **Startup update notice** — on every invocation, a dim one-line notice is printed when a newer GitHub release is available (cached 24 h). Disable via `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, or `session.update_check: false` in `nerdvana.yml`.
-- **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
-- **Phase B — Multi-Agent Swarm** — first-class `Agent`, `Swarm`, `TaskGet`, and `TaskStop` tools with concurrent execution budgets and a TaskPanel UI
-- **Phase C — Self-Recovery Hooks** — built-in lifecycle hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) that auto-resume max-token stops, repair JSON tool errors, and chase down TODO/FIXME/NotImplemented markers; optional planning gate, fallback models, and extended thinking
+- **Edit integrity**: `FileRead` tags every line `N#hhhhhh`; `FileEdit` and `FileWrite` refuse to change a file that was not read in the session or changed since, and relocate anchors moved by the agent's own edits. After an edit, errors it introduced are reported from the running language server.
+- **Sub-agents and background work**: `Agent` and `Swarm` run sub-agents with their own system prompt, turn limit and tool scope, at most `session.max_parallel_agents` per provider. Finished background agents are reported to the model automatically, and an idle session wakes up to review them.
+- **Recovery and completion**: provider failures are classified and retried with backoff, then fall back across models or providers; a too-long context is compacted and retried; stalled streams time out. Open todo items keep the agent working until it stops making progress. See [Self-Recovery](#self-recovery).
+- **Permission policy**: `--approval-mode`, `permissions.mode`, `always_allow` and `always_deny` apply to every tool call, including sub-agents. See [Permissions and Approval Modes](#permissions-and-approval-modes).
+- **Clarifying questions**: the `AskUser` tool lets the model ask instead of guessing.
+- **Claude Code compatible instructions**: root `AGENTS.md` and `CLAUDE.md` load after `NIRNA.md`; rule files in subdirectories are injected when a file there is first touched. Skills may be `SKILL.md` directories.
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
 - **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`)
 - **MCP server per-tenant quota** — `nerdvana serve` supports rpm / rph / daily_tokens / max_concurrent limits per client, configured via `mcp_quota.yml`. See [`docs/mcp-quota.md`](docs/mcp-quota.md).
-- **Session Persistence** — JSONL transcripts for resume
+- **Session Persistence**: JSONL transcripts; `nerdvana session resume <id>` restores the conversation
 - **Auto Provider Detection** — picks the right provider from model name
 - **Configurable** — YAML config, environment variables, CLI flags, fallback models, and complexity-triggered planning gate
 
@@ -295,9 +298,9 @@ the registry. The three external project tools stay unregistered until
 | Tool | Type | Description |
 |------|------|-------------|
 | `Bash` | Write | Execute shell commands |
-| `FileRead` | Read | Read file contents, returning a per-line SHA256 anchor hash |
-| `FileWrite` | Write | Create or overwrite files |
-| `FileEdit` | Write | String replacement with HashLine line verification and optional `anchor_hash` integrity checks |
+| `FileRead` | Read | Read file contents, prefixing each line with `N#hhhhhh` (line number and content hash) and recording the file's digest for the session |
+| `FileWrite` | Write | Create a file, or overwrite one that was read in this session and has not changed since |
+| `FileEdit` | Write | String or anchor (`N#hhhhhh`) replacement; refused when the file changed since it was read |
 | `Glob` | Read | File pattern matching |
 | `Grep` | Read | Content search with regex |
 | `TodoWrite` | Write | Maintain the task list the agent works through |
@@ -305,9 +308,9 @@ the registry. The three external project tools stay unregistered until
 | `WebFetch` | Read | Fetch a URL and return its readable text |
 | `WebSearch` | Read | Brave Search query; raises at call time when `BRAVE_API_KEY` is unset |
 | `Parism` | Write | Structured shell execution with JSON output (44 whitelisted commands) |
-| `Agent` | Write | Spawn an autonomous sub-agent (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) |
+| `Agent` | Write | Spawn a sub-agent (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer), in the foreground or the background |
 | `Swarm` | Write | Run multiple agents in parallel under a shared concurrency budget |
-| `TaskGet` | Read | Inspect the status, transcript, and result of a running or finished task |
+| `TaskGet` | Read | Inspect the status and result of a background task (finished tasks are also reported automatically) |
 | `TaskStop` | Write | Cancel a running agent task |
 | `lsp_diagnostics` | Read | Pull workspace and file-level diagnostics from a connected language server |
 | `lsp_goto_definition` | Read | Resolve a symbol to its definition location via the language server |
@@ -327,30 +330,50 @@ the registry. The three external project tools stay unregistered until
 
 ## Agent Types
 
-The `Agent` and `Swarm` tools dispatch tasks to one of six built-in agent profiles. Each profile defines a default turn budget and an allow-listed tool set. `*` means the agent inherits the full tool registry.
+The `Agent` and `Swarm` tools dispatch tasks to one of six built-in agent profiles. Each profile carries its own system prompt, turn limit and tool allow-list, and all of them are applied. `*` admits every tool of the session except spawning, task control and `AskUser`; `@read` admits every read-only tool (LSP lookups, symbol queries, web reads).
 
 | Agent Type | Max Turns | Allowed Tools | Purpose |
 |------------|-----------|---------------|---------|
-| `general-purpose` | 50 | `*` | Default catch-all agent with access to every registered tool |
-| `Explore` | 20 | `Glob`, `Grep`, `FileRead` | Read-only repo exploration and reconnaissance |
-| `Plan` | 20 | `Glob`, `Grep`, `FileRead` | Read-only plan drafting; pairs with the `planning_gate` setting |
-| `code-reviewer` | 15 | `FileRead`, `Grep`, `Glob` | Diff and source review with no write capability |
+| `general-purpose` | 50 | `*` | Default catch-all agent |
+| `Explore` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only repo exploration and reconnaissance |
+| `Plan` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only plan drafting; pairs with the `planning_gate` setting |
+| `code-reviewer` | 15 | `FileRead`, `Grep`, `Glob`, `@read` | Diff and source review with no write capability |
 | `git-management` | 20 | `Bash`, `FileRead` | Branch, commit, and merge orchestration via shell |
 | `test-writer` | 30 | `*` | Generates and runs tests across the project |
 
-Live tasks spawned by these agents stream into the REPL TaskPanel, where you can watch progress, inspect transcripts via `TaskGet`, and cancel runaway work via `TaskStop`.
+Sub-agents share the session's language server and MCP connections, follow the same permission policy, and cannot spawn further agents. Live tasks stream into the TaskPanel; a background task's result is reported to the model when it finishes, and `TaskStop` cancels one.
 
-## Self-Recovery Hooks
+## Self-Recovery
 
-NerdVana CLI ships with three built-in lifecycle hooks that keep long agent loops productive without manual intervention:
+| Mechanism | Behaviour |
+|-|-|
+| Provider recovery | Failures are classified as transient (429, 5xx, timeouts), context limit, authentication or decoding. Transient ones are retried `model.max_retries` times with backoff or the server's `Retry-After`, then the next `model.fallback_models` entry is used (`provider:model` switches provider). A context-limit failure compacts the history once and retries. Nothing is retried after part of the answer has streamed. |
+| Stream timeouts | A stream silent for `session.stream_idle_timeout` seconds, or running past `session.stream_total_timeout`, is treated as a transient failure. |
+| Todo guard | When the model ends a turn with open `TodoWrite` items, it is asked to continue; after three reminders without progress it stops and reports the open items. Open items are restated after compaction. |
+| `context_limit_recovery` | After a `max_tokens` stop, injects a continuation prompt quoting the last request. |
+| `json_parse_recovery` | When a tool result fails JSON parsing, asks for valid JSON. |
+| `ralph_loop_check` | On `end_turn`, asks the agent to finish `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요` or `# 미구현` markers. End-of-turn hooks may continue a turn at most three times per prompt. |
+| Repeat guard | The same tool call with identical arguments draws a warning at the third consecutive repeat and is refused at the fifth (`TaskGet` polling excepted). |
+| Output bounds | Tool results are capped at about 30,000 tokens (10,000 for `WebFetch`), keeping head and tail; the full output is saved under `~/.nerdvana/tool-output/`. |
 
-| Hook | Event | Behavior |
-|------|-------|----------|
-| `context_limit_recovery` | `AFTER_API_CALL` | When the model stops with `max_tokens`, injects a continuation prompt referencing the most recent user request so the agent can resume its work |
-| `json_parse_recovery` | `AFTER_TOOL` | When a tool result fails JSON parsing, injects a correction message naming the offending tool and asking for valid JSON |
-| `ralph_loop_check` | `AFTER_API_CALL` | On `end_turn`, scans the assistant message for `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, or `# 미구현` markers and asks the agent to finish them before yielding (the "Ralph" self-finishing loop) |
+## Permissions and Approval Modes
 
-These hooks are registered automatically and form the backbone of Phase C self-recovery. They can be combined with the optional `planning_gate`, `fallback_models`, and `extended_thinking` settings described in [Configuration](#configuration) for fully autonomous runs.
+Every tool call, in the main loop, sub-agents and background agents alike, is decided in this order:
+
+1. `permissions.always_deny` (tool names, glob patterns allowed): refused.
+2. Tools excluded by the active mode: refused and hidden from the model.
+3. The tool's own refusal (for example a blocked shell command): refused.
+4. `permissions.always_allow`: allowed without asking.
+5. The mode's trust level: `strict` asks before every write, `balanced` asks before destructive tools and tools that require confirmation, `yolo` asks nothing.
+
+| `--approval-mode` | Mode profile | Trust | Effect |
+|-|-|-|-|
+| `default` | `interactive` | balanced | Normal interactive use |
+| `auto_edit` | `editing` | balanced | Same tools, editing-oriented prompt |
+| `yolo` | `one-shot` | yolo | No confirmations |
+| `plan` | `planning` | strict | Write tools and `Bash` hidden |
+
+`permissions.mode` in `nerdvana.yml` (`default`, `accept-edits`, `bypass`, `plan`) selects the same profiles when no `--approval-mode` or `session.default_mode` is given. Without a terminal, a question becomes a refusal.
 
 ## MCP Server Integration
 
@@ -393,6 +416,8 @@ Discovery order (ascending priority):
 1. `~/.nerdvana/NIRNA.md` — global user instructions
 2. `<cwd>/NIRNA.md` — project instructions (checked in)
 3. `<cwd>/NIRNA.local.md` — local instructions (gitignored)
+
+`AGENTS.md` and `CLAUDE.md` in the project root are loaded after these. When a tool first touches a file in a subdirectory, rule files (`NIRNA.md`, `AGENTS.md`, `CLAUDE.md`) found between that directory and the project root are injected once, nearest first, up to 32 KB per session.
 
 Generate a starter file with `/init` in the REPL.
 
@@ -443,15 +468,16 @@ model:
   base_url: ""  # override API endpoint
   max_tokens: 8192
   temperature: 1.0
-  fallback_models:           # tried in order if the primary model errors
+  max_retries: 2             # same-model retries on a transient failure
+  fallback_models:           # tried in order once retries are spent
     - claude-opus-4-20250514
-    - gpt-4.1
+    - openai:gpt-4.1         # provider:model switches provider
   extended_thinking: false   # enable Anthropic extended thinking blocks
   thinking_budget: 8192      # token budget reserved for extended thinking
 
 permissions:
-  mode: default
-  always_allow: []
+  mode: default              # default, accept-edits, bypass, plan
+  always_allow: []           # tool names or glob patterns, e.g. ["FileRead", "lsp_*"]
   always_deny: []
 
 session:
@@ -465,9 +491,16 @@ session:
   default_context: standalone
   default_mode: interactive
   show_activity: true
+  stream_idle_timeout: 300   # seconds of provider silence before giving up on a request
+  stream_total_timeout: 3600
+  post_edit_diagnostics: true
+  max_parallel_agents: 5     # sub-agents at once per provider
 
 hooks:
   allow_project_hooks: false # see docs/hooks.md before turning this on
+
+skills:
+  include_claude_skills: false  # also read ~/.claude/skills and ./.claude/skills
 
 checkpoint:
   enabled: true
@@ -528,7 +561,7 @@ mypy nerdvana_cli/
 
 ## Changelog
 
-Release notes are tracked in [CHANGELOG.md](CHANGELOG.md). The full Phase A (Edit Quality), Phase B (Multi-Agent Swarm), and Phase C (Self-Recovery Hooks) implementation plans live under [`docs/superpowers/plans/`](docs/superpowers/plans/).
+Release notes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
