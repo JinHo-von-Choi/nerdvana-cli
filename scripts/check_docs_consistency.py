@@ -150,6 +150,20 @@ def code_agent_definitions() -> dict[str, Any]:
     return {agent.agent_type: agent for agent in BUILTIN_AGENTS}
 
 
+def code_settings_sections() -> dict[str, set[str]]:
+    """Field names of every nested settings section, keyed by its YAML name."""
+    from pydantic import BaseModel
+
+    from nerdvana_cli.core.settings import NerdvanaSettings
+
+    sections: dict[str, set[str]] = {}
+    for name, info in NerdvanaSettings.model_fields.items():
+        annotation = info.annotation
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            sections[name] = set(annotation.model_fields)
+    return sections
+
+
 def code_paths() -> dict[str, str]:
     """Canonical user-data paths, written the way documentation writes them."""
     from nerdvana_cli.core import paths as core_paths
@@ -442,8 +456,31 @@ def check_agent_definitions(docs: dict[str, str], report: Report) -> None:
                 )
 
 
+CONFIG_DOC = "docs/configuration.md"
+
+
+def check_settings_fields(docs: dict[str, str], report: Report) -> None:
+    """Every settings section has a table in the configuration guide listing exactly its fields."""
+    text = docs[CONFIG_DOC]
+    for section, fields in sorted(code_settings_sections().items()):
+        lines = section_lines(text, (f"### `{section}`",))
+        if not lines:
+            report.add(CONFIG_DOC, f"has no section for settings `{section}`")
+            continue
+        documented = {
+            names[0]
+            for _, cells in table_rows(lines)
+            if (names := backticked(cells[0]))
+        }
+        for missing in sorted(fields - documented):
+            report.add(CONFIG_DOC, f"`{section}.{missing}` exists in the code but is not documented")
+        for stale in sorted(documented - fields):
+            report.add(CONFIG_DOC, f"documents `{section}.{stale}`, which the settings model does not define")
+
+
 CHECKS = (
     check_env_vars,
+    check_settings_fields,
     check_builtin_tools,
     check_providers,
     check_paths,

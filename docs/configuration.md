@@ -73,7 +73,8 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | `base_url` | str | `""` (provider default) | Override API endpoint (Ollama, vLLM, self-hosted) |
 | `max_tokens` | int | `8192` | Max tokens per response |
 | `temperature` | float | `1.0` | Sampling temperature |
-| `fallback_models` | list[str] | `[]` | Phase C: models to try on 429/529/503/timeout errors |
+| `fallback_models` | list[str] | `[]` | Models tried in order when a request keeps failing with a transient error (429, 5xx, timeout) or an authentication error. `model` runs under the configured provider; `provider:model` (for example `openai:gpt-4.1`) switches provider and uses that provider's API key. A model that just failed is skipped for 60 seconds. |
+| `max_retries` | int | `2` | Retries of the same model, with backoff (or the server's `Retry-After`), before moving to the next fallback. Nothing is retried once part of the answer has streamed. |
 | `extended_thinking` | bool | `false` | Phase C: enabled automatically by `ultrawork`/`ulw` keywords |
 | `thinking_budget` | int | `8192` | Phase C: max tokens for extended thinking |
 | `show_thinking` | bool | `true` | Render `<think>...</think>` content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
@@ -88,9 +89,11 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | str | `"default"` | `default`, `accept-edits`, `bypass`, `plan` |
-| `always_allow` | list[str] | `[]` | Tool names to always allow without prompt |
-| `always_deny` | list[str] | `[]` | Tool names to always block |
+| `mode` | str | `"default"` | `default`, `accept-edits`, `bypass`, `plan`; mapped onto the `interactive`, `editing`, `one-shot` and `planning` mode profiles. `--approval-mode` and `session.default_mode` take precedence. |
+| `always_allow` | list[str] | `[]` | Tool names (glob patterns allowed) run without asking. A tool's own refusal still wins. |
+| `always_deny` | list[str] | `[]` | Tool names (glob patterns allowed) always refused, in every mode. |
+
+Every tool call goes through one policy, in this order: `always_deny`, tools excluded by the active mode, the tool's own refusal, `always_allow`, then the mode's trust level (`strict` asks before any write, `balanced` asks before destructive tools and tools that require confirmation, `yolo` asks nothing). Sub-agents and background agents follow the same policy.
 
 ### `session` (SessionConfig)
 
@@ -105,6 +108,10 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | `default_context` | str | `"standalone"` | Default runtime context profile name |
 | `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
 | `show_activity` | bool | `true` | Show the live ActivityIndicator widget between the chat log and the input row. Toggled via `/activity on|off`. |
+| `stream_idle_timeout` | float | `300.0` | Seconds a provider stream may stay silent before the request is abandoned and treated as a transient failure. `0` disables. |
+| `stream_total_timeout` | float | `3600.0` | Seconds one response may take in total. `0` disables. |
+| `post_edit_diagnostics` | bool | `true` | After a file or symbol edit, ask the running language server for errors and append only the errors the edit introduced to the tool result. |
+| `max_parallel_agents` | int | `5` | Sub-agents (`Agent`, `Swarm`) that may run at once against one provider; the rest wait. |
 | `update_check` | bool | `true` | Check GitHub Releases for a newer version on every CLI invocation. The result is cached for 24 hours at `~/.nerdvana/cache/update_check.json`. A one-line notice is printed when a newer version is available. Override priority (highest to lowest): `--no-update-check` flag > `NERDVANA_NO_UPDATE_CHECK=1` env > this setting. |
 
 ### `parism` (ParismConfig)
@@ -155,6 +162,12 @@ roles:
 ```
 
 Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per minute), `rph` (requests per hour), `daily_tokens`, `max_concurrent`. A value of `0` means unlimited. See [docs/mcp-quota.md](mcp-quota.md) for the full schema reference.
+
+### `skills` (SkillsConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `include_claude_skills` | bool | `false` | Also load skills from `~/.claude/skills` and `<cwd>/.claude/skills`, one tier below the matching nerdvana skill directories. Only each skill's `SKILL.md` is read; bundled files are never run. |
 
 ### `checkpoint` (CheckpointConfig)
 
