@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolRegistry
 
@@ -42,11 +43,13 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt)
     parts: list[str] = []
 
-    async for chunk in loop.run(config.prompt):
-        if abort.is_set():
-            return "".join(parts) + "\n[aborted]", 0
-        if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
-            parts.append(chunk)
+    limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)
+    async with agent_slot(child_settings.model.provider, limit):
+        async for chunk in loop.run(config.prompt):
+            if abort.is_set():
+                return "".join(parts) + "\n[aborted]", 0
+            if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
+                parts.append(chunk)
 
     total_tokens = loop.state.usage.input_tokens + loop.state.usage.output_tokens
     return "".join(parts), total_tokens

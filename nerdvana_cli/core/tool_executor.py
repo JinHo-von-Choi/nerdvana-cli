@@ -16,6 +16,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.token_estimator import estimate_tokens
@@ -31,6 +32,12 @@ logger = logging.getLogger(__name__)
 # Post-edit diagnostics: per-request time limit and how many new errors to list.
 _DIAGNOSTICS_TIMEOUT = 8.0
 _MAX_REPORTED_ERRORS = 10
+
+# Identical consecutive calls: warn at the first threshold, refuse at the second.
+_REPEAT_WARN  = 3
+_REPEAT_BLOCK = 5
+# Status polling repeats legitimately and never counts as a repeat.
+_POLLING_TOOLS: frozenset[str] = frozenset({"TaskGet"})
 
 
 class ToolExecutor:
@@ -74,6 +81,7 @@ class ToolExecutor:
         self._checkpoint_manager  = checkpoint_manager
         self._analytics_writer    = analytics_writer
         self._policy              = policy or PermissionPolicy()
+        self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
         self._pending_injections: list[dict[str, Any]] = []
 
     def drain_injections(self) -> list[dict[str, Any]]:
@@ -149,6 +157,17 @@ class ToolExecutor:
 
         tool_input = tool_use["input"]
         tool_id    = tool_use["id"]
+        repeats    = self._repeats.observe(tool_use["name"], tool_input)
+        if repeats >= _REPEAT_BLOCK:
+            return ToolResult(
+                tool_use_id = tool_id,
+                content     = (
+                    f"Refused: {tool_use['name']} was called {repeats} times in a row with identical "
+                    "arguments. Repeating it will not change the outcome; change the approach, or ask "
+                    "the user with AskUser if you are stuck."
+                ),
+                is_error    = True,
+            )
 
         problems = validate_arguments(
             tool.input_schema or {},
@@ -243,6 +262,11 @@ class ToolExecutor:
                 success = False
             elif edited and baseline is not None:
                 result.content += await self._new_errors_note(edited, baseline)
+            if repeats >= _REPEAT_WARN:
+                result.content += (
+                    f"\n\n[Note: this exact call has now been made {repeats} times in a row. "
+                    f"It will be refused from the {_REPEAT_BLOCK}th repeat; try something different.]"
+                )
             result_text = result.content
             return result
         except Exception as exc:  # noqa: BLE001
