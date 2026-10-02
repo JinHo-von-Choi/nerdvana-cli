@@ -3,13 +3,46 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal, TypeVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nerdvana_cli.core import paths as core_paths
+
+_SectionT = TypeVar("_SectionT", bound=BaseModel)
+
+
+class SettingsLoadError(ValueError):
+    """A security-relevant setting (permissions, trust, credentials) is invalid.
+
+    These fields are never replaced by defaults: the CLI refuses to start so
+    that a typo cannot silently widen or narrow what the agent may do.
+    """
+
+
+@dataclass(frozen=True)
+class SettingsWarning:
+    """One recoverable problem found while loading the config file.
+
+    ``kind`` is ``invalid_value`` (replaced by the field default) or
+    ``unknown_key`` (ignored, possibly written by a newer version).
+    ``value_type`` is the type name only; values are never echoed because a
+    rejected field can still hold a secret.
+    """
+
+    kind:       Literal["invalid_value", "unknown_key"]
+    path:       str
+    value_type: str
+    reason:     str
+
+    def format(self) -> str:
+        """Return a single-line human readable description."""
+        if self.kind == "unknown_key":
+            return f"{self.path}: unknown key, possibly from a newer version (ignored)"
+        return f"{self.path}: invalid {self.value_type} value, using default ({self.reason})"
 
 
 class ModelConfig(BaseModel):
@@ -67,6 +100,78 @@ class CheckpointConfig(BaseModel):
     per_session_max: int = 50
 
 
+_TOP_LEVEL_KEYS = frozenset({
+    "model", "permissions", "session", "parism", "hooks", "checkpoint",
+    "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
+})
+
+# Fields that are never softened. The sentinel marks a section whose every
+# field governs permissions.
+_ALL_FIELDS_STRICT = frozenset({"*"})
+_MODEL_STRICT_FIELDS = frozenset({"api_key"})
+_HOOKS_STRICT_FIELDS = frozenset({"allow_project_hooks"})
+
+
+def _strict_bool(path: str, value: object) -> bool:
+    """Validate an opt-in gate flag; raise instead of guessing on bad input."""
+    try:
+        return TypeAdapter(bool).validate_python(value)
+    except ValidationError as exc:
+        raise SettingsLoadError(f"{path}: expected a boolean, got {type(value).__name__}") from exc
+
+
+def _build_section(
+    cls:      type[_SectionT],
+    name:     str,
+    raw:      object,
+    warnings: list[SettingsWarning],
+    strict:   frozenset[str] = frozenset(),
+) -> _SectionT:
+    """Validate one config section, recovering from bad fields with a warning.
+
+    Unknown keys are dropped with an ``unknown_key`` warning. A field that
+    fails validation is dropped (its default applies) with an
+    ``invalid_value`` warning; a failure outside any single field resets the
+    whole section. Fields named in ``strict`` (or every field when ``strict``
+    is ``_ALL_FIELDS_STRICT``) raise ``SettingsLoadError`` instead.
+    """
+    everything = "*" in strict
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        if strict:
+            raise SettingsLoadError(f"{name}: expected a mapping, got {type(raw).__name__}")
+        warnings.append(SettingsWarning("invalid_value", name, type(raw).__name__, "expected a mapping"))
+        return cls()
+
+    fields: dict[str, Any] = {}
+    for key, value in raw.items():
+        if key in cls.model_fields:
+            fields[str(key)] = value
+        else:
+            warnings.append(SettingsWarning("unknown_key", f"{name}.{key}", type(value).__name__, ""))
+
+    for _ in range(len(fields) + 1):
+        try:
+            return cls(**fields)
+        except ValidationError as exc:
+            dropped = False
+            for err in exc.errors():
+                loc = err["loc"]
+                field = str(loc[0]) if loc else ""
+                value_type = type(fields.get(field)).__name__
+                if everything or field in strict:
+                    raise SettingsLoadError(f"{name}.{field}: {err['msg']} (got {value_type})") from exc
+                if field in fields:
+                    del fields[field]
+                    dropped = True
+                    warnings.append(SettingsWarning("invalid_value", f"{name}.{field}", value_type, err["msg"]))
+            if not dropped:
+                warnings.append(SettingsWarning("invalid_value", name, type(raw).__name__, "section reset to defaults"))
+                return cls()
+    return cls()
+
+
 class NerdvanaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NERDVANA_", env_file=".env", extra="ignore")
 
@@ -84,6 +189,12 @@ class NerdvanaSettings(BaseSettings):
     cwd: str = "."
     verbose: bool = False
     config_path: str = ""
+    _load_warnings: list[SettingsWarning] = PrivateAttr(default_factory=list)
+
+    @property
+    def load_warnings(self) -> list[SettingsWarning]:
+        """Recoverable problems recorded by the last ``load`` call."""
+        return self._load_warnings
 
     @classmethod
     def load(cls, config_path: str | None = None) -> NerdvanaSettings:
@@ -106,28 +217,44 @@ class NerdvanaSettings(BaseSettings):
             str(core_paths.legacy_config_path()),  # backwards compat
         ]
 
+        user_set_context = False
         for path in paths_to_check:
             if path and os.path.exists(path):
                 with open(path) as f:
                     data = yaml.safe_load(f) or {}
+                if not isinstance(data, dict):
+                    raise SettingsLoadError(f"{path}: top level must be a mapping, got {type(data).__name__}")
+                warnings = settings._load_warnings
+                for key in data:
+                    if key not in _TOP_LEVEL_KEYS:
+                        warnings.append(SettingsWarning("unknown_key", str(key), type(data[key]).__name__, ""))
                 if "model" in data:
-                    settings.model = ModelConfig(**data["model"])
+                    settings.model = _build_section(ModelConfig, "model", data["model"], warnings, _MODEL_STRICT_FIELDS)
                 if "permissions" in data:
-                    settings.permissions = PermissionConfig(**data["permissions"])
+                    settings.permissions = _build_section(
+                        PermissionConfig, "permissions", data["permissions"], warnings, _ALL_FIELDS_STRICT,
+                    )
                 if "session" in data:
-                    session_data = dict(data["session"])
+                    session_data = data["session"]
                     # Phase F: planning_gate=true → default_mode=planning (deprecated in 0.8.0)
-                    if session_data.get("planning_gate") and "default_mode" not in session_data:
-                        session_data["default_mode"] = "planning"
-                    settings.session = SessionConfig(**session_data)
+                    if (
+                        isinstance(session_data, dict)
+                        and session_data.get("planning_gate")
+                        and "default_mode" not in session_data
+                    ):
+                        session_data = {**session_data, "default_mode": "planning"}
+                    settings.session = _build_section(SessionConfig, "session", session_data, warnings)
+                    user_set_context = "max_context_tokens" in settings.session.model_fields_set
                 if "parism" in data:
-                    settings.parism = ParismConfig(**data["parism"])
+                    settings.parism = _build_section(ParismConfig, "parism", data["parism"], warnings)
                 if "hooks" in data:
-                    settings.hooks = HookConfig(**data["hooks"])
+                    settings.hooks = _build_section(HookConfig, "hooks", data["hooks"], warnings, _HOOKS_STRICT_FIELDS)
                 if "checkpoint" in data:
-                    settings.checkpoint = CheckpointConfig(**data["checkpoint"])
+                    settings.checkpoint = _build_section(CheckpointConfig, "checkpoint", data["checkpoint"], warnings)
                 if "external_projects_enabled" in data:
-                    settings.external_projects_enabled = bool(data["external_projects_enabled"])
+                    settings.external_projects_enabled = _strict_bool(
+                        "external_projects_enabled", data["external_projects_enabled"],
+                    )
                 if "model_history" in data and isinstance(data["model_history"], dict):
                     settings.model_history = {
                         str(k): str(v) for k, v in data["model_history"].items()
@@ -150,14 +277,7 @@ class NerdvanaSettings(BaseSettings):
             except ValueError:
                 pass
 
-        # Auto-apply model-specific context window
-        user_set_context = False
-        if settings.config_path and os.path.exists(settings.config_path):
-            with open(settings.config_path) as f:
-                raw = yaml.safe_load(f) or {}
-            if "session" in raw and "max_context_tokens" in raw.get("session", {}):
-                user_set_context = True
-
+        # Auto-apply model-specific context window (skipped when the file set it)
         if not user_set_context:
             from nerdvana_cli.providers.base import ProviderName, resolve_context_window
             try:

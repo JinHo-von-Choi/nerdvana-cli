@@ -50,6 +50,13 @@ _PROVIDER_CLASSES: dict[ProviderName, type[AnthropicProvider] | type[OpenAIProvi
 }
 
 
+def provider_class_for(
+    provider: ProviderName,
+) -> type[AnthropicProvider] | type[OpenAIProvider] | type[GeminiProvider] | None:
+    """Return the provider class registered for ``provider``, or None."""
+    return _PROVIDER_CLASSES.get(provider)
+
+
 def resolve_api_key(provider: ProviderName) -> str:
     """Resolve API key from environment variables."""
     env_vars = PROVIDER_KEY_ENVVARS.get(provider, [])

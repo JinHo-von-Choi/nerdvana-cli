@@ -13,7 +13,10 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from nerdvana_cli.providers.base import ProviderName
 
 
 @dataclass
@@ -205,6 +208,174 @@ def _ping_http(url: str, headers: dict[str, str]) -> int:
         return -1
 
 
+def _check_config_warnings() -> CheckResult:
+    """Report fields replaced by defaults or ignored while loading the config file."""
+    from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+
+    try:
+        settings = NerdvanaSettings.load()
+    except SettingsLoadError as exc:
+        return CheckResult("config_warnings", "fail", str(exc)[:200])
+    except Exception as exc:
+        return CheckResult("config_warnings", "fail", f"config could not be loaded: {exc}"[:200])
+
+    warnings = settings.load_warnings
+    if not warnings:
+        source = settings.config_path or "defaults"
+        return CheckResult("config_warnings", "ok", f"no problems ({source})")
+
+    shown = "; ".join(w.format() for w in warnings[:3])
+    extra = f" (+{len(warnings) - 3} more)" if len(warnings) > 3 else ""
+    return CheckResult("config_warnings", "warn", f"{len(warnings)} issue(s): {shown}{extra}")
+
+
+def _resolve_provider_class(provider_name: str) -> tuple[ProviderName | None, str]:
+    """Return ``(ProviderName, error)``; the name is ``None`` when unresolvable."""
+    from nerdvana_cli.providers.base import ProviderName
+    from nerdvana_cli.providers.factory import provider_class_for
+
+    try:
+        prov = ProviderName(provider_name)
+    except ValueError:
+        known = ", ".join(p.value for p in ProviderName)
+        return None, f"unknown provider '{provider_name}' (known: {known})"
+    if provider_class_for(prov) is None:
+        return None, f"no provider class registered for '{prov.value}'"
+    return prov, ""
+
+
+def _check_model_resolution() -> CheckResult:
+    """Configured provider and model must resolve to a provider class and context window."""
+    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.providers.base import resolve_context_window
+    from nerdvana_cli.providers.factory import provider_class_for
+
+    try:
+        settings = NerdvanaSettings.load()
+    except Exception as exc:
+        return CheckResult("model_resolution", "fail", f"config could not be loaded: {exc}"[:200])
+
+    model = settings.model.model
+    if not model:
+        return CheckResult("model_resolution", "fail", "model is empty")
+
+    prov, error = _resolve_provider_class(settings.model.provider)
+    if prov is None:
+        return CheckResult("model_resolution", "fail", error)
+
+    window = resolve_context_window(prov, model)
+    if window <= 0:
+        return CheckResult("model_resolution", "fail", f"no context window for {prov.value}/{model}")
+
+    cls = provider_class_for(prov)
+    cls_name = cls.__name__ if cls else "?"
+    return CheckResult("model_resolution", "ok", f"{prov.value}/{model} -> {cls_name}, context {window}")
+
+
+def _check_fallback_models() -> CheckResult:
+    """Every fallback model must resolve under the configured provider."""
+    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.providers.base import detect_provider, resolve_context_window
+
+    try:
+        settings = NerdvanaSettings.load()
+    except Exception as exc:
+        return CheckResult("fallback_models", "fail", f"config could not be loaded: {exc}"[:200])
+
+    entries = settings.model.fallback_models
+    if not entries:
+        return CheckResult("fallback_models", "skip", "no fallback models configured")
+
+    prov, error = _resolve_provider_class(settings.model.provider)
+    if prov is None:
+        return CheckResult("fallback_models", "fail", error)
+
+    failed: list[str] = []
+    drift:  list[str] = []
+    for entry in entries:
+        if not isinstance(entry, str) or not entry.strip():
+            failed.append(f"{entry!r} (empty or not a string)")
+        elif resolve_context_window(prov, entry) <= 0:
+            failed.append(f"{entry} (no context window)")
+        elif detect_provider(entry) != prov:
+            drift.append(f"{entry} (looks like {detect_provider(entry).value})")
+
+    if failed:
+        return CheckResult("fallback_models", "fail", f"unresolved: {', '.join(failed)}")
+    if drift:
+        return CheckResult(
+            "fallback_models",
+            "warn",
+            f"run under {prov.value} but look like another provider: {', '.join(drift)}",
+        )
+    return CheckResult("fallback_models", "ok", f"{len(entries)} fallback model(s) resolve under {prov.value}")
+
+
+def _mcp_config_files() -> list[Path]:
+    """Global then project MCP config paths, in load order."""
+    from nerdvana_cli.core import paths as _paths
+
+    return [_paths.user_mcp_json(), Path.cwd() / ".mcp.json"]
+
+
+def _validate_mcp_server(name: str, raw: Any) -> tuple[str, str]:
+    """Return ``(problem, missing_command)`` for one server entry; empty when fine."""
+    if not isinstance(raw, dict):
+        return f"{name}: entry must be an object", ""
+    transport = raw.get("type", "stdio")
+    if transport not in ("stdio", "http", "sse"):
+        return f"{name}: unknown type '{transport}'", ""
+    if transport in ("http", "sse"):
+        url = raw.get("url")
+        if not isinstance(url, str) or not url:
+            return f"{name}: {transport} server needs a 'url'", ""
+        return "", ""
+    command = raw.get("command")
+    if not isinstance(command, str) or not command:
+        return f"{name}: stdio server needs a 'command'", ""
+    args = raw.get("args", [])
+    if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
+        return f"{name}: 'args' must be a list of strings", ""
+    if shutil.which(command) is None:
+        return "", f"{name}({command})"
+    return "", ""
+
+
+def _check_mcp_config() -> CheckResult:
+    """MCP config files must parse; stdio commands must exist on PATH. No network, no spawning."""
+    problems: list[str] = []
+    missing:  list[str] = []
+    total = 0
+
+    for path in _mcp_config_files():
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            problems.append(f"{path.name}: cannot parse ({exc.__class__.__name__})")
+            continue
+        servers = data.get("mcpServers", {}) if isinstance(data, dict) else None
+        if not isinstance(servers, dict):
+            problems.append(f"{path.name}: 'mcpServers' must be an object")
+            continue
+        for name, raw in servers.items():
+            total += 1
+            problem, absent = _validate_mcp_server(str(name), raw)
+            if problem:
+                problems.append(problem)
+            if absent:
+                missing.append(absent)
+
+    if problems:
+        return CheckResult("mcp_config", "fail", "; ".join(problems)[:200])
+    if total == 0:
+        return CheckResult("mcp_config", "skip", "no MCP config files or servers")
+    if missing:
+        return CheckResult("mcp_config", "warn", f"command not on PATH: {', '.join(missing)}")
+    return CheckResult("mcp_config", "ok", f"{total} server(s) parse; stdio commands found")
+
+
 def _check_pricing_freshness() -> CheckResult:
     """Run check_pricing_freshness.py --report-only to detect stale snapshots."""
     script = Path(__file__).resolve().parents[2] / "scripts" / "check_pricing_freshness.py"
@@ -267,9 +438,13 @@ _ALL_CHECKS = [
     _check_uv_installed,
     _check_install_paths,
     _check_provider_keys,
+    _check_config_warnings,
+    _check_model_resolution,
+    _check_fallback_models,
     _check_parism,
     _check_lsp_servers,
     _check_mcp_servers,
+    _check_mcp_config,
     _check_pricing_freshness,
     _check_collect_baseline,
 ]

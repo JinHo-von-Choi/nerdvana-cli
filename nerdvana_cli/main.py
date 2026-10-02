@@ -20,7 +20,7 @@ from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.tools.registry import create_tool_registry
 
@@ -38,6 +38,15 @@ app.add_typer(hook_app)
 app.add_typer(admin_app)
 console        = Console()
 console_stderr = Console(stderr=True)
+
+
+def _load_settings(config_path: str | None = None) -> NerdvanaSettings:
+    """Load settings, turning a rejected security setting into a clean exit."""
+    try:
+        return NerdvanaSettings.load(config_path)
+    except SettingsLoadError as exc:
+        console_stderr.print(f"[bold red]Invalid configuration:[/bold red] {exc}")
+        raise typer.Exit(2) from None
 
 
 def _maybe_show_update_notice(target: Console | None = None) -> None:
@@ -196,7 +205,7 @@ async def repl_loop(
     approval_mode: str | None = None,
 ) -> None:
     """Interactive REPL loop."""
-    settings = NerdvanaSettings.load(config_path)
+    settings = _load_settings(config_path)
     _run_migration_once()
     settings.cwd     = cwd
     settings.verbose = verbose
@@ -221,7 +230,7 @@ async def repl_loop(
     if not config_path and not has_config_file() and not has_valid_api_key():
         config = run_setup()
         if config:
-            settings = NerdvanaSettings.load()
+            settings = _load_settings()
 
     # Resolve provider
     if not settings.model.provider:
@@ -241,7 +250,7 @@ async def repl_loop(
 
             config = run_setup()
             if config:
-                settings = NerdvanaSettings.load()
+                settings = _load_settings()
         else:
             console.print("Set the API key via environment variable or config file.")
             raise typer.Exit(1)
@@ -300,7 +309,9 @@ def run(
     max_tokens: int = typer.Option(0, "--max-tokens", help="Max tokens"),
 ) -> None:
     """Run a single prompt non-interactively."""
-    settings = NerdvanaSettings.load(config or None)
+    settings = _load_settings(config or None)
+    for warning in settings.load_warnings:
+        console_stderr.print(f"[dim yellow]Config: {warning.format()}[/dim yellow]")
     _run_migration_once()
     settings.cwd = cwd or os.getcwd()
     settings.verbose = verbose
