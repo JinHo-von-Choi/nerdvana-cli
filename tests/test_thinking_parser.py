@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nerdvana_cli.core.thinking_parser import ThinkBlockParser  # noqa: E402
+from nerdvana_cli.providers.thinking_parser import ThinkBlockParser  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers

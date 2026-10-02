@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.types import ToolSpec
 
 try:
     from google.genai import Client as _GenaiClient
@@ -63,7 +63,7 @@ class GeminiProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool[Any]],
+        tools: Sequence[ToolSpec],
     ) -> AsyncIterator[ProviderEvent]:
         """Stream completion from Gemini API."""
         try:
@@ -140,7 +140,7 @@ class GeminiProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool[Any]],
+        tools: Sequence[ToolSpec],
     ) -> dict[str, Any]:
         """Non-streaming completion."""
         try:

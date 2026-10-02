@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 from rich.console import Console
 
-from nerdvana_cli.core.thinking_parser import ThinkBlockParser
-from nerdvana_cli.core.tool import BaseTool
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.thinking_parser import ThinkBlockParser
+from nerdvana_cli.types import ToolSpec
 
 try:
     from openai import AsyncOpenAI
@@ -98,7 +98,7 @@ class OpenAIProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool[Any]],
+        tools: Sequence[ToolSpec],
     ) -> AsyncIterator[ProviderEvent]:
         """Stream completion from OpenAI-compatible API with UTF-8 safety."""
         try:
@@ -239,7 +239,7 @@ class OpenAIProvider:
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
-        tools: list[BaseTool[Any]],
+        tools: Sequence[ToolSpec],
     ) -> dict[str, Any]:
         """Non-streaming completion."""
         try:
@@ -300,7 +300,7 @@ class OpenAIProvider:
         except Exception as e:
             return {"content": str(e), "is_error": True}
 
-    def _build_tools(self, tools: list[BaseTool[Any]]) -> list[dict[str, Any]]:
+    def _build_tools(self, tools: Sequence[ToolSpec]) -> list[dict[str, Any]]:
         """Build tool definitions for API call."""
         return [
             {
