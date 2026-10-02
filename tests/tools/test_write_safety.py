@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.team import TeammateMessage, read_inbox, write_to_inbox
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.server.hook_bridge import HookBridge
 from nerdvana_cli.tools.file_tools import (
@@ -103,23 +102,6 @@ async def test_interrupted_edit_leaves_original_intact(
     assert result.is_error
     assert target.read_text(encoding="utf-8") == _ORIGINAL
     assert _leftovers(tmp_path) == []
-
-
-async def test_interrupted_inbox_write_keeps_earlier_messages(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A failed inbox write must not drop the messages already delivered."""
-    inbox = tmp_path / "inboxes" / "leaf.json"
-    await write_to_inbox(str(inbox), TeammateMessage(from_agent="lead", text="first"))
-
-    monkeypatch.setattr(os, "replace", _boom)
-    with pytest.raises(OSError, match="simulated interruption"):
-        await write_to_inbox(str(inbox), TeammateMessage(from_agent="lead", text="second"))
-    monkeypatch.undo()
-
-    kept = await read_inbox(str(inbox))
-    assert [m.text for m in kept] == ["first"]
-    assert _leftovers(inbox.parent) == []
 
 
 # ---------------------------------------------------------------------------

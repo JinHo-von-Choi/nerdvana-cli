@@ -149,7 +149,6 @@ class AgentLoop:
         registry:            ToolRegistry,
         session:             SessionStorage | None = None,
         task_registry:       Any = None,
-        team_registry:       Any = None,
         on_activity_change:  Callable[[ActivityState], None] | None = None,
         on_thinking_chunk:   Callable[[str], None] | None = None,
         analytics_writer:    AnalyticsWriter | None = None,
@@ -162,7 +161,6 @@ class AgentLoop:
         self.session              = session or SessionStorage()
         self.state                = SessionState()
         self._task_registry       = task_registry
-        self._team_registry       = team_registry
         self.console              = Console()
         self.activity_state       = ActivityState()
         self._on_activity_change  = on_activity_change
@@ -204,6 +202,7 @@ class AgentLoop:
         self._compact_prompt   = _cs.body if _cs else FALLBACK_PROMPT
         self._compaction_state = CompactionState(max_failures=settings.session.compact_max_failures)
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
+        self._session_ended   = False
         self.provider         = self.create_provider_from_settings()
         _cp_cfg = getattr(settings, "checkpoint", None)
         _cp_enabled = _cp_cfg.enabled if _cp_cfg is not None else True
@@ -304,7 +303,21 @@ class AgentLoop:
         self.state.messages.extend(restored)
         return len(restored)
 
+    def close_session(self, reason: str = "exit") -> None:
+        """Fire SESSION_END once for a session that has started."""
+        if not self._session_started or self._session_ended:
+            return
+        self._session_ended = True
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        self.hooks.fire(HookContext(
+            event    = HookEvent.SESSION_END,
+            settings = self.settings,
+            messages = self.state.messages,
+            extra    = {"reason": reason, "session_id": self.session.session_id},
+        ))
+
     def reset_session(self) -> None:
+        self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
         self._dir_rules.reset()
 
@@ -352,6 +365,7 @@ class AgentLoop:
         tools = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name)]
         if not self._session_started:
             self._session_started = True
+            self._session_ended   = False
             from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
             from nerdvana_cli.core.hooks import HookContext, HookEvent
             _p: list[str] = []
@@ -516,7 +530,6 @@ class AgentLoop:
         tool_ctx   = ToolContext(
             cwd           = self.settings.cwd,
             task_registry = self._task_registry,
-            team_registry = self._team_registry,
             ask_user      = self._on_ask_user,
         )
         tool_ctx.state["session_id"] = self.session.session_id

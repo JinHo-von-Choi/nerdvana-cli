@@ -9,10 +9,10 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 - **다중 제공자 지원** — 하나의 CLI로 21개 AI 플랫폼 사용 가능
 - **대화형 REPL** — 스트리밍 출력과 슬래시 명령어, 토큰 사용량 표시기
 - **비대화형 모드** — 스크립팅을 위한 단일 프롬프트 실행 (`nerdvana run`)
-- **32개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·팀·스웜·태스크 관리 도구
+- **30개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·스웜·태스크 관리 도구
 - **편집 품질 게이트 (Phase A)** — `FileRead`가 라인 단위 SHA256 앵커 해시를 발급하여 `FileEdit`의 컨텍스트 충돌을 차단하며, LSP 진단을 통해 편집 직후 회귀를 검출
 - **다중 에이전트 오케스트레이션 (Phase B)** — `Agent` / `Swarm` 도구로 6개 빌트인 에이전트 타입을 비동기 실행하고, `TaskPanel`이 TUI에서 진행 상황을 실시간으로 표시
-- **에이전트 팀 메시징 (Phase B)** — `TeamCreate` / `SendMessage` / `TaskGet` / `TaskStop`으로 장기 협업 워크플로우 구성
+- **백그라운드 작업 관리 (Phase B)** — `TaskGet` / `TaskStop`으로 백그라운드 서브에이전트 조회와 중단
 - **자동 복구 훅 (Phase C)** — 컨텍스트 압축, 모델 폴백 체인, 복잡도 기반 계획 게이트, MCP 헬스 체크를 통한 자율 회복
 - **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
 - **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알린다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끈다.
@@ -266,7 +266,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 
 ## 내장 도구
 
-레지스트리는 32개의 내장 도구를 조립합니다. 셸·파일·검색·작업 목록·웹·에이전트·팀 도구는 항상 등록됩니다.
+레지스트리는 30개의 내장 도구를 조립합니다. 셸·파일·검색·작업 목록·웹·에이전트·태스크 도구는 항상 등록됩니다.
 `Parism`은 번들된 Parism MCP 패키지에 접근할 수 있을 때 등록됩니다. LSP·심볼 도구는 호환 언어 서버가 설치된
 경우에만 등록되며, 없으면 조용히 생략됩니다. 외부 프로젝트 도구 3종은 설정에서 `external_projects_enabled: true`
 를 켜기 전까지 등록되지 않습니다.
@@ -286,8 +286,6 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `Parism` | 쓰기 | 화이트리스트된 44개 셸 명령어를 구조화된 JSON 출력으로 실행 |
 | `Agent` | 오케스트레이션 | 단일 서브에이전트를 비동기로 발사하고 `task_id` 반환 |
 | `Swarm` | 오케스트레이션 | 여러 서브에이전트를 병렬로 발사하여 독립 작업을 분산 |
-| `TeamCreate` | 협업 | 장기 협업을 위한 에이전트 팀 생성 |
-| `SendMessage` | 협업 | 팀 내부 에이전트에게 메시지 전송 |
 | `TaskGet` | 협업 | 비동기 작업의 상태와 결과 조회 |
 | `TaskStop` | 협업 | 실행 중인 비동기 작업 중단 |
 | `lsp_diagnostics` | LSP | 파일에 대한 LSP 진단(에러·경고) 조회 |
@@ -332,7 +330,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `json_parse_recovery` | `AFTER_TOOL` | 도구 결과의 JSON 파싱이 실패하면 해당 도구 이름을 명시한 정정 요청을 주입 |
 | `ralph_loop_check` | `AFTER_API_CALL` | `end_turn`에서 마지막 어시스턴트 메시지에 `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, `# 미구현` 마커가 남아 있으면 마무리하라고 지시 (Ralph self-finishing loop) |
 
-훅 파이프라인은 `hooks.session_start`, `hooks.before_tool`, `hooks.after_tool`로 확장 가능합니다. 추가로 `model.fallback_models`(HTTP 429/529/503/timeout 발생 시 다음 모델로 자동 전환)와 `session.planning_gate`(복잡도 기반 `Plan` 에이전트 선행 실행)을 함께 활성화하면 완전한 자율 운용 모드를 구성할 수 있습니다.
+훅은 `~/.nerdvana/hooks`와 승인된 프로젝트 훅 파일(`docs/hooks.md`)로 확장합니다. 추가로 `model.fallback_models`(일시 오류 시 `model.max_retries`만큼 재시도한 뒤 다음 모델로 전환, `provider:model` 형식이면 제공자도 전환)와 `session.planning_gate`(복잡도 기반 `Plan` 에이전트 선행 실행)을 함께 활성화하면 완전한 자율 운용 모드를 구성할 수 있습니다.
 
 ## MCP 서버 통합
 
@@ -455,11 +453,7 @@ parism:
   format: json
   fallback_to_bash: true
 
-hooks:                             # Phase C — 자동 복구 훅 파이프라인
-  session_start:
-    - builtin:context_injection
-  before_tool: []
-  after_tool: []
+hooks:
   # <cwd>/.nerdvana/hooks/*.py 실행 허용. 켜는 것만으로는 부족하고
   # ~/.nerdvana/trusted_hooks.json 에 기록된 SHA-256 해시와도 일치해야 한다.
   allow_project_hooks: false

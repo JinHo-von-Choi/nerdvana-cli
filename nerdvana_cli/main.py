@@ -339,14 +339,11 @@ def run(
         raise typer.Exit(1)
 
     from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team import TeamRegistry
 
     task_registry = TaskRegistry()
-    team_registry = TeamRegistry()
     registry      = create_tool_registry(
         settings      = settings,
         task_registry = task_registry,
-        team_registry = team_registry,
     )
     session = SessionStorage(persist=settings.session.persist)
     loop    = AgentLoop(
@@ -354,7 +351,6 @@ def run(
         registry      = registry,
         session       = session,
         task_registry = task_registry,
-        team_registry = team_registry,
     )
 
     async def _run() -> None:
@@ -362,7 +358,10 @@ def run(
             console.print(chunk, end="")
         console.print()
 
-    asyncio.run(_run())
+    try:
+        asyncio.run(_run())
+    finally:
+        loop.close_session("exit")
 
 
 @app.command()

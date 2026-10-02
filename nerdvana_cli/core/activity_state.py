@@ -88,14 +88,6 @@ def summarize_tool_call(tool_name: str, tool_input: dict[str, Any]) -> tuple[str
         n = len(agents) if isinstance(agents, list) else 0
         return "Swarm", f"spawn {n} agents"
 
-    # ------------------------------------------------------------- TeamCreate
-    if tool_name == "TeamCreate":
-        return "TeamCreate", str(inp.get("team_name", ""))
-
-    # ------------------------------------------------------------ SendMessage
-    if tool_name == "SendMessage":
-        return "SendMessage", f"to: {inp.get('to', '')}"
-
     # ---------------------------------------------------------------- TaskGet
     if tool_name == "TaskGet":
         return "TaskGet", str(inp.get("task_id", ""))

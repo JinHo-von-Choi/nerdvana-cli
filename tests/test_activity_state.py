@@ -209,38 +209,6 @@ class TestSwarm:
 
 
 # ---------------------------------------------------------------------------
-# TeamCreate
-# ---------------------------------------------------------------------------
-
-class TestTeamCreate:
-    def test_team_name(self) -> None:
-        label, detail = summarize_tool_call("TeamCreate", {"team_name": "alpha"})
-        assert label  == "TeamCreate"
-        assert detail == "alpha"
-
-    def test_empty(self) -> None:
-        label, detail = summarize_tool_call("TeamCreate", {})
-        assert label  == "TeamCreate"
-        assert detail == ""
-
-
-# ---------------------------------------------------------------------------
-# SendMessage
-# ---------------------------------------------------------------------------
-
-class TestSendMessage:
-    def test_to_field(self) -> None:
-        label, detail = summarize_tool_call("SendMessage", {"to": "agent-7", "message": "hello"})
-        assert label  == "SendMessage"
-        assert detail == "to: agent-7"
-
-    def test_empty(self) -> None:
-        label, detail = summarize_tool_call("SendMessage", {})
-        assert label  == "SendMessage"
-        assert detail == "to: "
-
-
-# ---------------------------------------------------------------------------
 # TaskGet / TaskStop
 # ---------------------------------------------------------------------------
 

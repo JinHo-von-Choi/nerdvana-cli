@@ -29,21 +29,12 @@ def _make_registry() -> ToolRegistry:
 
 
 def _make_meta_registry() -> ToolRegistry:
-    """Extend the standard registry with team/task tools."""
+    """Extend the standard registry with task tools."""
     from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team import TeamRegistry
-    from nerdvana_cli.tools.team_tools import (
-        SendMessageTool,
-        TaskGetTool,
-        TaskStopTool,
-        TeamCreateTool,
-    )
+    from nerdvana_cli.tools.team_tools import TaskGetTool, TaskStopTool
 
     registry = _make_registry()
     _task_reg = TaskRegistry()
-    _team_reg = TeamRegistry()
-    registry.register(TeamCreateTool(team_registry=_team_reg))
-    registry.register(SendMessageTool(team_registry=_team_reg))
     registry.register(TaskGetTool(task_registry=_task_reg))
     registry.register(TaskStopTool(task_registry=_task_reg))
     return registry
@@ -219,7 +210,7 @@ def test_meta_tools_are_not_read_only() -> None:
     """All META category tools must have is_read_only == False."""
     registry = _make_meta_registry()
     meta_tools = registry.filter(category=ToolCategory.META)
-    assert len(meta_tools) >= 4, "Expected at least 4 META tools"
+    assert len(meta_tools) >= 2, "Expected at least 2 META tools"
     for tool in meta_tools:
         assert tool.is_read_only is False, f"{tool.name} is META but is_read_only=True"
 

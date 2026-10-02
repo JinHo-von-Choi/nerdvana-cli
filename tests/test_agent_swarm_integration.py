@@ -13,7 +13,7 @@ def test_create_tool_registry_with_settings_includes_agent_swarm_tools() -> None
 
     assert "Agent"       in tool_names
     assert "Swarm"       in tool_names
-    assert "TeamCreate"  in tool_names
-    assert "SendMessage" in tool_names
+    assert "TeamCreate"  not in tool_names
+    assert "SendMessage" not in tool_names
     assert "TaskGet"     in tool_names
     assert "TaskStop"    in tool_names

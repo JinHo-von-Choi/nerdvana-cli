@@ -120,9 +120,6 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `session_start` | list[str] | `["builtin:context_injection"]` | Hook handler IDs |
-| `before_tool` | list[str] | `[]` | |
-| `after_tool` | list[str] | `[]` | |
 | `allow_project_hooks` | bool | `false` | Permit `<cwd>/.nerdvana/hooks/*.py` to run. Off by default, and an opt-in alone is not enough: each file must also match an approved SHA-256 digest. See [hooks.md](hooks.md). |
 
 Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) are auto-registered in `AgentLoop.__init__` and are not listed here.
@@ -262,10 +259,6 @@ session:
   update_check: true
 
 hooks:
-  session_start:
-    - builtin:context_injection
-  before_tool: []
-  after_tool: []
   allow_project_hooks: false
 
 external_projects_enabled: false

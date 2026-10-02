@@ -1,4 +1,4 @@
-"""Team tools: TeamCreate, SendMessage, TaskGet, TaskStop."""
+"""Background task tools: TaskGet, TaskStop."""
 
 from __future__ import annotations
 
@@ -6,124 +6,8 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
-from nerdvana_cli.core.team import (
-    TeammateMessage,
-    TeamRegistry,
-    get_inbox_path,
-    write_to_inbox,
-)
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
-
-# ---------------------------------------------------------------------------
-# TeamCreate
-# ---------------------------------------------------------------------------
-
-@dataclass
-class TeamCreateArgs:
-    team_name:   str
-    description: str = ""
-
-
-class TeamCreateTool(BaseTool[TeamCreateArgs]):
-    """Create a named multi-agent team."""
-
-    name             = "TeamCreate"
-    description_text = "Create a named team for multi-agent coordination."
-    input_schema     = {
-        "type": "object",
-        "properties": {
-            "team_name":   {"type": "string", "description": "Unique team name."},
-            "description": {"type": "string", "description": "Team purpose."},
-        },
-        "required": ["team_name"],
-    }
-    is_concurrency_safe    = True
-    args_class             = TeamCreateArgs
-    category               = ToolCategory.META
-    side_effects           = ToolSideEffect.NONE
-    tags: ClassVar[frozenset[str]] = frozenset({"agent", "team"})
-    requires_confirmation  = False
-
-    def __init__(self, team_registry: TeamRegistry) -> None:
-        self._team_registry = team_registry
-
-    async def call(
-        self,
-        args:         TeamCreateArgs,
-        context:      ToolContext,
-        can_use_tool: Any,
-        on_progress:  Any = None,
-    ) -> ToolResult:
-        registry = context.team_registry or self._team_registry
-        registry.create(args.team_name)
-        return ToolResult(
-            tool_use_id = "",
-            content     = f"Team '{args.team_name}' created.",
-        )
-
-
-# ---------------------------------------------------------------------------
-# SendMessage
-# ---------------------------------------------------------------------------
-
-@dataclass
-class SendMessageArgs:
-    to:        str
-    message:   str
-    team_name: str = ""
-    summary:   str = ""
-
-
-class SendMessageTool(BaseTool[SendMessageArgs]):
-    """Send a message to a teammate's mailbox."""
-
-    name             = "SendMessage"
-    description_text = "Send a text message to a named teammate in the team."
-    input_schema     = {
-        "type": "object",
-        "properties": {
-            "to":        {"type": "string", "description": "Recipient agent name."},
-            "message":   {"type": "string", "description": "Message content."},
-            "team_name": {"type": "string", "description": "Team the recipient belongs to."},
-            "summary":   {"type": "string", "description": "5-10 word preview summary."},
-        },
-        "required": ["to", "message"],
-    }
-    is_concurrency_safe    = True
-    args_class             = SendMessageArgs
-    category               = ToolCategory.META
-    side_effects           = ToolSideEffect.EXTERNAL
-    tags: ClassVar[frozenset[str]] = frozenset({"agent", "messaging"})
-    requires_confirmation  = False
-
-    def __init__(
-        self,
-        team_registry: TeamRegistry,
-        base_dir:      str = "",
-    ) -> None:
-        self._team_registry = team_registry
-        self._base_dir      = base_dir
-
-    async def call(
-        self,
-        args:         SendMessageArgs,
-        context:      ToolContext,
-        can_use_tool: Any,
-        on_progress:  Any = None,
-    ) -> ToolResult:
-        inbox = get_inbox_path(args.to, args.team_name or "default", base_dir=self._base_dir)
-        msg   = TeammateMessage(
-            from_agent = "leader",
-            text       = args.message,
-            summary    = args.summary,
-        )
-        await write_to_inbox(inbox, msg)
-        return ToolResult(
-            tool_use_id = "",
-            content     = f"Message sent to '{args.to}'.",
-        )
-
 
 # ---------------------------------------------------------------------------
 # TaskGet

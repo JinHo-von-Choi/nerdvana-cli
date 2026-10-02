@@ -108,10 +108,6 @@ checkpoint:
   per_session_max: 50
 
 hooks:
-  session_start:
-    - "builtin:context_injection"
-  before_tool: []
-  after_tool: []
   # Run <cwd>/.nerdvana/hooks/*.py. Opting in is not sufficient on its own:
   # each file must also match an approved digest in ~/.nerdvana/trusted_hooks.json.
   # See docs/hooks.md.

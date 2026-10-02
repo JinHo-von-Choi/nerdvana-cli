@@ -27,19 +27,22 @@ class SettingsLoadError(ValueError):
 class SettingsWarning:
     """One recoverable problem found while loading the config file.
 
-    ``kind`` is ``invalid_value`` (replaced by the field default) or
-    ``unknown_key`` (ignored, possibly written by a newer version).
+    ``kind`` is ``invalid_value`` (replaced by the field default),
+    ``unknown_key`` (ignored, possibly written by a newer version) or
+    ``removed_key`` (ignored, written for an older version).
     ``value_type`` is the type name only; values are never echoed because a
     rejected field can still hold a secret.
     """
 
-    kind:       Literal["invalid_value", "unknown_key"]
+    kind:       Literal["invalid_value", "unknown_key", "removed_key"]
     path:       str
     value_type: str
     reason:     str
 
     def format(self) -> str:
         """Return a single-line human readable description."""
+        if self.kind == "removed_key":
+            return f"{self.path}: no longer used (ignored); it can be deleted"
         if self.kind == "unknown_key":
             return f"{self.path}: unknown key, possibly from a newer version (ignored)"
         return f"{self.path}: invalid {self.value_type} value, using default ({self.reason})"
@@ -93,9 +96,6 @@ class ParismConfig(BaseModel):
 
 
 class HookConfig(BaseModel):
-    session_start: list[str] = Field(default_factory=lambda: ["builtin:context_injection"])
-    before_tool: list[str] = Field(default_factory=list)
-    after_tool: list[str] = Field(default_factory=list)
     # Project-local hooks (<cwd>/.nerdvana/hooks/*.py) execute code carried
     # by the repository, so they stay off until the user opts in and
     # approves each file's digest. See core.user_hooks.
@@ -106,6 +106,9 @@ class CheckpointConfig(BaseModel):
     enabled: bool = True
     per_session_max: int = 50
 
+
+# Keys earlier versions accepted but never acted on.
+_REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
     "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills",
@@ -156,7 +159,10 @@ def _build_section(
         if key in cls.model_fields:
             fields[str(key)] = value
         else:
-            warnings.append(SettingsWarning("unknown_key", f"{name}.{key}", type(value).__name__, ""))
+            kind: Literal["unknown_key", "removed_key"] = (
+                "removed_key" if f"{name}.{key}" in _REMOVED_KEYS else "unknown_key"
+            )
+            warnings.append(SettingsWarning(kind, f"{name}.{key}", type(value).__name__, ""))
 
     for _ in range(len(fields) + 1):
         try:

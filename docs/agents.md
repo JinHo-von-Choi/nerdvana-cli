@@ -98,7 +98,7 @@ Or via the MCP-style tool call from the REPL.
 - `allowed_tools: ["*"]` — wildcard, includes every standard tool.
 - `allowed_tools: []` — empty, returns a registry with **zero** tools. The agent will receive the request but have no tools to call.
 - `allowed_tools: ["FileRead", "Grep"]` — exact name matching. Mistakes like `"Read"` (pre-Phase-B name) will silently filter out `FileRead`.
-- `AgentTool` and team tools (`TeamCreate`, `SendMessage`, `TaskGet`, `TaskStop`) are **never** included in subagent registries — subagents cannot recursively spawn more agents or manage teams.
+- `AgentTool` and the task tools (`TaskGet`, `TaskStop`) are **never** included in subagent registries, so subagents cannot recursively spawn more agents.
 
 ---
 

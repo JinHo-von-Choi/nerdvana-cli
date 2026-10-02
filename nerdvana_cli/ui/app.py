@@ -225,18 +225,20 @@ class NerdvanaApp(App[object]):
         self.push_screen(AskUserScreen(question, options), _on_dismiss)
         return await answer
 
+    def on_unmount(self) -> None:
+        """Close the agent session so SESSION_END hooks run on exit."""
+        if self._agent_loop is not None:
+            self._agent_loop.close_session("exit")
+
     def on_mount(self) -> None:
         """Initialize agent loop and display welcome."""
-        from nerdvana_cli.core.team import TeamRegistry
 
         mcp_tools     = self.mcp_manager.get_all_tools() if self.mcp_manager else []
-        team_registry = TeamRegistry()
         registry      = create_tool_registry(
             parism_client = self.parism_client,
             mcp_tools     = mcp_tools,
             settings      = self.settings,
             task_registry = self._task_registry,
-            team_registry = team_registry,
         )
         resume_id = resume_session_id()
         session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
@@ -248,7 +250,6 @@ class NerdvanaApp(App[object]):
             registry           = registry,
             session            = session,
             task_registry      = self._task_registry,
-            team_registry      = team_registry,
             on_activity_change = _on_activity_change,
             on_ask_user        = self._ask_user_prompt,
         )

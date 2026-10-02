@@ -29,10 +29,10 @@
 - **Non-interactive mode** — single prompt execution for scripting
 - **Startup update notice** — on every invocation, a dim one-line notice is printed when a newer GitHub release is available (cached 24 h). Disable via `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, or `session.update_check: false` in `nerdvana.yml`.
 - **Phase A — Edit Quality** — `FileEdit` enforces line/anchor verification via HashLine and `anchor_hash`, with optional LSP-backed diagnostics, goto-definition, find-references, and rename
-- **Phase B — Multi-Agent Swarm** — first-class `Agent`, `Swarm`, `TeamCreate`, `SendMessage`, `TaskGet`, and `TaskStop` tools with concurrent execution budgets and a TaskPanel UI
+- **Phase B — Multi-Agent Swarm** — first-class `Agent`, `Swarm`, `TaskGet`, and `TaskStop` tools with concurrent execution budgets and a TaskPanel UI
 - **Phase C — Self-Recovery Hooks** — built-in lifecycle hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) that auto-resume max-token stops, repair JSON tool errors, and chase down TODO/FIXME/NotImplemented markers; optional planning gate, fallback models, and extended thinking
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
-- **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TeamCreate, SendMessage, TaskGet, TaskStop, plus four LSP tools
+- **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
 - **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`)
 - **MCP server per-tenant quota** — `nerdvana serve` supports rpm / rph / daily_tokens / max_concurrent limits per client, configured via `mcp_quota.yml`. See [`docs/mcp-quota.md`](docs/mcp-quota.md).
 - **Session Persistence** — JSONL transcripts for resume
@@ -285,8 +285,8 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 
 ## Built-in Tools
 
-The registry assembles 32 built-in tools. Bash, file, search, task, web, agent,
-and team tools are always present. `Parism` appears when the bundled Parism MCP
+The registry assembles 30 built-in tools. Bash, file, search, task, web and agent
+tools are always present. `Parism` appears when the bundled Parism MCP
 package is reachable. The LSP and symbol tools appear only when a compatible
 language server is installed; with none detected they are simply omitted from
 the registry. The three external project tools stay unregistered until
@@ -307,8 +307,6 @@ the registry. The three external project tools stay unregistered until
 | `Parism` | Write | Structured shell execution with JSON output (44 whitelisted commands) |
 | `Agent` | Write | Spawn an autonomous sub-agent (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) |
 | `Swarm` | Write | Run multiple agents in parallel under a shared concurrency budget |
-| `TeamCreate` | Write | Create a named, reusable team of agents (`TeamCreate` registers, `Swarm` dispatches) |
-| `SendMessage` | Write | Send a message between running agents in a swarm or team |
 | `TaskGet` | Read | Inspect the status, transcript, and result of a running or finished task |
 | `TaskStop` | Write | Cancel a running agent task |
 | `lsp_diagnostics` | Read | Pull workspace and file-level diagnostics from a connected language server |
@@ -469,10 +467,6 @@ session:
   show_activity: true
 
 hooks:
-  session_start:
-    - builtin:context_injection
-  before_tool: []
-  after_tool: []
   allow_project_hooks: false # see docs/hooks.md before turning this on
 
 checkpoint:
