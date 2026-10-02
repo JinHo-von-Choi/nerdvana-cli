@@ -232,3 +232,15 @@ class LspRenameTool(BaseTool[LspRenameArgs]):
         )
         summary += "\n".join(f"  {f}" for f in changed)
         return ToolResult(tool_use_id="", content=summary)
+
+
+def create_lsp_tools(client: LspClient) -> list[BaseTool[Any]]:
+    """Return the 4 LSP tools bound to *client*, or none when no server is installed."""
+    if not client.has_any_server():
+        return []
+    return [
+        LspDiagnosticsTool(client=client),
+        LspGotoDefinitionTool(client=client),
+        LspFindReferencesTool(client=client),
+        LspRenameTool(client=client),
+    ]

@@ -121,23 +121,6 @@ class LspClient:
                     return True
         return False
 
-    def available_tools(self) -> list[Any]:
-        """Return BaseTool instances for all 4 LSP operations."""
-        from nerdvana_cli.tools.lsp import (
-            LspDiagnosticsTool,
-            LspFindReferencesTool,
-            LspGotoDefinitionTool,
-            LspRenameTool,
-        )
-        if not self.has_any_server():
-            return []
-        return [
-            LspDiagnosticsTool(client=self),
-            LspGotoDefinitionTool(client=self),
-            LspFindReferencesTool(client=self),
-            LspRenameTool(client=self),
-        ]
-
     async def diagnostics(self, file_path: str) -> list[dict[str, Any]]:
         """Run textDocument/diagnostic and return a simplified list."""
         ext = Path(file_path).suffix

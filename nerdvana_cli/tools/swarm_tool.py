@@ -9,6 +9,7 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
+from nerdvana_cli.tools.registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 
 
@@ -96,7 +97,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
             task_registry = registry,
             max_turns     = args.max_turns,
         )
-        results = await run_swarm(config)
+        results = await run_swarm(config, create_subagent_registry)
 
         lines = [f"Swarm '{args.team_name}' completed. {len(results)} agents ran.\n"]
         for agent_id, output in results.items():

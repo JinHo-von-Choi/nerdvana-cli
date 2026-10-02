@@ -9,6 +9,7 @@ import pytest
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.tools.registry import create_subagent_registry
 
 
 @pytest.mark.asyncio
@@ -35,7 +36,7 @@ async def test_swarm_runs_all_tasks_in_parallel() -> None:
     )
 
     with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_fake_subagent):
-        results = await run_swarm(config)
+        results = await run_swarm(config, create_subagent_registry)
 
     assert len(results) == 3
     assert all(r.startswith("result from") for r in results.values())
@@ -60,7 +61,7 @@ async def test_swarm_marks_tasks_completed() -> None:
     )
 
     with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_fake_subagent):
-        await run_swarm(config)
+        await run_swarm(config, create_subagent_registry)
 
     completed = [t for t in task_registry.all() if t.status == TaskStatus.COMPLETED]
     assert len(completed) == 2
@@ -85,7 +86,7 @@ async def test_swarm_handles_partial_failure() -> None:
     )
 
     with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_failing):
-        results = await run_swarm(config)
+        results = await run_swarm(config, create_subagent_registry)
 
     assert any("ok" in v for v in results.values())
     assert any("[swarm error]" in v for v in results.values())

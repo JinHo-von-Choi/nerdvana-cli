@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nerdvana_cli.core.lsp_client import LspClient, LspError
+from nerdvana_cli.tools.lsp import create_lsp_tools
 
 
 @pytest.mark.asyncio
@@ -22,11 +23,11 @@ async def test_has_any_server_false_when_none_found():
 
 
 @pytest.mark.asyncio
-async def test_available_tools_returns_names():
-    """available_tools() returns tool objects for installed servers."""
+async def test_create_lsp_tools_returns_names():
+    """create_lsp_tools() returns tool objects for installed servers."""
     client = LspClient()
     with patch("shutil.which", side_effect=lambda b: "/usr/bin/pyright" if b == "pyright" else None):
-        tools = client.available_tools()
+        tools = create_lsp_tools(client)
     tool_names = [t.name for t in tools]
     assert "lsp_diagnostics" in tool_names
 

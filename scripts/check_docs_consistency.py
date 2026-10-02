@@ -104,6 +104,7 @@ def code_tool_names() -> set[str]:
     """
     from nerdvana_cli.core.lsp_client import LspClient
     from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.tools.lsp import create_lsp_tools
     from nerdvana_cli.tools.parism_tool import ParismTool
     from nerdvana_cli.tools.registry import create_tool_registry
     from nerdvana_cli.tools.symbol_tools import create_symbol_tools
@@ -117,7 +118,7 @@ def code_tool_names() -> set[str]:
     names = {tool.name for tool in registry.all_tools()}
 
     with patch.object(LspClient, "has_any_server", return_value=True):
-        names.update(tool.name for tool in LspClient().available_tools())
+        names.update(tool.name for tool in create_lsp_tools(LspClient()))
 
     names.update(
         tool.name

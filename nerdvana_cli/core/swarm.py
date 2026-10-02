@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.tools.registry import create_subagent_registry
+from nerdvana_cli.core.tool import ToolRegistry
 
 
 @dataclass
@@ -33,8 +34,13 @@ class SwarmConfig:
     max_turns:     int = 50
 
 
-async def run_swarm(config: SwarmConfig) -> dict[str, str]:
+async def run_swarm(
+    config:           SwarmConfig,
+    registry_factory: Callable[[NerdvanaSettings], ToolRegistry],
+) -> dict[str, str]:
     """Dispatch all swarm tasks in parallel, return {agent_id: output} map.
+
+    *registry_factory* builds each worker's tool registry from its settings.
 
     Partial failures are captured and returned as "[swarm error] ..." strings
     so the leader can inspect them without crashing.
@@ -55,7 +61,7 @@ async def run_swarm(config: SwarmConfig) -> dict[str, str]:
         if task.model:
             child_settings.model.model = task.model
 
-        child_registry = create_subagent_registry(child_settings)
+        child_registry = registry_factory(child_settings)
         sub_config     = SubagentConfig(
             agent_id  = agent_id,
             name      = task.subagent_type,
