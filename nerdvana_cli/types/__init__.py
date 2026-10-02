@@ -5,7 +5,15 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Protocol
+
+
+class ToolSpec(Protocol):
+    """The parts of a tool a provider reads to declare it to a model API."""
+
+    name:             str
+    description_text: str
+    input_schema:     dict[str, Any]
 
 
 class Role(StrEnum):
