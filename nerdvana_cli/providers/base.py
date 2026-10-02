@@ -71,6 +71,9 @@ class ProviderEvent:
     error_kind: str = ""
     status_code: int | None = None
     retry_after: float | None = None
+    # For type == "provider_block": a content block (an Anthropic thinking block, say)
+    # that must be sent back unchanged with the assistant turn it belongs to.
+    block: dict[str, Any] | None = None
 
 
 @dataclass
@@ -86,6 +89,12 @@ class ProviderConfig:
     # Ask the provider to reuse the processed prompt prefix between requests
     # (explicit cache breakpoints on Anthropic; the others cache on their own).
     prompt_caching: bool = True
+    # Thinking: ``extended_thinking`` turns it on for models where it is off by default,
+    # ``thinking_budget`` sizes it on models that only take a manual budget, and
+    # ``show_thinking`` asks for the thinking text where the model would otherwise omit it.
+    extended_thinking: bool = False
+    thinking_budget: int = 8192
+    show_thinking: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:

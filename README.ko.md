@@ -493,9 +493,9 @@ model:
   fallback_models:                 # 재시도를 다 쓰면 순서대로 사용
     - claude-haiku-4-5-20251001
     - openai:gpt-4.1               # provider:model 이면 제공자도 전환
-  extended_thinking: false         # 프롬프트에 자율적 도구 사용 지침을 추가. 제공자 쪽 사고 기능은 아직 전달하지 않음
-  thinking_budget: 8192            # 예약된 값. 아직 제공자에 전달하지 않음
-  show_thinking: true              # <think>...</think> 블록을 흐린 이탤릭으로 표시 (/thinking 로 토글)
+  extended_thinking: false         # 선택 사항인 Anthropic 모델에서 사고 기능 켜기 (Claude 5 계열은 기본으로 사고)
+  thinking_budget: 8192            # 수동 예산을 받는 모델(Haiku 4.5)의 사고 토큰 예산
+  show_thinking: true              # 사고 요약을 요청하고 <think>...</think> 블록을 흐린 이탤릭으로 표시 (/thinking 로 토글)
 
 # 제공자별 마지막 사용 모델. /model 과 /provider 가 자동으로 갱신한다.
 model_history: {}

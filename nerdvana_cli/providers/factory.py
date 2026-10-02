@@ -75,6 +75,9 @@ def create_provider(
     max_tokens: int = 8192,
     temperature: float = 1.0,
     prompt_caching: bool = True,
+    extended_thinking: bool = False,
+    thinking_budget: int = 8192,
+    show_thinking: bool = True,
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -107,6 +110,9 @@ def create_provider(
         max_tokens=max_tokens,
         temperature=temperature,
         prompt_caching=prompt_caching,
+        extended_thinking=extended_thinking,
+        thinking_budget=thinking_budget,
+        show_thinking=show_thinking,
     )
 
     provider_cls = _PROVIDER_CLASSES.get(provider)

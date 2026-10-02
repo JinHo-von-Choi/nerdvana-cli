@@ -63,14 +63,16 @@ model:
   # Fallback models tried in order on 429/529/503/timeout errors
   fallback_models: []
 
-  # Adds autonomous tool-use guidance to the prompt (the ultrawork/ulw keyword turns it on
-  # per prompt). Provider-side thinking is not sent yet.
+  # Turns on thinking for Anthropic models that make it optional (the ultrawork/ulw keyword
+  # turns it on per prompt). Current Claude 5 models think by default and ignore this switch.
   extended_thinking: false
 
-  # Reserved for provider-side thinking; not sent to any provider yet
+  # Token budget for thinking on models that take a manual budget (Haiku 4.5 and the other
+  # pre-4.6 models). Adaptive models decide for themselves and ignore it.
   thinking_budget: 8192
 
-  # Render <think>...</think> blocks as a dim italic prefix above the answer.
+  # Show thinking: asks Anthropic models for thinking summaries and renders <think>...</think>
+  # blocks as a dim italic prefix above the answer.
   show_thinking: true
 
 # Per-provider last-used model. Updated automatically by /provider and /model.

@@ -125,6 +125,9 @@ async def handle_thinking(app: NerdvanaApp, args: str) -> None:
         return
     new_value = target == "on"
     app.settings.model.show_thinking = new_value
+    provider_config = getattr(getattr(getattr(app, "_agent_loop", None), "provider", None), "config", None)
+    if provider_config is not None:
+        provider_config.show_thinking = new_value
 
     try:
         from nerdvana_cli.core.setup import load_config, save_config

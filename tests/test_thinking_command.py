@@ -102,3 +102,20 @@ class TestHandleThinking:
         await handle_thinking(app, "   ")
         msg = app._add_chat_message.call_args[0][0]
         assert "Thinking display" in msg
+
+
+async def test_the_toggle_reaches_the_provider_that_requests_summaries(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from nerdvana_cli.commands.system_commands import handle_thinking
+
+    monkeypatch.setattr("nerdvana_cli.core.setup.load_config", lambda: {})
+    monkeypatch.setattr("nerdvana_cli.core.setup.save_config", lambda cfg: None)
+    config = SimpleNamespace(show_thinking=True)
+    app    = SimpleNamespace(
+        settings    = SimpleNamespace(model=SimpleNamespace(show_thinking=True)),
+        _agent_loop = SimpleNamespace(provider=SimpleNamespace(config=config)),
+        _add_chat_message = lambda *a, **k: None,
+    )
+    await handle_thinking(app, "off")  # type: ignore[arg-type]
+    assert config.show_thinking is False

@@ -76,9 +76,9 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | `fallback_models` | list[str] | `[]` | Models tried in order when a request keeps failing with a transient error (429, 5xx, timeout) or an authentication error. `model` runs under the configured provider; `provider:model` (for example `openai:gpt-4.1`) switches provider and uses that provider's API key. A model that just failed is skipped for 60 seconds. |
 | `prompt_caching` | bool | `true` | Lets the provider reuse the processed system prompt, tool list and conversation prefix between requests. Anthropic requests get explicit cache breakpoints (last tool, system prompt, last message block); OpenAI-compatible servers and Gemini cache on their own and only their cached-token counts are read. Cached reads are billed at a fraction of normal input, and `nerdvana` prices them with the per-model `cache_read_per_1m` and `cache_write_per_1m` rates. |
 | `max_retries` | int | `2` | Retries of the same model, with backoff (or the server's `Retry-After`), before moving to the next fallback. Nothing is retried once part of the answer has streamed. |
-| `extended_thinking` | bool | `false` | Adds autonomous tool-use guidance to the system prompt; the `ultrawork`/`ulw` keyword turns it on for one prompt. It does not yet switch on any provider-side thinking mode. |
-| `thinking_budget` | int | `8192` | Reserved for provider-side thinking. Not yet sent to any provider. |
-| `show_thinking` | bool | `true` | Render `<think>...</think>` content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
+| `extended_thinking` | bool | `false` | Turns on thinking for Anthropic models where it is optional (Opus 4.6 to 4.8, Sonnet 4.6 and the manual-budget models such as Haiku 4.5); the `ultrawork`/`ulw` keyword turns it on for one prompt. Claude 5 models (Fable, Opus, Sonnet) think by default, so the switch has no effect on them. Other providers are unaffected. |
+| `thinking_budget` | int | `8192` | Thinking token budget for models that take a manual budget (Haiku 4.5 and earlier). Models with adaptive thinking choose their own depth and ignore it. |
+| `show_thinking` | bool | `true` | Asks Anthropic models for thinking summaries (they omit them by default) and renders the thinking content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
 
 ### `model_history` (dict[str, str])
 

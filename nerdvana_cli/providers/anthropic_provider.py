@@ -49,6 +49,58 @@ def _usage_dict(usage: Any, output_tokens: int | None = None) -> dict[str, int]:
     return result
 
 
+# Model families, by id prefix (https://platform.claude.com/docs/en/build-with-claude/thinking).
+# Thinking is on by default and rejects a manual budget (a 400) on these.
+_THINKING_DEFAULT_ON = ("claude-fable-5", "claude-mythos-5", "claude-opus-5", "claude-sonnet-5")
+# Thinking is off until asked for with ``adaptive``.
+_THINKING_OPT_IN     = ("claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6")
+# Non-default temperature is a 400 on every request for these.
+_FIXED_SAMPLING      = _THINKING_DEFAULT_ON + ("claude-opus-4-8", "claude-opus-4-7")
+
+
+def _redacted_block(block: Any) -> dict[str, Any]:
+    """A redacted thinking block in the shape the API expects back."""
+    return {"type": "redacted_thinking", "data": getattr(block, "data", "")}
+
+
+def _extend_thinking(current: dict[str, Any] | None, delta: Any) -> None:
+    """Fold a thinking or signature delta into the thinking block being streamed."""
+    if current is None:
+        return
+    if delta.type == "thinking_delta":
+        current["thinking"] += delta.thinking or ""
+    else:
+        current["signature"] = delta.signature
+
+
+def request_options(model: str, max_tokens: int, temperature: float, extended: bool, budget: int, show: bool) -> dict[str, Any]:
+    """Thinking, token limit and sampling fields for a request to *model*.
+
+    Only ``claude-*`` ids are interpreted; any other id (an Anthropic-compatible
+    endpoint) gets the plain request it always got. The returned dict holds
+    ``max_tokens``, optionally ``thinking``, and ``temperature`` when allowed.
+    """
+    options: dict[str, Any] = {"max_tokens": max_tokens}
+    if not model.startswith("claude-"):
+        options["temperature"] = temperature
+        return options
+    display = "summarized" if show else "omitted"
+    if model.startswith(_THINKING_DEFAULT_ON):
+        options["thinking"] = {"type": "adaptive", "display": display}
+    elif model.startswith(_THINKING_OPT_IN):
+        if extended:
+            options["thinking"] = {"type": "adaptive", "display": display}
+    elif extended:
+        # A model that only takes a manual budget; the budget must stay below max_tokens
+        # and the API requires the default temperature, so none is sent.
+        options["thinking"]   = {"type": "enabled", "budget_tokens": budget}
+        options["max_tokens"] = max(max_tokens, budget + 1024)
+        return options
+    if not model.startswith(_FIXED_SAMPLING):
+        options["temperature"] = temperature
+    return options
+
+
 def with_cache_breakpoints(
     system_prompt: str,
     api_tools:     list[dict[str, Any]],
@@ -106,6 +158,31 @@ class AnthropicProvider:
             self._client = _AsyncAnthropic(**client_kwargs)
         return self._client
 
+    def _request_options(self) -> dict[str, Any]:
+        """The thinking, token limit and sampling fields for this provider's configuration."""
+        config = self.config
+        return request_options(
+            config.model, config.max_tokens, config.temperature,
+            config.extended_thinking, config.thinking_budget, config.show_thinking,
+        )
+
+    def _prepare(
+        self,
+        system_prompt: str,
+        messages: list[dict[str, Any]],
+        tools: Sequence[ToolSpec],
+    ) -> tuple[Any, list[dict[str, Any]], list[dict[str, Any]]]:
+        """System prompt, tool declarations and messages in the API's shape, cache breakpoints applied."""
+        api_tools = [
+            {"name": t.name, "description": t.description_text, "input_schema": t.input_schema}
+            for t in tools
+        ]
+        api_messages = self._convert_messages(messages)
+        system: Any  = system_prompt
+        if self.config.prompt_caching:
+            system, api_tools, api_messages = with_cache_breakpoints(system_prompt, api_tools, api_messages)
+        return system, api_tools, api_messages
+
     async def stream(
         self,
         system_prompt: str,
@@ -119,25 +196,12 @@ class AnthropicProvider:
             yield ProviderEvent(type="error", error="anthropic package not installed. Run: pip install anthropic")
             return
 
-        api_tools = [
-            {
-                "name": t.name,
-                "description": t.description_text,
-                "input_schema": t.input_schema,
-            }
-            for t in tools
-        ]
-
-        api_messages = self._convert_messages(messages)
-        system: Any  = system_prompt
-        if self.config.prompt_caching:
-            system, api_tools, api_messages = with_cache_breakpoints(system_prompt, api_tools, api_messages)
+        system, api_tools, api_messages = self._prepare(system_prompt, messages, tools)
 
         try:
             create_kwargs: dict[str, Any] = {
                 "model": self.config.model,
-                "max_tokens": self.config.max_tokens,
-                "temperature": self.config.temperature,
+                **self._request_options(),
                 "system": system,
                 "messages": api_messages,
                 "stream": True,
@@ -150,6 +214,7 @@ class AnthropicProvider:
             # Track tool blocks for completion events
             current_tool: dict[str, Any] = {}
             current_tool_input = ""
+            current_thinking: dict[str, Any] | None = None
             usage: dict[str, int] = {}
             stop_reason = "end_turn"
 
@@ -161,7 +226,11 @@ class AnthropicProvider:
 
                 elif event.type == "content_block_start":
                     cb = event.content_block
-                    if cb.type == "tool_use":
+                    if cb.type == "thinking":
+                        current_thinking = {"type": "thinking", "thinking": "", "signature": ""}
+                    elif cb.type == "redacted_thinking":
+                        yield ProviderEvent(type="provider_block", block=_redacted_block(cb))
+                    elif cb.type == "tool_use":
                         current_tool = {"id": cb.id, "name": cb.name}
                         current_tool_input = ""
                         yield ProviderEvent(
@@ -174,8 +243,10 @@ class AnthropicProvider:
                     delta = event.delta
                     if delta.type == "text_delta":
                         yield ProviderEvent(type="content_delta", content=delta.text)
-                    elif delta.type == "thinking_delta":
-                        yield ProviderEvent(type="thinking_delta", thinking=delta.thinking)
+                    elif delta.type in ("thinking_delta", "signature_delta"):
+                        _extend_thinking(current_thinking, delta)
+                        if delta.type == "thinking_delta":
+                            yield ProviderEvent(type="thinking_delta", thinking=delta.thinking)
                     elif delta.type == "input_json_delta":
                         current_tool_input += delta.partial_json
                         yield ProviderEvent(
@@ -184,6 +255,9 @@ class AnthropicProvider:
                         )
 
                 elif event.type == "content_block_stop":
+                    if current_thinking is not None:
+                        yield ProviderEvent(type="provider_block", block=current_thinking)
+                        current_thinking = None
                     if current_tool:
                         try:
                             input_data = json.loads(current_tool_input) if current_tool_input else {}
@@ -229,25 +303,12 @@ class AnthropicProvider:
         except ImportError:
             return {"content": "anthropic package not installed", "is_error": True}
 
-        api_tools = [
-            {
-                "name": t.name,
-                "description": t.description_text,
-                "input_schema": t.input_schema,
-            }
-            for t in tools
-        ]
-
-        api_messages = self._convert_messages(messages)
-        system: Any  = system_prompt
-        if self.config.prompt_caching:
-            system, api_tools, api_messages = with_cache_breakpoints(system_prompt, api_tools, api_messages)
+        system, api_tools, api_messages = self._prepare(system_prompt, messages, tools)
 
         try:
             response = await client.messages.create(
                 model=self.config.model,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
+                **self._request_options(),
                 system=system,
                 messages=api_messages,  # type: ignore[arg-type]
                 tools=api_tools,  # type: ignore[arg-type]
@@ -255,9 +316,14 @@ class AnthropicProvider:
 
             content = ""
             tool_uses = []
+            provider_blocks: list[dict[str, Any]] = []
 
             for block in response.content:
-                if block.type == "text":
+                if block.type == "thinking":
+                    provider_blocks.append({"type": "thinking", "thinking": block.thinking, "signature": block.signature})
+                elif block.type == "redacted_thinking":
+                    provider_blocks.append(_redacted_block(block))
+                elif block.type == "text":
                     content += block.text
                 elif block.type == "tool_use":
                     tool_uses.append(
@@ -273,6 +339,7 @@ class AnthropicProvider:
                 "tool_uses": tool_uses,
                 "stop_reason": response.stop_reason,
                 "usage": _usage_dict(response.usage),
+                **({"provider_blocks": provider_blocks} if provider_blocks else {}),
             }
 
         except Exception as e:
@@ -328,8 +395,9 @@ class AnthropicProvider:
                     "is_error":    bool(msg.get("is_error", False)),
                 }])
             elif role == "assistant":
-                blocks: list[dict[str, Any]] = []
-                if isinstance(content, str) and content.strip():
+                # Thinking blocks go back first and unchanged, as the API requires.
+                blocks: list[dict[str, Any]] = [dict(b) for b in msg.get("provider_blocks") or []]
+                if isinstance(content, str) and content.strip() and not (content == "[tool execution]" and msg.get("tool_uses")):
                     blocks.append({"type": "text", "text": content})
                 for tool_use in msg.get("tool_uses") or []:
                     blocks.append({

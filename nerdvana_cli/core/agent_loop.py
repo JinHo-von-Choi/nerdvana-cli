@@ -163,6 +163,7 @@ class _Turn:
     used_ids:        set[str]
     sent_count:      int
     asst_text:       str                          = ""
+    provider_blocks: list[dict[str, Any]]         = field(default_factory=list)
     thinking_buffer: str                          = ""
     tool_uses:       list[dict[str, Any]]         = field(default_factory=list)
     seen_calls:      set[tuple[str, str, str]]    = field(default_factory=set)
@@ -411,7 +412,9 @@ class AgentLoop:
         pname = ProviderName(self.settings.model.provider) if self.settings.model.provider else None
         return create_provider(provider=pname, model=self.settings.model.model, api_key=self.settings.model.api_key,
             base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature,
-            prompt_caching=self.settings.model.prompt_caching)
+            prompt_caching=self.settings.model.prompt_caching,
+            extended_thinking=self.settings.model.extended_thinking,
+            thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking)
 
     def _reset_run_counters(self) -> None:
         """Zero the stop status, the typed-ahead queue and the session's usage totals."""
@@ -493,6 +496,8 @@ class AgentLoop:
                 out.append({"role": "user", "content": msg.content})
             elif msg.role == Role.ASSISTANT:
                 d = {"role": "assistant", "content": msg.content, **({"tool_uses": msg.tool_uses} if msg.tool_uses else {})}
+                if msg.provider_blocks:
+                    d["provider_blocks"] = msg.provider_blocks
                 out.append(d)
             elif msg.role == Role.TOOL:
                 out.append({"role": "tool", "content": msg.content, "tool_use_id": msg.tool_use_id or "", "is_error": msg.is_error})
@@ -509,6 +514,7 @@ class AgentLoop:
         original_et = self.settings.model.extended_thinking
         if _is_ultrawork(prompt):
             self.settings.model.extended_thinking = True
+            self.provider = self.create_provider_from_settings()
             yield "[dim cyan][Ultrawork mode: autonomous tool-use guidance ON][/dim cyan]\n"
 
         self._turn += 1
@@ -553,7 +559,9 @@ class AgentLoop:
             async for event in self._loop(system_prompt, tools):
                 yield event
         finally:
-            self.settings.model.extended_thinking = original_et
+            if self.settings.model.extended_thinking != original_et:
+                self.settings.model.extended_thinking = original_et
+                self.provider = self.create_provider_from_settings()
             self._record_session_totals()
 
     async def _run_plan_agent(self, prompt: str) -> str:
@@ -645,7 +653,7 @@ class AgentLoop:
                 recovered = True
         return recovered
 
-    def _handle_end_turn_stop(self, asst_text: str, thinking_buffer: str) -> bool:
+    def _handle_end_turn_stop(self, asst_text: str, thinking_buffer: str, provider_blocks: list[dict[str, Any]] | None = None) -> bool:
         """Finalize the assistant turn and run AFTER_API_CALL hooks.
 
         Persists the assistant message, fires hooks. Returns True if a hook
@@ -654,7 +662,7 @@ class AgentLoop:
         """
         self.last_thinking = thinking_buffer
         if asst_text:
-            self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
+            self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text, provider_blocks=list(provider_blocks or [])))
             self.session.record_assistant_message(asst_text)
         from nerdvana_cli.core.hooks import HookContext, HookEvent
         ctx = HookContext(
@@ -677,6 +685,7 @@ class AgentLoop:
         asst_text:  str,
         tool_uses:  list[dict[str, Any]],
         tool_ctx:   ToolContext,
+        provider_blocks: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[str, None]:
         """Execute the requested tool calls and append results to history.
 
@@ -697,6 +706,7 @@ class AgentLoop:
             role      = Role.ASSISTANT,
             content   = asst_text if asst_text else "[tool execution]",
             tool_uses = tool_uses,
+            provider_blocks = list(provider_blocks or []),
         ))
         for tr in results:
             self.state.messages.append(Message(
@@ -853,6 +863,8 @@ class AgentLoop:
                 if self._on_thinking_chunk is not None:
                     with contextlib.suppress(Exception):
                         self._on_thinking_chunk(turn.thinking_buffer)
+            elif ev.type == "provider_block" and ev.block:
+                turn.provider_blocks.append(ev.block)
             elif ev.type == "tool_use_complete":
                 turn.add_call(ev.tool_use_id, ev.tool_name, ev.tool_input_complete)
             elif ev.type == "usage" and ev.usage:
@@ -885,10 +897,10 @@ class AgentLoop:
             return
         if stop == "end_turn":
             if self.has_queued_input():
-                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer)
+                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer, turn.provider_blocks)
                 return  # the user typed ahead; answer it in the next step
             if (
-                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer)
+                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer, turn.provider_blocks)
                 and self._end_turn_nudges < _MAX_END_TURN_NUDGES
             ):
                 self._end_turn_nudges += 1
@@ -903,7 +915,7 @@ class AgentLoop:
             flow.finished = True
             return
         if stop == "tool_use" and turn.tool_uses:
-            async for status in self._handle_tool_use_stop(turn.asst_text, turn.tool_uses, tool_ctx):
+            async for status in self._handle_tool_use_stop(turn.asst_text, turn.tool_uses, tool_ctx, turn.provider_blocks):
                 yield status
             return
         logger.warning("Unhandled stop_reason: %s", stop)
@@ -989,7 +1001,10 @@ class AgentLoop:
             if usage:
                 self._apply_usage(usage, None)
             if tool_uses:
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses))
+                self.state.messages.append(Message(
+                    role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses,
+                    provider_blocks=list(result.get("provider_blocks") or []),
+                ))
                 if content:
                     self.session.record_assistant_message(content, tool_uses)
                 for tr in await self.tool_executor.run_batch(tool_uses, context):
