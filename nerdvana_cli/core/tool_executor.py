@@ -13,6 +13,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -56,6 +57,7 @@ class ToolExecutor:
         reminder:           Any | None = None,
         checkpoint_manager: Any | None = None,
         analytics_writer:   AnalyticsWriter | None = None,
+        policy:             PermissionPolicy | None = None,
     ) -> None:
         self._registry            = registry
         self._hooks               = hooks
@@ -63,6 +65,7 @@ class ToolExecutor:
         self._reminder            = reminder
         self._checkpoint_manager  = checkpoint_manager
         self._analytics_writer    = analytics_writer
+        self._policy              = policy or PermissionPolicy()
 
     async def run_batch(
         self,
@@ -137,7 +140,7 @@ class ToolExecutor:
                 is_error    = True,
             )
 
-        perm_result = tool.check_permissions(parsed_args, context)
+        perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context))
         if perm_result.behavior == PermissionBehavior.DENY:
             return ToolResult(
                 tool_use_id = tool_id,

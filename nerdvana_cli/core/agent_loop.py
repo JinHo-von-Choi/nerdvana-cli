@@ -22,6 +22,7 @@ from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
+from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
@@ -189,6 +190,7 @@ class AgentLoop:
         )
         self._usage_input_total  = 0
         self._usage_output_total = 0
+        self.policy        = PermissionPolicy.from_settings(self.settings)
         self.tool_executor = ToolExecutor(
             registry            = self.registry,
             hooks               = self.hooks,
@@ -196,6 +198,7 @@ class AgentLoop:
             reminder            = self._reminder,
             checkpoint_manager  = self._checkpoint_manager,
             analytics_writer    = self._analytics_writer,
+            policy              = self.policy,
         )
         self.loop_hook_engine = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
         from nerdvana_cli.core.activity_hooks import register_activity_hooks
@@ -264,7 +267,7 @@ class AgentLoop:
 
     def build_system_prompt(self) -> str:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
-        return _b(tools=self.registry.all_tools(), parism_active=self.registry.get("Parism") is not None,
+        return _b(tools=[t for t in self.registry.all_tools() if self.policy.is_visible(t.name)], parism_active=self.registry.get("Parism") is not None,
                   model=self.settings.model.model, provider=self.settings.model.provider, cwd=self.settings.cwd,
                   active_tool_mode=bool(self.settings.model.extended_thinking))
 
@@ -313,7 +316,7 @@ class AgentLoop:
         self.state.messages.append(Message(role=Role.USER, content=prompt))
         self.session.record_user_message(prompt)
         system_prompt = self.build_system_prompt()
-        tools = self.registry.all_tools()
+        tools = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name)]
         if not self._session_started:
             self._session_started = True
             from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
