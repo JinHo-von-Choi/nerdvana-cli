@@ -6,16 +6,23 @@ import contextlib
 import errno
 import hashlib
 import os
+import re
 import stat
 from typing import Any, ClassVar
 from uuid import uuid4
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
+from nerdvana_cli.tools import read_ledger
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.path import safe_makedirs, safe_open_fd, validate_path
 
 _O_DIRECTORY: int = getattr(os, "O_DIRECTORY", 0)
 _O_NOFOLLOW:  int = getattr(os, "O_NOFOLLOW", 0)
+
+_HASH_LEN:         int = 6
+_RELOCATE_WINDOW:  int = 20
+_CONTEXT_RADIUS:   int = 5
+_ANCHOR_RE = re.compile(rf"^(\d+)#([0-9a-f]{{{_HASH_LEN}}})$")
 
 
 def _is_symlink_block_error(exc: OSError) -> bool:
@@ -100,57 +107,85 @@ def _atomic_write(relative_path: str, cwd: str, content: str) -> None:
         os.close(dir_fd)
 
 
-def _hash4(line: str) -> str:
-    """Return first 4 hex chars of sha256(line)."""
-    return hashlib.sha256(line.encode()).hexdigest()[:4]
+def _line_hash(line: str) -> str:
+    """Return the first 6 hex chars of sha256 over the line without its newline."""
+    return hashlib.sha256(line.rstrip("\n").encode()).hexdigest()[:_HASH_LEN]
 
 
-def _resolve_anchor(anchor: str, lines: list[str]) -> int | None:
-    """Return 0-based line index for anchor (hash[:4] or hash[:4]#N).
+def _parse_anchor(anchor: str) -> tuple[int, str] | None:
+    """Split an ``N#hhhhhh`` anchor into (line number, hash); None when malformed."""
+    match = _ANCHOR_RE.match(anchor.strip())
+    if match is None:
+        return None
+    return int(match.group(1)), match.group(2)
 
-    Returns None if no matching line is found.
+
+def _resolve_anchor(lineno: int, line_hash: str, lines: list[str]) -> int | None:
+    """Return the 0-based index of the line an anchor names, or None.
+
+    The hash at ``lineno`` wins outright.  Otherwise the lines within
+    ``_RELOCATE_WINDOW`` of it are searched for the hash, and a relocation is
+    accepted only when exactly one of them carries it.  No similarity matching
+    is attempted.
     """
-    if "#" in anchor:
-        base_hash, _, nth_str = anchor.partition("#")
-        target_n = int(nth_str)
-    else:
-        base_hash = anchor
-        target_n  = 1
-
-    seen = 0
-    for idx, line in enumerate(lines):
-        if _hash4(line) == base_hash:
-            seen += 1
-            if seen == target_n:
-                return idx
-    return None
+    idx = lineno - 1
+    if 0 <= idx < len(lines) and _line_hash(lines[idx]) == line_hash:
+        return idx
+    low        = max(0, idx - _RELOCATE_WINDOW)
+    high       = min(len(lines) - 1, idx + _RELOCATE_WINDOW)
+    candidates = [i for i in range(low, high + 1) if _line_hash(lines[i]) == line_hash]
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _format_with_hashes(lines: list[str], start_lineno: int = 1) -> str:
-    """Format lines with hash anchors: 'N:xxxx    content'.
+    """Format lines as ``N#hhhhhh    content`` so each line carries its own anchor."""
+    return "\n".join(
+        f"{i}#{_line_hash(line)}    {line.rstrip(chr(10))}"
+        for i, line in enumerate(lines, start=start_lineno)
+    )
 
-    Duplicate lines (same hash) are disambiguated with #N suffix.
-    """
-    hash_counts: dict[str, int] = {}
-    hash_seen:   dict[str, int] = {}
-    # first pass: count occurrences per hash
-    for line in lines:
-        h = _hash4(line)
-        hash_counts[h] = hash_counts.get(h, 0) + 1
 
-    result_parts: list[str] = []
-    for i, line in enumerate(lines, start=start_lineno):
-        h = _hash4(line)
-        if hash_counts[h] > 1:
-            hash_seen[h] = hash_seen.get(h, 0) + 1
-            anchor = f"{h}#{hash_seen[h]}"
-        else:
-            anchor = h
-        # strip trailing newline for display; content itself keeps it
-        display = line.rstrip("\n")
-        result_parts.append(f"{i}:{anchor}    {display}")
+def _lines_around(lines: list[str], lineno: int) -> str:
+    """Return the current ``N#hhhhhh`` lines surrounding ``lineno``."""
+    if not lines:
+        return "(file is empty)"
+    centre = min(max(lineno, 1), len(lines))
+    first  = max(1, centre - _CONTEXT_RADIUS)
+    last   = min(len(lines), centre + _CONTEXT_RADIUS)
+    return _format_with_hashes(lines[first - 1:last], start_lineno=first)
 
-    return "\n".join(result_parts)
+
+def _read_bytes(relative_path: str, cwd: str) -> bytes:
+    """Read the whole file through the symlink-safe descriptor walk."""
+    fd = safe_open_fd(relative_path, cwd, os.O_RDONLY)
+    with os.fdopen(fd, "rb") as fh:
+        return fh.read()
+
+
+def _decode_text(data: bytes, errors: str) -> str:
+    """Decode UTF-8 bytes and fold CRLF/CR into LF, as text-mode reads do."""
+    return data.decode("utf-8", errors=errors).replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _ledger_error(
+    verb:     str,
+    path:     str,
+    session:  str,
+    key:      str,
+    digest:   str,
+) -> str | None:
+    """Return an error text unless the file is unchanged since it was read."""
+    recorded = read_ledger.lookup(session, key)
+    if recorded is None:
+        return f"{path} has not been read in this session. Call FileRead on it before {verb}."
+    if recorded != digest:
+        return f"{path} changed since it was last read. Call FileRead again before {verb}."
+    return None
+
+
+def _record_written(relative_path: str, cwd: str, session: str, key: str) -> None:
+    """Record the on-disk digest of a file this session just wrote."""
+    read_ledger.record(session, key, read_ledger.content_digest(_read_bytes(relative_path, cwd)))
 
 
 class FileReadArgs:
@@ -166,7 +201,10 @@ class FileReadTool(BaseTool[FileReadArgs]):
 
 Supports text files, PDFs, and images.
 Use offset/limit to read specific portions of large files.
-Line numbers are included in the output.
+Every line is prefixed with an anchor `N#hhhhhh` (line number, `#`, 6 hex chars
+of the line hash). Pass that anchor to FileEdit as anchor_hash.
+A file must be read in this session before FileEdit or an overwriting
+FileWrite will touch it; reading again refreshes that record.
 
 Examples:
 - path: "src/main.py"
@@ -209,7 +247,7 @@ Examples:
                 return ToolResult(tool_use_id="", content="Directory listing:\n" + "\n".join(entries))
 
             try:
-                fd = safe_open_fd(args.path, context.cwd, os.O_RDONLY)
+                data = _read_bytes(args.path, context.cwd)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
@@ -218,14 +256,19 @@ Examples:
                         is_error=True,
                     )
                 raise
-            with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
-                if args.offset == 0 and args.limit == 0:
-                    content = f.read()
-                else:
-                    lines = f.readlines()
-                    start = args.offset
-                    end = start + args.limit if args.limit > 0 else len(lines)
-                    content = "".join(lines[start:end])
+            read_ledger.record(
+                read_ledger.session_key(context),
+                read_ledger.resolve_key(args.path, context.cwd),
+                read_ledger.content_digest(data),
+            )
+            full_text = _decode_text(data, "replace")
+            if args.offset == 0 and args.limit == 0:
+                content = full_text
+            else:
+                lines   = full_text.splitlines(keepends=True)
+                start   = args.offset
+                end     = start + args.limit if args.limit > 0 else len(lines)
+                content = "".join(lines[start:end])
 
             context.file_state[args.path] = content
             raw_lines = content.splitlines(keepends=True)
@@ -250,7 +293,9 @@ class FileWriteTool(BaseTool[FileWriteArgs]):
     description_text = """Create or overwrite a file with the given content.
 
 This will create the file if it doesn't exist, or completely replace
-the contents if it does. For partial edits, use FileEdit instead.
+the contents if it does. Replacing an existing file requires that it was
+read with FileRead in this session and has not changed since; creating a new
+file needs no prior read. For partial edits, use FileEdit instead.
 
 Examples:
 - path: "src/new_module.py", content: "def hello(): ..."
@@ -284,11 +329,24 @@ WARNING: This replaces the entire file content."""
             path_error = validate_path(args.path, context.cwd)
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
+            session = read_ledger.session_key(context)
+            key     = read_ledger.resolve_key(args.path, context.cwd)
             parent_rel = os.path.dirname(args.path)
             try:
+                try:
+                    current: bytes | None = _read_bytes(args.path, context.cwd)
+                except FileNotFoundError:
+                    current = None
+                if current is not None:
+                    stale = _ledger_error(
+                        "overwriting it", args.path, session, key, read_ledger.content_digest(current),
+                    )
+                    if stale:
+                        return ToolResult(tool_use_id="", content=stale, is_error=True)
                 if parent_rel:
                     safe_makedirs(parent_rel, context.cwd)
                 _atomic_write(args.path, context.cwd, args.content)
+                _record_written(args.path, context.cwd, session, key)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
@@ -327,11 +385,20 @@ class FileEditTool(BaseTool[FileEditArgs]):
 
 Finds old_string and replaces it with new_string.
 Use replace_all to replace all occurrences.
+Alternatively set anchor_hash to an `N#hhhhhh` anchor from FileRead output
+(line number, `#`, 6 hex chars of the line hash): that whole line, including
+its trailing newline, is replaced by new_string. If lines shifted by your own
+earlier edit, the anchor is relocated when exactly one line within 20 lines
+carries the hash; otherwise the edit is rejected and the current anchors near
+that line are returned.
+The file must have been read with FileRead in this session and not changed
+since; otherwise the edit is rejected and you must FileRead it again.
 For creating new files or full replacements, use FileWrite.
 
 Examples:
 - path: "src/main.py", old_string: "def old():", new_string: "def new():"
 - path: "config.py", old_string: "DEBUG = False", new_string: "DEBUG = True", replace_all: false
+- path: "src/main.py", anchor_hash: "12#a1b2c3", new_string: "    return 42\n"
 
 IMPORTANT: old_string must match exactly (including whitespace)."""
     input_schema = {
@@ -346,7 +413,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
             },
             "anchor_hash": {
                 "type": ["string", "null"],
-                "description": "4-char (optionally #N) hash anchor from FileRead output",
+                "description": "Line anchor 'N#hhhhhh' copied from FileRead output (line number and 6-char hash)",
                 "default": None,
             },
             "replace_all": {
@@ -389,8 +456,15 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
             if not os.path.exists(full_path):
                 return ToolResult(tool_use_id="", content=f"File not found: {args.path}", is_error=True)
 
+            if args.anchor_hash is None and not args.old_string:
+                return ToolResult(
+                    tool_use_id="",
+                    content="Provide either anchor_hash (from FileRead output) or old_string",
+                    is_error=True,
+                )
+
             try:
-                read_fd = safe_open_fd(args.path, context.cwd, os.O_RDONLY)
+                data = _read_bytes(args.path, context.cwd)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
@@ -399,26 +473,36 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                         is_error=True,
                     )
                 raise
-            with os.fdopen(read_fd, encoding="utf-8") as f:
-                content = f.read()
 
-            if args.anchor_hash is None and not args.old_string:
-                return ToolResult(
-                    tool_use_id="",
-                    content="Provide either anchor_hash (from FileRead output) or old_string",
-                    is_error=True,
-                )
+            session = read_ledger.session_key(context)
+            key     = read_ledger.resolve_key(args.path, context.cwd)
+            stale   = _ledger_error("editing", args.path, session, key, read_ledger.content_digest(data))
+            if stale:
+                return ToolResult(tool_use_id="", content=stale, is_error=True)
+            content = _decode_text(data, "strict")
 
             # ── anchor_hash path ──────────────────────────────────────────
             if args.anchor_hash is not None:
                 raw_lines = content.splitlines(keepends=True)
-                target_idx = _resolve_anchor(args.anchor_hash, raw_lines)
+                parsed    = _parse_anchor(args.anchor_hash)
+                if parsed is None:
+                    return ToolResult(
+                        tool_use_id="",
+                        content=(
+                            f"Malformed anchor '{args.anchor_hash}'. Use the 'N#hhhhhh' form "
+                            "shown by FileRead (line number, '#', 6 hex chars)."
+                        ),
+                        is_error=True,
+                    )
+                lineno, line_hash = parsed
+                target_idx        = _resolve_anchor(lineno, line_hash, raw_lines)
                 if target_idx is None:
                     return ToolResult(
                         tool_use_id="",
                         content=(
-                            f"Anchor '{args.anchor_hash}' not found in {args.path}. "
-                            "File changed since last read. Re-read the file first."
+                            f"Anchor '{args.anchor_hash}' does not identify a unique line in "
+                            f"{args.path}. Current lines around {lineno}:\n"
+                            f"{_lines_around(raw_lines, lineno)}"
                         ),
                         is_error=True,
                     )
@@ -426,6 +510,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 new_content = "".join(raw_lines)
                 try:
                     _atomic_write(args.path, context.cwd, new_content)
+                    _record_written(args.path, context.cwd, session, key)
                 except OSError as exc:
                     if _is_symlink_block_error(exc):
                         return ToolResult(
@@ -457,6 +542,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
 
             try:
                 _atomic_write(args.path, context.cwd, new_content)
+                _record_written(args.path, context.cwd, session, key)
             except OSError as exc:
                 if _is_symlink_block_error(exc):
                     return ToolResult(
