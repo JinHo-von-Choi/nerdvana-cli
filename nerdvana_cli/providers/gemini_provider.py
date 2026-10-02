@@ -115,7 +115,10 @@ class GeminiProvider:
                 config=config,
             )
 
+            usage_metadata: Any = None
             async for chunk in stream:
+                # Counts are cumulative; the last chunk that carries them is the total.
+                usage_metadata = getattr(chunk, "usage_metadata", None) or usage_metadata
                 if chunk.candidates:
                     for candidate in chunk.candidates:
                         if candidate.content and candidate.content.parts:
@@ -132,6 +135,11 @@ class GeminiProvider:
                                         tool_input_complete=args,
                                     )
 
+            if usage_metadata is not None:
+                yield ProviderEvent(type="usage", usage={
+                    "input_tokens":  getattr(usage_metadata, "prompt_token_count", 0) or 0,
+                    "output_tokens": getattr(usage_metadata, "candidates_token_count", 0) or 0,
+                })
             yield ProviderEvent(type="done", stop_reason="end_turn")
 
         except Exception as e:
