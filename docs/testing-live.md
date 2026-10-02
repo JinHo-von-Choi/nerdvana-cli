@@ -16,7 +16,7 @@ This document is the canonical reference for running them locally and in CI.
 
 | Provider | Primary env var | Alternative | Default model | Notes |
 |-|-|-|-|-|
-| Anthropic | `ANTHROPIC_API_KEY` | — | `claude-sonnet-4-20250514` | metered |
+| Anthropic | `ANTHROPIC_API_KEY` | — | `claude-sonnet-5-5` | metered |
 | OpenAI | `OPENAI_API_KEY` | — | `gpt-4.1` | metered |
 | Google Gemini | `GEMINI_API_KEY` | `GOOGLE_API_KEY` | `gemini-2.5-flash` | metered (free tier available) |
 | Groq | `GROQ_API_KEY` | — | `llama-3.3-70b-versatile` | free tier with rate limits |

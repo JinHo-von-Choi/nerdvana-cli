@@ -46,7 +46,7 @@
 
 | Provider | Default Model | API Key Env Var |
 |----------|--------------|-----------------|
-| **Anthropic** | claude-sonnet-4-20250514 | `ANTHROPIC_API_KEY` |
+| **Anthropic** | claude-sonnet-5-5 | `ANTHROPIC_API_KEY` |
 | **OpenAI** | gpt-4.1 | `OPENAI_API_KEY` |
 | **Google Gemini** | gemini-2.5-flash | `GEMINI_API_KEY` |
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
@@ -126,7 +126,7 @@ export GEMINI_API_KEY="..."
 nerdvana
 
 # Specify provider explicitly
-nerdvana --provider anthropic --model claude-opus-4-20250514
+nerdvana --provider anthropic --model claude-opus-5-5
 nerdvana --provider openai --model gpt-4.1
 nerdvana --provider gemini --model gemini-2.5-pro
 nerdvana --provider groq --model llama-3.3-70b-versatile
@@ -298,7 +298,7 @@ the registry. The three external project tools stay unregistered until
 | Tool | Type | Description |
 |------|------|-------------|
 | `Bash` | Write | Execute shell commands |
-| `FileRead` | Read | Read file contents, prefixing each line with `N#hhhhhh` (line number and content hash) and recording the file's digest for the session |
+| `FileRead` | Read | Read file contents, prefixing each line with `N#hhhhhh` (line number and content hash) and recording the file's digest for the session; binary files are reported by type and size only |
 | `FileWrite` | Write | Create a file, or overwrite one that was read in this session and has not changed since |
 | `FileEdit` | Write | String or anchor (`N#hhhhhh`) replacement; refused when the file changed since it was read |
 | `Glob` | Read | File pattern matching |
@@ -463,17 +463,17 @@ export BRAVE_API_KEY="..."
 ```yaml
 model:
   provider: anthropic  # or openai, gemini, groq, ollama, etc.
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-5-5
   api_key: ""  # leave empty to use env var
   base_url: ""  # override API endpoint
   max_tokens: 8192
   temperature: 1.0
   max_retries: 2             # same-model retries on a transient failure
   fallback_models:           # tried in order once retries are spent
-    - claude-opus-4-20250514
+    - claude-opus-5-5
     - openai:gpt-4.1         # provider:model switches provider
-  extended_thinking: false   # enable Anthropic extended thinking blocks
-  thinking_budget: 8192      # token budget reserved for extended thinking
+  extended_thinking: false   # adds autonomous tool-use guidance to the prompt; provider-side thinking is not sent yet
+  thinking_budget: 8192      # reserved; not sent to providers yet
 
 permissions:
   mode: default              # default, accept-edits, bypass, plan

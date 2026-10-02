@@ -7,7 +7,7 @@ model:
   provider: ""
 
   # Model name — provider auto-detected from prefix
-  # Anthropic: claude-sonnet-4-20250514, claude-opus-4-20250514
+  # Anthropic: claude-sonnet-5-5, claude-opus-5-5
   # OpenAI: gpt-4.1, gpt-4o, o3
   # Gemini: gemini-2.5-flash, gemini-2.5-pro
   # Groq: llama-3.3-70b-versatile, llama-3.1-8b-instant
@@ -22,7 +22,7 @@ model:
   # Perplexity: sonar-pro, sonar-reasoning-pro
   # Fireworks AI: accounts/fireworks/models/llama-v3p3-70b-instruct
   # Cerebras: llama-3.3-70b, qwen-3-32b
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-5-5
 
   # Leave empty to use provider's env var
   # Anthropic: ANTHROPIC_API_KEY
@@ -63,10 +63,11 @@ model:
   # Fallback models tried in order on 429/529/503/timeout errors
   fallback_models: []
 
-  # Enable extended thinking (activated automatically by ultrawork/ulw keywords)
+  # Adds autonomous tool-use guidance to the prompt (the ultrawork/ulw keyword turns it on
+  # per prompt). Provider-side thinking is not sent yet.
   extended_thinking: false
 
-  # Max tokens allocated for extended thinking
+  # Reserved for provider-side thinking; not sent to any provider yet
   thinking_budget: 8192
 
   # Render <think>...</think> blocks as a dim italic prefix above the answer.
