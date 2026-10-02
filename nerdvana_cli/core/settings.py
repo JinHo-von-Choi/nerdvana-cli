@@ -89,6 +89,8 @@ class SessionConfig(BaseModel):
     # After a file edit, ask the language server (when one is running) for
     # errors the edit introduced and append them to the tool result.
     post_edit_diagnostics: bool = True
+    # Sub-agents (Agent, Swarm) running at once against one provider.
+    max_parallel_agents: int = 5
 
 
 class ParismConfig(BaseModel):
