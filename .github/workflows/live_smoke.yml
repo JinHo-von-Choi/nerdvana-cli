@@ -41,6 +41,6 @@ jobs:
         with:
           enable-cache: true
           python-version: "3.12"
-      - run: uv sync --extra dev --extra mcp
+      - run: uv sync --locked --extra dev --extra mcp
       - name: Run live smoke
         run: uv run pytest tests/live -m live -q
