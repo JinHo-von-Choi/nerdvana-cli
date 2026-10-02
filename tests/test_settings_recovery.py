@@ -175,3 +175,9 @@ class TestStartupDisplay:
         NerdvanaApp._show_load_warnings(stub)  # type: ignore[arg-type]
 
         assert shown == []
+
+
+def test_saved_provider_keys_are_not_reported_as_unknown(tmp_path: Path) -> None:
+    """``api_keys`` is written by /provider and must load without a warning."""
+    settings = NerdvanaSettings.load(_write(tmp_path, "api_keys:\n  openai: sk-test\n"))
+    assert settings.load_warnings == []

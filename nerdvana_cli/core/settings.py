@@ -118,6 +118,8 @@ _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.af
 _TOP_LEVEL_KEYS = frozenset({
     "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
+    # Per-provider keys saved by /provider and read back by the model commands.
+    "api_keys",
 })
 
 # Fields that are never softened. The sentinel marks a section whose every
