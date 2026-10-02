@@ -237,7 +237,7 @@ class TestCheckLspServers:
         from nerdvana_cli.commands.doctor_command import _check_lsp_servers
 
         def _which(binary: str) -> str | None:
-            return "/usr/bin/pyright" if binary == "pyright" else None
+            return "/usr/bin/pyright-langserver" if binary == "pyright-langserver" else None
 
         with patch("shutil.which", side_effect=_which):
             r = _check_lsp_servers()

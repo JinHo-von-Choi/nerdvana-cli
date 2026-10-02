@@ -231,7 +231,11 @@ class LanguageServerSymbol:
     kind_int:
         Raw LSP SymbolKind integer.
     location:
-        Definition location.
+        Start of the whole definition, decorators included.
+    name_location:
+        Position of the symbol's name (LSP ``selectionRange``); position-based
+        requests such as references must use it, because a decorated
+        definition starts on the decorator line.
     children:
         Nested child symbols (depth-limited by retriever).
     detail:
@@ -245,6 +249,7 @@ class LanguageServerSymbol:
     location:  Location
     children:  list[LanguageServerSymbol]  = field(default_factory=list)
     detail:    str                         = ""
+    name_location: Location | None         = None
 
     # -- helpers --
 
@@ -294,6 +299,15 @@ def _sym_from_dict(
         line      = (start.get("line") or 0) + 1,   # convert to 1-based
         character = start.get("character") or 0,
     )
+    selection     = (raw.get("selectionRange") or {}).get("start")
+    name_location = (
+        Location(
+            file_path = file_path,
+            line      = (selection.get("line") or 0) + 1,
+            character = selection.get("character") or 0,
+        )
+        if selection else None
+    )
 
     children: list[LanguageServerSymbol] = []
     if depth < max_depth:
@@ -303,13 +317,14 @@ def _sym_from_dict(
             )
 
     return LanguageServerSymbol(
-        name      = name,
-        name_path = name_path,
-        kind      = kind_name,
-        kind_int  = kind_int,
-        location  = location,
-        children  = children,
-        detail    = detail,
+        name          = name,
+        name_path     = name_path,
+        kind          = kind_name,
+        kind_int      = kind_int,
+        location      = location,
+        children      = children,
+        detail        = detail,
+        name_location = name_location,
     )
 
 
@@ -426,7 +441,7 @@ class LanguageServerSymbolRetriever:
 
         Delegates to ``textDocument/references`` via ``LspClient.find_references``.
         """
-        loc       = symbol.location
+        loc       = symbol.name_location or symbol.location
         file_path = loc.file_path
         line      = loc.line
         name      = symbol.name
