@@ -113,6 +113,17 @@ class HookConfig(BaseModel):
     allow_project_hooks: bool = False
 
 
+class SandboxConfig(BaseModel):
+    # Confine shell commands to a write scope with the operating system (Linux
+    # Landlock). "off" changes nothing, "auto" confines where the system supports it and
+    # warns once where it does not, "require" refuses to run a command it cannot confine.
+    mode: Literal["off", "auto", "require"] = "off"
+    # False also refuses TCP connections and binds from the command (needs Linux 6.7).
+    network: bool = True
+    # Writable in addition to the project directory and the temporary directories.
+    write_paths: list[str] = Field(default_factory=list)
+
+
 class CheckpointConfig(BaseModel):
     enabled: bool = True
     per_session_max: int = 50
@@ -122,7 +133,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -133,6 +144,7 @@ _TOP_LEVEL_KEYS = frozenset({
 _ALL_FIELDS_STRICT = frozenset({"*"})
 _MODEL_STRICT_FIELDS = frozenset({"api_key"})
 _HOOKS_STRICT_FIELDS = frozenset({"allow_project_hooks"})
+_SANDBOX_STRICT_FIELDS = frozenset({"mode", "network"})
 
 
 def _strict_bool(path: str, value: object) -> bool:
@@ -204,6 +216,23 @@ class SkillsConfig(BaseModel):
     include_claude_skills: bool = False
 
 
+class AgentsConfig(BaseModel):
+    # Category name -> model for sub-agents, written "model" or "provider:model".
+    # An agent type or an Agent call that names a category runs on the mapped model.
+    categories: dict[str, str] = Field(default_factory=dict)
+
+
+# Sections read from the config file as they are, with the fields that must never be softened.
+_PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
+    ("parism",     ParismConfig,     frozenset()),
+    ("hooks",      HookConfig,       _HOOKS_STRICT_FIELDS),
+    ("checkpoint", CheckpointConfig, frozenset()),
+    ("skills",     SkillsConfig,     frozenset()),
+    ("sandbox",    SandboxConfig,    _SANDBOX_STRICT_FIELDS),
+    ("agents",     AgentsConfig,     frozenset()),
+)
+
+
 class NerdvanaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NERDVANA_", env_file=".env", extra="ignore")
 
@@ -214,6 +243,8 @@ class NerdvanaSettings(BaseSettings):
     hooks: HookConfig = Field(default_factory=HookConfig)
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    agents: AgentsConfig = Field(default_factory=AgentsConfig)
+    sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.
@@ -278,14 +309,9 @@ class NerdvanaSettings(BaseSettings):
                         session_data = {**session_data, "default_mode": "planning"}
                     settings.session = _build_section(SessionConfig, "session", session_data, warnings)
                     user_set_context = "max_context_tokens" in settings.session.model_fields_set
-                if "parism" in data:
-                    settings.parism = _build_section(ParismConfig, "parism", data["parism"], warnings)
-                if "hooks" in data:
-                    settings.hooks = _build_section(HookConfig, "hooks", data["hooks"], warnings, _HOOKS_STRICT_FIELDS)
-                if "checkpoint" in data:
-                    settings.checkpoint = _build_section(CheckpointConfig, "checkpoint", data["checkpoint"], warnings)
-                if "skills" in data:
-                    settings.skills = _build_section(SkillsConfig, "skills", data["skills"], warnings)
+                for name, section_cls, strict in _PLAIN_SECTIONS:
+                    if name in data:
+                        setattr(settings, name, _build_section(section_cls, name, data[name], warnings, strict))
                 if "external_projects_enabled" in data:
                     settings.external_projects_enabled = _strict_bool(
                         "external_projects_enabled", data["external_projects_enabled"],

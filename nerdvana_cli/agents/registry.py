@@ -14,6 +14,8 @@ class AgentDefinition:
     max_turns:     int       = 50
     allowed_tools: list[str] = field(default_factory=lambda: ["*"])
     system_prompt: str       = ""
+    model:         str       = ""
+    category:      str       = ""
 
 
 class AgentTypeRegistry:
@@ -60,6 +62,8 @@ class AgentTypeRegistry:
                     max_turns     = int(data.get("max_turns", 50)),
                     allowed_tools = list(data.get("allowed_tools", ["*"])),
                     system_prompt = data.get("system_prompt", ""),
+                    model         = str(data.get("model", "") or ""),
+                    category      = str(data.get("category", "") or ""),
                 )
                 self.register(defn)
             except Exception:  # noqa: BLE001

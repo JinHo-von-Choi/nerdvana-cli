@@ -7,6 +7,7 @@ import copy
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
@@ -21,6 +22,7 @@ class SwarmTask:
     prompt:        str
     subagent_type: str = "general-purpose"
     model:         str = ""
+    category:      str = ""
 
 
 @dataclass
@@ -59,8 +61,7 @@ async def run_swarm(
 
         child_settings            = copy.deepcopy(config.settings)
         child_settings.session.max_turns = config.max_turns
-        if task.model:
-            child_settings.model.model = task.model
+        apply_model_spec(child_settings, select_model(task.model, task.category, "", "", child_settings.agents.categories))
 
         child_registry = registry_factory(child_settings)
         sub_config     = SubagentConfig(

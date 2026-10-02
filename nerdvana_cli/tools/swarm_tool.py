@@ -47,6 +47,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
                         "prompt":        {"type": "string"},
                         "subagent_type": {"type": "string"},
                         "model":         {"type": "string"},
+                        "category":      {"type": "string"},
                     },
                     "required": ["name", "prompt"],
                 },
@@ -90,6 +91,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
                 prompt        = t["prompt"],
                 subagent_type = t.get("subagent_type", "general-purpose"),
                 model         = t.get("model", ""),
+                category      = t.get("category", ""),
             )
             for t in args.tasks
         ]

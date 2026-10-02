@@ -171,6 +171,20 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 |-------|------|---------|-------------|
 | `include_claude_skills` | bool | `false` | Also load skills from `~/.claude/skills` and `<cwd>/.claude/skills`, one tier below the matching nerdvana skill directories. Only each skill's `SKILL.md` is read; bundled files are never run. |
 
+### `sandbox` (SandboxConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | string | `off` | `off`, `auto` (confine where the system supports it) or `require` (refuse a command that cannot be confined). An invalid value stops startup. See [sandbox.md](sandbox.md). |
+| `network` | bool | `true` | `false` also refuses TCP connections and binds from the confined command; needs Linux 6.7 (Landlock ABI 4). |
+| `write_paths` | list | `[]` | Paths a confined command may write in addition to the project directory and the temporary directories. |
+
+### `agents` (AgentsConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `categories` | map | `{}` | Category name to model for sub-agents, written `model` or `provider:model`. An `Agent` call, a `Swarm` task or an agent definition that names a category runs on the mapped model; see [agents.md](agents.md). |
+
 ### `checkpoint` (CheckpointConfig)
 
 | Field | Type | Default | Description |
