@@ -131,3 +131,10 @@ async def test_executor_applies_policy_before_running_the_tool(tmp_path: Any) ->
     )
     assert results[0].is_error
     assert "always_deny" in results[0].content
+
+
+def test_requires_confirmation_asks_outside_yolo() -> None:
+    tool = _Tool("TaskStop", ToolCategory.META)
+    tool.requires_confirmation = True  # type: ignore[misc]
+    assert PermissionPolicy().decide(tool, ALLOW).behavior == PermissionBehavior.ASK
+    assert PermissionPolicy(trust_level="yolo").decide(tool, ALLOW).behavior == PermissionBehavior.ALLOW
