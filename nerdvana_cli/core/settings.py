@@ -86,6 +86,9 @@ class SessionConfig(BaseModel):
     # between two events, total the longest single response.
     stream_idle_timeout:  float = 300.0
     stream_total_timeout: float = 3600.0
+    # After a file edit, ask the language server (when one is running) for
+    # errors the edit introduced and append them to the tool result.
+    post_edit_diagnostics: bool = True
 
 
 class ParismConfig(BaseModel):

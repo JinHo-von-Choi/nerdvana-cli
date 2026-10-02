@@ -11,6 +11,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
@@ -25,6 +27,10 @@ if TYPE_CHECKING:
     from nerdvana_cli.core.hooks import HookEngine
 
 logger = logging.getLogger(__name__)
+
+# Post-edit diagnostics: per-request time limit and how many new errors to list.
+_DIAGNOSTICS_TIMEOUT = 8.0
+_MAX_REPORTED_ERRORS = 10
 
 
 class ToolExecutor:
@@ -227,12 +233,16 @@ class ToolExecutor:
 
         output_dir = paths.user_data_home() / "tool-output" / str(context.state.get("session_id") or "default")
         dir_token  = TOOL_OUTPUT_DIR.set(str(output_dir))
+        edited     = self._diagnosable_edit(tool_use["name"], parsed_args, context)
+        baseline   = await self._error_messages(edited) if edited else None
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
             result.content     = tool.truncate_result(result.content)
             if result.is_error:
                 success = False
+            elif edited and baseline is not None:
+                result.content += await self._new_errors_note(edited, baseline)
             result_text = result.content
             return result
         except Exception as exc:  # noqa: BLE001
@@ -378,6 +388,55 @@ class ToolExecutor:
             self._checkpoint_manager.before_edit(tool_name, targets)
         except Exception as exc:  # noqa: BLE001
             logger.warning("checkpoint: capture failed before %s: %s", tool_name, exc)
+
+    def _diagnosable_edit(self, tool_name: str, parsed_args: Any, context: ToolContext) -> str | None:
+        """Absolute path of the file an edit will change, when diagnostics can check it."""
+        if tool_name not in self._EDIT_TOOL_NAMES or self._lsp_client() is None:
+            return None
+        session = getattr(self._settings, "session", None)
+        if not getattr(session, "post_edit_diagnostics", True):
+            return None
+        if not getattr(parsed_args, "apply", True):
+            return None
+        targets = self._edit_targets(parsed_args)
+        return os.path.join(context.cwd, targets[0]) if targets else None
+
+    def _lsp_client(self) -> Any | None:
+        """The language-server client behind the registered diagnostics tool, if any."""
+        tool = self._registry.get("lsp_diagnostics")
+        return getattr(tool, "_client", None) if tool is not None else None
+
+    async def _error_messages(self, path: str) -> list[dict[str, Any]] | None:
+        """Error-level diagnostics for *path*, or None when they could not be read in time."""
+        client = self._lsp_client()
+        if client is None:
+            return None
+        try:
+            diagnostics = await asyncio.wait_for(client.diagnostics(path), timeout=_DIAGNOSTICS_TIMEOUT)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("post-edit diagnostics skipped for %s: %s", path, exc)
+            return None
+        return [d for d in diagnostics if d.get("severity") == "error"]
+
+    async def _new_errors_note(self, path: str, baseline: list[dict[str, Any]]) -> str:
+        """Describe errors present after the edit that were not there before it."""
+        after = await self._error_messages(path)
+        if not after:
+            return ""
+        remaining = Counter(str(d.get("message", "")) for d in baseline)
+        fresh: list[dict[str, Any]] = []
+        for diagnostic in after:
+            message = str(diagnostic.get("message", ""))
+            if remaining[message] > 0:
+                remaining[message] -= 1
+            else:
+                fresh.append(diagnostic)
+        if not fresh:
+            return ""
+        lines = [f"- line {d.get('line', '?')}: {d.get('message', '')}" for d in fresh[:_MAX_REPORTED_ERRORS]]
+        more  = len(fresh) - len(lines)
+        tail  = f"\n- ... and {more} more" if more > 0 else ""
+        return "\n\nNew errors reported by the language server after this edit:\n" + "\n".join(lines) + tail
 
     def _edit_targets(self, parsed_args: Any) -> list[str]:
         """Return the file paths carried by a parsed edit-tool argument object."""

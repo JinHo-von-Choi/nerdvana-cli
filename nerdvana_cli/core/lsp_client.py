@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import atexit
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -106,6 +107,7 @@ class LspClient:
         self._req_id:       int       = 0
         self._disabled:     set[str]  = set()
         self._open_files:   dict[str, int] = {}  # abs_path -> version
+        self._open_digests: dict[str, str] = {}  # abs_path -> sha256 of the text last sent
         self._locks:        dict[str, asyncio.Lock] = {}   # ext -> stdio lock
         self._parked:       dict[
             asyncio.subprocess.Process, dict[int, dict[str, Any]]
@@ -273,11 +275,14 @@ class LspClient:
         return lock
 
     async def _ensure_open(self, ext: str, file_path: str) -> None:
-        """Send textDocument/didOpen once; subsequent calls are no-ops."""
+        """Open the document on first use and resend it whenever it changed on disk.
+
+        Edits happen through the file tools, not through the language server,
+        so the server only learns about them here: a changed file is sent in
+        full with ``textDocument/didChange`` under the next version number.
+        """
         abs_path = str(Path(file_path).resolve())
         async with self._lock_for(ext):
-            if abs_path in self._open_files:
-                return
             try:
                 text = await asyncio.to_thread(
                     Path(abs_path).read_text, encoding="utf-8"
@@ -285,23 +290,37 @@ class LspClient:
             except OSError:
                 return
 
-            lang_id = _ext_to_language_id(Path(file_path).suffix)
-            uri     = Path(abs_path).as_uri()
-            version = 1
-            self._open_files[abs_path] = version
+            uri    = Path(abs_path).as_uri()
+            digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            if abs_path in self._open_files:
+                if self._open_digests.get(abs_path) == digest:
+                    return
+                version = self._open_files[abs_path] + 1
+                notif   = json.dumps({
+                    "jsonrpc": "2.0",
+                    "method":  "textDocument/didChange",
+                    "params":  {
+                        "textDocument":   {"uri": uri, "version": version},
+                        "contentChanges": [{"text": text}],
+                    },
+                })
+            else:
+                version = 1
+                notif   = json.dumps({
+                    "jsonrpc": "2.0",
+                    "method":  "textDocument/didOpen",
+                    "params":  {
+                        "textDocument": {
+                            "uri":        uri,
+                            "languageId": _ext_to_language_id(Path(file_path).suffix),
+                            "version":    version,
+                            "text":       text,
+                        }
+                    },
+                })
+            self._open_files[abs_path]   = version
+            self._open_digests[abs_path] = digest
 
-            notif = json.dumps({
-                "jsonrpc": "2.0",
-                "method":  "textDocument/didOpen",
-                "params":  {
-                    "textDocument": {
-                        "uri":        uri,
-                        "languageId": lang_id,
-                        "version":    version,
-                        "text":       text,
-                    }
-                },
-            })
             nh = f"Content-Length: {len(notif)}\r\n\r\n"
             try:
                 proc = await self._get_proc(ext)
@@ -310,6 +329,7 @@ class LspClient:
                 await proc.stdin.drain()
             except LspError:
                 self._open_files.pop(abs_path, None)
+                self._open_digests.pop(abs_path, None)
 
     async def _request(
         self, ext: str, method: str, params: dict[str, Any],
