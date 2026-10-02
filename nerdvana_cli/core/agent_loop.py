@@ -11,7 +11,6 @@ import json
 import logging
 import math
 import re
-import uuid
 from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -39,6 +38,7 @@ from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
+from nerdvana_cli.core.tool_ids import collect_tool_use_ids, new_tool_use_id, repair_tool_ids
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
 from nerdvana_cli.providers.factory import create_provider
@@ -605,6 +605,11 @@ class AgentLoop:
                 if self.settings.verbose:
                     self.console.print(f"[dim]Turn {state.iteration} — {len(self.state.messages)} messages[/dim]")
 
+                repaired = repair_tool_ids(self.state.messages)
+                if repaired:
+                    logger.warning("renumbered %d duplicate tool call id(s) in the history", repaired)
+                used_ids   = collect_tool_use_ids(self.state.messages)
+                seen_calls: set[tuple[str, str, str]] = set()
                 messages = self._to_provider_messages()
                 if self._fire_before_api_call(tools):
                     messages = self._to_provider_messages()
@@ -634,11 +639,15 @@ class AgentLoop:
                                 with _cl.suppress(Exception):
                                     self._on_thinking_chunk(thinking_buffer)
                         elif ev.type == "tool_use_complete":
-                            tool_uses.append({
-                                "id": ev.tool_use_id or f"call_{ev.tool_name}_{uuid.uuid4().hex[:8]}",
-                                "name": ev.tool_name,
-                                "input": ev.tool_input_complete or {},
-                            })
+                            call: dict[str, Any] = {"id": ev.tool_use_id or "", "name": ev.tool_name, "input": ev.tool_input_complete or {}}
+                            signature = (call["id"], call["name"], json.dumps(call["input"], sort_keys=True, default=str))
+                            if signature in seen_calls:
+                                continue  # a provider echoed a call it already sent; run it once
+                            seen_calls.add(signature)
+                            if not call["id"] or call["id"] in used_ids:
+                                call["id"] = new_tool_use_id(call["name"], used_ids)
+                            used_ids.add(call["id"])
+                            tool_uses.append(call)
                         elif ev.type == "usage" and ev.usage:
                             self.state.usage.input_tokens  = ev.usage.get("input_tokens", 0)
                             self.state.usage.output_tokens = ev.usage.get("output_tokens", 0)
@@ -670,6 +679,9 @@ class AgentLoop:
                             elif stop == "tool_use" and tool_uses:
                                 async for status in self._handle_tool_use_stop(asst_text, tool_uses, tool_ctx):
                                     yield status
+                                # ``done`` ends the response. Reading on would run the same
+                                # calls again if the provider repeats its final chunk.
+                                break
                             else:
                                 logger.warning("Unhandled stop_reason: %s", stop)
                                 if asst_text:
@@ -745,6 +757,7 @@ class AgentLoop:
         """Non-streaming fallback when provider streaming fails."""
         for _ in range(10):
             self._fire_before_api_call(tools)
+            repair_tool_ids(self.state.messages)
             try:
                 result = await self.provider.send(system_prompt, self._to_provider_messages(), tools)
             except Exception as e:

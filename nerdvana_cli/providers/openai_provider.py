@@ -40,6 +40,21 @@ def _is_stream_options_unsupported(exc: BaseException) -> bool:
     return getattr(exc, "status_code", None) in _UNSUPPORTED_PARAM_STATUS
 
 
+def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:
+    """Map an OpenAI-style ``finish_reason`` to the loop's stop reasons.
+
+    Some servers report ``stop`` (or nothing) on a response that carries tool
+    calls, so the calls themselves decide: a response with calls is a tool_use.
+    """
+    if has_tool_calls and finish_reason in (None, "stop", "tool_calls", "function_call"):
+        return "tool_use"
+    if finish_reason in (None, "stop", "tool_calls", "function_call"):
+        return "end_turn"
+    if finish_reason == "length":
+        return "max_tokens"
+    return finish_reason or "end_turn"
+
+
 def _safe_str(value: Any) -> str:
     """Safely convert any value to string, handling encoding errors."""
     if value is None:
@@ -132,7 +147,11 @@ class OpenAIProvider:
                 # Fallback without stream_options
                 stream = await client.chat.completions.create(**create_kwargs)
 
-            current_tool_calls: dict[int, dict[str, str]] = {}
+            # One slot per tool call, in arrival order. A provider may reuse an
+            # index for a different call, so a new id on a used index opens a new slot.
+            slots:         list[dict[str, str]]         = []
+            slot_by_index: dict[int | None, dict[str, str]] = {}
+            finish_reason: str | None                   = None
             usage_received = False
             total_completion_chars = 0
             parser = ThinkBlockParser()
@@ -165,61 +184,62 @@ class OpenAIProvider:
                     # Tool call deltas
                     if choice.delta.tool_calls:
                         for tc in choice.delta.tool_calls:
-                            idx = tc.index
-                            if idx not in current_tool_calls:
-                                current_tool_calls[idx] = {
-                                    "id": tc.id or "",
-                                    "name": _safe_str(tc.function.name if tc.function else ""),
-                                    "arguments": "",
-                                }
+                            call_id = tc.id or ""
+                            slot    = slot_by_index.get(tc.index)
+                            if slot is not None and call_id and slot["id"] and call_id != slot["id"]:
+                                slot = None
+                            if slot is None:
+                                slot = {"id": call_id, "name": "", "arguments": ""}
+                                slots.append(slot)
+                                slot_by_index[tc.index] = slot
+                            if call_id and not slot["id"]:
+                                slot["id"] = call_id
+                            if tc.function:
+                                if tc.function.name and not slot["name"]:
+                                    slot["name"] = _safe_str(tc.function.name)
+                                if tc.function.arguments:
+                                    slot["arguments"] += _safe_str(tc.function.arguments)
 
-                            if tc.function and tc.function.arguments:
-                                current_tool_calls[idx]["arguments"] += _safe_str(tc.function.arguments)
-
-                    # Finish
-                    if choice.finish_reason:
-                        stop_reason = (
-                            "end_turn"
-                            if choice.finish_reason == "stop"
-                            else ("tool_use" if choice.finish_reason == "tool_calls" else choice.finish_reason)
-                        )
-
-                        if choice.finish_reason == "tool_calls":
-                            for _idx, tc in current_tool_calls.items():
-                                try:
-                                    input_data = json.loads(tc["arguments"]) if tc["arguments"] else {}
-                                except (json.JSONDecodeError, UnicodeDecodeError):
-                                    input_data = {}
-
-                                yield ProviderEvent(
-                                    type="tool_use_complete",
-                                    tool_use_id=tc["id"],
-                                    tool_name=tc["name"],
-                                    tool_input_complete=input_data,
-                                )
-
-                        # Flush any buffered think-block content
-                        final = parser.flush()
-                        if final.content:
-                            yield ProviderEvent(type="content_delta", content=final.content)
-                        if final.thinking:
-                            yield ProviderEvent(type="thinking_delta", thinking=final.thinking)
-
-                        # Emit estimated usage if no usage event received
-                        if not usage_received and total_completion_chars > 0:
-                            yield ProviderEvent(
-                                type="usage",
-                                usage={
-                                    "input_tokens": len(str(api_messages)) // 4,
-                                    "output_tokens": total_completion_chars // 4,
-                                },
-                            )
-
-                        yield ProviderEvent(type="done", stop_reason=stop_reason)
+                    # The first finish reason wins; later chunks may repeat it.
+                    if choice.finish_reason and finish_reason is None:
+                        finish_reason = choice.finish_reason
 
                 except UnicodeDecodeError:
                     # Skip chunks with encoding issues — next chunk will be fine
                     continue
+
+            # The response is complete: emit what it contained exactly once.
+            final = parser.flush()
+            if final.content:
+                yield ProviderEvent(type="content_delta", content=final.content)
+            if final.thinking:
+                yield ProviderEvent(type="thinking_delta", thinking=final.thinking)
+
+            stop_reason = _stop_reason(finish_reason, bool(slots))
+            if stop_reason == "tool_use":
+                for slot in slots:
+                    try:
+                        input_data = json.loads(slot["arguments"]) if slot["arguments"] else {}
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        input_data = {}
+                    yield ProviderEvent(
+                        type="tool_use_complete",
+                        tool_use_id=slot["id"],
+                        tool_name=slot["name"],
+                        tool_input_complete=input_data,
+                    )
+
+            # Emit estimated usage if no usage event received
+            if not usage_received and total_completion_chars > 0:
+                yield ProviderEvent(
+                    type="usage",
+                    usage={
+                        "input_tokens": len(str(api_messages)) // 4,
+                        "output_tokens": total_completion_chars // 4,
+                    },
+                )
+
+            yield ProviderEvent(type="done", stop_reason=stop_reason)
 
         except UnicodeDecodeError as e:
             yield ProviderEvent(
