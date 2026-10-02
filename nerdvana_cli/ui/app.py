@@ -11,6 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from rich.markup import escape
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
@@ -276,7 +277,18 @@ class NerdvanaApp(App[object]):
             with contextlib.suppress(Exception):
                 self.query_one("#activity-indicator", ActivityIndicator).styles.display = "none"
 
+        self._show_load_warnings()
         self._check_update_task = asyncio.create_task(self._check_update())
+
+    def _show_load_warnings(self) -> None:
+        """Show config problems recovered during loading, once at startup."""
+        warnings = getattr(self.settings, "load_warnings", None)
+        if not isinstance(warnings, list) or not warnings:
+            return
+        lines = "\n".join(f"  {w.format()}" for w in warnings)
+        self._add_chat_message(
+            f"[yellow]Config warnings (run `nerdvana doctor` for details):[/yellow]\n{escape(lines)}",
+        )
 
     def _refresh_mcp_section(self) -> None:
         """Update sidebar MCP section from mcp_manager.get_status()."""

@@ -500,7 +500,8 @@ class TestDoctorCliCommand:
         assert "checks"    in data
         assert "exit_code" in data
         assert isinstance(data["checks"], list)
-        assert len(data["checks"]) == 9
+        from nerdvana_cli.commands.doctor_command import _ALL_CHECKS
+        assert len(data["checks"]) == len(_ALL_CHECKS)
         for item in data["checks"]:
             assert "name"   in item
             assert "status" in item
