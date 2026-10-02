@@ -103,7 +103,9 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [verify-tag, build, smoke]
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    # Runs once the PyPI trusted publisher exists and the repository variable
+    # PYPI_PUBLISH is set to true.
+    if: github.event_name == 'push' && github.ref_type == 'tag' && vars.PYPI_PUBLISH == 'true'
     runs-on: ubuntu-22.04
     environment:
       name: pypi
@@ -125,7 +127,7 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    needs: [verify-tag, publish-pypi]
+    needs: [verify-tag, build, smoke]
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-22.04
     permissions:
