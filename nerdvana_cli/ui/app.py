@@ -23,7 +23,7 @@ from textual.widgets.option_list import Option
 from nerdvana_cli import __version__
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
@@ -238,7 +238,8 @@ class NerdvanaApp(App[object]):
             task_registry = self._task_registry,
             team_registry = team_registry,
         )
-        session  = SessionStorage()
+        resume_id = resume_session_id()
+        session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
 
         _on_activity_change = make_activity_change_callback(self, threading.get_ident())
 
@@ -251,6 +252,9 @@ class NerdvanaApp(App[object]):
             on_activity_change = _on_activity_change,
             on_ask_user        = self._ask_user_prompt,
         )
+        if resume_id:
+            restored = self._agent_loop.restore_history()
+            self.notify(f"Resumed session {resume_id}: {restored} message(s) restored.")
 
         self._update_banner()
 

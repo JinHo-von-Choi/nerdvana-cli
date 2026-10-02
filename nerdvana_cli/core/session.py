@@ -4,24 +4,82 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.types import Message, Role
+
+# Transcript tool results are capped at this many characters when recorded.
+_TRANSCRIPT_RESULT_CAP = 500
+_SESSION_ID_RE         = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+def resume_session_id() -> str | None:
+    """Session id requested through ``NERDVANA_RESUME``, or None.
+
+    Values that could escape the sessions directory are ignored.
+    """
+    raw = os.environ.get("NERDVANA_RESUME", "").strip()
+    if not raw or raw in {".", ".."} or not _SESSION_ID_RE.match(raw):
+        return None
+    return raw
+
+
+def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
+    """Rebuild conversation messages from transcript *entries*.
+
+    Tool calls and results are kept only in complete pairs: a tool_use whose
+    result was never recorded (the process stopped mid-batch) is removed from
+    its assistant message, and a result whose tool_use is missing is dropped.
+    Providers reject either half on its own.
+    """
+    answered = {str(e.get("tool_use_id", "")) for e in entries if e.get("type") == "tool_result"}
+    known:    set[str]      = set()
+    messages: list[Message] = []
+    for entry in entries:
+        kind = entry.get("type")
+        if kind == "user":
+            messages.append(Message(role=Role.USER, content=str(entry.get("content", ""))))
+        elif kind == "assistant":
+            uses = [tu for tu in entry.get("tool_uses") or [] if str(tu.get("id", "")) in answered]
+            known.update(str(tu.get("id", "")) for tu in uses)
+            content = str(entry.get("content", ""))
+            if content or uses:
+                messages.append(Message(role=Role.ASSISTANT, content=content, tool_uses=uses))
+        elif kind == "tool_result":
+            tool_use_id = str(entry.get("tool_use_id", ""))
+            if tool_use_id not in known:
+                continue
+            content = str(entry.get("content", ""))
+            if len(content) >= _TRANSCRIPT_RESULT_CAP:
+                content += "\n[truncated in the session transcript; re-run the tool if the full output matters]"
+            messages.append(Message(
+                role        = Role.TOOL,
+                content     = content,
+                tool_use_id = tool_use_id,
+                is_error    = bool(entry.get("is_error", False)),
+            ))
+    return messages
 
 
 class SessionStorage:
     """Append-only JSONL session transcript."""
 
-    def __init__(self, session_id: str | None = None, storage_dir: str = ""):
+    def __init__(self, session_id: str | None = None, storage_dir: str = "", persist: bool = True):
         self.session_id = session_id or str(uuid.uuid4())[:8]
+        self.persist    = persist
         base_dir = storage_dir or str(paths.user_sessions_dir())
-        os.makedirs(base_dir, exist_ok=True)
+        if persist:
+            os.makedirs(base_dir, exist_ok=True)
         self.file_path = os.path.join(base_dir, f"{self.session_id}.jsonl")
 
     def record(self, event_type: str, data: dict[str, Any]) -> None:
+        if not self.persist:
+            return
         entry = {
             "ts": datetime.now(UTC).isoformat(),
             "type": event_type,
@@ -42,7 +100,7 @@ class SessionStorage:
             {
                 "tool_name":  tool_name,
                 "tool_use_id": tool_use_id,
-                "content":    content[:500],
+                "content":    content[:_TRANSCRIPT_RESULT_CAP],
                 "is_error":   is_error,
             },
         )
@@ -75,6 +133,10 @@ class SessionStorage:
                 if line:
                     messages.append(json.loads(line))
         return messages
+
+    def load_messages(self) -> list[Message]:
+        """Conversation messages recorded in this session's transcript."""
+        return messages_from_transcript(self.replay())
 
     @classmethod
     def get_last_session(cls, storage_dir: str = "") -> str | None:
