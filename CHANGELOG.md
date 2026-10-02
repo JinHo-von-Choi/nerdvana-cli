@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - The language server is sent the new contents of a file that changed since it was opened.
 - `uv.lock` is tracked and CI installs from it.
 
+### Fixed
+
+- The Python language server is started as `pyright-langserver --stdio`; it was started as the `pyright` command-line checker, which exits at once, so LSP and symbol tools were unavailable with pyright. Servers that speak stdio by default (`pylsp`, `gopls`, `rust-analyzer`) are no longer passed `--stdio`. `doctor` looks for `pyright-langserver`.
+- References for a decorated definition are looked up at the symbol's name instead of its decorator line.
+- `/clear` ends the session before emptying the history, so `SESSION_END` hooks see the conversation.
+- The `api_keys` section written by `/provider` loads without an unknown-key warning.
+
 ### Removed
 
 - `TeamCreate` and `SendMessage`, which had no receiving side.
