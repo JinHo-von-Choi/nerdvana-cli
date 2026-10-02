@@ -440,6 +440,7 @@ model:
   max_tokens: 8192
   temperature: 1.0
   max_retries: 2                   # 일시 오류 시 같은 모델 재시도 횟수
+  prompt_caching: true             # 처리된 프롬프트 앞부분을 요청 사이에 재사용
   fallback_models:                 # 재시도를 다 쓰면 순서대로 사용
     - claude-haiku-4-5-20251001
     - openai:gpt-4.1               # provider:model 이면 제공자도 전환

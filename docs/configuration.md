@@ -74,6 +74,7 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | `max_tokens` | int | `8192` | Max tokens per response |
 | `temperature` | float | `1.0` | Sampling temperature |
 | `fallback_models` | list[str] | `[]` | Models tried in order when a request keeps failing with a transient error (429, 5xx, timeout) or an authentication error. `model` runs under the configured provider; `provider:model` (for example `openai:gpt-4.1`) switches provider and uses that provider's API key. A model that just failed is skipped for 60 seconds. |
+| `prompt_caching` | bool | `true` | Lets the provider reuse the processed system prompt, tool list and conversation prefix between requests. Anthropic requests get explicit cache breakpoints (last tool, system prompt, last message block); OpenAI-compatible servers and Gemini cache on their own and only their cached-token counts are read. Cached reads are billed at a fraction of normal input, and `nerdvana` prices them with the per-model `cache_read_per_1m` and `cache_write_per_1m` rates. |
 | `max_retries` | int | `2` | Retries of the same model, with backoff (or the server's `Retry-After`), before moving to the next fallback. Nothing is retried once part of the answer has streamed. |
 | `extended_thinking` | bool | `false` | Adds autonomous tool-use guidance to the system prompt; the `ultrawork`/`ulw` keyword turns it on for one prompt. It does not yet switch on any provider-side thinking mode. |
 | `thinking_budget` | int | `8192` | Reserved for provider-side thinking. Not yet sent to any provider. |
@@ -178,7 +179,7 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 
 ### Pricing maintenance
 
-`nerdvana_cli/providers/pricing.yml` stores rates as USD per 1,000,000 tokens under the keys `input_per_1m` and `output_per_1m`, which is the unit vendors publish, so a value can be copied from a source table without conversion. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
+`nerdvana_cli/providers/pricing.yml` stores rates as USD per 1,000,000 tokens under the keys `input_per_1m` and `output_per_1m`, which is the unit vendors publish, so a value can be copied from a source table without conversion. An entry may also carry `cache_write_per_1m` and `cache_read_per_1m` for prompt caching; without them cached tokens are billed at `input_per_1m`. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
 
 Scanning for stale entries:
 

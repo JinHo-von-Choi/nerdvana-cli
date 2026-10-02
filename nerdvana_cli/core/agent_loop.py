@@ -230,8 +230,10 @@ class AgentLoop:
             mode       = self.settings.model.provider or None,
             context    = self.settings.cwd or None,
         )
-        self._usage_input_total  = 0
-        self._usage_output_total = 0
+        self._usage_input_total       = 0
+        self._usage_output_total      = 0
+        self._usage_cache_read_total  = 0
+        self._usage_cache_write_total = 0
         self.policy        = PermissionPolicy.from_settings(self.settings)
         self.tool_executor = ToolExecutor(
             registry            = self.registry,
@@ -258,21 +260,48 @@ class AgentLoop:
                 # leaves no trace hides itself for as long as nobody looks.
                 logger.warning("activity change callback failed", exc_info=True)
 
+    def _apply_usage(self, usage: dict[str, int], messages_sent: int | None) -> None:
+        """Fold one request's reported *usage* into the session's counters.
+
+        ``input_tokens`` is the whole prompt; ``cache_read_tokens`` and
+        ``cache_write_tokens`` say how much of it was served from or written to the
+        provider's prompt cache. With *messages_sent* the figure also anchors the
+        context-window estimate.
+        """
+        current = self.state.usage
+        current.input_tokens          = usage.get("input_tokens", 0)
+        current.output_tokens         = usage.get("output_tokens", 0)
+        current.cache_read_tokens     = usage.get("cache_read_tokens", 0)
+        current.cache_creation_tokens = usage.get("cache_write_tokens", 0)
+        self._usage_input_total       += current.input_tokens
+        self._usage_output_total      += current.output_tokens
+        self._usage_cache_read_total  += current.cache_read_tokens
+        self._usage_cache_write_total += current.cache_creation_tokens
+        if messages_sent is not None:
+            self._context_budget.record_usage(current.input_tokens, messages_sent)
+
+    def session_cost_usd(self) -> float:
+        """Estimated USD cost of every provider request made so far in this session."""
+        return self._pricing_table.estimate_cost(
+            self.settings.model.provider or "",
+            self.settings.model.model or "",
+            self._usage_input_total,
+            self._usage_output_total,
+            cache_read_tokens  = self._usage_cache_read_total,
+            cache_write_tokens = self._usage_cache_write_total,
+        )
+
     def _record_session_totals(self) -> None:
         """Refresh the analytics session row with cumulative tokens and cost.
 
         Called at the end of every turn: the loop has no shutdown of its own,
         so the row is kept current rather than written once at exit.
         """
-        cost = self._pricing_table.estimate_cost(
-            self.settings.model.provider or "",
-            self.settings.model.model or "",
-            self._usage_input_total,
-            self._usage_output_total,
-        )
         self._analytics_writer.end_session(
-            token_total = self._usage_input_total + self._usage_output_total,
-            cost_total  = cost,
+            token_total        = self._usage_input_total + self._usage_output_total,
+            cost_total         = self.session_cost_usd(),
+            cache_read_tokens  = self._usage_cache_read_total,
+            cache_write_tokens = self._usage_cache_write_total,
         )
 
     def _fire_before_api_call(self, tools: list[Any]) -> bool:
@@ -302,7 +331,8 @@ class AgentLoop:
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
         pname = ProviderName(self.settings.model.provider) if self.settings.model.provider else None
         return create_provider(provider=pname, model=self.settings.model.model, api_key=self.settings.model.api_key,
-            base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature)
+            base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature,
+            prompt_caching=self.settings.model.prompt_caching)
 
     def restore_history(self) -> int:
         """Load this session's recorded conversation into the live history.
@@ -649,11 +679,7 @@ class AgentLoop:
                             used_ids.add(call["id"])
                             tool_uses.append(call)
                         elif ev.type == "usage" and ev.usage:
-                            self.state.usage.input_tokens  = ev.usage.get("input_tokens", 0)
-                            self.state.usage.output_tokens = ev.usage.get("output_tokens", 0)
-                            self._usage_input_total  += self.state.usage.input_tokens
-                            self._usage_output_total += self.state.usage.output_tokens
-                            self._context_budget.record_usage(self.state.usage.input_tokens, sent_count)
+                            self._apply_usage(ev.usage, sent_count)
                         elif ev.type == "done":
                             stop = ev.stop_reason
                             if stop == "max_tokens":
@@ -770,10 +796,7 @@ class AgentLoop:
             if content:
                 yield content
             if usage:
-                self.state.usage.input_tokens  = usage.get("input_tokens", 0)
-                self.state.usage.output_tokens = usage.get("output_tokens", 0)
-                self._usage_input_total  += self.state.usage.input_tokens
-                self._usage_output_total += self.state.usage.output_tokens
+                self._apply_usage(usage, None)
             if tool_uses:
                 self.state.messages.append(Message(role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses))
                 if content:

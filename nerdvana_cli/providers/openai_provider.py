@@ -40,6 +40,28 @@ def _is_stream_options_unsupported(exc: BaseException) -> bool:
     return getattr(exc, "status_code", None) in _UNSUPPORTED_PARAM_STATUS
 
 
+def _int(value: Any) -> int:
+    """*value* as a non-negative int, 0 for anything that is not a number."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+def _usage_dict(usage: Any) -> dict[str, int]:
+    """Normalise an OpenAI-style usage object.
+
+    ``input_tokens`` is the whole prompt (cached tokens included); the cached part
+    is reported separately as ``cache_read_tokens`` when the server says so.
+    """
+    cached = _int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0))
+    cached = cached or _int(getattr(usage, "prompt_cache_hit_tokens", 0))  # DeepSeek
+    result = {
+        "input_tokens":  _int(getattr(usage, "prompt_tokens", 0)),
+        "output_tokens": _int(getattr(usage, "completion_tokens", 0)),
+    }
+    if cached:
+        result["cache_read_tokens"] = cached
+    return result
+
+
 def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:
     """Map an OpenAI-style ``finish_reason`` to the loop's stop reasons.
 
@@ -161,13 +183,7 @@ class OpenAIProvider:
                     if not chunk.choices:
                         if chunk.usage:
                             usage_received = True
-                            yield ProviderEvent(
-                                type="usage",
-                                usage={
-                                    "input_tokens": getattr(chunk.usage, "prompt_tokens", 0) or 0,
-                                    "output_tokens": getattr(chunk.usage, "completion_tokens", 0) or 0,
-                                },
-                            )
+                            yield ProviderEvent(type="usage", usage=_usage_dict(chunk.usage))
                         continue
 
                     choice = chunk.choices[0]
@@ -304,12 +320,7 @@ class OpenAIProvider:
                             }
                         )
 
-            usage = {}
-            if response.usage:
-                usage = {
-                    "input_tokens": response.usage.prompt_tokens,
-                    "output_tokens": response.usage.completion_tokens,
-                }
+            usage = _usage_dict(response.usage) if response.usage else {}
 
             return {
                 "content": content,

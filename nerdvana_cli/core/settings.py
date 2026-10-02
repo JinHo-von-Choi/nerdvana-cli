@@ -59,6 +59,9 @@ class ModelConfig(BaseModel):
     # Retries of the same model on a transient failure before moving to the
     # next fallback model.
     max_retries: int = 2
+    # Let the provider reuse the processed system prompt, tool list and conversation
+    # prefix between requests (cached reads cost a fraction of normal input).
+    prompt_caching: bool = True
     extended_thinking: bool = False
     thinking_budget: int = 8192
     show_thinking: bool = True

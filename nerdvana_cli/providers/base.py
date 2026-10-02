@@ -83,6 +83,9 @@ class ProviderConfig:
     model: str = ""
     max_tokens: int = 8192
     temperature: float = 1.0
+    # Ask the provider to reuse the processed prompt prefix between requests
+    # (explicit cache breakpoints on Anthropic; the others cache on their own).
+    prompt_caching: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
