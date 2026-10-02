@@ -75,6 +75,27 @@ This installs NerdVana CLI to `~/.nerdvana-cli/` with a virtual environment and 
 
 Requirements: Python >= 3.11, git
 
+### Install from PyPI
+
+Available once the package is published to PyPI. Until then, use the one-line installer above.
+
+```bash
+uv tool install nerdvana-cli
+# or
+pipx install nerdvana-cli
+
+# With every provider SDK
+uv tool install "nerdvana-cli[all]"
+```
+
+Roll back to an earlier release by pinning it:
+
+```bash
+uv tool install nerdvana-cli==<previous-version>
+# or
+pipx install --force nerdvana-cli==<previous-version>
+```
+
 ### Manual install
 
 ```bash
