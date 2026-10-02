@@ -74,6 +74,7 @@ def create_provider(
     base_url: str = "",
     max_tokens: int = 8192,
     temperature: float = 1.0,
+    prompt_caching: bool = True,
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -105,6 +106,7 @@ def create_provider(
         model=model,
         max_tokens=max_tokens,
         temperature=temperature,
+        prompt_caching=prompt_caching,
     )
 
     provider_cls = _PROVIDER_CLASSES.get(provider)

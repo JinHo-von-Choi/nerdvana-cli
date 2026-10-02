@@ -58,7 +58,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     mode        TEXT,
     context     TEXT,
     token_total INTEGER DEFAULT 0,
-    cost_total  REAL    DEFAULT 0.0
+    cost_total  REAL    DEFAULT 0.0,
+    cache_read_tokens  INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0
 );
 """
 
@@ -109,16 +111,32 @@ class PricingTable:
 
     def estimate_cost(
         self,
-        provider:      str,
-        model:         str,
-        input_tokens:  int,
-        output_tokens: int,
+        provider:           str,
+        model:              str,
+        input_tokens:       int,
+        output_tokens:      int,
+        cache_read_tokens:  int = 0,
+        cache_write_tokens: int = 0,
     ) -> float:
-        """Return estimated USD cost. Returns 0.0 for unknown models."""
+        """Return estimated USD cost. Returns 0.0 for unknown models.
+
+        ``input_tokens`` is the whole prompt; the cached part is billed at the
+        entry's ``cache_read_per_1m`` / ``cache_write_per_1m`` and the rest at
+        ``input_per_1m``. An entry without cache rates bills cached tokens at the
+        plain input rate, which is the figure before caching existed.
+        """
         info = self._prices.get(provider.lower(), {}).get(model.lower(), {})
         if not info:
             return 0.0
-        input_cost  = info.get("input_per_1m",  0.0) * input_tokens  / 1_000_000.0
+        input_rate = info.get("input_per_1m", 0.0)
+        read_rate  = info.get("cache_read_per_1m",  input_rate)
+        write_rate = info.get("cache_write_per_1m", input_rate)
+        fresh      = max(input_tokens - cache_read_tokens - cache_write_tokens, 0)
+        input_cost = (
+            input_rate * fresh
+            + read_rate  * cache_read_tokens
+            + write_rate * cache_write_tokens
+        ) / 1_000_000.0
         output_cost = info.get("output_per_1m", 0.0) * output_tokens / 1_000_000.0
         return input_cost + output_cost
 
@@ -192,6 +210,11 @@ class AnalyticsWriter:
         try:
             with _connect(self._db_path) as conn:
                 conn.executescript(_DDL)
+                # Databases created before cache accounting lack these columns.
+                existing = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+                for column in ("cache_read_tokens", "cache_write_tokens"):
+                    if column not in existing:
+                        conn.execute(f"ALTER TABLE sessions ADD COLUMN {column} INTEGER DEFAULT 0")
         except Exception as exc:  # noqa: BLE001
             logger.warning("analytics: failed to initialise schema: %s", exc)
             self._enabled = False
@@ -222,7 +245,13 @@ class AnalyticsWriter:
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: start_session error: %s", exc)
 
-    def end_session(self, token_total: int = 0, cost_total: float = 0.0) -> None:
+    def end_session(
+        self,
+        token_total:        int   = 0,
+        cost_total:         float = 0.0,
+        cache_read_tokens:  int   = 0,
+        cache_write_tokens: int   = 0,
+    ) -> None:
         """Record session end and update totals."""
         if not self._enabled or not self._session_id:
             return
@@ -231,9 +260,10 @@ class AnalyticsWriter:
             with _connect(self._db_path) as conn:
                 conn.execute(
                     """UPDATE sessions
-                       SET ended_at=?, token_total=?, cost_total=?
+                       SET ended_at=?, token_total=?, cost_total=?,
+                           cache_read_tokens=?, cache_write_tokens=?
                        WHERE id=?""",
-                    (ts, token_total, cost_total, self._session_id),
+                    (ts, token_total, cost_total, cache_read_tokens, cache_write_tokens, self._session_id),
                 )
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: end_session error: %s", exc)

@@ -469,6 +469,7 @@ model:
   max_tokens: 8192
   temperature: 1.0
   max_retries: 2             # same-model retries on a transient failure
+  prompt_caching: true       # reuse the processed prompt prefix between requests
   fallback_models:           # tried in order once retries are spent
     - claude-opus-5-5
     - openai:gpt-4.1         # provider:model switches provider

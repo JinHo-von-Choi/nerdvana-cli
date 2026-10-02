@@ -17,6 +17,68 @@ try:
 except ImportError:  # pragma: no cover – runtime guard in _get_client
     AsyncAnthropic = None  # type: ignore[assignment,misc]
 
+# Block types that may carry a cache breakpoint.
+_CACHEABLE_BLOCKS = frozenset({"text", "tool_use", "tool_result", "image"})
+_EPHEMERAL: dict[str, str] = {"type": "ephemeral"}
+
+
+def _count(obj: Any, name: str) -> int:
+    """An integer usage counter from *obj*, 0 when absent or not a number."""
+    value = getattr(obj, name, 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _usage_dict(usage: Any, output_tokens: int | None = None) -> dict[str, int]:
+    """Normalise an Anthropic usage object.
+
+    ``input_tokens`` of the result is the whole prompt: Anthropic reports only the
+    tokens after the last cache breakpoint there, with cache writes and reads
+    counted separately.
+    """
+    fresh = _count(usage, "input_tokens")
+    write = _count(usage, "cache_creation_input_tokens")
+    read  = _count(usage, "cache_read_input_tokens")
+    result = {
+        "input_tokens":  fresh + write + read,
+        "output_tokens": _count(usage, "output_tokens") if output_tokens is None else output_tokens,
+    }
+    if read:
+        result["cache_read_tokens"] = read
+    if write:
+        result["cache_write_tokens"] = write
+    return result
+
+
+def with_cache_breakpoints(
+    system_prompt: str,
+    api_tools:     list[dict[str, Any]],
+    api_messages:  list[dict[str, Any]],
+) -> tuple[Any, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Mark the prompt prefix for caching; returns (system, tools, messages).
+
+    The prefix is built tools, then system, then messages, so breakpoints go on the
+    last tool, the system prompt, and the last block of the conversation. That is
+    three of the four allowed. Inputs are not modified.
+    """
+    tools = [dict(tool) for tool in api_tools]
+    if tools:
+        tools[-1]["cache_control"] = dict(_EPHEMERAL)
+
+    system: Any = system_prompt
+    if system_prompt:
+        system = [{"type": "text", "text": system_prompt, "cache_control": dict(_EPHEMERAL)}]
+
+    messages = [dict(message) for message in api_messages]
+    if messages and isinstance(messages[-1].get("content"), list):
+        blocks = [dict(block) for block in messages[-1]["content"]]
+        for block in reversed(blocks):
+            if block.get("type") in _CACHEABLE_BLOCKS:
+                block["cache_control"] = dict(_EPHEMERAL)
+                break
+        messages[-1]["content"] = blocks
+    return system, tools, messages
+
+
 console = Console()
 
 
@@ -67,13 +129,16 @@ class AnthropicProvider:
         ]
 
         api_messages = self._convert_messages(messages)
+        system: Any  = system_prompt
+        if self.config.prompt_caching:
+            system, api_tools, api_messages = with_cache_breakpoints(system_prompt, api_tools, api_messages)
 
         try:
             create_kwargs: dict[str, Any] = {
                 "model": self.config.model,
                 "max_tokens": self.config.max_tokens,
                 "temperature": self.config.temperature,
-                "system": system_prompt,
+                "system": system,
                 "messages": api_messages,
                 "stream": True,
             }
@@ -85,15 +150,14 @@ class AnthropicProvider:
             # Track tool blocks for completion events
             current_tool: dict[str, Any] = {}
             current_tool_input = ""
-            input_tokens = 0
-            output_tokens = 0
+            usage: dict[str, int] = {}
             stop_reason = "end_turn"
 
             async for event in stream:
                 if event.type == "message_start":
                     msg = getattr(event, "message", None)
                     if msg and hasattr(msg, "usage") and msg.usage:
-                        input_tokens = getattr(msg.usage, "input_tokens", 0) or 0
+                        usage = _usage_dict(msg.usage)
 
                 elif event.type == "content_block_start":
                     cb = event.content_block
@@ -136,16 +200,18 @@ class AnthropicProvider:
 
                 elif event.type == "message_delta":
                     if hasattr(event, "usage") and event.usage:
-                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
+                        usage = {**usage, "output_tokens": _count(event.usage, "output_tokens")}
+                        # Newer API versions repeat the cumulative cache counters here.
+                        for key, name in (("cache_read_tokens", "cache_read_input_tokens"), ("cache_write_tokens", "cache_creation_input_tokens")):
+                            reported = _count(event.usage, name)
+                            if reported:
+                                usage[key] = reported
                     if hasattr(event, "delta") and hasattr(event.delta, "stop_reason"):
                         stop_reason = event.delta.stop_reason or "end_turn"
 
             # Emit usage and done
-            if input_tokens or output_tokens:
-                yield ProviderEvent(
-                    type="usage",
-                    usage={"input_tokens": input_tokens, "output_tokens": output_tokens},
-                )
+            if usage.get("input_tokens") or usage.get("output_tokens"):
+                yield ProviderEvent(type="usage", usage=usage)
             yield ProviderEvent(type="done", stop_reason=stop_reason)
 
         except Exception as e:
@@ -173,13 +239,16 @@ class AnthropicProvider:
         ]
 
         api_messages = self._convert_messages(messages)
+        system: Any  = system_prompt
+        if self.config.prompt_caching:
+            system, api_tools, api_messages = with_cache_breakpoints(system_prompt, api_tools, api_messages)
 
         try:
             response = await client.messages.create(
                 model=self.config.model,
                 max_tokens=self.config.max_tokens,
                 temperature=self.config.temperature,
-                system=system_prompt,
+                system=system,
                 messages=api_messages,  # type: ignore[arg-type]
                 tools=api_tools,  # type: ignore[arg-type]
             )
@@ -203,10 +272,7 @@ class AnthropicProvider:
                 "content": content,
                 "tool_uses": tool_uses,
                 "stop_reason": response.stop_reason,
-                "usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                },
+                "usage": _usage_dict(response.usage),
             }
 
         except Exception as e:

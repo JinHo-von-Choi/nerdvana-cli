@@ -20,6 +20,23 @@ except ImportError:  # pragma: no cover – runtime guard in _get_client
 TOOL_USE_ID_PATTERN = re.compile(r"^call_(?P<name>.+)_[0-9a-f]{8}$")
 
 
+def _gemini_int(value: Any) -> int:
+    """*value* as a non-negative int, 0 for anything that is not a number."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+def _usage_dict(usage_metadata: Any) -> dict[str, int]:
+    """Normalise Gemini ``usage_metadata``; cached prompt tokens are part of the prompt count."""
+    result = {
+        "input_tokens":  _gemini_int(getattr(usage_metadata, "prompt_token_count", 0)),
+        "output_tokens": _gemini_int(getattr(usage_metadata, "candidates_token_count", 0)),
+    }
+    cached = _gemini_int(getattr(usage_metadata, "cached_content_token_count", 0))
+    if cached:
+        result["cache_read_tokens"] = cached
+    return result
+
+
 def make_tool_use_id(tool_name: str) -> str:
     """Build a tool_use_id of the form ``call_<tool name>_<8 hex chars>``.
 
@@ -136,10 +153,7 @@ class GeminiProvider:
                                     )
 
             if usage_metadata is not None:
-                yield ProviderEvent(type="usage", usage={
-                    "input_tokens":  getattr(usage_metadata, "prompt_token_count", 0) or 0,
-                    "output_tokens": getattr(usage_metadata, "candidates_token_count", 0) or 0,
-                })
+                yield ProviderEvent(type="usage", usage=_usage_dict(usage_metadata))
             yield ProviderEvent(type="done", stop_reason="end_turn")
 
         except Exception as e:
@@ -205,12 +219,7 @@ class GeminiProvider:
                                     }
                                 )
 
-            usage = {}
-            if response.usage_metadata:
-                usage = {
-                    "input_tokens": response.usage_metadata.prompt_token_count or 0,
-                    "output_tokens": response.usage_metadata.candidates_token_count or 0,
-                }
+            usage = _usage_dict(response.usage_metadata) if response.usage_metadata else {}
 
             return {
                 "content": content,
