@@ -166,6 +166,15 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "claude-opus-4": 200_000,
     "claude-sonnet-4": 200_000,
     "claude-haiku": 200_000,
+    # Claude 4.6 and later include the 1M window at standard pricing; the longest
+    # matching prefix wins, so these override the 200K family prefixes above.
+    "claude-opus-4-6": 1_000_000,
+    "claude-opus-4-7": 1_000_000,
+    "claude-opus-4-8": 1_000_000,
+    "claude-sonnet-4-6": 1_000_000,
+    "claude-opus-5": 1_000_000,
+    "claude-sonnet-5": 1_000_000,
+    "claude-fable-5": 1_000_000,
     "gpt-4.1": 1_048_576,
     "gpt-4o-mini": 128_000,
     "gpt-4o": 128_000,
@@ -347,39 +356,3 @@ def detect_provider(model: str) -> ProviderName:
     # Default to Anthropic
     logger.error("Unknown model prefix '%s' — defaulting to Anthropic", model)
     return ProviderName.ANTHROPIC
-
-
-def get_provider_config(
-    provider: ProviderName | str,
-    api_key: str = "",
-    base_url: str = "",
-    model: str = "",
-    max_tokens: int = 8192,
-    temperature: float = 1.0,
-) -> ProviderConfig:
-    """Build ProviderConfig from provider name + overrides."""
-    if isinstance(provider, str):
-        provider = ProviderName(provider)
-
-    if not api_key:
-        import os
-
-        for var_name in PROVIDER_KEY_ENVVARS.get(provider, []):
-            api_key = os.environ.get(var_name, "")
-            if api_key:
-                break
-
-    if not base_url:
-        base_url = DEFAULT_BASE_URLS.get(provider, "")
-
-    if not model:
-        model = DEFAULT_MODELS.get(provider, "gpt-4.1")
-
-    return ProviderConfig(
-        provider=provider,
-        api_key=api_key,
-        base_url=base_url,
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )

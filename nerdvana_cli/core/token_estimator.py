@@ -98,7 +98,7 @@ class AnthropicExactEstimator(TokenEstimator):
     def __init__(
         self,
         api_key: str | None = None,
-        model:   str        = "claude-sonnet-4-20250514",
+        model:   str        = "claude-sonnet-5-5",
     ) -> None:
         self._model    = model
         self._api_key  = api_key
@@ -160,7 +160,7 @@ class TokenEstimatorRegistry:
         p = provider.lower().strip()
 
         if p == "anthropic":
-            return AnthropicExactEstimator(api_key=api_key, model=model or "claude-sonnet-4-20250514")
+            return AnthropicExactEstimator(api_key=api_key, model=model or "claude-sonnet-5-5")
 
         if p in cls._TIKTOKEN_PROVIDERS:
             return TiktokenEstimator(model=model or "gpt-4o")
