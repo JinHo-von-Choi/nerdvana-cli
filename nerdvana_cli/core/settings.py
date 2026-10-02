@@ -76,6 +76,9 @@ class PermissionConfig(BaseModel):
 class SessionConfig(BaseModel):
     persist: bool = True
     max_turns: int = 200
+    # Stop once the estimated cost of this session's provider requests reaches this
+    # many USD; 0 means no limit. Needs a known price for the model.
+    max_cost_usd: float = 0.0
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures
