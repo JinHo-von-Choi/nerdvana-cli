@@ -10,13 +10,15 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 - **대화형 REPL** — 스트리밍 출력과 슬래시 명령어, 토큰 사용량 표시기
 - **비대화형 모드** — 스크립팅을 위한 단일 프롬프트 실행 (`nerdvana run`)
 - **30개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·스웜·태스크 관리 도구
-- **편집 품질 게이트 (Phase A)** — `FileRead`가 라인 단위 SHA256 앵커 해시를 발급하여 `FileEdit`의 컨텍스트 충돌을 차단하며, LSP 진단을 통해 편집 직후 회귀를 검출
-- **다중 에이전트 오케스트레이션 (Phase B)** — `Agent` / `Swarm` 도구로 6개 빌트인 에이전트 타입을 비동기 실행하고, `TaskPanel`이 TUI에서 진행 상황을 실시간으로 표시
-- **백그라운드 작업 관리 (Phase B)** — `TaskGet` / `TaskStop`으로 백그라운드 서브에이전트 조회와 중단
-- **자동 복구 훅 (Phase C)** — 컨텍스트 압축, 모델 폴백 체인, 복잡도 기반 계획 게이트, MCP 헬스 체크를 통한 자율 회복
+- **편집 무결성**: `FileRead`가 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙입니다. `FileEdit`와 `FileWrite`는 세션에서 읽지 않았거나 읽은 뒤 바뀐 파일을 고치지 않으며, 자기 편집으로 밀린 앵커는 다시 찾아 맞춥니다. 편집 직후 언어 서버가 그 편집으로 새로 생긴 오류를 알려 줍니다.
+- **서브에이전트와 백그라운드 작업**: `Agent` / `Swarm`이 서브에이전트를 각자의 시스템 프롬프트, 턴 한도, 도구 범위로 실행합니다. 제공자당 동시 실행 수는 `session.max_parallel_agents`로 묶입니다. 백그라운드 작업이 끝나면 결과가 모델에게 자동으로 전달되고, 쉬고 있던 세션은 스스로 깨어나 결과를 검토합니다.
+- **복구와 완주**: 제공자 실패를 분류해 백오프로 재시도한 뒤 다른 모델이나 제공자로 넘어갑니다. 컨텍스트 초과는 압축 후 재시도하고, 멈춘 스트림은 시간 제한으로 끊습니다. 열린 todo 항목이 있으면 진척이 멈출 때까지 작업을 이어 갑니다. [자동 복구](#자동-복구) 참고.
+- **권한 정책**: `--approval-mode`, `permissions.mode`, `always_allow`, `always_deny`가 서브에이전트를 포함한 모든 도구 호출에 적용됩니다. [권한과 승인 모드](#권한과-승인-모드) 참고.
+- **되묻기**: `AskUser` 도구로 모델이 추측 대신 사용자에게 묻습니다.
+- **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 `SKILL.md` 디렉터리 형식도 지원합니다.
 - **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
 - **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알린다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끈다.
-- **세션 지속성** — 재개를 위한 JSONL 트랜스크립트 저장
+- **세션 지속성**: JSONL 트랜스크립트를 저장하고 `nerdvana session resume <id>`로 대화를 복원합니다
 - **자동 제공자 감지** — 모델 이름에서 적절한 제공자 자동 선택
 - **MCP 통합** — 외부 MCP 서버를 연결하여 도구 시스템 확장
 - **구성 가능** — YAML 설정, 환경 변수, CLI 플래그
@@ -274,9 +276,9 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | 도구 | 유형 | 설명 |
 |------|------|------|
 | `Bash` | 쓰기 | 셸 명령어 실행 (타임아웃, 작업 디렉토리, 환경 변수 지원) |
-| `FileRead` | 읽기 | 파일 내용 읽기 — 라인 단위 SHA256 앵커 해시를 함께 반환하여 후속 `FileEdit`의 정합성 보장 |
-| `FileWrite` | 쓰기 | 파일 생성 또는 덮어쓰기 |
-| `FileEdit` | 쓰기 | 문자열 교체 또는 `anchor_hash` 기반 정밀 편집 (Phase A 편집 품질 게이트) |
+| `FileRead` | 읽기 | 파일 내용을 읽고 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙이며, 세션에 파일 다이제스트를 기록 |
+| `FileWrite` | 쓰기 | 새 파일 생성, 또는 이 세션에서 읽은 뒤 바뀌지 않은 파일 덮어쓰기 |
+| `FileEdit` | 쓰기 | 문자열 교체 또는 앵커(`N#hhhhhh`) 기반 편집. 읽은 뒤 파일이 바뀌었으면 거부 |
 | `Glob` | 읽기 | 파일 패턴 매칭 |
 | `Grep` | 읽기 | 정규식 기반 콘텐츠 검색 |
 | `TodoWrite` | 쓰기 | 에이전트가 수행할 작업 목록 관리 |
@@ -284,9 +286,9 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `WebFetch` | 읽기 | URL을 가져와 읽을 수 있는 본문으로 변환 |
 | `WebSearch` | 읽기 | Brave Search 질의. `BRAVE_API_KEY`가 없으면 호출 시점에 오류 |
 | `Parism` | 쓰기 | 화이트리스트된 44개 셸 명령어를 구조화된 JSON 출력으로 실행 |
-| `Agent` | 오케스트레이션 | 단일 서브에이전트를 비동기로 발사하고 `task_id` 반환 |
+| `Agent` | 오케스트레이션 | 서브에이전트를 전경 또는 백그라운드로 실행. 백그라운드면 `task_id` 반환 |
 | `Swarm` | 오케스트레이션 | 여러 서브에이전트를 병렬로 발사하여 독립 작업을 분산 |
-| `TaskGet` | 협업 | 비동기 작업의 상태와 결과 조회 |
+| `TaskGet` | 협업 | 백그라운드 작업의 상태와 결과 조회 (끝난 작업은 자동으로도 보고됨) |
 | `TaskStop` | 협업 | 실행 중인 비동기 작업 중단 |
 | `lsp_diagnostics` | LSP | 파일에 대한 LSP 진단(에러·경고) 조회 |
 | `lsp_goto_definition` | LSP | 심볼의 정의 위치로 이동 |
@@ -306,31 +308,50 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 
 ## 에이전트 타입
 
-`Agent` / `Swarm` 도구로 발사할 수 있는 6개 빌트인 에이전트 타입이 있습니다. 각 타입은 허용 도구 화이트리스트와 시스템 프롬프트로 책임 범위를 한정합니다.
+`Agent` / `Swarm` 도구는 6개 빌트인 에이전트 타입 중 하나로 작업을 보냅니다. 타입마다 시스템 프롬프트, 턴 한도, 허용 도구 목록이 있고 모두 실제로 적용됩니다. `*`는 에이전트 생성, 작업 제어, `AskUser`를 뺀 세션의 모든 도구를, `@read`는 읽기 전용 도구 전부(LSP 조회, 심볼 조회, 웹 읽기)를 허용합니다.
 
-| 에이전트 타입 | 허용 도구 | 용도 |
-|----------------|-----------|------|
-| `general-purpose` | 전체 (`*`) | 연구·코드·다단계 작업을 위한 범용 에이전트 (최대 50턴) |
-| `Explore` | `Glob`, `Grep`, `FileRead` | 코드베이스 탐색 전용 — 파일 작성·수정 금지 (최대 20턴) |
-| `Plan` | `Glob`, `Grep`, `FileRead` | 구현 계획 수립 전담 — 코드 작성 금지, 오직 설계만 (최대 20턴) |
-| `code-reviewer` | `FileRead`, `Grep`, `Glob` | 코드 품질·정확성·보안 검토 (읽기 전용, 최대 15턴) |
-| `git-management` | `Bash`, `FileRead` | git status/add/commit/branch/log/diff 등 git 작업 전담 (최대 20턴) |
-| `test-writer` | 전체 (`*`) | TDD 방식으로 단위·통합 테스트 작성 및 실행 (최대 30턴) |
+| 에이전트 타입 | 최대 턴 | 허용 도구 | 용도 |
+|-|-|-|-|
+| `general-purpose` | 50 | `*` | 범용 에이전트 |
+| `Explore` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | 코드베이스 탐색 전용, 파일 수정 불가 |
+| `Plan` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | 구현 계획 수립 전용, `planning_gate`와 함께 동작 |
+| `code-reviewer` | 15 | `FileRead`, `Grep`, `Glob`, `@read` | 코드 품질과 정확성 검토, 읽기 전용 |
+| `git-management` | 20 | `Bash`, `FileRead` | git 작업 전담 |
+| `test-writer` | 30 | `*` | 테스트 작성과 실행 |
 
-서브에이전트는 재귀 발사 및 팀 관리 도구를 보유하지 않으므로 부모 세션의 토큰 컨텍스트를 격리합니다. 비동기 작업의 진행 상태는 TUI 우측 `TaskPanel`에 실시간으로 표시됩니다.
+서브에이전트는 세션의 언어 서버와 MCP 연결을 함께 쓰고, 같은 권한 정책을 따르며, 다른 에이전트를 만들 수 없습니다. 진행 상황은 TUI 우측 `TaskPanel`에 표시되고, 백그라운드 작업이 끝나면 결과가 모델에게 전달됩니다. `TaskStop`으로 중단합니다.
 
-## 자동 복구 훅 (Phase C)
+## 자동 복구
 
-`AgentLoop` 초기화 시점에 자동 등록되는 빌트인 라이프사이클 훅 — 장시간 세션이 사람 개입 없이 자율 회복하도록 돕습니다.
+| 장치 | 동작 |
+|-|-|
+| 제공자 복구 | 실패를 일시 오류(429, 5xx, 시간 초과), 컨텍스트 초과, 인증, 디코딩으로 분류합니다. 일시 오류는 백오프나 서버의 `Retry-After`에 따라 `model.max_retries`번 재시도한 뒤 `model.fallback_models`의 다음 항목으로 넘어갑니다(`provider:model`이면 제공자도 바꿈). 컨텍스트 초과는 한 번 압축한 뒤 다시 요청합니다. 응답 일부가 이미 출력됐으면 재시도하지 않습니다. |
+| 스트림 시간 제한 | `session.stream_idle_timeout`초 동안 응답이 없거나 `session.stream_total_timeout`초를 넘기면 일시 오류로 처리합니다. |
+| todo 가드 | 열린 `TodoWrite` 항목이 남은 채 턴이 끝나면 계속하라고 요청합니다. 세 번 연속 진척이 없으면 멈추고 남은 항목을 보고합니다. 압축 뒤에는 열린 항목을 다시 알려 줍니다. |
+| `context_limit_recovery` | `max_tokens`로 끝나면 마지막 요청을 인용해 이어쓰기를 요청합니다. |
+| `json_parse_recovery` | 도구 결과의 JSON 파싱이 실패하면 올바른 JSON을 요청합니다. |
+| `ralph_loop_check` | `end_turn`에 `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, `# 미구현` 표시가 남아 있으면 마무리를 요청합니다. 턴 종료 훅으로 이어지는 진행은 프롬프트당 세 번까지입니다. |
+| 반복 호출 차단 | 같은 인자의 같은 도구 호출이 연속 세 번째면 경고하고, 다섯 번째면 거부합니다(`TaskGet` 폴링 제외). |
+| 출력 상한 | 도구 결과는 약 30,000토큰(`WebFetch`는 10,000)으로 앞뒤를 남겨 자르고, 전문은 `~/.nerdvana/tool-output/`에 저장합니다. |
 
-| 훅 | 이벤트 | 동작 |
-|-----|--------|------|
-| `session_start_context_injection` | `SESSION_START` | 첫 시스템 프롬프트에 도구 목록·세션 설정 요약·`NIRNA.md` 내용을 주입 |
-| `context_limit_recovery` | `AFTER_API_CALL` | 모델이 `max_tokens`로 종료되면 마지막 사용자 요청을 인용한 이어쓰기 메시지를 주입하여 작업을 재개 |
-| `json_parse_recovery` | `AFTER_TOOL` | 도구 결과의 JSON 파싱이 실패하면 해당 도구 이름을 명시한 정정 요청을 주입 |
-| `ralph_loop_check` | `AFTER_API_CALL` | `end_turn`에서 마지막 어시스턴트 메시지에 `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, `# 미구현` 마커가 남아 있으면 마무리하라고 지시 (Ralph self-finishing loop) |
+## 권한과 승인 모드
 
-훅은 `~/.nerdvana/hooks`와 승인된 프로젝트 훅 파일(`docs/hooks.md`)로 확장합니다. 추가로 `model.fallback_models`(일시 오류 시 `model.max_retries`만큼 재시도한 뒤 다음 모델로 전환, `provider:model` 형식이면 제공자도 전환)와 `session.planning_gate`(복잡도 기반 `Plan` 에이전트 선행 실행)을 함께 활성화하면 완전한 자율 운용 모드를 구성할 수 있습니다.
+메인 루프, 서브에이전트, 백그라운드 에이전트의 모든 도구 호출은 다음 순서로 판정합니다.
+
+1. `permissions.always_deny`(도구 이름, glob 패턴 가능): 거부
+2. 현재 모드가 제외한 도구: 거부하고 모델에게도 숨김
+3. 도구 자체의 거부(예: 차단된 셸 명령): 거부
+4. `permissions.always_allow`: 묻지 않고 허용
+5. 모드의 신뢰 수준: `strict`는 모든 쓰기 전에, `balanced`는 파괴적 도구와 확인이 필요한 도구 전에 묻고, `yolo`는 묻지 않음
+
+| `--approval-mode` | 모드 프로필 | 신뢰 수준 | 효과 |
+|-|-|-|-|
+| `default` | `interactive` | balanced | 일반 대화형 사용 |
+| `auto_edit` | `editing` | balanced | 같은 도구, 편집 중심 프롬프트 |
+| `yolo` | `one-shot` | yolo | 확인 없음 |
+| `plan` | `planning` | strict | 쓰기 도구와 `Bash` 숨김 |
+
+`--approval-mode`나 `session.default_mode`가 없으면 `nerdvana.yml`의 `permissions.mode`(`default`, `accept-edits`, `bypass`, `plan`)가 같은 프로필을 고릅니다. 터미널이 없으면 확인 요청은 거부로 처리됩니다.
 
 ## MCP 서버 통합
 
@@ -368,6 +389,8 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 1. `~/.nerdvana/NIRNA.md` (전역 사용자 지침)
 2. `<cwd>/NIRNA.md` (프로젝트 지침, 저장소에 커밋)
 3. `<cwd>/NIRNA.local.md` (로컬 지침, gitignore 대상)
+
+이어서 프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`를 읽습니다. 도구가 하위 디렉터리의 파일을 처음 다루면, 그 디렉터리부터 프로젝트 루트 사이에 있는 규칙 파일(`NIRNA.md`, `AGENTS.md`, `CLAUDE.md`)을 가까운 순서로 한 번씩 주입합니다. 세션당 상한은 32KB입니다.
 
 REPL에서 `/init`으로 초안 파일을 만듭니다.
 
@@ -416,9 +439,10 @@ model:
   base_url: ""                     # API 엔드포인트 재정의
   max_tokens: 8192
   temperature: 1.0
-  fallback_models:                 # Phase C — 주 모델 장애 시 순차 폴백
+  max_retries: 2                   # 일시 오류 시 같은 모델 재시도 횟수
+  fallback_models:                 # 재시도를 다 쓰면 순서대로 사용
     - claude-haiku-4-5-20251001
-    - gpt-4.1
+    - openai:gpt-4.1               # provider:model 이면 제공자도 전환
   extended_thinking: false         # 확장 사고 모드 활성화 여부
   thinking_budget: 8192            # 확장 사고에 할당할 토큰 예산
   show_thinking: true              # <think>...</think> 블록을 흐린 이탤릭으로 표시 (/thinking 로 토글)
@@ -428,7 +452,7 @@ model_history: {}
 
 permissions:
   mode: default                    # default | accept-edits | bypass | plan
-  always_allow: []
+  always_allow: []                 # 도구 이름 또는 glob 패턴, 예: ["FileRead", "lsp_*"]
   always_deny: []
 
 session:
@@ -442,6 +466,13 @@ session:
   default_mode: interactive        # 기본 런타임 모드 이름 (interactive, planning 등)
   show_activity: true              # ActivityIndicator 위젯 표시 (/activity 로 토글)
   update_check: true               # 시작 시 새 판 확인 (24시간 캐시)
+  stream_idle_timeout: 300         # 제공자 응답이 이 초 동안 없으면 요청 포기
+  stream_total_timeout: 3600
+  post_edit_diagnostics: true      # 편집 후 언어 서버로 새 오류 확인
+  max_parallel_agents: 5           # 제공자당 동시 서브에이전트 수
+
+skills:
+  include_claude_skills: false     # ~/.claude/skills, ./.claude/skills 도 읽기
 
 checkpoint:
   enabled: true

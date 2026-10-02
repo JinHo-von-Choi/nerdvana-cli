@@ -10,10 +10,10 @@ Hooks are registered against a `HookEvent` and receive a `HookContext` describin
 
 | Event | When it fires |
 |-------|---------------|
-| `SESSION_START` | Once when the agent loop is constructed, before the first user message is processed. |
-| `SESSION_END` | Once when the loop terminates (normal completion or error path). |
+| `SESSION_START` | Once per session, on the first prompt (and again on the first prompt after `/clear`). |
+| `SESSION_END` | Once per session that started: when the TUI exits, when a `nerdvana run` finishes or fails, and on `/clear` before the history is reset. `extra` carries `reason` (`exit` or `reset`) and `session_id`. |
 | `BEFORE_TOOL` | Immediately before a tool is invoked. Handlers may rewrite `tool_input` or set `allow=False` to block the call. |
-| `AFTER_TOOL` | Immediately after a tool has executed. Handlers receive the tool result and can inject follow-up messages. |
+| `AFTER_TOOL` | Immediately after a tool has executed. Handlers receive the tool result; messages they inject are appended after the batch's tool results, never between a call and its result. |
 | `BEFORE_API_CALL` | Before each request to the model. |
 | `AFTER_API_CALL` | After each model response. The `stop_reason` field carries `"max_tokens"`, `"end_turn"`, or `"tool_use"`. |
 
@@ -104,7 +104,11 @@ Triggered when the loop sets `context.extra["json_error"]` after a tool call who
 
 ### ralph_loop_check (`AFTER_API_CALL`)
 
-Fires on `stop_reason == "end_turn"` and scans the most recent assistant message for residual `TODO`, `FIXME`, or `NotImplemented` markers. When it finds one, it injects a follow-up prompt that pushes the model to finish the work instead of declaring victory prematurely. This prevents the agent from halting on a half-finished implementation.
+Fires on `stop_reason == "end_turn"` and scans the most recent assistant message for residual `TODO`, `FIXME`, or `NotImplemented` markers. When it finds one, it injects a follow-up prompt that pushes the model to finish the work instead of declaring victory prematurely. This prevents the agent from halting on a half-finished implementation. End-of-turn hooks can continue a turn at most three times per prompt, so a reply that keeps mentioning `TODO` cannot hold the loop.
+
+### directory rules (`AFTER_TOOL`)
+
+When `FileRead`, `FileEdit` or `FileWrite` first touches a file in a subdirectory, the `NIRNA.md`, `AGENTS.md` and `CLAUDE.md` files between that directory and the project root are injected once, nearest first, up to 32 KB per session.
 
 ## User hook directories
 
