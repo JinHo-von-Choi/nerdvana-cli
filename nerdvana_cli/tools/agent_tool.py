@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
+from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
@@ -21,6 +22,7 @@ class AgentToolArgs:
     description:       str  = ""
     subagent_type:     str  = "general-purpose"
     model:             str  = ""
+    category:          str  = ""
     run_in_background: bool = False
 
 
@@ -56,7 +58,17 @@ class AgentTool(BaseTool[AgentToolArgs]):
             },
             "model": {
                 "type": "string",
-                "description": "Optional model override (empty = inherit parent model).",
+                "description": (
+                    "Optional model override, 'model' or 'provider:model' "
+                    "(empty = the agent type's model, then its category, then the parent's)."
+                ),
+            },
+            "category": {
+                "type": "string",
+                "description": (
+                    "Optional task category mapped to a model by agents.categories "
+                    "in the configuration (empty = the agent type's category)."
+                ),
             },
             "run_in_background": {
                 "type": "boolean",
@@ -102,8 +114,6 @@ class AgentTool(BaseTool[AgentToolArgs]):
         registry.register(task)
 
         child_settings = copy.deepcopy(self._settings)
-        if args.model:
-            child_settings.model.model = args.model
 
         import os
 
@@ -129,6 +139,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 is_error=True,
             )
         allowed_tools = agent_defn.allowed_tools
+        apply_model_spec(child_settings, select_model(args.model, args.category, agent_defn.model, agent_defn.category, child_settings.agents.categories))
         child_settings.session.max_turns = agent_defn.max_turns
         child_registry = create_subagent_registry(
             settings      = child_settings,

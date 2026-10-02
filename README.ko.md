@@ -524,6 +524,14 @@ session:
 skills:
   include_claude_skills: false     # ~/.claude/skills, ./.claude/skills 도 읽기
 
+agents:
+  categories: {}                   # 서브에이전트 카테고리별 모델 (예: quick: claude-haiku-4-5-20251001)
+
+sandbox:
+  mode: off                        # off | auto | require: OS 수준으로 Bash 쓰기 범위 제한 (Linux Landlock)
+  network: true                    # false 면 TCP 연결도 차단 (Linux 6.7 이상)
+  write_paths: []                  # 프로젝트·임시 디렉터리 외에 쓰기를 허용할 경로
+
 checkpoint:
   enabled: true
   per_session_max: 50

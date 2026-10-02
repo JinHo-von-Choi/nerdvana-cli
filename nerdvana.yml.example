@@ -116,6 +116,21 @@ hooks:
   # See docs/hooks.md.
   allow_project_hooks: false
 
+agents:
+  # Category -> model for sub-agents, "model" or "provider:model". An Agent call, a Swarm
+  # task or an agent definition that names a category runs on the mapped model.
+  categories: {}
+  #  quick: claude-haiku-4-5-20251001
+
+sandbox:
+  # off | auto | require: confine what the Bash tool can write with the operating system
+  # (Linux Landlock). See docs/sandbox.md.
+  mode: off
+  # false also refuses TCP connections and binds from the command (Linux 6.7 and later)
+  network: true
+  # Writable in addition to the project directory and the temporary directories
+  write_paths: []
+
 # Register ListQueryableProjects / RegisterExternalProject / QueryExternalProject.
 # They hand a registered directory to a read-capable subprocess, so the family
 # stays unregistered until this is turned on.

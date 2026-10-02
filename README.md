@@ -552,6 +552,14 @@ hooks:
 skills:
   include_claude_skills: false  # also read ~/.claude/skills and ./.claude/skills
 
+agents:
+  categories: {}                # category -> model for sub-agents, e.g. quick: claude-haiku-4-5-20251001
+
+sandbox:
+  mode: off                     # off | auto | require: confine Bash writes with the OS (Linux Landlock)
+  network: true                 # false also refuses TCP connections (Linux 6.7+)
+  write_paths: []               # writable besides the project and temp directories
+
 checkpoint:
   enabled: true
   per_session_max: 50

@@ -386,6 +386,26 @@ def _check_mcp_config() -> CheckResult:
     return CheckResult("mcp_config", "ok", f"{total} server(s) parse; stdio commands found")
 
 
+def _check_sandbox() -> CheckResult:
+    """Report whether shell commands can be confined, and what the configuration asks for."""
+    from nerdvana_cli.core.sandbox import landlock_abi
+    from nerdvana_cli.core.settings import NerdvanaSettings
+
+    try:
+        sandbox = NerdvanaSettings.load().sandbox
+    except Exception:  # noqa: BLE001 - config problems are reported by the config check
+        return CheckResult("sandbox", "skip", "config could not be loaded")
+    abi = landlock_abi()
+    if abi < 1:
+        detail = "Landlock is not available on this system"
+        if sandbox.mode == "require":
+            return CheckResult("sandbox", "fail", f"sandbox.mode is require but {detail}")
+        return CheckResult("sandbox", "warn" if sandbox.mode == "auto" else "ok", f"{detail}; mode {sandbox.mode}")
+    if not sandbox.network and abi < 4:
+        return CheckResult("sandbox", "fail" if sandbox.mode == "require" else "warn", f"Landlock ABI {abi}; sandbox.network false needs ABI 4 (Linux 6.7)")
+    return CheckResult("sandbox", "ok", f"Landlock ABI {abi} available; mode {sandbox.mode}")
+
+
 def _check_pricing_freshness() -> CheckResult:
     """Run check_pricing_freshness.py --report-only to detect stale snapshots."""
     script = Path(__file__).resolve().parents[2] / "scripts" / "check_pricing_freshness.py"
@@ -455,6 +475,7 @@ _ALL_CHECKS = [
     _check_lsp_servers,
     _check_mcp_servers,
     _check_mcp_config,
+    _check_sandbox,
     _check_pricing_freshness,
     _check_collect_baseline,
 ]

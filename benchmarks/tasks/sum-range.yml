@@ -1,0 +1,7 @@
+id: sum-range
+path: ../fixtures/sum-range
+prompt: "calc.sum_range(1, 4) should return 10 but it does not. Fix the bug in calc.py."
+verify: python check.py
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600

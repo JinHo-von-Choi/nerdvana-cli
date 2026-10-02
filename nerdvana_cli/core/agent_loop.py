@@ -34,6 +34,7 @@ from nerdvana_cli.core.provider_recovery import (
     ProviderCallError,
     RecoveryPlanner,
 )
+from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.stream_guard import guarded_stream
@@ -734,6 +735,8 @@ class AgentLoop:
             confirm       = self._on_confirm,
         )
         context.state["session_id"] = self.session.session_id
+        sandbox = self.settings.sandbox
+        context.state["sandbox"]    = SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths))
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:

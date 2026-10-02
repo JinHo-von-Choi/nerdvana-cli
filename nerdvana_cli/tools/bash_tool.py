@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 from typing import Any, ClassVar
 
+from nerdvana_cli.core.sandbox import Launch, plan_launch
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
+
+logger  = logging.getLogger(__name__)
+_warned: set[str] = set()
 
 # Name patterns for environment variables withheld from the subprocess.
 #
@@ -42,6 +47,21 @@ _SENSITIVE_ENV = re.compile(
       )
     """
 )
+
+
+async def _spawn(launch: Launch, command: str, cwd: str, env: dict[str, str]) -> asyncio.subprocess.Process:
+    """Start *command* through the sandbox launcher when the plan has one, else through the shell."""
+    pipe = asyncio.subprocess.PIPE
+    if launch.argv:
+        return await asyncio.create_subprocess_exec(*launch.argv, stdout=pipe, stderr=pipe, cwd=cwd, env=env)
+    return await asyncio.create_subprocess_shell(command, stdout=pipe, stderr=pipe, cwd=cwd, env=env)
+
+
+def _warn_once(notice: str) -> None:
+    """Log a sandbox notice the first time it is seen."""
+    if notice not in _warned:
+        _warned.add(notice)
+        logger.warning("%s", notice)
 
 
 def _build_env(cwd: str) -> dict[str, str]:
@@ -214,14 +234,13 @@ Examples:
         on_progress: Any = None,
     ) -> ToolResult:
         try:
-            env = _build_env(context.cwd)
-            proc = await asyncio.create_subprocess_shell(
-                args.command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=context.cwd,
-                env=env,
-            )
+            env    = _build_env(context.cwd)
+            launch = plan_launch(context.state.get("sandbox"), args.command, context.cwd)
+            if launch.refused:
+                return ToolResult(tool_use_id="", content=launch.notice, is_error=True)
+            if launch.notice:
+                _warn_once(launch.notice)
+            proc = await _spawn(launch, args.command, context.cwd, env)
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=args.timeout)
             except TimeoutError:

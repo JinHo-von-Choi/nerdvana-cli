@@ -71,9 +71,33 @@ allowed_tools:                      # optional — default ["*"] (all)
   - Glob
   - Grep
   - Bash
+model: claude-opus-5-5              # optional — "model" or "provider:model"; default is the parent's model
+category: deep                      # optional — model taken from agents.categories when no model is set
 system_prompt: |                    # optional — injected into child's system prompt
   You are a security expert.
   Audit code for OWASP Top 10 vulnerabilities.
+```
+
+### Choosing the model
+
+A sub-agent runs on its parent's model unless something names another one. The
+first of these that is set wins:
+
+1. the `model` argument of the `Agent` tool call (or of a `Swarm` task)
+2. the `model` of the agent definition
+3. the model mapped by `agents.categories` to the `category` argument of the call, or to the `category` of the agent definition
+
+A model is written `model` for the parent's provider or `provider:model` for
+another one, the form `model.fallback_models` uses. A different provider is used
+only when its API key is present in the environment; otherwise the sub-agent keeps
+the parent's model and a warning is logged.
+
+```yaml
+# nerdvana.yml
+agents:
+  categories:
+    quick: claude-haiku-4-5-20251001
+    deep: claude-opus-5-5
 ```
 
 ### Loading
