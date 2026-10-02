@@ -7,11 +7,13 @@ ToolExecutor, recovery hooks to LoopHookEngine, iteration state to LoopState.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import math
 import re
 from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -143,6 +145,44 @@ def _drop_orphan_tool_results(msgs: list[Any]) -> list[Any]:
             continue
         kept.append(msg)
     return kept
+
+
+@dataclass
+class _Flow:
+    """Whether the run ends after the current step, and the context size measured for it."""
+
+    finished:       bool = False
+    context_tokens: int  = 0
+
+
+@dataclass
+class _Turn:
+    """One request to the provider and what its response has delivered so far."""
+
+    messages:        list[dict[str, Any]]
+    used_ids:        set[str]
+    sent_count:      int
+    asst_text:       str                          = ""
+    thinking_buffer: str                          = ""
+    tool_uses:       list[dict[str, Any]]         = field(default_factory=list)
+    seen_calls:      set[tuple[str, str, str]]    = field(default_factory=set)
+
+    def add_call(self, call_id: str, name: str, arguments: dict[str, Any] | None) -> None:
+        """Collect a tool call, keeping ids unique and dropping a repeated copy.
+
+        A provider may echo a call it already sent (same id, name and arguments),
+        which must run once, or reuse an id for a different call, which gets a
+        fresh id because providers reject a request holding two calls with one id.
+        """
+        call: dict[str, Any] = {"id": call_id or "", "name": name, "input": arguments or {}}
+        signature = (call["id"], call["name"], json.dumps(call["input"], sort_keys=True, default=str))
+        if signature in self.seen_calls:
+            return
+        self.seen_calls.add(signature)
+        if not call["id"] or call["id"] in self.used_ids:
+            call["id"] = new_tool_use_id(call["name"], self.used_ids)
+        self.used_ids.add(call["id"])
+        self.tool_uses.append(call)
 
 
 class AgentLoop:
@@ -632,190 +672,246 @@ class AgentLoop:
             )
         self.state.messages.extend(_hook_injection_messages(self.tool_executor))
 
-    async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
-        tool_ctx   = ToolContext(
+    def _new_tool_context(self) -> ToolContext:
+        """The context every tool call of this run receives."""
+        context = ToolContext(
             cwd           = self.settings.cwd,
             task_registry = self._task_registry,
             ask_user      = self._on_ask_user,
             confirm       = self._on_confirm,
         )
-        tool_ctx.state["session_id"] = self.session.session_id
-        state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
-        orig_model    = self.settings.model.model
-        orig_provider = self.settings.model.provider
-        orig_api_key  = self.settings.model.api_key
-        orig_base_url = self.settings.model.base_url
+        context.state["session_id"] = self.session.session_id
+        return context
+
+    async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
+        """Request, execute tools and repeat until the model is done or a limit stops it."""
+        tool_ctx = self._new_tool_context()
+        state    = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
+        saved    = (
+            self.settings.model.provider,
+            self.settings.model.model,
+            self.settings.model.api_key,
+            self.settings.model.base_url,
+        )
         self._context_budget.set_overhead(system_prompt, tools)
-        recovery      = RecoveryPlanner(
+        recovery = RecoveryPlanner(
             fallbacks   = list(self.settings.model.fallback_models),
             max_retries = self.settings.model.max_retries,
         )
         try:
             while True:
                 state = state.evolve(iteration=state.iteration + 1)
-                if state.iteration > self.settings.session.max_turns:
-                    self.last_stop = "max_turns"
-                    yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
+                flow  = _Flow()
+                async for notice in self._check_run_limits(state.iteration, flow):
+                    yield notice
+                if flow.finished:
                     return
-                self.turns_used = state.iteration
-                over_budget = self._over_cost_limit()
-                if over_budget:
-                    self.last_stop = "max_cost"
-                    yield over_budget
-                    return
-                if self._cost_limit_unenforceable():
-                    yield (
-                        f"\n[yellow]Cost limit ${self.settings.session.max_cost_usd:.2f} is not enforced: "
-                        f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"
-                    )
 
-                self._report_background_tasks()
-                max_ctx  = self.settings.session.max_context_tokens
-                thr      = int(max_ctx * self.settings.session.compact_threshold)
-                cur_toks = self._context_budget.current(self.state.messages)
-                state    = state.evolve(token_budget_used=cur_toks)
+                async for status in self._prepare_context(state.iteration, flow):
+                    yield status
+                state = state.evolve(token_budget_used=flow.context_tokens)
 
-                if cur_toks > thr:
-                    async for status in self._maybe_compact_messages(cur_toks, thr):
-                        yield status
-
-                yield f"{CONTEXT_USAGE_PREFIX}{min(100, int(cur_toks / max_ctx * 100)) if max_ctx > 0 else 0}"
-                if self.settings.verbose:
-                    self.console.print(f"[dim]Turn {state.iteration} — {len(self.state.messages)} messages[/dim]")
-
-                repaired = repair_tool_ids(self.state.messages)
-                if repaired:
-                    logger.warning("renumbered %d duplicate tool call id(s) in the history", repaired)
-                used_ids   = collect_tool_use_ids(self.state.messages)
-                seen_calls: set[tuple[str, str, str]] = set()
-                messages = self._to_provider_messages()
-                if self._fire_before_api_call(tools):
-                    messages = self._to_provider_messages()
-                sent_count = len(self.state.messages)
+                turn = self._build_turn(tools)
                 try:
-                    asst_text       = ""
-                    thinking_buffer = ""
-                    tool_uses: list[dict[str, Any]] = []
-
-                    async for ev in guarded_stream(
-                        self.provider.stream(system_prompt, messages, tools),
-                        idle  = self.settings.session.stream_idle_timeout,
-                        total = self.settings.session.stream_total_timeout,
-                    ):
-                        if ev.type == "content_delta":
-                            self._set_activity(
-                                phase="streaming",
-                                label=f"Streaming from {self.settings.model.model}",
-                            )
-                            asst_text += ev.content
-                            yield ev.content
-                        elif ev.type == "thinking_delta":
-                            thinking_buffer += ev.thinking
-                            self._set_activity(phase="thinking", label="Thinking...")
-                            if self._on_thinking_chunk is not None:
-                                import contextlib as _cl
-                                with _cl.suppress(Exception):
-                                    self._on_thinking_chunk(thinking_buffer)
-                        elif ev.type == "tool_use_complete":
-                            call: dict[str, Any] = {"id": ev.tool_use_id or "", "name": ev.tool_name, "input": ev.tool_input_complete or {}}
-                            signature = (call["id"], call["name"], json.dumps(call["input"], sort_keys=True, default=str))
-                            if signature in seen_calls:
-                                continue  # a provider echoed a call it already sent; run it once
-                            seen_calls.add(signature)
-                            if not call["id"] or call["id"] in used_ids:
-                                call["id"] = new_tool_use_id(call["name"], used_ids)
-                            used_ids.add(call["id"])
-                            tool_uses.append(call)
-                        elif ev.type == "usage" and ev.usage:
-                            self._apply_usage(ev.usage, sent_count)
-                        elif ev.type == "done":
-                            stop = ev.stop_reason
-                            if stop == "max_tokens":
-                                if not self._handle_max_tokens_stop():
-                                    self.last_stop = "max_tokens"
-                                    yield "\n\n[bold red]Max tokens reached.[/bold red]"
-                                    return
-                                break
-                            elif stop == "end_turn":
-                                if (
-                                    self._handle_end_turn_stop(asst_text, thinking_buffer)
-                                    and self._end_turn_nudges < _MAX_END_TURN_NUDGES
-                                ):
-                                    self._end_turn_nudges += 1
-                                    break
-                                decision = self._todo_guard.check(self.session.session_id)
-                                if decision.kind == CONTINUE:
-                                    self.state.messages.append(Message(role=Role.USER, content=decision.message))
-                                    break
-                                if decision.kind == STALLED:
-                                    yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
-                                self._set_activity(phase="idle", label="Ready")
-                                return
-                            elif stop == "tool_use" and tool_uses:
-                                async for status in self._handle_tool_use_stop(asst_text, tool_uses, tool_ctx):
-                                    yield status
-                                # ``done`` ends the response. Reading on would run the same
-                                # calls again if the provider repeats its final chunk.
-                                break
-                            else:
-                                logger.warning("Unhandled stop_reason: %s", stop)
-                                if asst_text:
-                                    self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text))
-                                    self.session.record_assistant_message(asst_text)
-                                return
-                        elif ev.type == "error":
-                            raise ProviderCallError(
-                                ev.error or "Unknown error",
-                                ProviderFailure(ev.error_kind or OTHER, ev.status_code, ev.retry_after),
-                            )
-
+                    async for chunk in self._stream_response(system_prompt, tools, tool_ctx, turn, flow):
+                        yield chunk
                 except UnicodeDecodeError:
                     yield "\n[dim yellow]Encoding error, retrying without streaming...[/dim yellow]\n"
                     try:
-                        async for c in self._fallback_to_send(system_prompt, messages, tools, tool_ctx):
+                        async for c in self._fallback_to_send(system_prompt, turn.messages, tools, tool_ctx):
                             yield c
                     except Exception as fe:
                         yield f"\n[bold red]Fallback also failed: {fe}[/bold red]"
                     return
-                except Exception as e:
-                    from_event = isinstance(e, ProviderCallError)
-                    failure    = e.failure if isinstance(e, ProviderCallError) else classify_exception(e)
-                    action     = recovery.plan(
-                        failure,
-                        current          = self.settings.model.model,
-                        current_provider = self.settings.model.provider or "",
-                        streamed         = bool(asst_text or tool_uses),
-                    )
-                    if action.kind == RESEND:
-                        yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
-                        async for c in self._fallback_to_send(system_prompt, messages, tools, tool_ctx):
-                            yield c
-                        return
-                    if action.kind == RETRY:
-                        yield f"\n[dim yellow][Retrying in {action.delay:.1f}s: {failure.kind}][/dim yellow]\n"
-                        await asyncio.sleep(action.delay)
-                        continue
-                    if action.kind == COMPACT:
-                        async for status in self._maybe_compact_messages(cur_toks, int(cur_toks * 0.6)):
-                            yield status
-                        continue
-                    if action.kind == FALLBACK:
-                        self._switch_model(action.provider, action.model)
-                        yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
-                        continue
-                    self.last_stop = "provider_error"
-                    if from_event:
-                        yield f"\n[bold red]Provider error: {e}[/bold red]"
-                        return
-                    yield f"\n[bold red]Error: {e}[/bold red]"
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {e}"))
+                except Exception as exc:
+                    async for chunk in self._recover_from_failure(exc, recovery, turn, flow, system_prompt, tools, tool_ctx):
+                        yield chunk
+                if flow.finished:
                     return
         finally:
-            self.settings.model.provider = orig_provider
-            self.settings.model.model    = orig_model
-            self.settings.model.api_key  = orig_api_key
-            self.settings.model.base_url = orig_base_url
-            self.provider                = self.create_provider_from_settings()
+            (
+                self.settings.model.provider,
+                self.settings.model.model,
+                self.settings.model.api_key,
+                self.settings.model.base_url,
+            ) = saved
+            self.provider = self.create_provider_from_settings()
+
+    async def _check_run_limits(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
+        """Stop the run when the turn or cost limit is reached, and warn about an unenforceable one."""
+        if iteration > self.settings.session.max_turns:
+            self.last_stop = "max_turns"
+            flow.finished  = True
+            yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
+            return
+        self.turns_used = iteration
+        over_budget = self._over_cost_limit()
+        if over_budget:
+            self.last_stop = "max_cost"
+            flow.finished  = True
+            yield over_budget
+            return
+        if self._cost_limit_unenforceable():
+            yield (
+                f"\n[yellow]Cost limit ${self.settings.session.max_cost_usd:.2f} is not enforced: "
+                f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"
+            )
+
+    async def _prepare_context(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
+        """Report finished background work, compact when the window is nearly full, and show usage."""
+        self._report_background_tasks()
+        max_ctx  = self.settings.session.max_context_tokens
+        thr      = int(max_ctx * self.settings.session.compact_threshold)
+        cur_toks = self._context_budget.current(self.state.messages)
+        flow.context_tokens = cur_toks
+
+        if cur_toks > thr:
+            async for status in self._maybe_compact_messages(cur_toks, thr):
+                yield status
+
+        yield f"{CONTEXT_USAGE_PREFIX}{min(100, int(cur_toks / max_ctx * 100)) if max_ctx > 0 else 0}"
+        if self.settings.verbose:
+            self.console.print(f"[dim]Turn {iteration} — {len(self.state.messages)} messages[/dim]")
+
+    def _build_turn(self, tools: list[Any]) -> _Turn:
+        """Prepare the next request: a history with unique tool call ids, and its provider form."""
+        repaired = repair_tool_ids(self.state.messages)
+        if repaired:
+            logger.warning("renumbered %d duplicate tool call id(s) in the history", repaired)
+        used_ids = collect_tool_use_ids(self.state.messages)
+        messages = self._to_provider_messages()
+        if self._fire_before_api_call(tools):
+            messages = self._to_provider_messages()
+        return _Turn(messages=messages, used_ids=used_ids, sent_count=len(self.state.messages))
+
+    async def _stream_response(
+        self,
+        system_prompt: str,
+        tools:         list[Any],
+        tool_ctx:      ToolContext,
+        turn:          _Turn,
+        flow:          _Flow,
+    ) -> AsyncGenerator[str, None]:
+        """Consume one provider response, acting on each event until it reports ``done``."""
+        async for ev in guarded_stream(
+            self.provider.stream(system_prompt, turn.messages, tools),
+            idle  = self.settings.session.stream_idle_timeout,
+            total = self.settings.session.stream_total_timeout,
+        ):
+            if ev.type == "content_delta":
+                self._set_activity(
+                    phase="streaming",
+                    label=f"Streaming from {self.settings.model.model}",
+                )
+                turn.asst_text += ev.content
+                yield ev.content
+            elif ev.type == "thinking_delta":
+                turn.thinking_buffer += ev.thinking
+                self._set_activity(phase="thinking", label="Thinking...")
+                if self._on_thinking_chunk is not None:
+                    with contextlib.suppress(Exception):
+                        self._on_thinking_chunk(turn.thinking_buffer)
+            elif ev.type == "tool_use_complete":
+                turn.add_call(ev.tool_use_id, ev.tool_name, ev.tool_input_complete)
+            elif ev.type == "usage" and ev.usage:
+                self._apply_usage(ev.usage, turn.sent_count)
+            elif ev.type == "done":
+                # ``done`` ends the response. Reading on would act twice on a provider
+                # that repeats its final chunk.
+                async for status in self._finish_response(ev.stop_reason, tool_ctx, turn, flow):
+                    yield status
+                return
+            elif ev.type == "error":
+                raise ProviderCallError(
+                    ev.error or "Unknown error",
+                    ProviderFailure(ev.error_kind or OTHER, ev.status_code, ev.retry_after),
+                )
+
+    async def _finish_response(
+        self,
+        stop:     str,
+        tool_ctx: ToolContext,
+        turn:     _Turn,
+        flow:     _Flow,
+    ) -> AsyncGenerator[str, None]:
+        """Act on why the response ended: continue the run (flow stays open) or end it."""
+        if stop == "max_tokens":
+            if not self._handle_max_tokens_stop():
+                self.last_stop = "max_tokens"
+                flow.finished  = True
+                yield "\n\n[bold red]Max tokens reached.[/bold red]"
+            return
+        if stop == "end_turn":
+            if (
+                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer)
+                and self._end_turn_nudges < _MAX_END_TURN_NUDGES
+            ):
+                self._end_turn_nudges += 1
+                return
+            decision = self._todo_guard.check(self.session.session_id)
+            if decision.kind == CONTINUE:
+                self.state.messages.append(Message(role=Role.USER, content=decision.message))
+                return
+            if decision.kind == STALLED:
+                yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
+            self._set_activity(phase="idle", label="Ready")
+            flow.finished = True
+            return
+        if stop == "tool_use" and turn.tool_uses:
+            async for status in self._handle_tool_use_stop(turn.asst_text, turn.tool_uses, tool_ctx):
+                yield status
+            return
+        logger.warning("Unhandled stop_reason: %s", stop)
+        if turn.asst_text:
+            self.state.messages.append(Message(role=Role.ASSISTANT, content=turn.asst_text))
+            self.session.record_assistant_message(turn.asst_text)
+        flow.finished = True
+
+    async def _recover_from_failure(
+        self,
+        exc:           Exception,
+        recovery:      RecoveryPlanner,
+        turn:          _Turn,
+        flow:          _Flow,
+        system_prompt: str,
+        tools:         list[Any],
+        tool_ctx:      ToolContext,
+    ) -> AsyncGenerator[str, None]:
+        """Retry, compact, fall back, resend without streaming, or end the run after a failed request."""
+        from_event = isinstance(exc, ProviderCallError)
+        failure    = exc.failure if isinstance(exc, ProviderCallError) else classify_exception(exc)
+        action     = recovery.plan(
+            failure,
+            current          = self.settings.model.model,
+            current_provider = self.settings.model.provider or "",
+            streamed         = bool(turn.asst_text or turn.tool_uses),
+        )
+        if action.kind == RESEND:
+            flow.finished = True
+            yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
+            async for c in self._fallback_to_send(system_prompt, turn.messages, tools, tool_ctx):
+                yield c
+            return
+        if action.kind == RETRY:
+            yield f"\n[dim yellow][Retrying in {action.delay:.1f}s: {failure.kind}][/dim yellow]\n"
+            await asyncio.sleep(action.delay)
+            return
+        if action.kind == COMPACT:
+            cur_toks = flow.context_tokens
+            async for status in self._maybe_compact_messages(cur_toks, int(cur_toks * 0.6)):
+                yield status
+            return
+        if action.kind == FALLBACK:
+            self._switch_model(action.provider, action.model)
+            yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
+            return
+        self.last_stop = "provider_error"
+        flow.finished  = True
+        if from_event:
+            yield f"\n[bold red]Provider error: {exc}[/bold red]"
+            return
+        yield f"\n[bold red]Error: {exc}[/bold red]"
+        self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {exc}"))
 
     def _switch_model(self, provider: str | None, model: str) -> None:
         """Point the loop at *model*, on *provider* when one is given."""
