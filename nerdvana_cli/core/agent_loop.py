@@ -188,6 +188,15 @@ class _Turn:
 class AgentLoop:
     """Orchestrates provider calls, tool execution, and session recording."""
 
+    _queued_input:            list[str]
+    last_stop:                str
+    turns_used:               int
+    _cost_limit_warned:       bool
+    _usage_input_total:       int
+    _usage_output_total:      int
+    _usage_cache_read_total:  int
+    _usage_cache_write_total: int
+
     def __init__(
         self,
         settings:            NerdvanaSettings,
@@ -270,13 +279,7 @@ class AgentLoop:
             mode       = self.settings.model.provider or None,
             context    = self.settings.cwd or None,
         )
-        self.last_stop                = "completed"
-        self.turns_used               = 0
-        self._cost_limit_warned       = False
-        self._usage_input_total       = 0
-        self._usage_output_total      = 0
-        self._usage_cache_read_total  = 0
-        self._usage_cache_write_total = 0
+        self._reset_run_counters()
         self.policy        = PermissionPolicy.from_settings(self.settings)
         self.tool_executor = ToolExecutor(
             registry            = self.registry,
@@ -408,6 +411,41 @@ class AgentLoop:
             base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature,
             prompt_caching=self.settings.model.prompt_caching)
 
+    def _reset_run_counters(self) -> None:
+        """Zero the stop status, the typed-ahead queue and the session's usage totals."""
+        self._queued_input            = []
+        self.last_stop                = "completed"
+        self.turns_used               = 0
+        self._cost_limit_warned       = False
+        self._usage_input_total       = 0
+        self._usage_output_total      = 0
+        self._usage_cache_read_total  = 0
+        self._usage_cache_write_total = 0
+
+    def queue_input(self, text: str) -> None:
+        """Hold text the user typed while the agent was working.
+
+        It reaches the model at the start of the next step, after any tool results
+        already in the history, or becomes the next prompt when the run ends first.
+        """
+        if text.strip():
+            self._queued_input.append(text)
+
+    def has_queued_input(self) -> bool:
+        """True when typed-ahead text is waiting for the model."""
+        return bool(self._queued_input)
+
+    def take_queued_input(self) -> list[str]:
+        """Return and clear the typed-ahead text."""
+        taken, self._queued_input = self._queued_input, []
+        return taken
+
+    def _inject_queued_input(self) -> None:
+        """Put typed-ahead text into the history as user messages, in the order typed."""
+        for text in self.take_queued_input():
+            self.state.messages.append(Message(role=Role.USER, content=text))
+            self.session.record_user_message(text)
+
     def restore_history(self) -> int:
         """Load this session's recorded conversation into the live history.
 
@@ -431,6 +469,7 @@ class AgentLoop:
         ))
 
     def reset_session(self) -> None:
+        self._queued_input = []
         self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
         self._dir_rules.reset()
@@ -759,6 +798,7 @@ class AgentLoop:
 
     async def _prepare_context(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
         """Report finished background work, compact when the window is nearly full, and show usage."""
+        self._inject_queued_input()
         self._report_background_tasks()
         max_ctx  = self.settings.session.max_context_tokens
         thr      = int(max_ctx * self.settings.session.compact_threshold)
@@ -842,6 +882,9 @@ class AgentLoop:
                 yield "\n\n[bold red]Max tokens reached.[/bold red]"
             return
         if stop == "end_turn":
+            if self.has_queued_input():
+                self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer)
+                return  # the user typed ahead; answer it in the next step
             if (
                 self._handle_end_turn_stop(turn.asst_text, turn.thinking_buffer)
                 and self._end_turn_nudges < _MAX_END_TURN_NUDGES

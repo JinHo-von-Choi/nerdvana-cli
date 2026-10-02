@@ -118,6 +118,12 @@ class _FakeApp:
     def _wake_for_background(self) -> None:
         return None
 
+    def _drain_queued_input(self) -> None:
+        return None
+
+    def _after_response(self) -> None:
+        return None
+
     def _update_context_usage(self, pct: int) -> None:
         return None
 

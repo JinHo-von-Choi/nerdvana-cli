@@ -178,4 +178,4 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         app._add_chat_message(f"\n[bold red]Error: {e}[/bold red]")
     finally:
         app._is_generating = False
-        app.call_later(app._wake_for_background)
+        app.call_later(app._after_response)

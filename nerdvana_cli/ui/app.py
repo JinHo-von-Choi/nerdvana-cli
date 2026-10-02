@@ -435,12 +435,31 @@ class NerdvanaApp(App[object]):
             return
 
         if self._is_generating:
+            if self._agent_loop is not None:
+                self._agent_loop.queue_input(user_text)
+                self._add_chat_message(
+                    f"\n[bold green]> {escape(user_text)}[/bold green] [dim](queued, applied at the next step)[/dim]",
+                    raw_text=user_text,
+                )
             return
 
         self._add_chat_message(f"\n[bold green]> {user_text}[/bold green]", raw_text=user_text)
         self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
 
         self._generate_response(user_text)
+
+    def _after_response(self) -> None:
+        """Pick up what accumulated while a response was being generated."""
+        self._drain_queued_input()
+        self._wake_for_background()
+
+    def _drain_queued_input(self) -> None:
+        """Start a turn with text typed ahead that the finished run did not get to."""
+        loop = self._agent_loop
+        if self._is_generating or loop is None or not loop.has_queued_input():
+            return
+        self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
+        self._generate_response("\n\n".join(loop.take_queued_input()))
 
     @work(exclusive=True)
     async def _generate_response(self, prompt: str) -> None:
