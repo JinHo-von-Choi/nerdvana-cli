@@ -19,15 +19,12 @@ def create_tool_registry(
     mcp_tools:      Any    = None,
     settings:       Any    = None,
     task_registry:  Any    = None,
-    team_registry:  Any    = None,
 ) -> ToolRegistry:
     """Create and populate the tool registry with all built-in tools."""
     from nerdvana_cli.core.task_state import TaskRegistry
-    from nerdvana_cli.core.team import TeamRegistry
 
     registry  = ToolRegistry()
     _task_reg = task_registry or TaskRegistry()
-    _team_reg = team_registry or TeamRegistry()
 
     if mcp_tools:
         for tool in mcp_tools:
@@ -60,14 +57,7 @@ def create_tool_registry(
         from nerdvana_cli.tools.agent_tool import AgentTool
         registry.register(AgentTool(settings=settings, task_registry=_task_reg))
 
-    from nerdvana_cli.tools.team_tools import (
-        SendMessageTool,
-        TaskGetTool,
-        TaskStopTool,
-        TeamCreateTool,
-    )
-    registry.register(TeamCreateTool(team_registry=_team_reg))
-    registry.register(SendMessageTool(team_registry=_team_reg))
+    from nerdvana_cli.tools.team_tools import TaskGetTool, TaskStopTool
     registry.register(TaskGetTool(task_registry=_task_reg))
     registry.register(TaskStopTool(task_registry=_task_reg))
 
@@ -120,8 +110,8 @@ def create_subagent_registry(
 ) -> ToolRegistry:
     """Create a restricted tool registry for subagent use.
 
-    Subagents get standard tools filtered by allowed_tools but NOT AgentTool or
-    team tools (no recursive spawning, no team management from subagents).
+    Subagents get standard tools filtered by allowed_tools but NOT AgentTool
+    (no recursive spawning).
 
     If allowed_tools is None or ["*"], all standard tools are included.
     Otherwise only tools whose name appears in allowed_tools are registered.

@@ -134,10 +134,10 @@ class TestStrictFields:
         with pytest.raises(SettingsLoadError, match="allow_project_hooks"):
             NerdvanaSettings.load(_write(tmp_path, "hooks:\n  allow_project_hooks: [yes]\n"))
 
-    def test_other_hook_fields_still_recover(self, tmp_path: Path) -> None:
+    def test_removed_hook_keys_do_not_block_loading(self, tmp_path: Path) -> None:
         settings = NerdvanaSettings.load(_write(tmp_path, "hooks:\n  before_tool: 3\n"))
-        assert settings.hooks.before_tool == []
-        assert [w.path for w in settings.load_warnings] == ["hooks.before_tool"]
+        assert settings.hooks.allow_project_hooks is False
+        assert [(w.kind, w.path) for w in settings.load_warnings] == [("removed_key", "hooks.before_tool")]
 
     def test_invalid_external_projects_flag_fails_loading(self, tmp_path: Path) -> None:
         with pytest.raises(SettingsLoadError, match="external_projects_enabled"):
