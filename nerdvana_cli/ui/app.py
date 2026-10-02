@@ -25,7 +25,7 @@ from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.task_state import TaskRegistry
+from nerdvana_cli.core.task_state import TaskRegistry, TaskState
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.editor_pane import EditorPane, language_for_path
@@ -225,6 +225,21 @@ class NerdvanaApp(App[object]):
         self.push_screen(AskUserScreen(question, options), _on_dismiss)
         return await answer
 
+    def _on_background_task_finished(self, task: TaskState) -> None:
+        """Defer the wake-up so it runs after the finishing task returns."""
+        self.call_later(self._wake_for_background)
+
+    def _wake_for_background(self) -> None:
+        """Start a turn to report finished background work when the agent is idle.
+
+        While a turn is running, the agent loop reports finished tasks at its
+        next step, and the response runner calls this again once it is done.
+        """
+        if self._is_generating or self._agent_loop is None or not self._task_registry.has_unreported():
+            return
+        self._add_chat_message("[dim]Background work finished; reviewing the result.[/dim]")
+        self._generate_response("Background work finished. Review the reported results and continue.")
+
     def on_unmount(self) -> None:
         """Close the agent session so SESSION_END hooks run on exit."""
         if self._agent_loop is not None:
@@ -273,6 +288,7 @@ class NerdvanaApp(App[object]):
         triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
         sidebar.set_skills(triggers)
         sidebar.set_tasks_registry(self._task_registry)
+        self._task_registry.add_listener(self._on_background_task_finished)
         self.set_interval(0.5, self._refresh_sidebar_tasks)
         self.set_interval(2.0, self._schedule_sidebar_file_refresh)
 

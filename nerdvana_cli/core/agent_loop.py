@@ -64,6 +64,9 @@ CONTEXT_USAGE_PREFIX  = "\x00CTX_USAGE:"
 # End-of-turn hooks (unfinished-marker checks and the like) may keep the loop
 # going at most this many times per user prompt.
 _MAX_END_TURN_NUDGES = 3
+
+# Longest background task output quoted in a completion notice.
+_BACKGROUND_REPORT_CHARS = 4_000
 COMPACT_STATUS_PREFIX = "\x00COMPACT:"
 
 _COMPLEXITY_SIGNALS: list[str] = [
@@ -447,6 +450,20 @@ class AgentLoop:
         self._context_budget.reset()
         self._keep_todos_in_view()
 
+    def _report_background_tasks(self) -> None:
+        """Tell the model about background tasks that finished since it last looked."""
+        registry = self._task_registry
+        if registry is None or not hasattr(registry, "drain_unreported"):
+            return
+        for task in registry.drain_unreported():
+            body = task.output if task.output else (task.error or "")
+            if len(body) > _BACKGROUND_REPORT_CHARS:
+                body = body[:_BACKGROUND_REPORT_CHARS] + f"\n... [cut; TaskGet {task.id} returns the full output]"
+            self.state.messages.append(Message(
+                role    = Role.USER,
+                content = f"[Background task {task.id} {task.status}] {task.description}\n{body}",
+            ))
+
     def _keep_todos_in_view(self) -> None:
         """After compaction, restate the open todo items the summary may have lost."""
         pending = open_items(load_todos(self.session.session_id))
@@ -571,6 +588,7 @@ class AgentLoop:
                     yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
                     return
 
+                self._report_background_tasks()
                 max_ctx  = self.settings.session.max_context_tokens
                 thr      = int(max_ctx * self.settings.session.compact_threshold)
                 cur_toks = self._context_budget.current(self.state.messages)

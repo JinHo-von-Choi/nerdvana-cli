@@ -64,6 +64,9 @@ class TaskGetTool(BaseTool[TaskGetArgs]):
             lines.append(f"\n--- output ---\n{task.output}")
         if task.error:
             lines.append(f"\n--- error ---\n{task.error}")
+        if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.KILLED):
+            # The model has now seen the outcome; no completion notice is needed.
+            task.reported = True
         return ToolResult(tool_use_id="", content="\n".join(lines))
 
 
