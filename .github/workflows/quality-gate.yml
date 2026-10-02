@@ -43,7 +43,7 @@ jobs:
         run: uv run mypy nerdvana_cli/
 
       - name: Pytest
-        run: uv run pytest -m "not lsp_integration and not live" -q --continue-on-collection-errors
+        run: uv run pytest -m "not lsp_integration and not live" -q
 
       - name: Verify test collection baseline
         run: |
