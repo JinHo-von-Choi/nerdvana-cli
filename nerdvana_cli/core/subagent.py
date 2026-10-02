@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.tool import ToolRegistry
+from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
 
 _PROTOCOL_PREFIXES = (
     "\x00TOOL:",
@@ -27,6 +27,18 @@ class SubagentConfig:
     registry:      ToolRegistry
     max_turns:     int = 50
     system_prompt: str = ""
+    confirm:       ConfirmCallback | None = None
+
+
+def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
+    """Wrap *confirm* so a request names the agent that is asking."""
+    if confirm is None:
+        return None
+
+    async def _labelled(tool_name: str, message: str) -> bool:
+        return await confirm(tool_name, f"[{label}] {message}")
+
+    return _labelled
 
 
 async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
@@ -40,7 +52,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
 
-    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt)
+    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm)
     parts: list[str] = []
 
     limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)

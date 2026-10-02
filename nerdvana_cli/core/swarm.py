@@ -8,9 +8,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.core.tool import ToolRegistry
+from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
 
 
 @dataclass
@@ -32,6 +32,7 @@ class SwarmConfig:
     settings:      NerdvanaSettings
     task_registry: TaskRegistry
     max_turns:     int = 50
+    confirm:       ConfirmCallback | None = None
 
 
 async def run_swarm(
@@ -69,6 +70,7 @@ async def run_swarm(
             settings  = child_settings,
             registry  = child_registry,
             max_turns = config.max_turns,
+            confirm   = label_confirm(config.confirm, agent_id),
         )
 
         try:

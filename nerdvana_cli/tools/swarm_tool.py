@@ -99,6 +99,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
             settings      = self._settings,
             task_registry = registry,
             max_turns     = args.max_turns,
+            confirm       = context.confirm,
         )
         parent_tools = self._parent_registry.all_tools() if self._parent_registry else None
         results      = await run_swarm(config, partial(create_subagent_registry, parent_tools=parent_tools))
