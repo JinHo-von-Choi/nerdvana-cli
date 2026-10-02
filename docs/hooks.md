@@ -110,6 +110,10 @@ Fires on `stop_reason == "end_turn"` and scans the most recent assistant message
 
 When `FileRead`, `FileEdit` or `FileWrite` first touches a file in a subdirectory, the `NIRNA.md`, `AGENTS.md` and `CLAUDE.md` files between that directory and the project root are injected once, nearest first, up to 32 KB per session.
 
+## Command hooks
+
+Shell commands can be declared without writing Python, in `~/.nerdvana/hooks.yml` and `<project>/.nerdvana/hooks.yml`; see "Custom Commands and Command Hooks" in the README for the format. They attach to `BEFORE_TOOL`, `AFTER_TOOL`, `SESSION_START` and `SESSION_END`. An exit code of 2 makes a `BEFORE_TOOL` command veto the call (`HookResult(allow=False)` with the command's output as the message) and makes an `AFTER_TOOL` command inject its output as a user message; every other outcome is ignored. A project `hooks.yml` is subject to the same opt-in and digest approval as project Python hooks.
+
 ## User hook directories
 
 NerdVana CLI auto-loads any `*.py` file from these directories on every

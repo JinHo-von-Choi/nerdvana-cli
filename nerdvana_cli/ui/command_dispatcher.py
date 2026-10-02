@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
 from textual.widgets import Input
 
 if TYPE_CHECKING:
@@ -73,7 +74,8 @@ async def dispatch_command(app: NerdvanaApp, cmd: str) -> None:
         1. ``/quit`` aliases — exit the app.
         2. Static handler map — direct dispatch.
         3. Skill trigger fallback — activate matching skill and forward args.
-        4. Unknown — print red error in chat.
+        4. User command template — send its rendered text as the prompt.
+        5. Unknown — print red error in chat.
     """
     parts   = cmd.split(maxsplit=1)
     command = parts[0].lower()
@@ -103,4 +105,9 @@ async def dispatch_command(app: NerdvanaApp, cmd: str) -> None:
                 app.call_later(input_widget.action_submit)
             return
 
-    app._add_chat_message(f"[red]Unknown command: {command}[/red]")
+    template = next((c for c in app._user_commands() if c.trigger == command), None)
+    if template is not None:
+        app._start_prompt(cmd, template.render(args))
+        return
+
+    app._add_chat_message(f"[red]Unknown command: {escape(command)}[/red]")
