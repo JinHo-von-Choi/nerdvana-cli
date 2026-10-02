@@ -116,11 +116,6 @@ def user_cache_dir() -> Path:
     return user_data_home() / "cache"
 
 
-def user_logs_dir() -> Path:
-    """Directory for structured logs (reserved for future use)."""
-    return user_data_home() / "logs"
-
-
 def ensure_user_dirs() -> None:
     """Create all user subdirectories if they do not exist. Idempotent."""
     root = user_data_home()
@@ -165,34 +160,10 @@ def legacy_sessions_dir() -> Path:
 # Project-local helpers — always take an explicit cwd argument
 # ---------------------------------------------------------------------------
 
-def project_config_path(cwd: str) -> Path:
-    """Project config override file (commit-friendly)."""
-    return Path(cwd) / "nerdvana.yml"
-
-
-def project_config_path_yaml(cwd: str) -> Path:
-    """Alternate project config override (yaml extension)."""
-    return Path(cwd) / "nerdvana.yaml"
-
 
 def project_skills_dir(cwd: str) -> Path:
     """Project-local skills directory."""
     return Path(cwd) / ".nerdvana" / "skills"
-
-
-def project_hooks_dir(cwd: str) -> Path:
-    """Project-local hooks directory."""
-    return Path(cwd) / ".nerdvana" / "hooks"
-
-
-def project_agents_dir(cwd: str) -> Path:
-    """Project-local agent definitions directory."""
-    return Path(cwd) / ".nerdvana" / "agents"
-
-
-def project_mcp_json(cwd: str) -> Path:
-    """Project-local MCP config (claude-code compatible name)."""
-    return Path(cwd) / ".mcp.json"
 
 
 def project_nirnamd_path(cwd: str) -> Path:
