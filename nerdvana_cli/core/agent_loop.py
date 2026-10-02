@@ -16,6 +16,7 @@ from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
+from rich.markup import escape
 
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
@@ -35,6 +36,7 @@ from nerdvana_cli.core.provider_recovery import (
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.stream_guard import guarded_stream
+from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
 from nerdvana_cli.core.tool import AskUserCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderName
@@ -58,6 +60,10 @@ logger  = logging.getLogger(__name__)
 TOOL_STATUS_PREFIX    = "\x00TOOL:"
 TOOL_DONE_PREFIX      = "\x00TOOL_DONE:"
 CONTEXT_USAGE_PREFIX  = "\x00CTX_USAGE:"
+
+# End-of-turn hooks (unfinished-marker checks and the like) may keep the loop
+# going at most this many times per user prompt.
+_MAX_END_TURN_NUDGES = 3
 COMPACT_STATUS_PREFIX = "\x00COMPACT:"
 
 _COMPLEXITY_SIGNALS: list[str] = [
@@ -198,6 +204,8 @@ class AgentLoop:
         self._compact_prompt   = _cs.body if _cs else FALLBACK_PROMPT
         self._compaction_state = CompactionState(max_failures=settings.session.compact_max_failures)
         self._context_budget   = ContextBudget()
+        self._todo_guard       = TodoGuard()
+        self._end_turn_nudges  = 0
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
         self._session_ended   = False
         self.provider         = self.create_provider_from_settings()
@@ -354,6 +362,8 @@ class AgentLoop:
             yield "[dim cyan][Ultrawork mode: extended thinking ON][/dim cyan]\n"
 
         self._turn += 1
+        self._todo_guard.reset()
+        self._end_turn_nudges = 0
         reminder = self._reminder.build(turn=self._turn)
         if reminder:
             self.state.messages.append(Message(role=Role.USER, content=reminder))
@@ -429,11 +439,22 @@ class AgentLoop:
                 self.state.messages = [summary] + recent
                 self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
                 self._context_budget.reset()
+                self._keep_todos_in_view()
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
         self.state.messages = _drop_orphan_tool_results(compact_messages(self.state.messages, thr))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
         self._context_budget.reset()
+        self._keep_todos_in_view()
+
+    def _keep_todos_in_view(self) -> None:
+        """After compaction, restate the open todo items the summary may have lost."""
+        pending = open_items(load_todos(self.session.session_id))
+        if pending:
+            self.state.messages.append(Message(
+                role    = Role.USER,
+                content = f"Open todo items (kept across compaction):\n{describe(pending)}",
+            ))
 
     def _handle_max_tokens_stop(self) -> bool:
         """Run AFTER_API_CALL hooks with stop_reason='max_tokens'.
@@ -611,8 +632,18 @@ class AgentLoop:
                                     return
                                 break
                             elif stop == "end_turn":
-                                if self._handle_end_turn_stop(asst_text, thinking_buffer):
+                                if (
+                                    self._handle_end_turn_stop(asst_text, thinking_buffer)
+                                    and self._end_turn_nudges < _MAX_END_TURN_NUDGES
+                                ):
+                                    self._end_turn_nudges += 1
                                     break
+                                decision = self._todo_guard.check(self.session.session_id)
+                                if decision.kind == CONTINUE:
+                                    self.state.messages.append(Message(role=Role.USER, content=decision.message))
+                                    break
+                                if decision.kind == STALLED:
+                                    yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
                                 self._set_activity(phase="idle", label="Ready")
                                 return
                             elif stop == "tool_use" and tool_uses:

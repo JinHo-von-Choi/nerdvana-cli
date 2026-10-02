@@ -3,38 +3,23 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from nerdvana_cli.core.todos import sanitize_session_id, todos_dir
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 _VALID_STATUSES = frozenset({"pending", "in_progress", "completed"})
 
-# Reject any session_id that would escape the todos directory.
-# Allow only alphanumeric, hyphen, underscore, and dot (no path separators).
-_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-
-
 def _sanitize_session_id(raw: str) -> str:
-    """Return a filesystem-safe session identifier.
-
-    If *raw* contains path-traversal sequences or disallowed characters the
-    fallback ``"default"`` is returned instead.  This prevents a malicious or
-    malformed session_id (e.g. ``"../../../etc"``) from writing outside the
-    todos directory.
-    """
-    if raw and _SESSION_ID_RE.match(raw):
-        return raw
-    return "default"
+    """Return a filesystem-safe session identifier (``"default"`` when unsafe)."""
+    return sanitize_session_id(raw)
 
 
 def _todos_dir() -> Path:
-    """Return ``~/.nerdvana/todos/``, creating it when absent."""
-    d = Path.home() / ".nerdvana" / "todos"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """Return the todo directory under the user data home, creating it when absent."""
+    return todos_dir()
 
 
 def _validate_todos(todos: list[Any]) -> str | None:
