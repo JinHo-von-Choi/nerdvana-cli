@@ -138,15 +138,15 @@ def _check_parism() -> CheckResult:
 
 
 def _check_lsp_servers() -> CheckResult:
-    """Check for pyright and typescript-language-server binaries."""
-    found   = [b for b in ("pyright", "typescript-language-server") if shutil.which(b)]
-    missing = [b for b in ("pyright", "typescript-language-server") if b not in found]
+    """Check for the pyright and typescript language server binaries."""
+    found   = [b for b in ("pyright-langserver", "typescript-language-server") if shutil.which(b)]
+    missing = [b for b in ("pyright-langserver", "typescript-language-server") if b not in found]
 
     if not found:
         return CheckResult(
             "lsp_servers",
             "warn",
-            "Neither pyright nor typescript-language-server found on PATH",
+            "Neither pyright-langserver nor typescript-language-server found on PATH",
         )
 
     detail = f"found: {', '.join(found)}"

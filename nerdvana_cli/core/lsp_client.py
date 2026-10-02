@@ -22,13 +22,20 @@ from nerdvana_cli.utils.path import safe_open_fd
 logger = logging.getLogger(__name__)
 
 _EXT_SERVERS: dict[str, list[str]] = {
-    ".py":  ["pyright", "pylsp"],
+    ".py":  ["pyright-langserver", "pylsp"],
     ".ts":  ["typescript-language-server"],
     ".tsx": ["typescript-language-server"],
     ".js":  ["typescript-language-server"],
     ".jsx": ["typescript-language-server"],
     ".go":  ["gopls"],
     ".rs":  ["rust-analyzer"],
+}
+
+# Arguments that put each server into stdio LSP mode. Servers not listed here
+# (pylsp, gopls, rust-analyzer) speak LSP over stdio when run without arguments.
+_SERVER_ARGS: dict[str, list[str]] = {
+    "pyright-langserver":         ["--stdio"],
+    "typescript-language-server": ["--stdio"],
 }
 
 # Per-server initialize timeouts (seconds); keyed by binary name.
@@ -106,6 +113,7 @@ class LspClient:
         self._procs:        dict[str, asyncio.subprocess.Process] = {}
         self._req_id:       int       = 0
         self._disabled:     set[str]  = set()
+        self._binaries:     dict[str, str] = {}  # ext -> server binary that was started
         self._open_files:   dict[str, int] = {}  # abs_path -> version
         self._open_digests: dict[str, str] = {}  # abs_path -> sha256 of the text last sent
         self._locks:        dict[str, asyncio.Lock] = {}   # ext -> stdio lock
@@ -419,7 +427,8 @@ class LspClient:
         binaries = _EXT_SERVERS.get(ext, [])
         for binary in binaries:
             if shutil.which(binary):
-                args = [binary, "--stdio"]
+                args = [binary, *_SERVER_ARGS.get(binary, [])]
+                self._binaries[ext] = binary
                 proc = await asyncio.create_subprocess_exec(
                     *args,
                     stdin=asyncio.subprocess.PIPE,
@@ -432,7 +441,7 @@ class LspClient:
 
     async def _initialize(self, proc: asyncio.subprocess.Process, ext: str) -> None:
         """Send LSP initialize + initialized handshake."""
-        binary   = (_EXT_SERVERS.get(ext) or [""])[0]
+        binary   = self._binaries.get(ext, "")
         timeout  = _init_timeout_for(binary)
         root_uri = Path(self._project_root).resolve().as_uri()
 

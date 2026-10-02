@@ -193,3 +193,19 @@ class TestLanguageServerSymbol:
         assert sym.detail == ""
         d = sym.to_dict()
         assert "detail" not in d
+
+
+def test_decorated_symbol_keeps_definition_start_and_name_position() -> None:
+    """A decorated class starts on its decorator; its name sits on the next line."""
+    from nerdvana_cli.core.symbol import _sym_from_dict
+
+    raw = {
+        "name":           "User",
+        "kind":           5,
+        "range":          {"start": {"line": 6, "character": 0}, "end": {"line": 20, "character": 0}},
+        "selectionRange": {"start": {"line": 7, "character": 6}, "end": {"line": 7, "character": 10}},
+    }
+    symbol = _sym_from_dict(raw, "/p/models.py", "", 0, 0)
+    assert symbol.location.line == 7
+    assert symbol.name_location is not None
+    assert (symbol.name_location.line, symbol.name_location.character) == (8, 6)

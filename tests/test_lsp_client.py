@@ -26,7 +26,7 @@ async def test_has_any_server_false_when_none_found():
 async def test_create_lsp_tools_returns_names():
     """create_lsp_tools() returns tool objects for installed servers."""
     client = LspClient()
-    with patch("shutil.which", side_effect=lambda b: "/usr/bin/pyright" if b == "pyright" else None):
+    with patch("shutil.which", side_effect=lambda b: "/usr/bin/pyright" if b == "pyright-langserver" else None):
         tools = create_lsp_tools(client)
     tool_names = [t.name for t in tools]
     assert "lsp_diagnostics" in tool_names
@@ -98,3 +98,24 @@ async def test_changed_file_is_resent_with_did_change(tmp_path) -> None:
     assert [b["method"] for b in bodies] == ["textDocument/didOpen", "textDocument/didChange"]
     assert bodies[1]["params"]["textDocument"]["version"] == 2
     assert bodies[1]["params"]["contentChanges"] == [{"text": "x = 2\n"}]
+
+
+@pytest.mark.asyncio
+async def test_servers_are_started_in_stdio_mode_with_their_own_arguments(tmp_path) -> None:
+    """pyright runs as pyright-langserver --stdio; pylsp takes no stdio flag."""
+    from types import SimpleNamespace
+
+    started: list[tuple[str, ...]] = []
+
+    async def _exec(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        started.append(args)
+        return SimpleNamespace(pid=1, returncode=None)
+
+    for available, expected in (("pyright-langserver", ("pyright-langserver", "--stdio")), ("pylsp", ("pylsp",))):
+        client = LspClient(project_root=str(tmp_path))
+        with patch("shutil.which", side_effect=lambda b, a=available: f"/usr/bin/{b}" if b == a else None), \
+             patch("asyncio.create_subprocess_exec", side_effect=_exec), \
+             patch("nerdvana_cli.core.lsp_client._track_proc"):
+            await client._start_server(".py")
+        assert started[-1] == expected
+        assert client._binaries[".py"] == available
