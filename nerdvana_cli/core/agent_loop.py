@@ -20,6 +20,7 @@ from rich.console import Console
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
+from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
@@ -80,12 +81,7 @@ def estimate_tokens(text: str) -> int:
 
 
 def estimate_messages_tokens(msgs: list[Any]) -> int:
-    total = 0
-    for m in msgs:
-        total += estimate_tokens(m.content if isinstance(m.content, str) else json.dumps(m.content))
-        if m.tool_uses:
-            total += estimate_tokens(json.dumps(m.tool_uses))
-    return total
+    return message_tokens(msgs)
 
 
 def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
@@ -201,6 +197,7 @@ class AgentLoop:
         _cs = self.skill_loader.get_by_name("compress-context")
         self._compact_prompt   = _cs.body if _cs else FALLBACK_PROMPT
         self._compaction_state = CompactionState(max_failures=settings.session.compact_max_failures)
+        self._context_budget   = ContextBudget()
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
         self._session_ended   = False
         self.provider         = self.create_provider_from_settings()
@@ -320,6 +317,7 @@ class AgentLoop:
         self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
         self._dir_rules.reset()
+        self._context_budget.reset()
 
     def build_system_prompt(self) -> str:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
@@ -430,10 +428,12 @@ class AgentLoop:
                     recent = recent[1:]
                 self.state.messages = [summary] + recent
                 self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
+                self._context_budget.reset()
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
         self.state.messages = _drop_orphan_tool_results(compact_messages(self.state.messages, thr))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
+        self._context_budget.reset()
 
     def _handle_max_tokens_stop(self) -> bool:
         """Run AFTER_API_CALL hooks with stop_reason='max_tokens'.
@@ -538,6 +538,7 @@ class AgentLoop:
         orig_provider = self.settings.model.provider
         orig_api_key  = self.settings.model.api_key
         orig_base_url = self.settings.model.base_url
+        self._context_budget.set_overhead(system_prompt, tools)
         recovery      = RecoveryPlanner(
             fallbacks   = list(self.settings.model.fallback_models),
             max_retries = self.settings.model.max_retries,
@@ -551,7 +552,7 @@ class AgentLoop:
 
                 max_ctx  = self.settings.session.max_context_tokens
                 thr      = int(max_ctx * self.settings.session.compact_threshold)
-                cur_toks = estimate_messages_tokens(self.state.messages)
+                cur_toks = self._context_budget.current(self.state.messages)
                 state    = state.evolve(token_budget_used=cur_toks)
 
                 if cur_toks > thr:
@@ -565,6 +566,7 @@ class AgentLoop:
                 messages = self._to_provider_messages()
                 if self._fire_before_api_call(tools):
                     messages = self._to_provider_messages()
+                sent_count = len(self.state.messages)
                 try:
                     asst_text       = ""
                     thinking_buffer = ""
@@ -600,6 +602,7 @@ class AgentLoop:
                             self.state.usage.output_tokens = ev.usage.get("output_tokens", 0)
                             self._usage_input_total  += self.state.usage.input_tokens
                             self._usage_output_total += self.state.usage.output_tokens
+                            self._context_budget.record_usage(self.state.usage.input_tokens, sent_count)
                         elif ev.type == "done":
                             stop = ev.stop_reason
                             if stop == "max_tokens":
