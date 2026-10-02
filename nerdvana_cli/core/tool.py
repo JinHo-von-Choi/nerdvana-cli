@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import os
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
+from nerdvana_cli.core.token_estimator import approx_tokens
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 T = TypeVar("T")
@@ -15,6 +20,28 @@ T = TypeVar("T")
 # Interactive question hook: receives the question and the suggested options and
 # resolves to the user's answer, or None when the user dismissed the prompt.
 AskUserCallback = Callable[[str, list[str]], Awaitable[str | None]]
+
+# Directory where full outputs are kept when a result is truncated. Set by the
+# tool executor for the duration of one call; unset means no copy is kept.
+TOOL_OUTPUT_DIR: ContextVar[str | None] = ContextVar("tool_output_dir", default=None)
+
+# Share of a truncated result kept from the start; the rest comes from the end.
+_HEAD_SHARE = 0.6
+
+
+def _save_full_output(tool_name: str, content: str) -> str | None:
+    """Write *content* under ``TOOL_OUTPUT_DIR``; return the path, or None."""
+    directory = TOOL_OUTPUT_DIR.get()
+    if not directory:
+        return None
+    try:
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in tool_name) or "tool"
+        path = Path(directory) / f"{safe}-{uuid.uuid4().hex[:8]}.txt"
+        path.write_text(content, encoding="utf-8")
+        return str(path)
+    except OSError:
+        return None
 
 
 class ToolCategory(StrEnum):
@@ -63,7 +90,7 @@ class BaseTool(ABC, Generic[T]):
     input_schema:        dict[str, Any] = {}
     is_concurrency_safe: bool           = False
     is_destructive:      bool           = False
-    max_result_size:     int            = 500_000
+    max_result_tokens:   int            = 30_000
     args_class:          type | None    = None
 
     # ── Phase 0B metadata ────────────────────────────────────────────────
@@ -113,14 +140,27 @@ class BaseTool(ABC, Generic[T]):
         return None
 
     def truncate_result(self, content: str) -> str:
-        if len(content) > self.max_result_size:
-            half = self.max_result_size // 2
-            return (
-                content[:half]
-                + f"\n\n... [truncated, {len(content) - self.max_result_size} chars omitted] ...\n\n"
-                + content[-half:]
-            )
-        return content
+        """Bound *content* to ``max_result_tokens``, keeping its head and tail.
+
+        When the executor has set ``TOOL_OUTPUT_DIR`` the full output is saved
+        there first and the note names the file.
+        """
+        total = approx_tokens(content)
+        if total <= self.max_result_tokens:
+            return content
+        saved = _save_full_output(self.name, content)
+        keep  = int(len(content) * self.max_result_tokens / total * 0.9)
+        head  = int(keep * _HEAD_SHARE)
+        tail  = keep - head
+        where = (
+            f" Full output saved to {saved}; read parts of it with Bash (for example sed -n '1,200p')."
+            if saved else ""
+        )
+        note = (
+            f"\n\n... [truncated: about {total - self.max_result_tokens} of {total} estimated tokens omitted."
+            f"{where} Prefer narrowing the request (offset/limit, a more specific pattern).] ...\n\n"
+        )
+        return content[:head] + note + (content[-tail:] if tail > 0 else "")
 
 
 @dataclass
@@ -135,7 +175,7 @@ class ToolDef(Generic[T]):
     # is_read_only is derived from category; kept for back-compat at call sites
     is_read_only:          bool             = False
     is_destructive:        bool             = False
-    max_result_size:       int              = 500_000
+    max_result_tokens:     int              = 30_000
     check_permissions_fn:  Any              = None
     validate_input_fn:     Any              = None
     prompt_fn:             Any              = None
@@ -174,7 +214,7 @@ def build_tool(defn: ToolDef[T]) -> BaseTool[T]:
         input_schema     = defn.input_schema
         is_concurrency_safe = defn.is_concurrency_safe
         is_destructive   = defn.is_destructive
-        max_result_size  = defn.max_result_size
+        max_result_tokens = defn.max_result_tokens
         category: ClassVar[ToolCategory]   = _cat
         side_effects: ClassVar[ToolSideEffect] = _se
         tags: ClassVar[frozenset[str]]     = _tags

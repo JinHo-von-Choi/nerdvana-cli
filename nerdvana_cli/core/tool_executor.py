@@ -13,10 +13,11 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from nerdvana_cli.core import paths
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.token_estimator import estimate_tokens
-from nerdvana_cli.core.tool import ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
 if TYPE_CHECKING:
@@ -224,6 +225,8 @@ class ToolExecutor:
 
         result_text = ""
 
+        output_dir = paths.user_data_home() / "tool-output" / str(context.state.get("session_id") or "default")
+        dir_token  = TOOL_OUTPUT_DIR.set(str(output_dir))
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
@@ -242,6 +245,7 @@ class ToolExecutor:
                 is_error    = True,
             )
         finally:
+            TOOL_OUTPUT_DIR.reset(dir_token)
             if self._analytics_writer is not None:
                 duration_ms        = int((time.perf_counter() - t0) * 1000)
                 provider, model    = self._model_identity()

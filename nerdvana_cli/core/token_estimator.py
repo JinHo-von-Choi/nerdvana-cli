@@ -172,6 +172,16 @@ class TokenEstimatorRegistry:
 # Module-level convenience (drop-in replacement for agent_loop.estimate_tokens)
 # ---------------------------------------------------------------------------
 
+def approx_tokens(text: str) -> int:
+    """Fast token estimate that does not undercount non-Latin scripts.
+
+    ASCII text averages about four characters per token; CJK and most other
+    scripts take about one token per character or more. O(n), no tokenizer.
+    """
+    ascii_chars = len(text.encode("ascii", "ignore"))
+    return -(-ascii_chars // 4) + (len(text) - ascii_chars)
+
+
 def estimate_tokens(text: str, provider: str | None = None) -> int:
     """Estimate token count. Compatible with the original agent_loop signature.
 
