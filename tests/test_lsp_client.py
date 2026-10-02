@@ -60,3 +60,41 @@ async def test_lsp_error_on_server_crash():
     client = LspClient()
     with patch.object(client, "_start_server", side_effect=LspError("crash")), pytest.raises(LspError):
         await client.diagnostics("/tmp/test.py")
+
+
+class _FakeStdin:
+    def __init__(self) -> None:
+        self.frames: list[str] = []
+
+    def write(self, data: bytes) -> None:
+        self.frames.append(data.decode())
+
+    async def drain(self) -> None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_changed_file_is_resent_with_did_change(tmp_path) -> None:
+    """A file edited after didOpen is resent in full under the next version."""
+    import json as _json
+    from types import SimpleNamespace
+
+    target = tmp_path / "mod.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    stdin  = _FakeStdin()
+    client = LspClient(project_root=str(tmp_path))
+
+    async def _proc(ext: str):  # noqa: ANN202
+        return SimpleNamespace(stdin=stdin)
+
+    client._get_proc = _proc  # type: ignore[method-assign]
+
+    await client._ensure_open(".py", str(target))
+    await client._ensure_open(".py", str(target))
+    target.write_text("x = 2\n", encoding="utf-8")
+    await client._ensure_open(".py", str(target))
+
+    bodies = [_json.loads(frame.split("\r\n\r\n", 1)[1]) for frame in stdin.frames]
+    assert [b["method"] for b in bodies] == ["textDocument/didOpen", "textDocument/didChange"]
+    assert bodies[1]["params"]["textDocument"]["version"] == 2
+    assert bodies[1]["params"]["contentChanges"] == [{"text": "x = 2\n"}]
