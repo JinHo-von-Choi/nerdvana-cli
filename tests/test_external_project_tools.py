@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nerdvana_cli.core.external_projects import ExternalProject, ExternalProjectRegistry
+from nerdvana_cli.core.external_worker import ExternalWorker
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.server.external_worker import ExternalWorker
 from nerdvana_cli.tools.external_project_tools import (
     ListQueryableProjectsTool,
     QueryExternalProjectTool,
