@@ -162,6 +162,28 @@ def _read_bytes(relative_path: str, cwd: str) -> bytes:
         return fh.read()
 
 
+_BINARY_MAGIC: tuple[tuple[bytes, str], ...] = (
+    (b"\x89PNG\r\n\x1a\n", "PNG image"),
+    (b"\xff\xd8\xff",       "JPEG image"),
+    (b"GIF87a",             "GIF image"),
+    (b"GIF89a",             "GIF image"),
+    (b"%PDF-",              "PDF document"),
+    (b"PK\x03\x04",         "ZIP archive"),
+    (b"\x1f\x8b",           "gzip data"),
+    (b"\x7fELF",            "ELF executable"),
+)
+
+
+def _binary_kind(data: bytes) -> str | None:
+    """Name the kind of binary *data* is, or None when it reads as text."""
+    for magic, label in _BINARY_MAGIC:
+        if data.startswith(magic):
+            return label
+    if b"\x00" in data[:8192]:
+        return "binary data"
+    return None
+
+
 def _decode_text(data: bytes, errors: str) -> str:
     """Decode UTF-8 bytes and fold CRLF/CR into LF, as text-mode reads do."""
     return data.decode("utf-8", errors=errors).replace("\r\n", "\n").replace("\r", "\n")
@@ -199,7 +221,8 @@ class FileReadTool(BaseTool[FileReadArgs]):
     name = "FileRead"
     description_text = """Read the contents of a file.
 
-Supports text files, PDFs, and images.
+Reads text files. Binary files (images, PDFs, archives, executables) are
+reported by type and size without their contents.
 Use offset/limit to read specific portions of large files.
 Every line is prefixed with an anchor `N#hhhhhh` (line number, `#`, 6 hex chars
 of the line hash). Pass that anchor to FileEdit as anchor_hash.
@@ -261,6 +284,15 @@ Examples:
                 read_ledger.resolve_key(args.path, context.cwd),
                 read_ledger.content_digest(data),
             )
+            binary = _binary_kind(data)
+            if binary is not None:
+                return ToolResult(
+                    tool_use_id = "",
+                    content     = (
+                        f"[File: {args.path}] {binary}, {len(data)} bytes. FileRead shows text only, so the "
+                        "contents are not displayed. Use Bash (file, xxd, pdftotext) to inspect it."
+                    ),
+                )
             full_text = _decode_text(data, "replace")
             if args.offset == 0 and args.limit == 0:
                 content = full_text

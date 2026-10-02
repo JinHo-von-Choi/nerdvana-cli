@@ -389,3 +389,44 @@ async def test_context_without_session_id_uses_the_default_session(tmp_path: Pat
 
     assert not same_default.is_error
     assert named.is_error
+
+
+# ---------------------------------------------------------------------------
+# Binary files are reported, not decoded
+# ---------------------------------------------------------------------------
+
+
+async def _read_as_text_result(tmp_path: Path, name: str, data: bytes) -> str:
+    (tmp_path / name).write_bytes(data)
+    result = await FileReadTool().call(FileReadArgs(path=name), ToolContext(cwd=str(tmp_path)), None)
+    assert not result.is_error
+    return result.content
+
+
+async def test_png_is_reported_by_type_and_size(tmp_path: Path) -> None:
+    content = await _read_as_text_result(tmp_path, "a.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 40)
+    assert "PNG image" in content
+    assert "48 bytes" in content
+    assert "N#" not in content
+
+
+async def test_pdf_without_nul_bytes_is_still_recognised(tmp_path: Path) -> None:
+    assert "PDF document" in await _read_as_text_result(tmp_path, "a.pdf", b"%PDF-1.7\n" + b"stream data " * 20)
+
+
+async def test_unknown_file_with_nul_bytes_is_binary_data(tmp_path: Path) -> None:
+    assert "binary data" in await _read_as_text_result(tmp_path, "blob.bin", b"abc\x00def")
+
+
+async def test_text_files_are_unaffected(tmp_path: Path) -> None:
+    content = await _read_as_text_result(tmp_path, "a.txt", b"hello\nworld\n")
+    assert "1#" in content
+    assert "binary" not in content
+
+
+async def test_a_binary_file_can_still_be_overwritten_after_it_was_looked_at(tmp_path: Path) -> None:
+    ctx = ToolContext(cwd=str(tmp_path))
+    (tmp_path / "a.bin").write_bytes(b"\x00\x01\x02")
+    await FileReadTool().call(FileReadArgs(path="a.bin"), ctx, None)
+    result = await FileWriteTool().call(FileWriteArgs(path="a.bin", content="text now"), ctx, None)
+    assert not result.is_error
