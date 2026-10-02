@@ -385,6 +385,9 @@ class TestSessionLogToolName:
                     ToolResult(tool_use_id=first, content="body"),
                 ]
 
+            def drain_injections(self) -> list[dict[str, Any]]:
+                return []
+
         session = RecordingSession()
         loop = SimpleNamespace(session=session, tool_executor=Executor(), state=SessionState())
 

@@ -67,6 +67,17 @@ class ToolExecutor:
         self._checkpoint_manager  = checkpoint_manager
         self._analytics_writer    = analytics_writer
         self._policy              = policy or PermissionPolicy()
+        self._pending_injections: list[dict[str, Any]] = []
+
+    def drain_injections(self) -> list[dict[str, Any]]:
+        """Return and clear the messages AFTER_TOOL hooks asked to inject.
+
+        They cannot be placed between a tool call and its result, so the caller
+        appends them once the batch's tool results are in the history.
+        """
+        drained = self._pending_injections
+        self._pending_injections = []
+        return drained
 
     async def run_batch(
         self,
@@ -313,9 +324,7 @@ class ToolExecutor:
     def _fire_after_tool(self, call: dict[str, Any], result: ToolResult) -> None:
         """Fire AFTER_TOOL hooks for a completed tool call.
 
-        This path returns tool results, not conversation messages, so a hook
-        that asks for an injection cannot be honoured here. That is reported
-        rather than dropped in silence.
+        Messages a hook asks to inject are queued for drain_injections().
         """
         from nerdvana_cli.core.hooks import HookContext, HookEvent
 
@@ -327,13 +336,7 @@ class ToolExecutor:
             tool_result = result,
         )
         for hr in self._hooks.fire(hook_ctx):
-            if hr.inject_messages:
-                logger.warning(
-                    "AFTER_TOOL hook requested %d message injection(s) after %s; "
-                    "the tool execution path cannot deliver them",
-                    len(hr.inject_messages),
-                    call["name"],
-                )
+            self._pending_injections.extend(hr.inject_messages)
 
     def _capture_checkpoint(self, tool_name: str, parsed_args: Any) -> None:
         """Snapshot the files *tool_name* is about to change.

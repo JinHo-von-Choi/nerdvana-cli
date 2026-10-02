@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import re
+from typing import Any
 
 from nerdvana_cli.core.hooks import HookContext, HookResult
+from nerdvana_cli.core.nirnamd import is_within_root, read_rule_file
 
 
 def session_start_context_injection(ctx: HookContext) -> HookResult:
@@ -166,3 +170,96 @@ def ralph_loop_check(ctx: HookContext) -> HookResult:
     return HookResult(
         inject_messages=[{"role": "user", "content": msg}]
     )
+
+
+RULE_FILENAMES:    tuple[str, ...] = ("NIRNA.md", "AGENTS.md", "CLAUDE.md")
+RULE_FILE_TOOLS:   frozenset[str]  = frozenset({"FileRead", "FileEdit", "FileWrite"})
+RULE_BUDGET_BYTES: int             = 32 * 1024
+
+
+class DirectoryRuleInjector:
+    """Inject directory-scoped rule files the first time a file below them is touched.
+
+    Registered on HookEvent.AFTER_TOOL. For FileRead, FileEdit and FileWrite on a
+    file inside a subdirectory of the project root, every NIRNA.md, AGENTS.md and
+    CLAUDE.md between the file's directory and the project root (root excluded,
+    the root files are part of the system prompt) is delivered once as a
+    user-role message, nearest directory first. Content is deduplicated by
+    sha256 and the total delivered bytes are capped per session.
+
+    HookContext carries no session id, so the state lives on the instance, which
+    the agent loop creates once per session and clears through reset().
+    """
+
+    def __init__(self, budget_bytes: int = RULE_BUDGET_BYTES) -> None:
+        self._budget_bytes     = budget_bytes
+        self._seen_hashes:     set[str] = set()
+        self._used_bytes       = 0
+        self._truncation_noted = False
+
+    def reset(self) -> None:
+        """Forget what was injected, for a conversation that starts over."""
+        self._seen_hashes.clear()
+        self._used_bytes       = 0
+        self._truncation_noted = False
+
+    def handle(self, ctx: HookContext) -> HookResult | None:
+        """AFTER_TOOL handler; returns the rule messages to inject, if any."""
+        if ctx.tool_name not in RULE_FILE_TOOLS or getattr(ctx.tool_result, "is_error", False):
+            return None
+        root = getattr(ctx.settings, "cwd", None)
+        raw  = ctx.tool_input.get("path") if ctx.tool_input else None
+        if not root or not isinstance(raw, str) or not raw:
+            return None
+
+        resolved_root = os.path.realpath(root)
+        target        = os.path.realpath(os.path.join(resolved_root, raw))
+        if not is_within_root(target, resolved_root):
+            return None
+
+        messages: list[dict[str, Any]] = []
+        for directory in self._directories_below_root(os.path.dirname(target), resolved_root):
+            for name in RULE_FILENAMES:
+                self._collect(os.path.join(directory, name), resolved_root, messages)
+        return HookResult(inject_messages=messages) if messages else None
+
+    @staticmethod
+    def _directories_below_root(start: str, root: str) -> list[str]:
+        """Directories from *start* up to, excluding, *root*, nearest first."""
+        directories: list[str] = []
+        current = start
+        while current != root and is_within_root(current, root):
+            directories.append(current)
+            parent = os.path.dirname(current)
+            if parent == current:
+                break
+            current = parent
+        return directories
+
+    def _collect(self, path: str, root: str, messages: list[dict[str, Any]]) -> None:
+        content = read_rule_file(path, root)
+        if not content:
+            return
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if digest in self._seen_hashes:
+            return
+        size     = len(content.encode("utf-8"))
+        relative = os.path.relpath(path, root)
+        if self._used_bytes + size > self._budget_bytes:
+            if not self._truncation_noted:
+                self._truncation_noted = True
+                messages.append({
+                    "role":    "user",
+                    "content": (
+                        f"Directory rule budget of {self._budget_bytes} bytes reached; "
+                        f"{relative} and later rule files were not injected. "
+                        "Read them directly if they matter for the current task."
+                    ),
+                })
+            return
+        self._seen_hashes.add(digest)
+        self._used_bytes += size
+        messages.append({
+            "role":    "user",
+            "content": f"Directory rules from {relative}:\n\n{content}",
+        })

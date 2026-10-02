@@ -99,6 +99,19 @@ def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
     return early + recent
 
 
+def _hook_injection_messages(executor: Any) -> list[Message]:
+    """Turn the messages AFTER_TOOL hooks queued on *executor* into user messages.
+
+    The caller appends them after the batch's tool results, never between a tool
+    call and its result.
+    """
+    return [
+        Message(role=Role.USER, content=str(msg["content"]))
+        for msg in executor.drain_injections()
+        if msg.get("content")
+    ]
+
+
 def _drop_orphan_tool_results(msgs: list[Any]) -> list[Any]:
     """Remove tool results whose originating tool_use is no longer in *msgs*.
 
@@ -145,6 +158,7 @@ class AgentLoop:
         self._on_thinking_chunk   = on_thinking_chunk
         self.last_thinking:  str  = ""
         from nerdvana_cli.core.builtin_hooks import (
+            DirectoryRuleInjector,
             context_limit_recovery,
             json_parse_recovery,
             ralph_loop_check,
@@ -162,6 +176,8 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_API_CALL, context_limit_recovery)
         self.hooks.register(HookEvent.AFTER_API_CALL, ralph_loop_check)
         self.hooks.register(HookEvent.AFTER_TOOL, json_parse_recovery)
+        self._dir_rules = DirectoryRuleInjector()
+        self.hooks.register(HookEvent.AFTER_TOOL, self._dir_rules.handle)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
         self.skill_loader = SkillLoader(
             project_dir=settings.cwd,
@@ -269,6 +285,7 @@ class AgentLoop:
 
     def reset_session(self) -> None:
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
+        self._dir_rules.reset()
 
     def build_system_prompt(self) -> str:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
@@ -482,6 +499,7 @@ class AgentLoop:
                 content     = tr.content,
                 is_error    = tr.is_error,
             )
+        self.state.messages.extend(_hook_injection_messages(self.tool_executor))
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
         tool_ctx   = ToolContext(cwd=self.settings.cwd, task_registry=self._task_registry, team_registry=self._team_registry)
@@ -623,6 +641,7 @@ class AgentLoop:
                     self.session.record_assistant_message(content, tool_uses)
                 for tr in await self.tool_executor.run_batch(tool_uses, context):
                     self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
+                self.state.messages.extend(_hook_injection_messages(self.tool_executor))
                 continue
             if content:
                 self.state.messages.append(Message(role=Role.ASSISTANT, content=content))
