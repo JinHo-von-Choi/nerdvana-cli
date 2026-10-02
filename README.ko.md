@@ -27,7 +27,7 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 
 | 제공자 | 기본 모델 | API 키 환경 변수 |
 |--------|-----------|------------------|
-| **Anthropic** | claude-sonnet-4-20250514 | `ANTHROPIC_API_KEY` |
+| **Anthropic** | claude-sonnet-5-5 | `ANTHROPIC_API_KEY` |
 | **OpenAI** | gpt-4.1 | `OPENAI_API_KEY` |
 | **Google Gemini** | gemini-2.5-flash | `GEMINI_API_KEY` |
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
@@ -110,7 +110,7 @@ export GEMINI_API_KEY="..."
 nerdvana
 
 # 명시적으로 제공자 지정
-nerdvana --provider anthropic --model claude-opus-4-20250514
+nerdvana --provider anthropic --model claude-opus-5-5
 nerdvana --provider openai --model gpt-4.1
 nerdvana --provider gemini --model gemini-2.5-pro
 nerdvana --provider groq --model llama-3.3-70b-versatile
@@ -276,7 +276,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | 도구 | 유형 | 설명 |
 |------|------|------|
 | `Bash` | 쓰기 | 셸 명령어 실행 (타임아웃, 작업 디렉토리, 환경 변수 지원) |
-| `FileRead` | 읽기 | 파일 내용을 읽고 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙이며, 세션에 파일 다이제스트를 기록 |
+| `FileRead` | 읽기 | 파일 내용을 읽고 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙이며, 세션에 파일 다이제스트를 기록. 바이너리 파일은 종류와 크기만 알림 |
 | `FileWrite` | 쓰기 | 새 파일 생성, 또는 이 세션에서 읽은 뒤 바뀌지 않은 파일 덮어쓰기 |
 | `FileEdit` | 쓰기 | 문자열 교체 또는 앵커(`N#hhhhhh`) 기반 편집. 읽은 뒤 파일이 바뀌었으면 거부 |
 | `Glob` | 읽기 | 파일 패턴 매칭 |
@@ -434,7 +434,7 @@ export BRAVE_API_KEY="..."
 ```yaml
 model:
   provider: anthropic              # 또는 openai, gemini, groq, ollama, zai 등
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-5-5
   api_key: ""                      # 환경 변수 사용 시 비워둠
   base_url: ""                     # API 엔드포인트 재정의
   max_tokens: 8192
@@ -443,8 +443,8 @@ model:
   fallback_models:                 # 재시도를 다 쓰면 순서대로 사용
     - claude-haiku-4-5-20251001
     - openai:gpt-4.1               # provider:model 이면 제공자도 전환
-  extended_thinking: false         # 확장 사고 모드 활성화 여부
-  thinking_budget: 8192            # 확장 사고에 할당할 토큰 예산
+  extended_thinking: false         # 프롬프트에 자율적 도구 사용 지침을 추가. 제공자 쪽 사고 기능은 아직 전달하지 않음
+  thinking_budget: 8192            # 예약된 값. 아직 제공자에 전달하지 않음
   show_thinking: true              # <think>...</think> 블록을 흐린 이탤릭으로 표시 (/thinking 로 토글)
 
 # 제공자별 마지막 사용 모델. /model 과 /provider 가 자동으로 갱신한다.

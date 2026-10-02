@@ -68,15 +68,15 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `provider` | str | `""` (auto-detect from model name) | One of `anthropic`, `openai`, `gemini`, `groq`, etc. |
-| `model` | str | `"claude-sonnet-4-20250514"` | Model identifier |
+| `model` | str | `"claude-sonnet-5-5"` | Model identifier |
 | `api_key` | str | `""` (use env var) | API key override |
 | `base_url` | str | `""` (provider default) | Override API endpoint (Ollama, vLLM, self-hosted) |
 | `max_tokens` | int | `8192` | Max tokens per response |
 | `temperature` | float | `1.0` | Sampling temperature |
 | `fallback_models` | list[str] | `[]` | Models tried in order when a request keeps failing with a transient error (429, 5xx, timeout) or an authentication error. `model` runs under the configured provider; `provider:model` (for example `openai:gpt-4.1`) switches provider and uses that provider's API key. A model that just failed is skipped for 60 seconds. |
 | `max_retries` | int | `2` | Retries of the same model, with backoff (or the server's `Retry-After`), before moving to the next fallback. Nothing is retried once part of the answer has streamed. |
-| `extended_thinking` | bool | `false` | Phase C: enabled automatically by `ultrawork`/`ulw` keywords |
-| `thinking_budget` | int | `8192` | Phase C: max tokens for extended thinking |
+| `extended_thinking` | bool | `false` | Adds autonomous tool-use guidance to the system prompt; the `ultrawork`/`ulw` keyword turns it on for one prompt. It does not yet switch on any provider-side thinking mode. |
+| `thinking_budget` | int | `8192` | Reserved for provider-side thinking. Not yet sent to any provider. |
 | `show_thinking` | bool | `true` | Render `<think>...</think>` content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
 
 ### `model_history` (dict[str, str])
@@ -202,7 +202,7 @@ Snapshot comment format (first comment line inside the provider block):
 ```yaml
 anthropic:
   # 2026-04-29 snapshot — https://www.anthropic.com/pricing
-  claude-sonnet-4-20250514: ...
+  claude-sonnet-5-5: ...
 ```
 
 Provider pricing sources:
@@ -240,13 +240,13 @@ Provider pricing sources:
 ```yaml
 model:
   provider: anthropic
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-5-5
   max_tokens: 8192
   temperature: 1.0
   fallback_models:
-    - claude-sonnet-4-20250514
-    - openai/gpt-4.1
-    - gemini-2.5-flash
+    - claude-haiku-4-5-20251001
+    - openai:gpt-4.1
+    - gemini:gemini-2.5-flash
   extended_thinking: false
   thinking_budget: 8192
   show_thinking: true

@@ -4,7 +4,7 @@
 - Install: `pip install -e ".[all]"` (all providers) or `pip install -e ".[anthropic]"` (specific)
 - One-line install: `curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash`
 - Dev install: `pip install -e ".[dev]"`
-- Test: `pytest` (pytest-asyncio auto mode, 2252 tests; `python scripts/sync_test_count.py` keeps this number honest)
+- Test: `pytest` (pytest-asyncio auto mode, 2263 tests; `python scripts/sync_test_count.py` keeps this number honest)
 - Lint: `ruff check .` (line-length 120, 0 violations)
 - Format: `ruff format .`
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)
@@ -27,7 +27,7 @@
 - Planning gate: opt-in two-phase mode (planning_gate=true in YAML) that forces a Plan agent pass before code execution; child agents always run with planning_gate=False to prevent recursion
 - Model fallback: core/settings.py ModelConfig.fallback_models (`model` or `provider:model`) and max_retries; the original provider, model and key are restored after the run
 - Custom agents: .nerdvana/agents/*.yml loaded by agents/registry.py at startup, merged on top of builtin definitions
-- Ultrawork: the `ultrawork`/`ulw` keyword turns on extended thinking for that prompt
+- Ultrawork: the `ultrawork`/`ulw` keyword adds autonomous tool-use guidance to the system prompt for that prompt; extended_thinking and thinking_budget are not yet sent to providers
 
 ## Key Components
 - core/agent_loop.py: streaming agent loop, tool execution, context compaction, recovery (planning_gate, provider recovery, todo guard, background task reports, ultrawork), session resume (restore_history) and close_session (SESSION_END)
