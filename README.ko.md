@@ -59,6 +59,27 @@ curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/in
 
 요구사항: Python >= 3.11, git
 
+### PyPI 설치
+
+패키지가 PyPI에 게시된 이후부터 사용할 수 있습니다. 그 전에는 위의 한 줄 설치를 사용하십시오.
+
+```bash
+uv tool install nerdvana-cli
+# 또는
+pipx install nerdvana-cli
+
+# 모든 제공자 SDK 포함
+uv tool install "nerdvana-cli[all]"
+```
+
+이전 릴리스로 되돌리려면 버전을 고정해 다시 설치합니다.
+
+```bash
+uv tool install nerdvana-cli==<이전-버전>
+# 또는
+pipx install --force nerdvana-cli==<이전-버전>
+```
+
 ### 수동 설치
 
 ```bash

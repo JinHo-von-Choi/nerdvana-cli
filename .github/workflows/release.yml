@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    # Manual runs build and smoke-test only. Publishing is gated on a tag push.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-tag:
+    name: Verify tag matches pyproject version
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read project version
+        id: version
+        run: echo "version=$(python scripts/release_notes.py version)" >> "$GITHUB_OUTPUT"
+
+      - name: Compare tag with version
+        if: github.ref_type == 'tag'
+        run: python scripts/release_notes.py check-tag "${GITHUB_REF_NAME}"
+
+  build:
+    name: Build sdist and wheel
+    needs: verify-tag
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build
+        run: uv build
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    name: Clean-install smoke (py${{ matrix.python-version }})
+    needs: [verify-tag, build]
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install the wheel into a fresh venv
+        run: |
+          uv venv --python "${{ matrix.python-version }}" "${RUNNER_TEMP}/smoke-venv"
+          uv pip install --python "${RUNNER_TEMP}/smoke-venv/bin/python" dist/*.whl
+
+      - name: nerdvana --help
+        run: |
+          "${RUNNER_TEMP}/smoke-venv/bin/nerdvana" --help
+
+      - name: nerdvana --version reports the released version
+        env:
+          EXPECTED: ${{ needs.verify-tag.outputs.version }}
+        run: |
+          out="$("${RUNNER_TEMP}/smoke-venv/bin/nerdvana" --version)"
+          echo "${out}"
+          case "${out}" in
+            *"${EXPECTED}"*) ;;
+            *) echo "version output does not contain ${EXPECTED}" >&2; exit 1 ;;
+          esac
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [verify-tag, build, smoke]
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/nerdvana-cli/
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          attestations: true
+
+  github-release:
+    name: Create GitHub release
+    needs: [verify-tag, publish-pypi]
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION:  ${{ needs.verify-tag.outputs.version }}
+        run: |
+          if python scripts/release_notes.py notes "${VERSION}" > "${RUNNER_TEMP}/notes.md"; then
+            gh release create "${GITHUB_REF_NAME}" dist/* \
+              --title "${GITHUB_REF_NAME}" --notes-file "${RUNNER_TEMP}/notes.md" --verify-tag
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/* \
+              --title "${GITHUB_REF_NAME}" --generate-notes --verify-tag
+          fi
