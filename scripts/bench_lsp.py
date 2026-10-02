@@ -41,6 +41,7 @@ import time
 from pathlib import Path
 
 from nerdvana_cli.core.lsp_client import LspClient, LspError
+from nerdvana_cli.tools.lsp import create_lsp_tools
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -93,7 +94,7 @@ async def _bench(root: Path, iterations: int) -> dict[str, object]:
         out["available_tools"] = []
         out["status"]          = "no-lsp-server-on-path"
         return out
-    out["available_tools"] = [t.__class__.__name__ for t in client.available_tools()]
+    out["available_tools"] = [t.__class__.__name__ for t in create_lsp_tools(client)]
 
     # Cold open: time first diagnostics call on the first file.
     cold_t0 = time.monotonic()

@@ -87,9 +87,10 @@ def create_tool_registry(
 
     # LSP tools — registered only when a language server binary is installed
     from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.tools.lsp import create_lsp_tools
     lsp = LspClient()
     if lsp.has_any_server():
-        for lsp_tool in lsp.available_tools():
+        for lsp_tool in create_lsp_tools(lsp):
             registry.register(lsp_tool)
 
         # Phase D: semantic symbol tools

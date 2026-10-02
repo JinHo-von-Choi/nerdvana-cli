@@ -12,7 +12,7 @@ def test_lsp_tools_registered_when_server_present():
         "nerdvana_cli.core.lsp_client.LspClient.has_any_server",
         return_value=True,
     ), patch(
-        "nerdvana_cli.core.lsp_client.LspClient.available_tools",
+        "nerdvana_cli.tools.lsp.create_lsp_tools",
         return_value=[fake_tool],
     ):
         registry = create_tool_registry()
