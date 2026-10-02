@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from nerdvana_cli.core.external_projects import ExternalProject
-from nerdvana_cli.server.external_worker import ExternalSession, ExternalWorker
+from nerdvana_cli.core.external_worker import ExternalSession, ExternalWorker
 
 # ---------------------------------------------------------------------------
 # Helpers
