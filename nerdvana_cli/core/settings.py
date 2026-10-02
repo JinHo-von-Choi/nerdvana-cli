@@ -50,7 +50,7 @@ class SettingsWarning:
 
 class ModelConfig(BaseModel):
     provider: str = ""  # empty = auto-detect from model name
-    model: str = "claude-sonnet-4-20250514"
+    model: str = "claude-sonnet-5-5"
     api_key: str = ""
     base_url: str = ""
     max_tokens: int = 8192

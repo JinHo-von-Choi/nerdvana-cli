@@ -21,7 +21,7 @@ acme:
   m2: {input_per_1m: 0.0, output_per_1m: 0.0}
 """
 
-CLAUDE_5_MODELS = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5-1")
+CLAUDE_5_MODELS = ("claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-sonnet-5-5", "claude-fable-5-1")
 
 
 @pytest.fixture

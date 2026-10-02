@@ -19,7 +19,7 @@ from nerdvana_cli.core.setup import (
     run_setup,
     save_config,
 )
-from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS
+from nerdvana_cli.providers.base import DEFAULT_MODELS, PROVIDER_KEY_ENVVARS, ProviderName
 
 
 @pytest.fixture
@@ -136,7 +136,7 @@ def test_run_setup_force_reruns_wizard(
 
     assert result is not None
     assert result["model"]["provider"] == "anthropic"
-    assert result["model"]["model"] == "claude-sonnet-4-20250514"
+    assert result["model"]["model"] == DEFAULT_MODELS[ProviderName.ANTHROPIC]
     assert result["model"]["max_tokens"] == 4096
     assert result["model"]["api_key"] == "sk-wizard"
     assert load_config()["model"]["provider"] == "anthropic"
