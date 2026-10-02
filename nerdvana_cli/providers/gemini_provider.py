@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.errors import error_fields
 from nerdvana_cli.types import ToolSpec
 
 try:
@@ -134,7 +135,7 @@ class GeminiProvider:
             yield ProviderEvent(type="done", stop_reason="end_turn")
 
         except Exception as e:
-            yield ProviderEvent(type="error", error=str(e))
+            yield ProviderEvent(type="error", error=str(e), **error_fields(e))
 
     async def send(
         self,

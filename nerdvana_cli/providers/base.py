@@ -66,6 +66,11 @@ class ProviderEvent:
     usage: dict[str, int] | None = None
     stop_reason: str = ""
     error: str = ""
+    # For type == "error": one of the kinds in providers.errors, the HTTP
+    # status when known, and the server's Retry-After hint in seconds.
+    error_kind: str = ""
+    status_code: int | None = None
+    retry_after: float | None = None
 
 
 @dataclass

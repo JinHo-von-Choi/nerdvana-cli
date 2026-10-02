@@ -208,6 +208,7 @@ async def test_c3_fallback_restores_original_model():
     settings = _make_settings()
     settings.model.model = "claude-opus-4-6"
     settings.model.fallback_models = ["claude-sonnet-4-6"]
+    settings.model.max_retries     = 0
     registry = _make_registry()
 
     with (

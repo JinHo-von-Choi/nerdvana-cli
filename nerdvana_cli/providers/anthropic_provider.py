@@ -9,6 +9,7 @@ from typing import Any
 from rich.console import Console
 
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.errors import error_fields
 from nerdvana_cli.types import ToolSpec
 
 try:
@@ -148,7 +149,7 @@ class AnthropicProvider:
             yield ProviderEvent(type="done", stop_reason=stop_reason)
 
         except Exception as e:
-            yield ProviderEvent(type="error", error=str(e))
+            yield ProviderEvent(type="error", error=str(e), **error_fields(e))
 
     async def send(
         self,

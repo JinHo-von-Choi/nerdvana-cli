@@ -95,6 +95,7 @@ def test_provider_http_500_retries_then_succeeds(tmp_path: Path) -> None:
     continues. This test verifies the full path produces the success response.
     """
     settings = _make_settings(str(tmp_path), fallback_models=["claude-fallback-model"])
+    settings.model.max_retries = 0
     registry = ToolRegistry()
     storage  = SessionStorage(session_id="fault-retry", storage_dir=str(tmp_path))
     loop     = AgentLoop(settings=settings, registry=registry, session=storage)

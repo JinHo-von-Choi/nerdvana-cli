@@ -53,6 +53,9 @@ class ModelConfig(BaseModel):
     max_tokens: int = 8192
     temperature: float = 1.0
     fallback_models: list[str] = Field(default_factory=list)
+    # Retries of the same model on a transient failure before moving to the
+    # next fallback model.
+    max_retries: int = 2
     extended_thinking: bool = False
     thinking_budget: int = 8192
     show_thinking: bool = True

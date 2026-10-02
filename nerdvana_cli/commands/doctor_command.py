@@ -273,9 +273,15 @@ def _check_model_resolution() -> CheckResult:
 
 
 def _check_fallback_models() -> CheckResult:
-    """Every fallback model must resolve under the configured provider."""
+    """Every fallback entry must resolve, on its own provider when it names one.
+
+    Entries are ``model`` (run under the configured provider) or
+    ``provider:model`` (switch provider for that fallback).
+    """
+    from nerdvana_cli.core.provider_recovery import parse_fallback
     from nerdvana_cli.core.settings import NerdvanaSettings
-    from nerdvana_cli.providers.base import detect_provider, resolve_context_window
+    from nerdvana_cli.providers.base import ProviderName, detect_provider, resolve_context_window
+    from nerdvana_cli.providers.factory import resolve_api_key
 
     try:
         settings = NerdvanaSettings.load()
@@ -290,25 +296,29 @@ def _check_fallback_models() -> CheckResult:
     if prov is None:
         return CheckResult("fallback_models", "fail", error)
 
-    failed: list[str] = []
-    drift:  list[str] = []
+    failed:   list[str] = []
+    warnings: list[str] = []
     for entry in entries:
         if not isinstance(entry, str) or not entry.strip():
             failed.append(f"{entry!r} (empty or not a string)")
-        elif resolve_context_window(prov, entry) <= 0:
+            continue
+        explicit, model = parse_fallback(entry)
+        target          = ProviderName(explicit) if explicit else prov
+        if resolve_context_window(target, model) <= 0:
             failed.append(f"{entry} (no context window)")
-        elif detect_provider(entry) != prov:
-            drift.append(f"{entry} (looks like {detect_provider(entry).value})")
+        elif explicit and target != prov and not resolve_api_key(target):
+            warnings.append(f"{entry} (no API key for {target.value})")
+        elif not explicit and detect_provider(model) != prov:
+            warnings.append(
+                f"{entry} (looks like {detect_provider(model).value}; write it as "
+                f"{detect_provider(model).value}:{model} to switch provider)"
+            )
 
     if failed:
         return CheckResult("fallback_models", "fail", f"unresolved: {', '.join(failed)}")
-    if drift:
-        return CheckResult(
-            "fallback_models",
-            "warn",
-            f"run under {prov.value} but look like another provider: {', '.join(drift)}",
-        )
-    return CheckResult("fallback_models", "ok", f"{len(entries)} fallback model(s) resolve under {prov.value}")
+    if warnings:
+        return CheckResult("fallback_models", "warn", "; ".join(warnings))
+    return CheckResult("fallback_models", "ok", f"{len(entries)} fallback model(s) resolve")
 
 
 def _mcp_config_files() -> list[Path]:

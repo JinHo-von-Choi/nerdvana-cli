@@ -9,6 +9,7 @@ from typing import Any
 from rich.console import Console
 
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.errors import DECODE, error_fields
 from nerdvana_cli.providers.thinking_parser import ThinkBlockParser
 from nerdvana_cli.types import ToolSpec
 
@@ -224,6 +225,7 @@ class OpenAIProvider:
             yield ProviderEvent(
                 type="error",
                 error=f"UTF-8 decoding error from API: {e}. Try a different model or provider.",
+                **error_fields(e),
             )
         except Exception as e:
             error_str = str(e)
@@ -231,9 +233,10 @@ class OpenAIProvider:
                 yield ProviderEvent(
                     type="error",
                     error=f"Encoding error from API: {error_str}. This may be a model-specific issue.",
+                    **error_fields(e, kind=DECODE),
                 )
             else:
-                yield ProviderEvent(type="error", error=error_str)
+                yield ProviderEvent(type="error", error=error_str, **error_fields(e))
 
     async def send(
         self,
