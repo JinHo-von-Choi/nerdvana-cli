@@ -18,6 +18,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
 
@@ -649,6 +650,12 @@ class NerdvanaApp(App[object]):
     def action_clear_chat(self) -> None:
         """Clear chat action (Ctrl+L)."""
         asyncio.create_task(self._handle_command("/clear"))
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Let Escape reach an open modal instead of the app-wide focus binding."""
+        if action == "focus_input" and isinstance(self.screen, ModalScreen):
+            return False
+        return super().check_action(action, parameters)
 
     def action_focus_input(self) -> None:
         """Focus input widget (Escape)."""

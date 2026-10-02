@@ -358,7 +358,7 @@ class RecordingSession:
     def __init__(self) -> None:
         self.tool_results: list[dict[str, Any]] = []
 
-    def record_assistant_message(self, text: str, tool_uses: Any = None) -> None:
+    def record_assistant_message(self, text: str, tool_uses: Any = None, provider_blocks: Any = None) -> None:
         return None
 
     def record_tool_result(self, tool_name: str, tool_use_id: str, content: str, is_error: bool = False) -> None:

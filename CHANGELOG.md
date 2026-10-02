@@ -14,16 +14,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Text typed while the agent works is delivered at its next step instead of waiting for the turn to end.
 - Tool permission prompts open as a modal and show the diff of a file change before it is approved.
 - Custom slash commands from `~/.nerdvana/commands/*.md` and `<project>/.nerdvana/commands/*.md` (`$ARGUMENTS`, `$1` to `$9`, optional frontmatter description), and shell command hooks from `hooks.yml` for `before_tool`, `after_tool`, `session_start` and `session_end`. A project `hooks.yml` loads only with `hooks.allow_project_hooks` and an approved digest.
-- Thinking on Anthropic models: Claude 5 models run with adaptive thinking, `model.extended_thinking` and `ultrawork` enable it where it is optional, `model.thinking_budget` applies to manual-budget models, and `model.show_thinking` requests summaries. Thinking blocks are returned unchanged with tool results, which the API requires to keep thinking active across tool turns.
+- `nerdvana cost` and the session cost read the usage each request reported, with cached read and write tokens as their own columns; sessions recorded before this keep their per-tool-call figures.
+- Gemini 3 function calls carry their thought signature back to the API, with the documented stand-in for history that has none, and the results of parallel calls go out in one message.
+- Thinking on Anthropic models: Claude 5 models run with adaptive thinking, `model.extended_thinking` and `ultrawork` enable it where it is optional, `model.thinking_budget` applies to manual-budget models, and `model.show_thinking` requests summaries. Thinking blocks are returned unchanged with tool results, which the API requires to keep thinking active across tool turns, and are saved in the session transcript so a resumed conversation keeps them.
 
 ### Changed
 
 - The default model is `claude-sonnet-5-5`; `claude-sonnet-4-20250514` is retired. Context windows of 1M tokens are recognised for the models that have them, and `pricing.yml` carries cache rates and the Claude 5 entries.
 - `FileRead` reports a binary file by type and size instead of decoding it.
+- Unused path helpers, `get_provider_config` and the `ActivateMode` and `DeactivateMode` tools are removed.
 - The agent loop and tool executor are split into single-purpose steps, and a contract test keeps function length from growing.
 
 ### Fixed
 
+- A turn made of tool calls only (no text) is now saved in the session transcript, so resuming a session no longer drops those calls and their results.
+- Escape closes a tool permission prompt instead of being swallowed by the app-wide focus binding.
 - Anthropic tool calls are sent as `tool_use` blocks and their results merged into one user message.
 - Duplicate tool call ids no longer reach the API: a stream stops after its tool-use stop, OpenAI-compatible streams emit each call once and keep parallel calls apart, repeated ids are renamed, and ids are repaired before each request.
 - Gemini token usage is reported from the stream.

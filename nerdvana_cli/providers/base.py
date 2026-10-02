@@ -74,6 +74,9 @@ class ProviderEvent:
     # For type == "provider_block": a content block (an Anthropic thinking block, say)
     # that must be sent back unchanged with the assistant turn it belongs to.
     block: dict[str, Any] | None = None
+    # For type == "tool_use_complete": an opaque token the provider needs back with this call
+    # (Gemini's thought signature, base64 text).
+    tool_signature: str = ""
 
 
 @dataclass
