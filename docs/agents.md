@@ -95,10 +95,11 @@ Or via the MCP-style tool call from the REPL.
 
 ## Tool-filtering semantics
 
-- `allowed_tools: ["*"]` — wildcard, includes every standard tool.
-- `allowed_tools: []` — empty, returns a registry with **zero** tools. The agent will receive the request but have no tools to call.
-- `allowed_tools: ["FileRead", "Grep"]` — exact name matching. Mistakes like `"Read"` (pre-Phase-B name) will silently filter out `FileRead`.
-- `AgentTool` and the task tools (`TaskGet`, `TaskStop`) are **never** included in subagent registries, so subagents cannot recursively spawn more agents.
+- `allowed_tools: ["*"]`: wildcard. Every candidate tool: the standard file, search and shell tools plus the session's LSP, symbol, web, todo and MCP tools.
+- `allowed_tools: []`: empty, returns a registry with **zero** tools. The agent will receive the request but have no tools to call.
+- `allowed_tools: ["FileRead", "Grep"]`: exact name matching. Mistakes like `"Read"` (pre-Phase-B name) will silently filter out `FileRead`.
+- `"@read"`: adds every candidate whose category is READ or SYMBOLIC (LSP lookups, symbol queries, web reads). `Explore`, `Plan` and `code-reviewer` use it. MCP tools declare WRITE, so they are only admitted by name or by the wildcard.
+- `Agent`, `Swarm`, `TaskGet`, `TaskStop`, `AskUser` and other META tools are **never** included in subagent registries, so subagents cannot recursively spawn more agents.
 
 ---
 

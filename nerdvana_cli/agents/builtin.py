@@ -15,7 +15,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
         agent_type="Explore",
         description="Fast agent for codebase exploration — glob, grep, read only.",
         max_turns=20,
-        allowed_tools=["Glob", "Grep", "FileRead"],
+        allowed_tools=["Glob", "Grep", "FileRead", "@read"],
         system_prompt=(
             "You are an exploration agent. Use search and read tools to answer "
             "questions about the codebase. Do not write or edit files. "
@@ -26,7 +26,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
         agent_type="Plan",
         description="Software architect agent for designing implementation plans.",
         max_turns=20,
-        allowed_tools=["Glob", "Grep", "FileRead"],
+        allowed_tools=["Glob", "Grep", "FileRead", "@read"],
         system_prompt=(
             "You are an architect agent. Analyze the codebase and produce a "
             "structured implementation plan. Do not write code — only plan."
@@ -36,7 +36,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
         agent_type="code-reviewer",
         description="Code review agent — read-only analysis of code quality and correctness.",
         max_turns=15,
-        allowed_tools=["FileRead", "Grep", "Glob"],
+        allowed_tools=["FileRead", "Grep", "Glob", "@read"],
         system_prompt=(
             "You are a code review agent. Read files, search for patterns, and "
             "identify bugs, security issues, and style problems. "

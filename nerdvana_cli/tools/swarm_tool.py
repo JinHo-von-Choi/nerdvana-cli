@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry
-from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.tools.registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 
@@ -67,11 +68,13 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
 
     def __init__(
         self,
-        settings:      NerdvanaSettings,
-        task_registry: TaskRegistry,
+        settings:        NerdvanaSettings,
+        task_registry:   TaskRegistry,
+        parent_registry: ToolRegistry | None = None,
     ) -> None:
-        self._settings      = settings
-        self._task_registry = task_registry
+        self._settings        = settings
+        self._task_registry   = task_registry
+        self._parent_registry = parent_registry
 
     async def call(
         self,
@@ -97,7 +100,8 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
             task_registry = registry,
             max_turns     = args.max_turns,
         )
-        results = await run_swarm(config, create_subagent_registry)
+        parent_tools = self._parent_registry.all_tools() if self._parent_registry else None
+        results      = await run_swarm(config, partial(create_subagent_registry, parent_tools=parent_tools))
 
         lines = [f"Swarm '{args.team_name}' completed. {len(results)} agents ran.\n"]
         for agent_id, output in results.items():
