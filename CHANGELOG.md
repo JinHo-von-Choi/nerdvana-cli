@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Every tool call passes through one permission policy: `permissions.always_deny`, tools excluded by the active mode, the tool's own verdict, `permissions.always_allow`, then the mode's trust level. `--approval-mode`, `session.default_mode` and `permissions.mode` now take effect, and tools declaring `requires_confirmation` ask first.
+- Tool arguments are checked against the tool's schema; missing, unknown or mistyped arguments come back to the model as an error instead of being dropped.
+- Provider failures are classified (transient, context limit, authentication, decoding). Transient failures are retried with backoff or `Retry-After` (`model.max_retries`), then fall back through `model.fallback_models`, which accepts `provider:model` to switch provider. A context-limit failure compacts the history and retries once.
+- `nerdvana session resume <id>` restores the recorded conversation. `session.persist: false` stops transcript writes. Provider streams stop after `session.stream_idle_timeout` seconds of silence or `session.stream_total_timeout` seconds in total.
+- Open todo items keep the agent working after it ends a turn, until three reminders in a row make no progress; the list is restated after compaction.
+- `AskUser` lets the model ask a clarifying question with suggested answers in the TUI.
+- After a file or symbol edit, errors the edit introduced are reported from the running language server (`session.post_edit_diagnostics`).
+- Finished background agents are reported to the model at its next step, and an idle TUI session starts a turn to review them.
+- Sub-agents run with their definition's system prompt and turn limit, can use the session's LSP, symbol, web and MCP tools (`"@read"` admits read tools), and are limited to `session.max_parallel_agents` per provider. Identical consecutive tool calls draw a warning at the third repeat and are refused at the fifth.
+- Root `AGENTS.md` and `CLAUDE.md` are loaded after `NIRNA.md`, and rule files in subdirectories are injected the first time a file there is touched.
+- Skills can be directories with a `SKILL.md`; `skills.include_claude_skills` also reads `.claude/skills`.
+- Invalid config values fall back to defaults with a warning shown at startup and by `doctor`; permission and credential fields still stop startup. `doctor` checks model resolution, fallback entries and MCP configuration.
+- Release workflow builds, smoke-tests and publishes tagged versions to PyPI.
+
+### Changed
+
+- `FileRead` prefixes lines as `N#hhhhhh`. `FileEdit` and `FileWrite` refuse to change an existing file that was not read in the session or changed since it was read; anchors that moved within 20 lines are relocated when unambiguous.
+- Tool results are bounded by estimated tokens (30,000; 10,000 for `WebFetch`) instead of characters, keeping head and tail, and the full output is saved under the data home.
+- Context use is measured from the provider's reported input tokens plus an estimate of later messages; the estimate counts the system prompt, tool schemas and non-Latin text.
+- The language server is sent the new contents of a file that changed since it was opened.
+- `uv.lock` is tracked and CI installs from it.
+
+### Removed
+
+- `TeamCreate` and `SendMessage`, which had no receiving side.
+- `hooks.session_start`, `hooks.before_tool` and `hooks.after_tool`, which were never read; existing keys load with a "no longer used" warning.
+- The agent-loop snapshot suite and the `pytest-snapshot` dependency.
+
 ## [1.5.0] - 2026-09-11
 
 ### Changed

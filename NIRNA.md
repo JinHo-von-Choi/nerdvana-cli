@@ -4,33 +4,33 @@
 - Install: `pip install -e ".[all]"` (all providers) or `pip install -e ".[anthropic]"` (specific)
 - One-line install: `curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash`
 - Dev install: `pip install -e ".[dev]"`
-- Test: `pytest` (pytest-asyncio auto mode, 1993 tests; `python scripts/sync_test_count.py` keeps this number honest)
+- Test: `pytest` (pytest-asyncio auto mode, 2241 tests; `python scripts/sync_test_count.py` keeps this number honest)
 - Lint: `ruff check .` (line-length 120, 0 violations)
 - Format: `ruff format .`
 - Type check: `mypy nerdvana_cli/ --ignore-missing-imports` (strict, Python 3.11)
 
 ## Architecture
 - 21 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 19, Anthropic/Gemini separate)
-- Tool pipeline: parse_args -> check_permissions (ALLOW/DENY/ASK) -> validate_input -> call
+- Tool pipeline: schema check (core/schema_check.py) -> parse_args -> check_permissions combined with PermissionPolicy (core/policy.py: always_deny, mode exclusions, tool verdict, always_allow, trust level) -> BEFORE_TOOL hooks -> validate_input -> call -> token-bounded truncation (full output kept under the data home) -> post-edit diagnostics
 - Concurrency: read-only tools parallel (asyncio.gather), write tools serial
 - Session: JSONL append-only logs, messages recorded after API response
 - State: SessionState mutable (state.messages.append), context compaction at threshold
 - TUI: Textual App (ui/app.py) with ChatMessage widgets (click-to-copy), AgentLoop is backend
 - MCP: config -> client -> tools -> manager, stdio + HTTP transport, failure isolation per server
 - Parism: structured shell output via MCP, falls back silently to Bash on failure
-- Hooks: HookEngine with SESSION_START/BEFORE_TOOL/AFTER_TOOL events, builtin context injection
+- Hooks: HookEngine with SESSION_START/SESSION_END/BEFORE_TOOL/AFTER_TOOL/BEFORE_API_CALL/AFTER_API_CALL events, builtin context injection, directory rule injection (AGENTS.md/CLAUDE.md/NIRNA.md in subdirectories on first touch)
 - Skills: markdown-based prompt plugins (.nerdvana/skills/*.md), /trigger activation
-- Agents: 6 builtin types (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) dispatched via AgentTool, allowed_tools allowlist filters tool registry per-agent
+- Agents: 6 builtin types (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) dispatched via AgentTool with their own system prompt and max_turns; allowed_tools filters the parent session's tools per agent ("@read" admits READ/SYMBOLIC tools); sub-agents run under a per-provider concurrency bound
 - TaskPanel: Textual widget (ui/task_panel.py) renders live AgentTool/SwarmTool sub-task progress in the right pane, driven by TaskState updates from agent_loop
 - LSP: LspClient (core/lsp_client.py) speaks JSON-RPC 2.0 over stdio to language servers; 4 tools (lsp_diagnostics, lsp_goto_definition, lsp_find_references, lsp_rename) registered with graceful degradation when no server is available
-- Recovery hooks: agent_loop wraps provider calls with context_limit_recovery, json_parse_recovery, ralph_loop_check, and _is_retryable_error to recover from transient errors and runaway loops without crashing the session
+- Recovery: provider failures are classified (providers/errors.py) and core/provider_recovery.py decides retry with backoff, fallback, compaction, non-streaming resend or give-up; nothing is retried after output streamed. Provider streams are bounded by idle and total timeouts (core/stream_guard.py). End-of-turn hooks (context_limit_recovery, ralph_loop_check) may continue a turn at most 3 times per prompt; the todo guard (core/todos.py) keeps the loop on open todo items until three nudges make no progress
 - Planning gate: opt-in two-phase mode (planning_gate=true in YAML) that forces a Plan agent pass before code execution; child agents always run with planning_gate=False to prevent recursion
-- Model fallback: providers/base.py exposes fallback_models so a failed primary call cascades through alternates before raising
+- Model fallback: core/settings.py ModelConfig.fallback_models (`model` or `provider:model`) and max_retries; the original provider, model and key are restored after the run
 - Custom agents: .nerdvana/agents/*.yml loaded by agents/registry.py at startup, merged on top of builtin definitions
-- Ultrawork: long-running mode that keeps the agent loop alive across HookContext.stop_reason transitions for multi-step refactors
+- Ultrawork: the `ultrawork`/`ulw` keyword turns on extended thinking for that prompt
 
 ## Key Components
-- core/agent_loop.py: streaming agent loop, tool execution, context compaction, recovery hooks (planning_gate, context_limit_recovery, json_parse_recovery, ralph_loop_check, _is_retryable_error, ultrawork)
+- core/agent_loop.py: streaming agent loop, tool execution, context compaction, recovery (planning_gate, provider recovery, todo guard, background task reports, ultrawork), session resume (restore_history) and close_session (SESSION_END)
 - core/compact.py: compaction strategy module shared by agent_loop and SessionState
 - core/lsp_client.py: stdio JSON-RPC 2.0 LspClient, request/response correlation, capability negotiation
 - core/hooks.py: HookEngine event system, HookContext (with stop_reason field, default None)
@@ -39,14 +39,14 @@
 - core/updater.py: GitHub release check, self-update via git pull
 - agents/builtin.py: 6 builtin agent definitions (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) with system prompts and allowed_tools
 - agents/registry.py: agent registry, .nerdvana/agents/*.yml custom loader, allowed_tools filtering
-- providers/base.py: BaseProvider Protocol, ProviderConfig, MODEL_CONTEXT_WINDOWS, fallback_models
+- providers/base.py: BaseProvider Protocol, ProviderConfig, ProviderEvent (error_kind, status_code, retry_after), MODEL_CONTEXT_WINDOWS
 - providers/factory.py: create_provider(), resolve_api_key()
 - tools/bash_tool.py: regex-based dangerous command blocking, sudo detection
 - tools/file_tools.py: path traversal defense via _validate_path(), FileEdit anchor_hash verification (HashLine)
 - tools/search_tools.py: path traversal defense via _validate_search_path()
 - tools/agent_tool.py: dispatches sub-agent runs through AgentLoop, surfaces progress to TaskPanel
 - tools/lsp.py: 4 LSP tool classes (lsp_diagnostics, lsp_goto_definition, lsp_find_references, lsp_rename), silent skip when LspClient unavailable
-- tools/team_tools.py: team coordination tools (broadcast/handoff) for multi-agent workflows
+- tools/team_tools.py: TaskGet/TaskStop for background agents; finished background tasks are also reported to the model automatically
 - tools/swarm_tool.py: parallel sub-agent dispatch with TaskState aggregation
 - ui/app.py: Textual TUI, ChatMessage (click-to-copy), context usage bar, tool spinner, TaskPanel mount
 - ui/task_panel.py: TaskPanel widget rendering live sub-task tree from TaskState
@@ -75,7 +75,8 @@
 - Auto-resolved per model via MODEL_CONTEXT_WINDOWS in providers/base.py
 - Fallback to PROVIDER_CAPABILITIES max_context per provider
 - User can override in YAML: session.max_context_tokens
-- Compaction at compact_threshold (default 0.8): drops oldest messages, keeps recent 10
+- Window use (core/context_budget.py): the provider's input_tokens for the last request plus an estimate of messages added since; before the first report, an estimate including the system prompt and tool schemas
+- Compaction at compact_threshold (default 0.8): AI summary or naive truncation keeping recent 10; open todo items are restated afterwards
 
 ## Skills
 - Built-in: /review, /debug, /explain, /compress-context (nerdvana_cli/skills/)
