@@ -146,57 +146,73 @@ class ToolExecutor:
 
         return [result for result in slots if result is not None]
 
+    @staticmethod
+    def _refusal(tool_id: str, content: str) -> ToolResult:
+        """An error result that tells the model a call was not run, and why."""
+        return ToolResult(tool_use_id=tool_id, content=content, is_error=True)
+
     async def _run_single(
         self,
         tool_use: dict[str, Any],
         tool:     Any,
         context:  ToolContext,
     ) -> ToolResult:
-        """Execute a single tool with permission check, hook firing, and validation."""
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        """Run one call: refuse it when a check fails, otherwise execute and record it."""
+        repeats = self._repeats.observe(tool_use["name"], tool_use["input"])
+        parsed_args, refusal = self._check_input(tool_use, tool, repeats)
+        if refusal is not None:
+            return refusal
+        refusal = await self._check_permission(tool_use, tool, parsed_args, context)
+        if refusal is not None:
+            return refusal
+        refusal = self._check_hooks_and_validation(tool_use, tool, parsed_args, context)
+        if refusal is not None:
+            return refusal
 
+        # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
+        if self._checkpoint_manager is not None and tool_use["name"] in self._EDIT_TOOL_NAMES:
+            self._capture_checkpoint(tool_use["name"], parsed_args)
+
+        return await self._execute(tool_use, tool, parsed_args, context, repeats)
+
+    def _check_input(self, tool_use: dict[str, Any], tool: Any, repeats: int) -> tuple[Any, ToolResult | None]:
+        """Refuse a call that repeats too often or whose arguments are malformed.
+
+        Returns the parsed arguments, or a refusal when the call must not run.
+        """
         tool_input = tool_use["input"]
         tool_id    = tool_use["id"]
-        repeats    = self._repeats.observe(tool_use["name"], tool_input)
         if repeats >= _REPEAT_BLOCK:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = (
-                    f"Refused: {tool_use['name']} was called {repeats} times in a row with identical "
-                    "arguments. Repeating it will not change the outcome; change the approach, or ask "
-                    "the user with AskUser if you are stuck."
-                ),
-                is_error    = True,
+            return None, self._refusal(
+                tool_id,
+                f"Refused: {tool_use['name']} was called {repeats} times in a row with identical "
+                "arguments. Repeating it will not change the outcome; change the approach, or ask "
+                "the user with AskUser if you are stuck.",
             )
-
         problems = validate_arguments(
             tool.input_schema or {},
             tool_input,
             reject_unknown = getattr(tool, "reject_unknown_args", True),
         )
         if problems:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = f"Invalid tool input: {'; '.join(problems)}",
-                is_error    = True,
-            )
-
+            return None, self._refusal(tool_id, f"Invalid tool input: {'; '.join(problems)}")
         try:
-            parsed_args = tool.parse_args(tool_input)
+            return tool.parse_args(tool_input), None
         except (TypeError, ValueError) as exc:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = f"Invalid tool input: {exc}",
-                is_error    = True,
-            )
+            return None, self._refusal(tool_id, f"Invalid tool input: {exc}")
 
+    async def _check_permission(
+        self,
+        tool_use:    dict[str, Any],
+        tool:        Any,
+        parsed_args: Any,
+        context:     ToolContext,
+    ) -> ToolResult | None:
+        """Apply the permission policy; ask the user when it says so. None means allowed."""
+        tool_id     = tool_use["id"]
         perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context))
         if perm_result.behavior == PermissionBehavior.DENY:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = f"Permission denied: {perm_result.message}",
-                is_error    = True,
-            )
+            return self._refusal(tool_id, f"Permission denied: {perm_result.message}")
         if perm_result.behavior == PermissionBehavior.ASK:
             granted = await self._ask_user_permission(
                 context   = context,
@@ -204,46 +220,47 @@ class ToolExecutor:
                 message   = perm_result.message,
             )
             if not granted:
-                return ToolResult(
-                    tool_use_id = tool_id,
-                    content     = (
-                        f"Permission denied by user: {perm_result.message}"
-                    ),
-                    is_error    = True,
-                )
+                return self._refusal(tool_id, f"Permission denied by user: {perm_result.message}")
+        return None
 
+    def _check_hooks_and_validation(
+        self,
+        tool_use:    dict[str, Any],
+        tool:        Any,
+        parsed_args: Any,
+        context:     ToolContext,
+    ) -> ToolResult | None:
+        """Let BEFORE_TOOL hooks and the tool's own validation veto the call. None means go ahead."""
+        from nerdvana_cli.core.hooks import HookContext, HookEvent
+
+        tool_id  = tool_use["id"]
         hook_ctx = HookContext(
             event      = HookEvent.BEFORE_TOOL,
             tool_name  = tool_use["name"],
-            tool_input = tool_input,
+            tool_input = tool_use["input"],
             settings   = self._settings,
         )
         for hr in self._hooks.fire(hook_ctx):
             if not hr.allow:
-                return ToolResult(
-                    tool_use_id = tool_id,
-                    content     = f"Blocked by hook: {hr.message}",
-                    is_error    = True,
-                )
-
+                return self._refusal(tool_id, f"Blocked by hook: {hr.message}")
         validation_error = tool.validate_input(parsed_args, context)
         if validation_error:
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = f"Validation error: {validation_error}",
-                is_error    = True,
-            )
+            return self._refusal(tool_id, f"Validation error: {validation_error}")
+        return None
 
-        # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
-        if (
-            self._checkpoint_manager is not None
-            and tool_use["name"] in self._EDIT_TOOL_NAMES
-        ):
-            self._capture_checkpoint(tool_use["name"], parsed_args)
-
+    async def _execute(
+        self,
+        tool_use:    dict[str, Any],
+        tool:        Any,
+        parsed_args: Any,
+        context:     ToolContext,
+        repeats:     int,
+    ) -> ToolResult:
+        """Call the tool, shape its result (truncation, diagnostics, repeat note) and record the call."""
         import time
         from datetime import UTC, datetime
 
+        tool_id   = tool_use["id"]
         start_ts  = datetime.now(UTC).isoformat()
         t0        = time.perf_counter()
         exc_class: str | None = None
@@ -274,32 +291,40 @@ class ToolExecutor:
             success     = False
             exc_class   = type(exc).__name__
             result_text = f"Tool execution error: {exc}"
-            return ToolResult(
-                tool_use_id = tool_id,
-                content     = result_text,
-                is_error    = True,
-            )
+            return self._refusal(tool_id, result_text)
         finally:
             TOOL_OUTPUT_DIR.reset(dir_token)
-            if self._analytics_writer is not None:
-                duration_ms        = int((time.perf_counter() - t0) * 1000)
-                provider, model    = self._model_identity()
-                with contextlib.suppress(Exception):
-                    self._analytics_writer.record_tool_call(
-                        tool_name     = tool_use["name"],
-                        start_ts      = start_ts,
-                        duration_ms   = duration_ms,
-                        success       = success,
-                        error_class   = exc_class,
-                        provider      = provider,
-                        model         = model,
-                        # The call arguments were produced by the model, and the
-                        # result is fed back to it, so each side is priced the
-                        # way the provider bills it. The count stays local: a
-                        # finished tool must not wait on a counting API.
-                        input_tokens  = estimate_tokens(result_text),
-                        output_tokens = estimate_tokens(json.dumps(tool_input, ensure_ascii=False, default=str)),
-                    )
+            self._record_call(tool_use, start_ts, time.perf_counter() - t0, success, exc_class, result_text)
+
+    def _record_call(
+        self,
+        tool_use:    dict[str, Any],
+        start_ts:    str,
+        seconds:     float,
+        success:     bool,
+        exc_class:   str | None,
+        result_text: str,
+    ) -> None:
+        """Write the finished call to the analytics database, when one is configured."""
+        if self._analytics_writer is None:
+            return
+        provider, model = self._model_identity()
+        with contextlib.suppress(Exception):
+            self._analytics_writer.record_tool_call(
+                tool_name     = tool_use["name"],
+                start_ts      = start_ts,
+                duration_ms   = int(seconds * 1000),
+                success       = success,
+                error_class   = exc_class,
+                provider      = provider,
+                model         = model,
+                # The call arguments were produced by the model, and the
+                # result is fed back to it, so each side is priced the
+                # way the provider bills it. The count stays local: a
+                # finished tool must not wait on a counting API.
+                input_tokens  = estimate_tokens(result_text),
+                output_tokens = estimate_tokens(json.dumps(tool_use["input"], ensure_ascii=False, default=str)),
+            )
 
     def _model_identity(self) -> tuple[str | None, str | None]:
         """Provider and model names to attribute a tool call to.
