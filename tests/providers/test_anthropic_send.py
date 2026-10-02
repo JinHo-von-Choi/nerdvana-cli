@@ -105,9 +105,9 @@ def test_convert_messages_pass_through_plain_roles() -> None:
             {"role": "user", "content": parts},
         ]
     )
-    assert out[0] == {"role": "user", "content": "plain"}
-    assert out[1] == {"role": "assistant", "content": "answer"}
-    assert out[2]["content"] is parts
+    assert out[0] == {"role": "user", "content": [{"type": "text", "text": "plain"}]}
+    assert out[1] == {"role": "assistant", "content": [{"type": "text", "text": "answer"}]}
+    assert out[2]["content"] == parts
 
 
 def test_convert_messages_tool_result_block() -> None:
