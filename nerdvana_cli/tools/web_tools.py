@@ -77,6 +77,8 @@ class WebFetchArgs:
 
 class WebFetchTool(BaseTool[WebFetchArgs]):
     name             = "WebFetch"
+    # Pages are mostly boilerplate; a tighter cap keeps them from crowding the window.
+    max_result_tokens = 10_000
     description_text = (
         "Fetch a URL and return the response body as text.\n"
         "HTTP/HTTPS only. Private/loopback IPs are blocked. Default max_bytes 1 MiB."
