@@ -23,12 +23,21 @@ from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compa
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
+from nerdvana_cli.core.provider_recovery import (
+    COMPACT,
+    FALLBACK,
+    RESEND,
+    RETRY,
+    ProviderCallError,
+    RecoveryPlanner,
+)
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.tool import AskUserCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderName
+from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
 from nerdvana_cli.providers.factory import create_provider
 from nerdvana_cli.types import Message, Role, SessionState
 
@@ -308,16 +317,6 @@ class AgentLoop:
     def activate_skill(self, skill_body: str) -> None: self._active_skill = skill_body  # noqa: E704
     def deactivate_skill(self) -> None: self._active_skill = None  # noqa: E704
 
-    def _next_fallback_model(self) -> str | None:
-        fb = self.settings.model.fallback_models
-        if not fb:
-            return None
-        try:
-            idx = fb.index(self.settings.model.model) + 1
-        except ValueError:
-            idx = 0
-        return fb[idx] if idx < len(fb) else None
-
     def _to_provider_messages(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for msg in self.state.messages:
@@ -522,7 +521,14 @@ class AgentLoop:
         )
         tool_ctx.state["session_id"] = self.session.session_id
         state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
-        orig_model = self.settings.model.model
+        orig_model    = self.settings.model.model
+        orig_provider = self.settings.model.provider
+        orig_api_key  = self.settings.model.api_key
+        orig_base_url = self.settings.model.base_url
+        recovery      = RecoveryPlanner(
+            fallbacks   = list(self.settings.model.fallback_models),
+            max_retries = self.settings.model.max_retries,
+        )
         try:
             while True:
                 state = state.evolve(iteration=state.iteration + 1)
@@ -603,14 +609,10 @@ class AgentLoop:
                                     self.session.record_assistant_message(asst_text)
                                 return
                         elif ev.type == "error":
-                            err = ev.error or "Unknown error"
-                            if any(k in err.lower() for k in ("utf-8", "decode", "encoding")):
-                                yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
-                                async for c in self._fallback_to_send(system_prompt, messages, tools, tool_ctx):
-                                    yield c
-                                return
-                            yield f"\n[bold red]Provider error: {err}[/bold red]"
-                            return
+                            raise ProviderCallError(
+                                ev.error or "Unknown error",
+                                ProviderFailure(ev.error_kind or OTHER, ev.status_code, ev.retry_after),
+                            )
 
                 except UnicodeDecodeError:
                     yield "\n[dim yellow]Encoding error, retrying without streaming...[/dim yellow]\n"
@@ -621,19 +623,53 @@ class AgentLoop:
                         yield f"\n[bold red]Fallback also failed: {fe}[/bold red]"
                     return
                 except Exception as e:
-                    if self.loop_hook_engine._is_retryable_error(e):
-                        fallback = self._next_fallback_model()
-                        if fallback:
-                            yield f"\n[dim yellow][Fallback: {fallback}][/dim yellow]\n"
-                            self.settings.model.model = fallback
-                            self.provider = self.create_provider_from_settings()
-                            continue
+                    from_event = isinstance(e, ProviderCallError)
+                    failure    = e.failure if isinstance(e, ProviderCallError) else classify_exception(e)
+                    action     = recovery.plan(
+                        failure,
+                        current          = self.settings.model.model,
+                        current_provider = self.settings.model.provider or "",
+                        streamed         = bool(asst_text or tool_uses),
+                    )
+                    if action.kind == RESEND:
+                        yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
+                        async for c in self._fallback_to_send(system_prompt, messages, tools, tool_ctx):
+                            yield c
+                        return
+                    if action.kind == RETRY:
+                        yield f"\n[dim yellow][Retrying in {action.delay:.1f}s: {failure.kind}][/dim yellow]\n"
+                        await asyncio.sleep(action.delay)
+                        continue
+                    if action.kind == COMPACT:
+                        async for status in self._maybe_compact_messages(cur_toks, int(cur_toks * 0.6)):
+                            yield status
+                        continue
+                    if action.kind == FALLBACK:
+                        self._switch_model(action.provider, action.model)
+                        yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
+                        continue
+                    if from_event:
+                        yield f"\n[bold red]Provider error: {e}[/bold red]"
+                        return
                     yield f"\n[bold red]Error: {e}[/bold red]"
                     self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {e}"))
                     return
         finally:
-            self.settings.model.model = orig_model
-            self.provider             = self.create_provider_from_settings()
+            self.settings.model.provider = orig_provider
+            self.settings.model.model    = orig_model
+            self.settings.model.api_key  = orig_api_key
+            self.settings.model.base_url = orig_base_url
+            self.provider                = self.create_provider_from_settings()
+
+    def _switch_model(self, provider: str | None, model: str) -> None:
+        """Point the loop at *model*, on *provider* when one is given."""
+        if provider and provider != self.settings.model.provider:
+            from nerdvana_cli.providers.factory import resolve_api_key
+            self.settings.model.provider = provider
+            self.settings.model.api_key  = resolve_api_key(ProviderName(provider))
+            self.settings.model.base_url = ""
+        self.settings.model.model = model
+        self.provider             = self.create_provider_from_settings()
 
     async def _fallback_to_send(
         self, system_prompt: str, messages: list[dict[str, Any]], tools: list[Any], context: ToolContext,

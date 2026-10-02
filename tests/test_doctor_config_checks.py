@@ -99,6 +99,18 @@ class TestFallbackModels:
         assert r.status == "warn"
         assert "gpt-4.1" in r.detail
 
+    def test_provider_prefixed_entry_with_key_is_ok(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        _config(tmp_path, "model:\n  provider: anthropic\n  fallback_models: ['openai:gpt-4.1']\n")
+        assert dc._check_fallback_models().status == "ok"
+
+    def test_provider_prefixed_entry_without_key_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        _config(tmp_path, "model:\n  provider: anthropic\n  fallback_models: ['openai:gpt-4.1']\n")
+        r = dc._check_fallback_models()
+        assert r.status == "warn"
+        assert "no API key" in r.detail
+
 
 class TestMcpConfig:
     def test_skip_without_files(self) -> None:
