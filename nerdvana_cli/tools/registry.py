@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
+from nerdvana_cli.tools.ask_user_tool import AskUserTool
 from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
 from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
 from nerdvana_cli.tools.parism_tool import ParismTool
@@ -46,6 +47,10 @@ def create_tool_registry(
 
     # Task tracking tool
     registry.register(TodoWriteTool())
+
+    # Clarifying questions: answerable only through an interactive front end,
+    # so create_subagent_registry never hands this tool to a subagent.
+    registry.register(AskUserTool())
 
     # Web tools — WebSearch raises ToolError at call time when BRAVE_API_KEY is absent
     registry.register(WebFetchTool())

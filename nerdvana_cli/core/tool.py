@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, ClassVar, Generic, TypeVar, cast
@@ -10,6 +11,10 @@ from typing import Any, ClassVar, Generic, TypeVar, cast
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 T = TypeVar("T")
+
+# Interactive question hook: receives the question and the suggested options and
+# resolves to the user's answer, or None when the user dismissed the prompt.
+AskUserCallback = Callable[[str, list[str]], Awaitable[str | None]]
 
 
 class ToolCategory(StrEnum):
@@ -41,6 +46,7 @@ class ToolContext:
         max_result_size: int  = 500_000,
         task_registry:   Any  = None,
         team_registry:   Any  = None,
+        ask_user:        AskUserCallback | None = None,
     ) -> None:
         self.cwd             = cwd
         self.max_result_size = max_result_size
@@ -48,6 +54,7 @@ class ToolContext:
         self.state:          dict[str, Any] = {}
         self.task_registry                  = task_registry
         self.team_registry                  = team_registry
+        self.ask_user                       = ask_user
 
 
 class BaseTool(ABC, Generic[T]):

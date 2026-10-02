@@ -25,7 +25,7 @@ from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.tool import ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import AskUserCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider
@@ -145,6 +145,7 @@ class AgentLoop:
         analytics_writer:    AnalyticsWriter | None = None,
         pricing_table:       PricingTable | None = None,
         role_prompt:         str = "",
+        on_ask_user:         AskUserCallback | None = None,
     ) -> None:
         self.settings             = settings
         self.registry             = registry
@@ -156,6 +157,7 @@ class AgentLoop:
         self.activity_state       = ActivityState()
         self._on_activity_change  = on_activity_change
         self._on_thinking_chunk   = on_thinking_chunk
+        self._on_ask_user         = on_ask_user
         self.last_thinking:  str  = ""
         from nerdvana_cli.core.builtin_hooks import (
             DirectoryRuleInjector,
@@ -502,7 +504,12 @@ class AgentLoop:
         self.state.messages.extend(_hook_injection_messages(self.tool_executor))
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
-        tool_ctx   = ToolContext(cwd=self.settings.cwd, task_registry=self._task_registry, team_registry=self._team_registry)
+        tool_ctx   = ToolContext(
+            cwd           = self.settings.cwd,
+            task_registry = self._task_registry,
+            team_registry = self._team_registry,
+            ask_user      = self._on_ask_user,
+        )
         state      = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
         orig_model = self.settings.model.model
         try:

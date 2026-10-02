@@ -12,6 +12,7 @@ or the module-specific form::
 from __future__ import annotations
 
 from nerdvana_cli.ui.widgets.activity_indicator import ActivityIndicator
+from nerdvana_cli.ui.widgets.ask_user_screen import AskUserScreen
 from nerdvana_cli.ui.widgets.chat_message import ChatMessage
 from nerdvana_cli.ui.widgets.command_menu import SLASH_COMMANDS, CommandMenu
 from nerdvana_cli.ui.widgets.model_selector import ModelSelector
@@ -23,6 +24,7 @@ from nerdvana_cli.ui.widgets.tool_status import ToolStatusLine
 
 __all__ = [
     "ActivityIndicator",
+    "AskUserScreen",
     "ChatMessage",
     "CommandMenu",
     "ModelSelector",

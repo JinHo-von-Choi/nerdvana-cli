@@ -35,6 +35,7 @@ from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
 from nerdvana_cli.ui.widgets import (
     SLASH_COMMANDS,
     ActivityIndicator,
+    AskUserScreen,
     ChatMessage,
     CommandMenu,
     ModelSelector,
@@ -207,6 +208,23 @@ class NerdvanaApp(App[object]):
         yield StatusBar(id="status-bar")
         yield Footer()
 
+    async def _ask_user_prompt(self, question: str, options: list[str]) -> str | None:
+        """Show the AskUser modal and wait for the answer.
+
+        Registered as the agent loop's ``on_ask_user`` hook. The loop runs as a
+        Textual worker on the app's event loop, so the modal is pushed directly
+        and its dismissal resolves a future the tool call awaits. Returns None
+        when the user dismisses the prompt.
+        """
+        answer: asyncio.Future[str | None] = asyncio.get_running_loop().create_future()
+
+        def _on_dismiss(result: str | None) -> None:
+            if not answer.done():
+                answer.set_result(result)
+
+        self.push_screen(AskUserScreen(question, options), _on_dismiss)
+        return await answer
+
     def on_mount(self) -> None:
         """Initialize agent loop and display welcome."""
         from nerdvana_cli.core.team import TeamRegistry
@@ -231,6 +249,7 @@ class NerdvanaApp(App[object]):
             task_registry      = self._task_registry,
             team_registry      = team_registry,
             on_activity_change = _on_activity_change,
+            on_ask_user        = self._ask_user_prompt,
         )
 
         self._update_banner()
