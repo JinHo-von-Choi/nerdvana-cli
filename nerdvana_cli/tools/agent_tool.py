@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
-from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 
@@ -75,11 +75,13 @@ class AgentTool(BaseTool[AgentToolArgs]):
 
     def __init__(
         self,
-        settings:      NerdvanaSettings,
-        task_registry: TaskRegistry,
+        settings:        NerdvanaSettings,
+        task_registry:   TaskRegistry,
+        parent_registry: ToolRegistry | None = None,
     ) -> None:
-        self._settings      = settings
-        self._task_registry = task_registry
+        self._settings        = settings
+        self._task_registry   = task_registry
+        self._parent_registry = parent_registry
 
     async def call(
         self,
@@ -131,6 +133,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         child_registry = create_subagent_registry(
             settings      = child_settings,
             allowed_tools = allowed_tools,
+            parent_tools  = self._parent_registry.all_tools() if self._parent_registry else None,
         )
         config = SubagentConfig(
             agent_id      = task_id,

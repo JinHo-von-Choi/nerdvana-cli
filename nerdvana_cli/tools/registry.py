@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nerdvana_cli.core.tool import BaseTool, ToolRegistry
+from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolRegistry
 from nerdvana_cli.tools.ask_user_tool import AskUserTool
 from nerdvana_cli.tools.bash_tool import BashTool, create_bash_tool
 from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool, FileWriteTool
@@ -55,7 +55,7 @@ def create_tool_registry(
 
     if settings is not None:
         from nerdvana_cli.tools.agent_tool import AgentTool
-        registry.register(AgentTool(settings=settings, task_registry=_task_reg))
+        registry.register(AgentTool(settings=settings, task_registry=_task_reg, parent_registry=registry))
 
     from nerdvana_cli.tools.team_tools import TaskGetTool, TaskStopTool
     registry.register(TaskGetTool(task_registry=_task_reg))
@@ -63,7 +63,7 @@ def create_tool_registry(
 
     if settings is not None:
         from nerdvana_cli.tools.swarm_tool import SwarmTool
-        registry.register(SwarmTool(settings=settings, task_registry=_task_reg))
+        registry.register(SwarmTool(settings=settings, task_registry=_task_reg, parent_registry=registry))
 
     # Phase H: external project tools, gated on an explicit opt-in. A caller
     # that carries no setting gets the closed state, so a missing switch can
@@ -103,18 +103,33 @@ def create_tool_registry(
     return registry
 
 
+# Never handed to a subagent: spawning, background-task control and questions
+# to the user all belong to the top-level session.
+_SUBAGENT_EXCLUDED: frozenset[str] = frozenset({"Agent", "Swarm", "TaskGet", "TaskStop", "AskUser"})
+
+# ``allowed_tools`` entry granting every tool that only reads.
+READ_ONLY_TOKEN = "@read"
+_READ_ONLY_CATEGORIES: frozenset[ToolCategory] = frozenset({ToolCategory.READ, ToolCategory.SYMBOLIC})
+
+
 def create_subagent_registry(
-    settings:       Any                = None,
-    mcp_tools:      Any                = None,
-    allowed_tools:  list[str] | None   = None,
+    settings:       Any                          = None,
+    mcp_tools:      Any                          = None,
+    allowed_tools:  list[str] | None             = None,
+    parent_tools:   list[BaseTool[Any]] | None   = None,
 ) -> ToolRegistry:
     """Create a restricted tool registry for subagent use.
 
-    Subagents get standard tools filtered by allowed_tools but NOT AgentTool
-    (no recursive spawning).
+    The standard file, search and shell tools are always candidates. With
+    *parent_tools* (the session's own registry), its LSP, symbol, web, todo and
+    MCP tools are candidates too, sharing the parent's instances so no second
+    language server starts. Spawning, task control, AskUser and other META
+    tools are never included.
 
-    If allowed_tools is None or ["*"], all standard tools are included.
-    Otherwise only tools whose name appears in allowed_tools are registered.
+    ``allowed_tools`` of None or ``["*"]`` admits every candidate. Otherwise a
+    candidate is admitted when its name is listed, or when ``"@read"`` is
+    listed and its category is READ or SYMBOLIC. MCP tools declare WRITE, so
+    they are admitted only by name or by the wildcard.
     """
     _all: dict[str, BaseTool[Any]] = {}
 
@@ -123,6 +138,10 @@ def create_subagent_registry(
     for cls in (FileReadTool, FileWriteTool, FileEditTool, GlobTool, GrepTool):
         t = cls()
         _all[t.name] = t
+
+    for tool in parent_tools or []:
+        if tool.name not in _SUBAGENT_EXCLUDED and tool.category != ToolCategory.META:
+            _all[tool.name] = tool
 
     if mcp_tools:
         for tool in mcp_tools:
@@ -136,8 +155,9 @@ def create_subagent_registry(
             registry.register(tool)
     else:
         allowed_set = set(allowed_tools or [])
+        read_only   = READ_ONLY_TOKEN in allowed_set
         for name, tool in _all.items():
-            if name in allowed_set:
+            if name in allowed_set or (read_only and tool.category in _READ_ONLY_CATEGORIES):
                 registry.register(tool)
 
     return registry
