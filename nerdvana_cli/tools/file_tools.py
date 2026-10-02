@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import difflib
 import errno
 import hashlib
 import os
@@ -189,6 +190,58 @@ def _decode_text(data: bytes, errors: str) -> str:
     return data.decode("utf-8", errors=errors).replace("\r\n", "\n").replace("\r", "\n")
 
 
+# Longest diff shown in a confirmation, in lines.
+_MAX_PREVIEW_LINES = 120
+
+
+def _current_text(path: str, cwd: str) -> str | None:
+    """The text a path holds now ("" for a new file), or None when it cannot be read as text."""
+    if validate_path(path, cwd):
+        return None
+    try:
+        return _decode_text(_read_bytes(path, cwd), "replace")
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return None
+
+
+def unified_preview(path: str, before: str, after: str) -> str | None:
+    """A unified diff of *before* to *after*, shortened to a readable length; None when nothing changes."""
+    diff = list(difflib.unified_diff(
+        before.splitlines(keepends=True),
+        after.splitlines(keepends=True),
+        fromfile = f"a/{path}" if before else "/dev/null",
+        tofile   = f"b/{path}",
+    ))
+    if not diff:
+        return None
+    shown = [line if line.endswith("\n") else line + "\n" for line in diff[:_MAX_PREVIEW_LINES]]
+    if len(diff) > _MAX_PREVIEW_LINES:
+        shown.append(f"... {len(diff) - _MAX_PREVIEW_LINES} more diff line(s) not shown\n")
+    return "".join(shown).rstrip("\n")
+
+
+def edit_result_text(content: str, args: Any) -> str | None:
+    """What *content* becomes under a FileEdit *args*, or None when the edit would be refused."""
+    if args.anchor_hash is not None:
+        parsed = _parse_anchor(args.anchor_hash)
+        if parsed is None:
+            return None
+        lines = content.splitlines(keepends=True)
+        index = _resolve_anchor(parsed[0], parsed[1], lines)
+        if index is None:
+            return None
+        lines[index] = args.new_string
+        return "".join(lines)
+    old = args.old_string
+    if not old or old not in content:
+        return None
+    if args.replace_all:
+        return content.replace(old, args.new_string)
+    return None if content.count(old) > 1 else content.replace(old, args.new_string, 1)
+
+
 def _ledger_error(
     verb:     str,
     path:     str,
@@ -350,6 +403,13 @@ WARNING: This replaces the entire file content."""
     tags: ClassVar[frozenset[str]] = frozenset({"file"})
     requires_confirmation  = False
 
+    def preview_change(self, args: FileWriteArgs, context: ToolContext) -> str | None:
+        """The diff of replacing the file with ``content`` (or the whole text of a new file)."""
+        before = _current_text(args.path, context.cwd)
+        if before is None:
+            return None
+        return unified_preview(args.path, before, _decode_text(args.content.encode("utf-8"), "replace"))
+
     async def call(
         self,
         args: FileWriteArgs,
@@ -463,6 +523,14 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
     side_effects           = ToolSideEffect.FILESYSTEM
     tags: ClassVar[frozenset[str]] = frozenset({"file", "edit"})
     requires_confirmation  = False
+
+    def preview_change(self, args: FileEditArgs, context: ToolContext) -> str | None:
+        """The diff this edit would make, computed without writing anything."""
+        before = _current_text(args.path, context.cwd)
+        if not before:
+            return None
+        after = edit_result_text(before, args)
+        return None if after is None else unified_preview(args.path, before, after)
 
     def validate_input(self, args: FileEditArgs, context: ToolContext) -> str | None:
         if args.anchor_hash is None and not args.old_string:

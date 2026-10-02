@@ -217,11 +217,27 @@ class ToolExecutor:
             granted = await self._ask_user_permission(
                 context   = context,
                 tool_name = tool_use["name"],
-                message   = perm_result.message,
+                message   = self._with_preview(tool, parsed_args, context, perm_result.message),
             )
             if not granted:
                 return self._refusal(tool_id, f"Permission denied by user: {perm_result.message}")
         return None
+
+    @staticmethod
+    def _with_preview(tool: Any, parsed_args: Any, context: ToolContext, message: str) -> str:
+        """Append the change a tool would make to *message*, when the tool can compute it.
+
+        Any failure just means no preview: the question is still asked.
+        """
+        preview = getattr(tool, "preview_change", None)
+        if preview is None:
+            return message
+        try:
+            detail = preview(parsed_args, context)
+        except Exception:  # noqa: BLE001
+            logger.debug("no preview for %s", getattr(tool, "name", "?"), exc_info=True)
+            return message
+        return f"{message}\n\n{detail}" if detail else message
 
     def _check_hooks_and_validation(
         self,
