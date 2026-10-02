@@ -23,8 +23,9 @@ class SubagentConfig:
     name:      str
     prompt:    str
     settings:  NerdvanaSettings
-    registry:  ToolRegistry
-    max_turns: int = 50
+    registry:      ToolRegistry
+    max_turns:     int = 50
+    system_prompt: str = ""
 
 
 async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
@@ -38,7 +39,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
 
-    loop   = AgentLoop(settings=child_settings, registry=config.registry)
+    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt)
     parts: list[str] = []
 
     async for chunk in loop.run(config.prompt):

@@ -102,7 +102,6 @@ class AgentTool(BaseTool[AgentToolArgs]):
         child_settings = copy.deepcopy(self._settings)
         if args.model:
             child_settings.model.model = args.model
-        child_settings.session.max_turns = 50
 
         import os
 
@@ -128,16 +127,19 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 is_error=True,
             )
         allowed_tools = agent_defn.allowed_tools
+        child_settings.session.max_turns = agent_defn.max_turns
         child_registry = create_subagent_registry(
             settings      = child_settings,
             allowed_tools = allowed_tools,
         )
         config = SubagentConfig(
-            agent_id = task_id,
-            name     = args.subagent_type,
-            prompt   = args.prompt,
-            settings = child_settings,
-            registry = child_registry,
+            agent_id      = task_id,
+            name          = args.subagent_type,
+            prompt        = args.prompt,
+            settings      = child_settings,
+            registry      = child_registry,
+            max_turns     = agent_defn.max_turns,
+            system_prompt = agent_defn.system_prompt,
         )
 
         if args.run_in_background:

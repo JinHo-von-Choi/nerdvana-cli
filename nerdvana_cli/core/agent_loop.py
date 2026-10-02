@@ -131,6 +131,7 @@ class AgentLoop:
         on_thinking_chunk:   Callable[[str], None] | None = None,
         analytics_writer:    AnalyticsWriter | None = None,
         pricing_table:       PricingTable | None = None,
+        role_prompt:         str = "",
     ) -> None:
         self.settings             = settings
         self.registry             = registry
@@ -165,6 +166,7 @@ class AgentLoop:
         self.skill_loader = SkillLoader(project_dir=settings.cwd)
         self.skill_loader.load_all()
         self._active_skill: str | None = None
+        self._role_prompt = role_prompt
         self._reminder    = ContextReminder(cwd=settings.cwd or ".", max_recent=5)
         self._turn        = 0
         _cs = self.skill_loader.get_by_name("compress-context")
@@ -338,6 +340,8 @@ class AgentLoop:
                 self._sticky_session_context = "\n\n".join(_p)
         if self._sticky_session_context:
             system_prompt += f"\n\n{self._sticky_session_context}"
+        if self._role_prompt:
+            system_prompt += f"\n\n# Agent Role\n{self._role_prompt}"
         if self._active_skill:
             system_prompt += f"\n\n# Active Skill\n{self._active_skill}"
         try:
