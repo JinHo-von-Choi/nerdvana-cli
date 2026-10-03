@@ -4,7 +4,7 @@ Verifies:
 - Non-TTY (pipe / CI): ASK → automatic DENY, no blocking
 - Interactive TTY: 'y'/'yes' → ALLOW; '' / 'n' / 'no' / 'x' → DENY
 - EOFError on stdin → DENY (fail-safe)
-- ToolExecutor integration: ASK path wires through _ask_user_permission
+- ToolExecutor integration: ASK path wires through ask_user_permission
 
 작성자: 최진호
 작성일: 2026-04-18
@@ -19,20 +19,16 @@ import pytest
 
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.core.tool_executor import ToolExecutor
+from nerdvana_cli.core.tool_permission import ask_user_permission
 
 # ---------------------------------------------------------------------------
-# _ask_user_permission unit tests
+# ask_user_permission unit tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_non_tty_always_denies() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with patch.object(sys.stdin, "isatty", return_value=False):
-        result = await executor._ask_user_permission(
+        result = await ask_user_permission(
             tool_name = "RegisterExternalProject",
             message   = "Will write to filesystem",
         )
@@ -41,93 +37,63 @@ async def test_non_tty_always_denies() -> None:
 
 @pytest.mark.asyncio
 async def test_tty_y_grants() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", return_value="y"),
     ):
-        result = await executor._ask_user_permission("TestTool", "test msg")
+        result = await ask_user_permission("TestTool", "test msg")
     assert result is True
 
 
 @pytest.mark.asyncio
 async def test_tty_yes_grants() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", return_value="yes"),
     ):
-        result = await executor._ask_user_permission("TestTool", "test msg")
+        result = await ask_user_permission("TestTool", "test msg")
     assert result is True
 
 
 @pytest.mark.asyncio
 async def test_tty_yes_case_insensitive() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     for reply in ("Y", "YES", "Yes"):
         with (
             patch.object(sys.stdin, "isatty", return_value=True),
             patch("builtins.input", return_value=reply),
         ):
-            result = await executor._ask_user_permission("TestTool", "msg")
+            result = await ask_user_permission("TestTool", "msg")
         assert result is True, f"Reply {reply!r} should have been accepted"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reply", ["", "n", "N", "no", "NO", "x", "cancel", "  "])
 async def test_tty_non_yes_denies(reply: str) -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", return_value=reply),
     ):
-        result = await executor._ask_user_permission("TestTool", "msg")
+        result = await ask_user_permission("TestTool", "msg")
     assert result is False, f"Reply {reply!r} should have been denied"
 
 
 @pytest.mark.asyncio
 async def test_tty_eof_denies() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", side_effect=EOFError),
     ):
-        result = await executor._ask_user_permission("TestTool", "msg")
+        result = await ask_user_permission("TestTool", "msg")
     assert result is False
 
 
 @pytest.mark.asyncio
 async def test_tty_oserror_denies() -> None:
-    executor = ToolExecutor(
-        registry  = MagicMock(),
-        hooks     = MagicMock(),
-        settings  = None,
-    )
     with (
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("builtins.input", side_effect=OSError("stdin broken")),
     ):
-        result = await executor._ask_user_permission("TestTool", "msg")
+        result = await ask_user_permission("TestTool", "msg")
     assert result is False
 
 
@@ -239,7 +205,7 @@ async def test_run_batch_deny_unchanged() -> None:
     context   = ToolContext()
     _         = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
-    with patch.object(executor, "_ask_user_permission") as mock_ask:
+    with patch("nerdvana_cli.core.tool_permission.ask_user_permission") as mock_ask:
         results = await executor.run_batch([fake_call], context=context)
 
     mock_ask.assert_not_called()

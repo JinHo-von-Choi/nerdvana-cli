@@ -164,7 +164,7 @@ def _loop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: _Script, co
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setattr(AgentLoop, "create_provider_from_settings", lambda self: provider)
     monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
-    monkeypatch.setattr("nerdvana_cli.core.agent_loop.detect_test_command", lambda cwd: command)
+    monkeypatch.setattr("nerdvana_cli.core.goal_gate.detect_test_command", lambda cwd: command)
     project = tmp_path / "project"
     project.mkdir(exist_ok=True)
     registry = ToolRegistry()
@@ -301,7 +301,7 @@ async def test_a_sub_agent_is_not_held_to_the_check(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setattr(AgentLoop, "create_provider_from_settings", lambda self: provider)
     monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
-    monkeypatch.setattr("nerdvana_cli.core.agent_loop.detect_test_command", lambda cwd: "false")
+    monkeypatch.setattr("nerdvana_cli.core.goal_gate.detect_test_command", lambda cwd: "false")
     project = tmp_path / "project"
     project.mkdir()
     registry = ToolRegistry()

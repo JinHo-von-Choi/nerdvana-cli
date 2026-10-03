@@ -30,7 +30,7 @@ def _loop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AgentLoop:
 
 def test_absorbing_adds_tokens_and_signal_counts_to_the_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     loop = _loop(monkeypatch, tmp_path)
-    loop._usage_input_total = 100
+    loop.limits.input_tokens = 100
     loop._signals["tool_error"] = 1
     loop.absorb_subagent(
         {"input_tokens": 40, "output_tokens": 5, "cache_read_tokens": 30, "cache_write_tokens": 2},

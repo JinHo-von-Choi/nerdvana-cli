@@ -100,7 +100,7 @@ async def test_with_nothing_to_rewind_it_says_so_and_changes_nothing(loop: Agent
 
 async def test_a_compaction_ends_how_far_back_it_can_go(loop: AgentLoop) -> None:
     await _prompt(loop, "first")
-    loop._turn_marks.clear()           # what a compaction does to the marks
+    loop.rewinder.marks.clear()           # what a compaction does to the marks
     assert "Nothing to rewind" in loop.rewind(1)
 
 
@@ -109,7 +109,7 @@ async def test_a_prompt_after_a_rewind_starts_from_the_rewound_state(loop: Agent
     loop.rewind(1)
     await _prompt(loop, "again")
     assert [m.content for m in loop.state.messages if m.role == Role.USER][-1] == "again"
-    assert len(loop._turn_marks) == 1
+    assert len(loop.rewinder.marks) == 1
 
 
 async def test_the_transcript_records_the_rewind_so_a_resumed_session_agrees(loop: AgentLoop) -> None:

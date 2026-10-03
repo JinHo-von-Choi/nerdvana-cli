@@ -144,7 +144,7 @@ async def test_the_loop_accumulates_cache_tokens_and_prices_the_session(
 
     assert loop.state.usage.cache_read_tokens == 900
     assert loop.state.usage.input_tokens == 1100
-    assert loop._usage_cache_write_total == 800
+    assert loop.limits.cache_write_tokens == 800
     expected = table.estimate_cost("acme", "cached", 2100, 30, cache_read_tokens=900, cache_write_tokens=800)
     assert loop.session_cost_usd() == pytest.approx(expected)
     row = sqlite3.connect(tmp_path / "an.sqlite").execute("SELECT cache_read_tokens, cache_write_tokens, cost_total FROM sessions").fetchone()

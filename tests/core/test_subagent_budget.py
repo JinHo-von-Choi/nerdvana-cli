@@ -172,9 +172,9 @@ async def test_the_parents_limit_counts_what_its_sub_agents_spent(monkeypatch: p
     table = PricingTable(pricing_path=tmp_path / "none.yml")
     loop  = AgentLoop(settings=settings, registry=ToolRegistry(), session=SessionStorage(session_id="b", storage_dir=str(tmp_path / "s")),
                       analytics_writer=AnalyticsWriter(db_path=tmp_path / "a.sqlite", pricing_table=table, enabled=True), pricing_table=table)
-    assert loop._over_cost_limit() == ""
+    assert loop.limits.over_cost_limit() == ""
     loop.budget.spent = 3.5
-    assert "Cost limit reached" in loop._over_cost_limit()
+    assert "Cost limit reached" in loop.limits.over_cost_limit()
     settings.session.max_cost_usd = 5.0            # a new limit starts a fresh ledger
     assert loop.budget.limit == 5.0 and loop.budget.spent == 0.0
     context = loop._new_tool_context()

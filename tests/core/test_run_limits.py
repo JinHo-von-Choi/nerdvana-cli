@@ -280,7 +280,7 @@ async def test_a_sub_agent_that_hits_its_share_returns_what_it_had_and_says_so(m
     monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
     pricing = tmp_path / "pricing.yml"
     pricing.write_text(PRICING, encoding="utf-8")
-    monkeypatch.setattr("nerdvana_cli.core.agent_loop.PricingTable", lambda: PricingTable(pricing_path=pricing))
+    monkeypatch.setattr("nerdvana_cli.core.run_limits.PricingTable", lambda: PricingTable(pricing_path=pricing))
     settings = NerdvanaSettings()
     settings.cwd = str(tmp_path)
     settings.model.provider = "acme"
