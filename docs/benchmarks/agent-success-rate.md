@@ -32,7 +32,7 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | `--attempts N` | attempts per task (default 1; 4 or more recommended) |
 | `--set SECTION.FIELD=VALUE` | override a setting in every attempt (repeatable); run the same tasks with different values of `session.compact_threshold`, `session.escalation_model` or `model.fallback_models` and compare |
 | `--gate` | pass each task's verify command to `nerdvana run --verify`, so the agent is told when it fails and keeps working; compare a gated run with an ungated one to see what the check is worth |
-| `--tag TAG` | run only tasks carrying this tag (repeatable); tags in `benchmarks/tasks` include `python`, `node`, `c`, `bugfix`, `feature`, `refactor`, `multi-file`, `tests`, `recovery`, `permission`, `injection`, `preserve` |
+| `--tag TAG` | run only tasks carrying this tag (repeatable); tags in `benchmarks/tasks` include `python`, `node`, `c`, `bugfix`, `feature`, `refactor`, `multi-file`, `tests`, `recovery`, `permission`, `injection`, `preserve`; the tasks in `benchmarks/long` carry `long` |
 | `--k K` | k for pass@k and pass^k (default: the number of attempts) |
 | `--model`, `--provider` | passed to `nerdvana run` |
 | `--approval-mode` | `default`, `auto_edit`, `yolo` (default) or `plan` |
@@ -63,6 +63,50 @@ tags: [python, bugfix]         # used by --tag and for the per-tag summary
 
 Every attempt starts from a fresh copy of the repository, so attempts never see each
 other's changes and the source repository is never modified.
+
+## Long-horizon tasks
+
+The 20 tasks in `benchmarks/tasks` average about 8 turns, so the context features (observation masking, compaction, server-side
+compaction) never trigger in them and their effect cannot be measured: masking fired in none of 80 attempts. `benchmarks/long/`
+holds 8 tasks built to need 25 to 60 tool turns and to read enough text that the history grows past 60k tokens. They use the same
+layout as the short tasks, one level down:
+
+```
+benchmarks/long/tasks/<id>.yml       task files (id, path, prompt, verify, max_turns 80, max_cost_usd 1.0, tags)
+benchmarks/long/fixtures/<id>/       the starting repository, with the task's check.py or tests
+benchmarks/long/solutions/<id>/      the reference solution, laid over the fixture by tests/test_bench_fixtures.py
+benchmarks/long/generate.py          the generator that writes all of the above from fixed seeds
+```
+
+Every task carries the tag `long`. Point the script at the directory (`--tag long` selects them in any directory that holds them):
+
+```bash
+python scripts/bench_agent.py benchmarks/long/tasks --tag long --attempts 4 --yes --out long.jsonl
+```
+
+The fixtures are generated, not written by hand: `python benchmarks/long/generate.py` rewrites `tasks/`, `fixtures/` and `solutions/`,
+and `python benchmarks/long/generate.py --check` reports any committed file that differs from a fresh generation (a test runs it). Each
+fixture stays under 300 KB. `python benchmarks/long/generate.py --sizes` prints the figures below. Edit the generator, never the
+generated files.
+
+| Task | What the agent does | Files to read or patch | Characters | Tokens (about) |
+|-|-|-|-|-|
+| `long-rename-snake-case` | rename camelCase functions to snake_case in 25 of 40 modules and fix every import, call and string reference | the 39 files that change (modules and the route table) | 193k | 48k |
+| `long-data-consistency-repair` | repair 30 JSON data files against a rule spec: ids, regions, currencies, prices, totals, dates | all 30 data files and the spec | 201k | 50k |
+| `long-log-analysis` | answer five questions from ten 1000-line logs in three formats and several time zones, written to `answer.json` | the 10 logs and the format notes | 197k | 50k, more in practice (digits and short lines tokenise densely) |
+| `long-move-function` | move three names out of a helper module and update 20 importers that use six import styles, plus the tests | the 25 changed files and the helper module | 156k | 39k |
+| `long-docs-summary-table` | read eight project records of about 29k characters each and tabulate owner, budget, go-live, vendor and open risks, where the latest dated sentence wins | the 8 documents | 234k | 58k |
+| `long-bughunt-ledger` | find two defects behind failing statement tests, four modules deep, among about 30 look-alike modules | the package (the failing path alone is about 6k characters) | 204k | 51k |
+| `long-add-field-six-layers` | add a field to tickets through migration, model, repository, service, API, views and `openapi.json` in an app with six entities | the app files | 161k | 40k |
+| `long-config-migration` | convert 15 INI service configs to TOML by a written schema with unit, boolean and default rules | the 15 configs and the schema | 226k | 57k |
+
+Characters count the files an agent has to open if it reads each in full; tokens are characters divided by four. An agent that searches
+instead of reading reads less, but each of these tasks needs several passes (find, read, edit, run the check, read the check output), so
+the history of a typical attempt exceeds the figure for the first pass. The verify commands are the checks `tests/test_bench_fixtures.py`
+runs without a model (fail on the fixture, pass with the solution overlay), and the same test file checks the contract of the long tasks:
+tag `long`, 80 turns, a cost ceiling of 1.0 and a fixture between 100 KB and 300 KB. The expected answers inside the check scripts of
+`long-log-analysis`, `long-docs-summary-table`, `long-data-consistency-repair` and `long-config-migration` are digests, so the check
+scripts show what is wrong without showing the answer.
 
 ## Reading the result
 
