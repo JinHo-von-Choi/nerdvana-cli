@@ -103,6 +103,10 @@ session:
   mask_trigger_tokens: 20000
   # Spawn a Plan subagent on complex prompts before execution
   planning_gate: false
+  # Tell the model once when this many edits in a row to one file all failed, or this many turns
+  # in a row only read and searched (counted as no_progress); 0 turns a check off. See docs/goals.md.
+  no_progress_failed_edits: 3
+  no_progress_read_turns: 12
   # Show the live ActivityIndicator (idle/thinking/tool/streaming/waiting).
   show_activity: true
   # Default runtime context profile name
@@ -135,6 +139,9 @@ goal:
   verify_timeout: 300
   max_attempts: 5
   output_tail_chars: 4000
+  # Without a goal, run the detected test command (pytest, npm test, cargo test, go test) before a
+  # run that changed files is accepted as finished. See docs/goals.md.
+  auto_verify: false
 
 sandbox:
   # off | auto | require: confine what the Bash tool can write with the operating system

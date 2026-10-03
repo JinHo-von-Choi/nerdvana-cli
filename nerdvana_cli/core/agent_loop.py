@@ -23,6 +23,7 @@ from rich.markup import escape
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
+from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
@@ -217,6 +218,8 @@ class AgentLoop:
     _queued_input:            list[str]
     _goal:                    Goal | None
     _goal_loaded:             bool
+    _auto_goal:               Goal | None
+    _auto_edit_mark:          int
     _budget:                  Budget | None
     _tool_index:              ToolIndex | None
     _escalated:               bool
@@ -397,7 +400,7 @@ class AgentLoop:
 
     def verification_summary(self) -> dict[str, Any] | None:
         """How the goal stands, for the run result; None when the session has no goal."""
-        goal = self.goal
+        goal = self.goal or self._auto_goal
         if goal is None:
             return None
         return {"command": goal.verify, "status": goal.status, "attempts": goal.attempts, "last_exit": goal.last_exit}
@@ -407,14 +410,34 @@ class AgentLoop:
         sandbox = self.settings.sandbox
         return SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths), sandbox.project_writable, sandbox.scratch_writable)
 
-    async def _verify_goal(self, flow: _Flow) -> AsyncGenerator[str, None]:
-        """Run the goal's verification command now that the model says it is done.
+    def _edit_count(self) -> int:
+        """How many edits the edit tools have applied in this session so far."""
+        return sum(self.tool_executor.edited.values())
+
+    def _completion_goal(self) -> Goal | None:
+        """The goal that must be met before the run may end: the session's own, else the detected-test check.
+
+        Without a goal and with ``goal.auto_verify`` on, a run that has changed files since the last
+        passing check is held to the project's test command; none detected means no check.
+        """
+        if self.goal is not None:
+            return self.goal if self.goal.enforced else None
+        if not self.settings.goal.auto_verify or self._edit_count() <= self._auto_edit_mark:
+            return None
+        if self._auto_goal is not None and self._auto_goal.enforced:
+            return self._auto_goal
+        command = detect_test_command(self.settings.cwd or ".")
+        if not command:
+            return None
+        self._auto_goal = Goal("Keep the project's tests passing", command, max_attempts=self.settings.goal.max_attempts)
+        return self._auto_goal
+
+    async def _verify_goal(self, flow: _Flow, goal: Goal) -> AsyncGenerator[str, None]:
+        """Run the verification command of *goal* now that the model says it is done.
 
         A pass ends the run; running out of attempts ends it as unmet; otherwise the failure is put in
         front of the model and the run goes on (``flow.finished`` stays False).
         """
-        goal = self.goal
-        assert goal is not None
         config = self.settings.goal
         yield f"\n[dim]Verifying: {escape(goal.verify)}[/dim]\n"
         result = await run_verify(
@@ -423,8 +446,10 @@ class AgentLoop:
         )
         result = replace(result, tail=self.tool_executor.mask_text(result.tail))
         goal.record_attempt(result.passed, result.exit_code, result.tail)
-        save_goal(self.session.session_id, goal)
+        if goal is self.goal:
+            save_goal(self.session.session_id, goal)
         if goal.status == MET:
+            self._auto_edit_mark = self._edit_count()
             yield f"[green]Goal met: {escape(goal.verify)} passed ({result.summary()}).[/green]\n"
             flow.finished = True
             return
@@ -533,6 +558,8 @@ class AgentLoop:
         self.wrap_up_at            = 0
         self._goal                 = None
         self._goal_loaded          = False
+        self._auto_goal            = None
+        self._auto_edit_mark       = 0
         self._budget               = None
         self._tool_index           = None
         self._escalated            = False
@@ -972,6 +999,8 @@ class AgentLoop:
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
         """Request, execute tools and repeat until the model is done or a limit stops it."""
         tool_ctx = self._new_tool_context()
+        self._auto_goal      = None
+        self._auto_edit_mark = self._edit_count()
         state    = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
         saved    = self._model_state()
         self._context_budget.set_overhead(system_prompt, tools)
@@ -1162,8 +1191,9 @@ class AgentLoop:
                 return
             if decision.kind == STALLED:
                 yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
-            if self.goal is not None and self.goal.enforced:
-                async for note in self._verify_goal(flow):
+            gate = self._completion_goal()
+            if gate is not None:
+                async for note in self._verify_goal(flow, gate):
                     yield note
                 if not flow.finished:
                     return  # the check failed: the model has been told and takes another step

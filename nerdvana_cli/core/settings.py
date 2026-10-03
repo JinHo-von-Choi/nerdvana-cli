@@ -98,6 +98,10 @@ class SessionConfig(BaseModel):
     escalation_model: str = ""
     # Signal name -> how many occurrences trigger the switch (see core/signals.py).
     escalation_signals: dict[str, int] = Field(default_factory=lambda: {"verify_failed": 1, "repeat_refused": 1, "cas_rejected": 3, "new_diagnostics": 4})
+    # Tell the model once when it has made this many edits in a row to one file that all failed, or has
+    # spent this many turns in a row only reading and searching; 0 turns a check off. Counted as `no_progress`.
+    no_progress_failed_edits: int = 3
+    no_progress_read_turns:   int = 12
     # MCP tools whose full declarations are sent only after the model loads them with ToolSearch:
     # "auto" defers them once their declarations pass defer_tools_threshold tokens, "always", "never".
     defer_tools: Literal["auto", "always", "never"] = "auto"
@@ -262,6 +266,7 @@ class GoalConfig(BaseModel):
     verify_timeout:    int = 300   # seconds before the verification command is stopped
     max_attempts:      int = 5     # failed verifications before the goal is given up
     output_tail_chars: int = 4000  # how much of the end of a failing output is shown to the model
+    auto_verify:       bool = False  # without a goal, check a run that changed files with the project's detected test command
 
 
 class AgentsConfig(BaseModel):

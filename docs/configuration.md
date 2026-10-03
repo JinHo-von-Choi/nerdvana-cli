@@ -111,6 +111,8 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `defer_tools_threshold` | int | `3000` | Size, in estimated tokens, above which `defer_tools: auto` defers the MCP tools. |
 | `escalation_model` | string | `` | Model to switch to, once per session, when the run shows trouble: `model` for the current provider or `provider:model` (the provider's API key must be in the environment). Empty = never. Start on a cheap model (`model.model` or an agent category) and let this one take over only if it is needed. The thinking blocks of the earlier model are dropped on the switch, and providers that cache the start of a request reread it once. |
 | `escalation_signals` | map | `verify_failed: 1`, `repeat_refused: 1`, `cas_rejected: 3`, `new_diagnostics: 4` | Signal name to the number of occurrences that triggers the escalation; the signals are the ones counted in the `signals` of a run result. |
+| `no_progress_failed_edits` | int | `3` | Tell the model once when this many edits in a row to one file all failed (a stale or wrong anchor it keeps retrying); counted as `no_progress`. `0` turns the check off. See [goals.md](goals.md). |
+| `no_progress_read_turns` | int | `12` | Tell the model once when this many turns in a row used only read-only tools, with no edit and no command run; counted as `no_progress`. `0` turns the check off. |
 | `mask_secrets` | bool | `true` | Replace secret-looking values in the output of commands and external tools with `[REDACTED]` before the model sees it. See [secret-masking.md](secret-masking.md). |
 | `mask_extra_patterns` | list | `[]` | Regular expressions whose matches are replaced as well. |
 | `require_price` | bool | `false` | Refuse to run when `max_cost_usd` is set but the model has no known price, instead of continuing without a cost limit. Also `nerdvana run --require-price`. |
@@ -203,6 +205,7 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 | `verify_timeout` | int | `300` | Seconds before a verification command is stopped, together with everything it started. |
 | `max_attempts` | int | `5` | Failed verifications before the goal is given up and the run ends as unmet. |
 | `output_tail_chars` | int | `4000` | How much of the end of a failing verification output is shown to the model. |
+| `auto_verify` | bool | `false` | Without a goal, run the project's detected test command before accepting that a run which changed files is finished: `pytest -q` (a `pyproject.toml`, a `pytest.ini` or Python tests under `tests/`), `npm test` (a `test` script in `package.json`), `cargo test` (`Cargo.toml`) or `go test ./...` (`go.mod`), the first that applies whose program is installed. Nothing detected means no check. It uses `max_attempts`, `verify_timeout` and the sandbox policy like a goal. Sub-agents are not checked. See [goals.md](goals.md). |
 
 See [goals.md](goals.md).
 
