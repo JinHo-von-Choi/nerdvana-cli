@@ -211,7 +211,7 @@ def _functions(spec: Importer, after: bool) -> tuple[list[str], list[str]]:
     funcs, calls = [], []
     if "format_money" in spec.used:
         local = _local_import(spec, "format_money", after)
-        body  = '    return f"' + label + ": {" + refs["format_money"] + '(cents, "USD")}"\n'
+        body  = '    return f"' + label + ": {" + refs["format_money"] + "(cents, 'USD')}" + '"\n'
         funcs.append('def amount_label(cents: int) -> str:\n    """Label an amount of this module."""\n' + local + body)
         calls.append(f"amount_label({12345 + spec.factor})")
     if "parse_money" in spec.used:

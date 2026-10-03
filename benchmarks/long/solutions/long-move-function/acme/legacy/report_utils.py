@@ -59,7 +59,7 @@ NOTE_16 = (
 
 def amount_label(cents: int) -> str:
     """Label an amount of this module."""
-    return f"legacy.report_utils: {format_money(cents, "USD")}"
+    return f"legacy.report_utils: {format_money(cents, 'USD')}"
 
 
 def symbol_for(code: str) -> str:
