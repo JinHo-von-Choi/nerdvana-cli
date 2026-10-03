@@ -117,6 +117,9 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `max_context_tokens` | int | `180000` | Auto-resolved per model (1M-token models resolve to 1,000,000, so compaction starts near 800,000 tokens); set a smaller value to compact earlier |
 | `compact_threshold` | float | `0.8` | Fraction of max_context_tokens that triggers compaction |
 | `compact_max_failures` | int | `3` | AI compaction circuit breaker |
+| `observation_masking` | bool | `false` | Replace the text of old read-type tool results (FileRead, Glob, Grep, Bash, Parism, web and MCP tools, symbol and LSP lookups) with a short placeholder before compaction runs, so compaction triggers less often. The call and its result stay paired; only the result text changes. Results of edit, write and todo tools, error results, the newest result that shows line anchors for a file, and anything holding an activated skill are never cleared. Counted as `observations_masked` in the `signals` of a run result. |
+| `mask_keep_last` | int | `6` | Number of most recent tool results that observation masking always leaves intact |
+| `mask_trigger_tokens` | int | `20000` | Estimated tokens of clearable old results that must pile up before observation masking clears them all at once. Clearing in batches keeps the start of the request unchanged between batches, so provider prompt caches stay valid. |
 | `planning_gate` | bool | `false` | Spawn Plan subagent on complex prompts |
 | `default_context` | str | `"standalone"` | Default runtime context profile name |
 | `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
@@ -306,6 +309,9 @@ session:
   max_context_tokens: 180000
   compact_threshold: 0.8
   compact_max_failures: 3
+  observation_masking: false # opt-in
+  mask_keep_last: 6
+  mask_trigger_tokens: 20000
   planning_gate: true        # opt-in
   default_context: standalone
   default_mode: interactive
