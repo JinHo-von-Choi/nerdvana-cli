@@ -19,7 +19,6 @@ KNOWN_LARGE: dict[str, int] = {
     "core/agent_loop.py": 836,
     "tools/file_tools.py": 706,
     "core/checkpoint.py": 642,
-    "core/lsp_client.py": 626,
 }
 
 

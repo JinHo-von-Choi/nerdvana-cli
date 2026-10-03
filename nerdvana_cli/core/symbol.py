@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from nerdvana_cli.core.lsp_workspace import NoticedList, notice_of
 from nerdvana_cli.utils.path import validate_path
 
 if TYPE_CHECKING:
@@ -451,14 +452,14 @@ class LanguageServerSymbolRetriever:
         name      = symbol.name
 
         raw_refs  = await self._client.find_references(file_path, line, name)
-        return [
+        return NoticedList([
             Location(
                 file_path = r["file"],
                 line      = r["line"],
                 character = r["col"],
             )
             for r in raw_refs
-        ]
+        ], notice_of(raw_refs))
 
     # -- internal --
 

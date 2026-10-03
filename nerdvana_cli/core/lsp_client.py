@@ -17,7 +17,8 @@ import signal
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.utils.path import safe_open_fd
+from nerdvana_cli.core.lsp_protocol import language_id_for, park_response, simplify_diagnostic, write_file
+from nerdvana_cli.core.lsp_workspace import MAX_REFERENCE_FILES, NoticedList, mentioning_files
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +61,9 @@ _CAPABILITIES: dict[str, Any] = {
         "definition":       {"dynamicRegistration": False},
         "rename":           {"prepareSupport": True, "dynamicRegistration": False},
     },
-    "workspace": {"workspaceEdit": {"documentChanges": True}},
+    "workspace": {"workspaceEdit": {"documentChanges": True}, "workspaceFolders": True},
 }
 
-
-# Responses whose id belongs to another (usually timed out) request are parked
-# here rather than dropped.  The cap bounds the memory a misbehaving server can
-# pin; eviction is oldest-first and always logged.
-MAX_PARKED_RESPONSES: int = 32
 
 _KILL_SIGNAL: int = int(getattr(signal, "SIGKILL", signal.SIGTERM))
 
@@ -142,7 +138,7 @@ class LspClient:
             params={"textDocument": {"uri": uri}},
         )
         raw = result.get("items") or result.get("diagnostics", [])
-        return [_simplify_diag(d) for d in raw]
+        return [simplify_diagnostic(d) for d in raw]
 
     async def goto_definition(
         self, file_path: str, line: int, symbol: str
@@ -172,11 +168,16 @@ class LspClient:
     async def find_references(
         self, file_path: str, line: int, symbol: str
     ) -> list[dict[str, Any]]:
-        """Return all reference locations for symbol."""
-        ext = Path(file_path).suffix
-        uri = _path_to_uri(file_path)
-        await self._ensure_open(ext, file_path)
-        col = self._find_symbol_col(file_path, line, symbol)
+        """Return all reference locations for symbol.
+
+        The workspace files that mention *symbol* are opened first, because a
+        server reports only the documents it has seen. The list carries a
+        ``notice`` when files had to be left out.
+        """
+        ext    = Path(file_path).suffix
+        uri    = _path_to_uri(file_path)
+        notice = await self._open_workspace_files(ext, file_path, symbol)
+        col    = self._find_symbol_col(file_path, line, symbol)
         result = await self._request(
             ext,
             method="textDocument/references",
@@ -186,25 +187,23 @@ class LspClient:
                 "context":      {"includeDeclaration": True},
             },
         )
-        if not result:
-            return []
-        return [
+        return NoticedList([
             {
                 "file": _uri_to_path(r["uri"]),
                 "line": r["range"]["start"]["line"] + 1,
                 "col":  r["range"]["start"]["character"],
             }
-            for r in result
-        ]
+            for r in result or []
+        ], notice)
 
     async def rename(
         self, file_path: str, line: int, symbol: str, new_name: str
     ) -> dict[str, Any]:
-        """Rename symbol across workspace; return changed files."""
-        ext = Path(file_path).suffix
-        uri = _path_to_uri(file_path)
-        await self._ensure_open(ext, file_path)
-        col = self._find_symbol_col(file_path, line, symbol)
+        """Rename symbol across workspace; return changed files (and a ``notice`` when files were left out)."""
+        ext    = Path(file_path).suffix
+        uri    = _path_to_uri(file_path)
+        notice = await self._open_workspace_files(ext, file_path, symbol)
+        col    = self._find_symbol_col(file_path, line, symbol)
         result = await self._request(
             ext,
             method="textDocument/rename",
@@ -214,7 +213,8 @@ class LspClient:
                 "newName":      new_name,
             },
         )
-        return await asyncio.to_thread(_apply_workspace_edit, result, cwd=self._project_root)
+        applied = await asyncio.to_thread(_apply_workspace_edit, result, cwd=self._project_root)
+        return {**applied, "notice": notice} if notice else applied
 
     async def shutdown_server(self, ext: str) -> None:
         """shutdown request → exit notification → 2 s grace → SIGKILL."""
@@ -287,57 +287,79 @@ class LspClient:
 
         Edits happen through the file tools, not through the language server,
         so the server only learns about them here: a changed file is sent in
-        full with ``textDocument/didChange`` under the next version number.
+        full with ``textDocument/didChange`` under the next version number, and
+        a file that no longer exists is closed.
         """
         abs_path = str(Path(file_path).resolve())
+        uri      = Path(abs_path).as_uri()
         async with self._lock_for(ext):
             try:
                 text = await asyncio.to_thread(
                     Path(abs_path).read_text, encoding="utf-8"
                 )
             except OSError:
+                if self._open_files.pop(abs_path, None) is not None:
+                    self._open_digests.pop(abs_path, None)
+                    await self._notify(ext, "textDocument/didClose", {"textDocument": {"uri": uri}})
                 return
 
-            uri    = Path(abs_path).as_uri()
             digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             if abs_path in self._open_files:
                 if self._open_digests.get(abs_path) == digest:
                     return
                 version = self._open_files[abs_path] + 1
-                notif   = json.dumps({
-                    "jsonrpc": "2.0",
-                    "method":  "textDocument/didChange",
-                    "params":  {
-                        "textDocument":   {"uri": uri, "version": version},
-                        "contentChanges": [{"text": text}],
-                    },
-                })
+                method  = "textDocument/didChange"
+                params  = {
+                    "textDocument":   {"uri": uri, "version": version},
+                    "contentChanges": [{"text": text}],
+                }
             else:
                 version = 1
-                notif   = json.dumps({
-                    "jsonrpc": "2.0",
-                    "method":  "textDocument/didOpen",
-                    "params":  {
-                        "textDocument": {
-                            "uri":        uri,
-                            "languageId": _ext_to_language_id(Path(file_path).suffix),
-                            "version":    version,
-                            "text":       text,
-                        }
-                    },
-                })
+                method  = "textDocument/didOpen"
+                params  = {
+                    "textDocument": {
+                        "uri":        uri,
+                        "languageId": language_id_for(Path(file_path).suffix),
+                        "version":    version,
+                        "text":       text,
+                    }
+                }
             self._open_files[abs_path]   = version
             self._open_digests[abs_path] = digest
 
-            nh = f"Content-Length: {len(notif)}\r\n\r\n"
             try:
-                proc = await self._get_proc(ext)
-                assert proc.stdin is not None
-                proc.stdin.write((nh + notif).encode())
-                await proc.stdin.drain()
+                await self._notify(ext, method, params)
             except LspError:
                 self._open_files.pop(abs_path, None)
                 self._open_digests.pop(abs_path, None)
+
+    async def _open_workspace_files(self, ext: str, file_path: str, symbol: str) -> str:
+        """Show the server every file a cross-file answer on *symbol* depends on.
+
+        A language server reports references and renames only from documents it
+        has seen, so this opens *file_path* and each workspace file mentioning
+        *symbol*, and resyncs the files that are open already (an edited one
+        would otherwise answer from stale text). Returns a notice when the
+        number of files to open hit ``MAX_REFERENCE_FILES``, else an empty string.
+        """
+        mentions = await asyncio.to_thread(mentioning_files, self._project_root, ext, symbol, file_path, MAX_REFERENCE_FILES)
+        known    = [path for path in self._open_files if path.endswith(ext)]
+        for path in dict.fromkeys([file_path, *mentions.files, *known]):
+            await self._ensure_open(ext, path)
+        if not mentions.omitted:
+            return ""
+        return (
+            f"{mentions.omitted} more files mention {symbol!r} and were not opened "
+            f"(limit {MAX_REFERENCE_FILES}), so the result may be missing their entries."
+        )
+
+    async def _notify(self, ext: str, method: str, params: dict[str, Any]) -> None:
+        """Send a JSON-RPC notification; the caller holds the stdio lock."""
+        proc = await self._get_proc(ext)
+        body = json.dumps({"jsonrpc": "2.0", "method": method, "params": params})
+        assert proc.stdin is not None
+        proc.stdin.write(f"Content-Length: {len(body)}\r\n\r\n{body}".encode())
+        await proc.stdin.drain()
 
     async def _request(
         self, ext: str, method: str, params: dict[str, Any],
@@ -359,7 +381,13 @@ class LspClient:
             proc.stdin.write((header + body).encode())
             await proc.stdin.drain()
 
-            response = await self._read_response(proc, req_id, timeout=timeout)
+            try:
+                response = await self._read_response(proc, req_id, timeout=timeout)
+            except TimeoutError as exc:
+                raise LspError(
+                    f"{method} got no answer within {timeout:g}s; the language server may "
+                    "still be indexing the workspace, try again shortly"
+                ) from exc
         if "error" in response:
             raise LspError(f"LSP error: {response['error']}")
         return response.get("result")
@@ -403,7 +431,7 @@ class LspClient:
             if msg_id == req_id:
                 return dict(msg)
             if isinstance(msg_id, int):
-                _park_response(parked, msg_id, dict(msg))
+                park_response(parked, msg_id, dict(msg))
 
     async def _get_proc(self, ext: str) -> asyncio.subprocess.Process:
         """Return running process for ext, starting one if needed."""
@@ -421,7 +449,7 @@ class LspClient:
             return proc
         except Exception as e:
             self._disabled.add(ext)
-            raise LspError(f"Failed to start LSP server for {ext}: {e}") from e
+            raise LspError(f"Failed to start LSP server for {ext}: {e or type(e).__name__}") from e
 
     async def _start_server(self, ext: str) -> asyncio.subprocess.Process:
         binaries = _EXT_SERVERS.get(ext, [])
@@ -453,6 +481,7 @@ class LspClient:
             "params":  {
                 "processId":    os.getpid(),
                 "rootUri":      root_uri,
+                "workspaceFolders": [{"uri": root_uri, "name": Path(self._project_root).resolve().name}],
                 "capabilities": _CAPABILITIES,
             },
         }
@@ -502,41 +531,6 @@ def _uri_to_path(uri: str) -> str:
     """
     from urllib.parse import unquote, urlparse
     return unquote(urlparse(uri).path)
-
-
-def _park_response(
-    parked: dict[int, dict[str, Any]],
-    msg_id: int,
-    msg:    dict[str, Any],
-) -> None:
-    """Store an out-of-order response, evicting the oldest when full."""
-    while len(parked) >= MAX_PARKED_RESPONSES:
-        oldest = next(iter(parked))
-        del parked[oldest]
-        logger.warning(
-            "LSP response buffer full; discarding parked response id=%s", oldest
-        )
-    parked[msg_id] = msg
-
-
-_LANG_IDS: dict[str, str] = {
-    ".py": "python", ".ts": "typescript", ".tsx": "typescriptreact",
-    ".js": "javascript", ".jsx": "javascriptreact", ".go": "go", ".rs": "rust",
-}
-
-
-def _ext_to_language_id(suffix: str) -> str:
-    return _LANG_IDS.get(suffix, "plaintext")
-
-
-def _simplify_diag(d: dict[str, Any]) -> dict[str, Any]:
-    severity_map = {1: "error", 2: "warning", 3: "information", 4: "hint"}
-    return {
-        "line":     d["range"]["start"]["line"] + 1,
-        "col":      d["range"]["start"]["character"],
-        "severity": severity_map.get(d.get("severity", 2), "warning"),
-        "message":  d.get("message", ""),
-    }
 
 
 def _apply_workspace_edit(
@@ -595,32 +589,7 @@ def _apply_workspace_edit(
                 original = original[:sl] + [head + new_text + tail] + original[el + 1:]
 
         content = "".join(original).encode("utf-8")
-        _write_file(path, content, cwd=cwd)
+        write_file(path, content, cwd=cwd)
         changed.append(path)
 
     return {"changed_files": changed, "skipped_files": skipped, "diffs": []}
-
-
-def _write_file(path: str, content: bytes, cwd: str | None) -> None:
-    """Write *path* through the symlink-hardened opener rooted at *cwd*.
-
-    There is no unhardened fallback: a target that resolves outside the root,
-    or whose components cannot be walked with ``O_NOFOLLOW``, is an error and
-    nothing is written.
-
-    Raises:
-        PermissionError: *path* resolves outside *cwd*.
-        OSError: A path component is a symlink, or the open fails.
-    """
-    root     = os.path.realpath(cwd or os.getcwd())
-    abs_path = os.path.realpath(path)
-    if abs_path != root and not abs_path.startswith(root + os.sep):
-        raise PermissionError(
-            f"Refusing to write outside the project root: {path} "
-            f"(project root: {root})"
-        )
-
-    rel = os.path.relpath(abs_path, root)
-    fd  = safe_open_fd(rel, root, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(content)
