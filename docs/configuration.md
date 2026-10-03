@@ -273,6 +273,12 @@ See [goals.md](goals.md).
 |-------|------|---------|-------------|
 | `categories` | map | `{}` | Category name to model for sub-agents, written `model` or `provider:model`. An `Agent` call, a `Swarm` task or an agent definition that names a category runs on the mapped model; see [agents.md](agents.md). |
 
+### `tools` (ToolsConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_result_chars` | map | `{}` | Tool name to the most characters of its result kept in the conversation, overriding the tool's own limit. A key is a tool name (`Bash`, `mcp__github__search_code`) or a glob (`mcp__github__*`); an exact name beats a glob and a longer glob beats a shorter one. A longer result keeps its head and its tail, the full text is saved under `~/.nerdvana/tool-output/<session>/` and the note names the file. The smallest value is 1000. Example: `{Grep: 8000, "mcp__*": 4000}`. |
+
 ### `checkpoint` (CheckpointConfig)
 
 | Field | Type | Default | Description |

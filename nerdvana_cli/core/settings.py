@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from nerdvana_cli.core.managed_policy import ManagedPolicy
 
 _SectionT = TypeVar("_SectionT", bound=BaseModel)
+
+# Smallest value of tools.max_result_chars: below it the note that a result was cut is most of what is left.
+MIN_RESULT_CHARS = 1000
 
 
 class SettingsLoadError(ValueError):
@@ -237,7 +241,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory", "workflow",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory", "workflow", "tools",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -365,6 +369,28 @@ class MemoryConfig(BaseModel):
     review: bool = False
 
 
+class ToolsConfig(BaseModel):
+    # Tool name (or glob such as "mcp__server__*") -> most characters of a result kept in the conversation;
+    # a longer result keeps its head and tail and the full text is saved to the tool-output directory.
+    # Overrides the tool's own limit; empty = every tool keeps its own limit.
+    max_result_chars: dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("max_result_chars")
+    @classmethod
+    def _check_caps(cls, caps: dict[str, int]) -> dict[str, int]:
+        for name, cap in caps.items():
+            if cap < MIN_RESULT_CHARS:
+                raise ValueError(f"{name}: a result limit below {MIN_RESULT_CHARS} characters leaves nothing to read")
+        return caps
+
+    def result_cap(self, tool_name: str) -> int | None:
+        """The character limit for *tool_name*: an exact entry first, then the longest matching glob."""
+        if tool_name in self.max_result_chars:
+            return self.max_result_chars[tool_name]
+        matches = [pattern for pattern in self.max_result_chars if fnmatch.fnmatchcase(tool_name, pattern)]
+        return self.max_result_chars[max(matches, key=len)] if matches else None
+
+
 class AgentsConfig(BaseModel):
     # Category name -> model for sub-agents, written "model" or "provider:model".
     # An agent type or an Agent call that names a category runs on the mapped model.
@@ -409,6 +435,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("telemetry",  TelemetryConfig,  frozenset()),
     ("memory",     MemoryConfig,     _MEMORY_STRICT_FIELDS),
     ("workflow",   WorkflowConfig,   _WORKFLOW_STRICT_FIELDS),
+    ("tools",      ToolsConfig,      frozenset()),
 )
 
 
@@ -429,6 +456,7 @@ class NerdvanaSettings(BaseSettings):
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
+    tools: ToolsConfig = Field(default_factory=ToolsConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.
