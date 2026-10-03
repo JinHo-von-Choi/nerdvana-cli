@@ -200,6 +200,19 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana approvals` | 계속 승인하는 권한 질문에 대해 `always_allow` 규칙(`Bash(git status)`)을 제안합니다. 설정은 바뀌지 않습니다 |
 | `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
 
+### 예약 실행 (`nerdvana schedule ...`)
+
+| 서브명령어 | 설명 |
+|-|-|
+| `nerdvana schedule add "<크론 또는 every 15m>" --prompt "..."` | 작업 추가 (`--cwd`, `--max-cost-usd`, `--approval-mode plan\|default`, `--name`). 따로 지정하지 않으면 읽기 전용(`plan`)과 비용 상한으로 실행합니다 |
+| `nerdvana schedule list` | 작업과 다음 실행 시각, 마지막 실행 결과 표시 |
+| `nerdvana schedule remove <이름>` | 작업 삭제 (저장된 실행 기록은 남습니다) |
+| `nerdvana schedule run <이름>` | 작업을 지금 한 번 실행하고 끝날 때까지 기다립니다 |
+| `nerdvana schedule daemon` | 포그라운드에서 때가 된 작업을 시작하는 루프. 작업별과 일별 비용 상한이 있고, 데몬이 꺼져 있던 동안 놓친 실행은 되풀이하지 않습니다 |
+| `nerdvana schedule install-systemd` | 데몬용 systemd 사용자 유닛을 출력합니다. 설치하지는 않습니다 |
+
+[docs/scheduling.md](docs/scheduling.md) 참고.
+
 ### 세션 기록 (`nerdvana session ...`)
 
 | 서브명령어 | 설명 |
@@ -627,6 +640,7 @@ mypy nerdvana_cli/
 | [docs/configuration.md](docs/configuration.md) | 설정 전체 레퍼런스 |
 | [docs/hooks.md](docs/hooks.md) | 훅 이벤트 체계와 브리지 규약 |
 | [docs/managed-policy.md](docs/managed-policy.md) | 관리자가 모든 사용자·프로젝트 설정 위에 두는 기기 단위 설정 |
+| [docs/scheduling.md](docs/scheduling.md) | 예약 실행: 크론과 간격 작업, 데몬, 비용 상한 |
 | [docs/agents.md](docs/agents.md) | 에이전트 타입, 도구 예산, 스웜 패턴 |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP 서버 테넌트별 쿼터 스키마 |
 | [docs/testing-live.md](docs/testing-live.md) | 실 제공자 시험 행렬과 비밀값 설정 |

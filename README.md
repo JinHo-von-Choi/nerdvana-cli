@@ -218,6 +218,19 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written |
 | `nerdvana cost` | Aggregate token usage, cached tokens, the cache hit ratio (cache reads over input, `Hit %` and `cache_hit_ratio`) and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
 
+### Scheduled runs (`nerdvana schedule ...`)
+
+| Subcommand | Purpose |
+|-|-|
+| `nerdvana schedule add "<cron or every 15m>" --prompt "..."` | Add a job (`--cwd`, `--max-cost-usd`, `--approval-mode plan\|default`, `--name`); runs read-only (`plan`) with a cost ceiling unless told otherwise |
+| `nerdvana schedule list` | List the jobs with their next run and the outcome of the last one |
+| `nerdvana schedule remove <name>` | Remove a job (its saved run records stay) |
+| `nerdvana schedule run <name>` | Run a job once now and wait for it |
+| `nerdvana schedule daemon` | Foreground loop that starts each job when it is due, with a per-job and a daily cost ceiling; runs missed while it was down are not replayed |
+| `nerdvana schedule install-systemd` | Print a systemd user unit for the daemon; nothing is installed |
+
+See [docs/scheduling.md](docs/scheduling.md).
+
 ### Session transcripts (`nerdvana session ...`)
 
 | Subcommand | Purpose |
@@ -648,6 +661,7 @@ mypy nerdvana_cli/
 | [docs/configuration.md](docs/configuration.md) | Full config reference |
 | [docs/hooks.md](docs/hooks.md) | Hook event system and bridge protocol |
 | [docs/managed-policy.md](docs/managed-policy.md) | Machine-wide settings an administrator sets above every user and project setting |
+| [docs/scheduling.md](docs/scheduling.md) | Scheduled runs: cron and interval jobs, the daemon, cost ceilings |
 | [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
 | [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
