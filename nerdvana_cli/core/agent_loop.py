@@ -30,6 +30,7 @@ from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
 from nerdvana_cli.core.images import prompt_content, transcript_text
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
+from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.provider_recovery import (
     COMPACT,
@@ -1041,6 +1042,7 @@ class AgentLoop:
         """Report finished background work, compact when the window is nearly full, and show usage."""
         self._inject_queued_input()
         self._report_background_tasks()
+        self._mask_old_observations()
         max_ctx  = self.settings.session.max_context_tokens
         thr      = int(max_ctx * self.settings.session.compact_threshold)
         cur_toks = self._context_budget.current(self.state.messages)
@@ -1053,6 +1055,17 @@ class AgentLoop:
         yield f"{CONTEXT_USAGE_PREFIX}{min(100, int(cur_toks / max_ctx * 100)) if max_ctx > 0 else 0}"
         if self.settings.verbose:
             self.console.print(f"[dim]Turn {iteration} — {len(self.state.messages)} messages[/dim]")
+
+    def _mask_old_observations(self) -> None:
+        """Clear old read-type tool output once enough of it has piled up (``session.observation_masking``)."""
+        session = self.settings.session
+        if not session.observation_masking:
+            return
+        result = mask_observations(self.state.messages, keep_last=session.mask_keep_last, trigger_tokens=session.mask_trigger_tokens)
+        if result.masked:
+            self._signals[signals.OBSERVATIONS_MASKED] += result.masked
+            self.session.record_system("observation_masking", {"masked": result.masked, "tokens_saved": result.tokens_saved})
+            self._context_budget.reset()
 
     def _build_turn(self, tools: list[Any]) -> _Turn:
         """Prepare the next request: a history with unique tool call ids, and its provider form."""

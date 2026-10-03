@@ -95,6 +95,12 @@ session:
   compact_threshold: 0.8
   # Circuit breaker: max consecutive AI compaction failures before fallback
   compact_max_failures: 3
+  # Replace old read-type tool output with a placeholder, in batches, before compaction
+  observation_masking: false
+  # Most recent tool results that are never cleared
+  mask_keep_last: 6
+  # Clearable old output (estimated tokens) that must pile up before one batch clears it
+  mask_trigger_tokens: 20000
   # Spawn a Plan subagent on complex prompts before execution
   planning_gate: false
   # Show the live ActivityIndicator (idle/thinking/tool/streaming/waiting).

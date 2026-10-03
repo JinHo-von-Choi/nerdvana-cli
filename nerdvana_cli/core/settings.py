@@ -108,6 +108,12 @@ class SessionConfig(BaseModel):
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures
+    # Replace old read-type tool output with a placeholder before compaction (core/observation_mask.py):
+    # the last mask_keep_last tool results stay, and nothing is cleared until the clearable
+    # results add up to mask_trigger_tokens, so the request prefix changes once per batch.
+    observation_masking: bool = False
+    mask_keep_last: int = 6
+    mask_trigger_tokens: int = 20_000
     planning_gate: bool = False  # enable complexity-triggered Plan agent before execution
     # Phase F: runtime profiles — default context and mode names
     default_context: str = "standalone"
