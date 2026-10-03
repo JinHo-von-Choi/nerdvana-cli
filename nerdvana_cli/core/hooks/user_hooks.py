@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.config import paths
-from nerdvana_cli.core.hooks import HookEngine
+from nerdvana_cli.core.hooks.hooks import HookEngine
 
 logger = logging.getLogger(__name__)
 

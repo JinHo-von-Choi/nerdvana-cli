@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from nerdvana_cli.core.agent_loop import _is_ultrawork
 from nerdvana_cli.core.builtin_hooks import ralph_loop_check
-from nerdvana_cli.core.hooks import HookContext, HookEvent
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
 
 def test_ultrawork_korean_sentence() -> None:

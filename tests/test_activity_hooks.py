@@ -14,7 +14,7 @@ from nerdvana_cli.core.activity_state import ActivityState, summarize_tool_call
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.config.settings_sections import SkillsConfig
-from nerdvana_cli.core.hooks import HookContext, HookEvent
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 from nerdvana_cli.core.tool import ToolRegistry
 
 # ---------------------------------------------------------------------------

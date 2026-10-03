@@ -6,7 +6,7 @@ from nerdvana_cli.core.builtin_hooks import (
     context_limit_recovery,
     json_parse_recovery,
 )
-from nerdvana_cli.core.hooks import HookContext, HookEvent
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
 
 def test_context_limit_recovery_injects_message() -> None:

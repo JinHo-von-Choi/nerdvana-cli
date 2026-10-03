@@ -70,7 +70,7 @@ def hook_trust(
     Approval binds to the file's current bytes. Editing the file afterwards
     revokes it until this is run again.
     """
-    from nerdvana_cli.core.user_hooks import trust_project_hook
+    from nerdvana_cli.core.hooks.user_hooks import trust_project_hook
 
     target = Path(path)
     if not target.is_file():
@@ -93,7 +93,7 @@ def hook_revoke(
     path: str = typer.Argument(..., help="Path to the project hook file to revoke"),
 ) -> None:
     """Drop the approval recorded for a project-local hook."""
-    from nerdvana_cli.core.user_hooks import revoke_project_hook
+    from nerdvana_cli.core.hooks.user_hooks import revoke_project_hook
 
     target = Path(path)
     try:
@@ -111,7 +111,7 @@ def hook_revoke(
 @hook_app.command("trusted")
 def hook_trusted() -> None:
     """List approved project hooks and flag any whose contents changed."""
-    from nerdvana_cli.core.user_hooks import (
+    from nerdvana_cli.core.hooks.user_hooks import (
         hook_digest,
         load_trust_record,
         project_hook_trust_path,

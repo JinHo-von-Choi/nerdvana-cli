@@ -18,7 +18,7 @@ from nerdvana_cli.agents.registry import AgentDefinition, AgentTypeRegistry
 from nerdvana_cli.core import sandbox
 from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.hooks import HookEngine
+from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.sandbox import SandboxPolicy, writable_paths
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry

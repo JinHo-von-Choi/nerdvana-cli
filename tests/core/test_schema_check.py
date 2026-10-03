@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.hooks import HookEngine
+from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

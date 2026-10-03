@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import user_hooks
 from nerdvana_cli.core.config import paths
-from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
-from nerdvana_cli.core.user_hooks import load_user_hooks, trust_project_hook
+from nerdvana_cli.core.hooks import user_hooks
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
+from nerdvana_cli.core.hooks.user_hooks import load_user_hooks, trust_project_hook
 
 pytestmark = pytest.mark.security
 
@@ -25,7 +25,7 @@ HOOK_SOURCE = textwrap.dedent(
     '''
     from pathlib import Path
 
-    from nerdvana_cli.core.hooks import HookEvent, HookResult
+    from nerdvana_cli.core.hooks.hooks import HookEvent, HookResult
 
     Path(__file__).with_name("{sentinel}").write_text("{marker}")
 

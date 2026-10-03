@@ -19,7 +19,7 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
-from nerdvana_cli.core.hooks import HookContext, HookEvent, HookResult
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent, HookResult
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry

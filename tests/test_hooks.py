@@ -1,4 +1,4 @@
-from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
 
 
 def test_register_and_fire():

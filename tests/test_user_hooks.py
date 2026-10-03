@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
-from nerdvana_cli.core.user_hooks import load_user_hooks, trust_project_hook
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
+from nerdvana_cli.core.hooks.user_hooks import load_user_hooks, trust_project_hook
 
 
 class _StubHookConfig:
@@ -42,7 +42,7 @@ def test_load_user_hooks_loads_project_hook(tmp_path: Path, isolated_data_home: 
     hook_dir = tmp_path / ".nerdvana" / "hooks"
     hook_dir.mkdir(parents=True)
     (hook_dir / "my_hook.py").write_text(textwrap.dedent('''
-        from nerdvana_cli.core.hooks import HookEngine, HookEvent, HookContext, HookResult
+        from nerdvana_cli.core.hooks.hooks import HookEngine, HookEvent, HookContext, HookResult
 
         def _h(ctx):
             return HookResult(system_prompt_append="from-user-hook")

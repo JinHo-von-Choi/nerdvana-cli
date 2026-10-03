@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.approvals import normalise
 from nerdvana_cli.core.classifier import ALLOW, ASK, DENY, ENFORCE, SHADOW, ActionClassifier, Classification
-from nerdvana_cli.core.hooks import HookEvent
+from nerdvana_cli.core.hooks.hooks import HookEvent
 from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.signals import CLASSIFIER_ASK, CLASSIFIER_DENY, CLASSIFIER_ERROR
 from nerdvana_cli.core.tool import ToolContext
@@ -23,7 +23,7 @@ from nerdvana_cli.core.untrusted import UntrustedTracker
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.hooks import HookEngine
+    from nerdvana_cli.core.hooks.hooks import HookEngine
     from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 
 logger = logging.getLogger(__name__)

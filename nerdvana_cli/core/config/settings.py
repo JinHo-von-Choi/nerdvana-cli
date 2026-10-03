@@ -213,7 +213,7 @@ class HookConfig(BaseModel):
     # Project-local hooks (<cwd>/.nerdvana/hooks/*.py) execute code carried
     # by the repository, so they stay off until the user opts in and
     # approves each file's digest. Project skills (<cwd>/.agents/skills,
-    # <cwd>/.nerdvana/skills) are gated the same way. See core.user_hooks.
+    # <cwd>/.nerdvana/skills) are gated the same way. See core.hooks.user_hooks.
     allow_project_hooks: bool = False
 
 

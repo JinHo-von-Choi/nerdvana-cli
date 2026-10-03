@@ -35,7 +35,6 @@ from nerdvana_cli.core.builtin_hooks import (
 )
 from nerdvana_cli.core.cancellation import race_abort, until_interrupted
 from nerdvana_cli.core.checkpoint import CheckpointManager
-from nerdvana_cli.core.command_hooks import load_command_hooks
 from nerdvana_cli.core.compact import (
     FALLBACK_PROMPT,
     CompactionState,
@@ -48,7 +47,9 @@ from nerdvana_cli.core.context_budget import ContextBudget
 from nerdvana_cli.core.context_reminder import ContextReminder
 from nerdvana_cli.core.goal import Goal
 from nerdvana_cli.core.goal_gate import GoalGate
-from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
+from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
+from nerdvana_cli.core.hooks.user_hooks import load_user_hooks
 from nerdvana_cli.core.images import prompt_content, transcript_text
 from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
 from nerdvana_cli.core.loop_context import (
@@ -83,7 +84,6 @@ from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.tool_index import ToolIndex
-from nerdvana_cli.core.user_hooks import load_user_hooks
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.types import Message, Role, SessionState
 

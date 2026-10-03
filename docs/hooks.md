@@ -1,6 +1,6 @@
 # Lifecycle Hooks
 
-The hook system in `nerdvana_cli/core/hooks.py` provides extension points that fire at well-defined moments inside the agent loop. Hooks let you observe, modify, or veto behaviour without patching the loop itself: they can inject additional messages, rewrite tool input, or short-circuit a tool call before it runs.
+The hook system in `nerdvana_cli/core/hooks/hooks.py` provides extension points that fire at well-defined moments inside the agent loop. Hooks let you observe, modify, or veto behaviour without patching the loop itself: they can inject additional messages, rewrite tool input, or short-circuit a tool call before it runs.
 
 Hooks are registered against a `HookEvent` and receive a `HookContext` describing the current state. They return a `HookResult` (or `None` to opt out) that the engine consolidates into the loop.
 
@@ -193,7 +193,7 @@ $ nerdvana hook revoke .nerdvana/hooks/my_hook.py
 changed or disappeared since it was granted. Deleting
 `~/.nerdvana/trusted_hooks.json` drops all of them at once. The same
 operations are available as `trust_project_hook` and `revoke_project_hook`
-in `nerdvana_cli.core.user_hooks`.
+in `nerdvana_cli.core.hooks.user_hooks`.
 
 Global hooks live under your own data directory and are subject to neither
 condition.
@@ -203,7 +203,7 @@ condition.
 Each user hook module must export a module-level `register` function:
 
 ```python
-from nerdvana_cli.core.hooks import HookEngine, HookEvent, HookContext, HookResult
+from nerdvana_cli.core.hooks.hooks import HookEngine, HookEvent, HookContext, HookResult
 
 def register(engine: HookEngine, settings) -> None:
     """Called once per AgentLoop init. Register any number of handlers."""
@@ -225,7 +225,7 @@ def _my_handler(ctx: HookContext) -> HookResult:
 A minimal observational hook:
 
 ```python
-from nerdvana_cli.core.hooks import HookContext, HookEvent, HookResult
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent, HookResult
 
 def log_tool_calls(ctx: HookContext) -> HookResult | None:
     if ctx.event is HookEvent.BEFORE_TOOL:

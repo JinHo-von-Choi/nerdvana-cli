@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.builtin_hooks import RULE_BUDGET_BYTES, DirectoryRuleInjector
-from nerdvana_cli.core.hooks import HookContext, HookEvent
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 from nerdvana_cli.core.nirnamd import format_nirna_for_prompt, load_nirna_files
 
 
@@ -239,7 +239,7 @@ class TestDirectoryRuleInjector:
 
 class TestInjectionDelivery:
     def test_executor_queues_after_tool_injections_until_drained(self, tmp_path: Path) -> None:
-        from nerdvana_cli.core.hooks import HookEngine
+        from nerdvana_cli.core.hooks.hooks import HookEngine
         from nerdvana_cli.core.tool import ToolRegistry
         from nerdvana_cli.core.tool_executor import ToolExecutor
         from nerdvana_cli.types import ToolResult

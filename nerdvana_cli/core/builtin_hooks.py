@@ -7,7 +7,7 @@ import os
 import re
 from typing import Any
 
-from nerdvana_cli.core.hooks import HookContext, HookResult
+from nerdvana_cli.core.hooks.hooks import HookContext, HookResult
 from nerdvana_cli.core.nirnamd import is_within_root, read_rule_file
 
 

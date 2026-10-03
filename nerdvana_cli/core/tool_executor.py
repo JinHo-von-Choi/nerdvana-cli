@@ -39,7 +39,7 @@ from nerdvana_cli.core.untrusted import UntrustedTracker
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.hooks import HookEngine
+    from nerdvana_cli.core.hooks.hooks import HookEngine
     from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 
 logger = logging.getLogger(__name__)
@@ -238,7 +238,7 @@ class ToolExecutor:
         context:     ToolContext,
     ) -> ToolResult | None:
         """Let BEFORE_TOOL hooks and the tool's own validation veto the call. None means go ahead."""
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
         tool_id  = tool_use["id"]
         hook_ctx = HookContext(
@@ -392,7 +392,7 @@ class ToolExecutor:
 
         Messages a hook asks to inject are queued for drain_injections().
         """
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
         hook_ctx = HookContext(
             event       = HookEvent.AFTER_TOOL,
