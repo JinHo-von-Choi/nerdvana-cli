@@ -17,7 +17,6 @@ LIMIT = 600
 
 KNOWN_LARGE: dict[str, int] = {
     "core/agent_loop.py": 1268,
-    "server/mcp_server.py": 935,
     "ui/app.py": 779,
     "tools/file_tools.py": 706,
     "core/tool_executor.py": 650,

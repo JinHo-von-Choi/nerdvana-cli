@@ -15,6 +15,9 @@ so another agent can use this server as its edit backend. Each client has a read
 
 Every tool call goes through AuthManager + ACLManager + AuditLogger.
 
+The HTTP middleware lives in ``http_app``, TLS validation in ``tls`` and the MCP-visible tool
+signatures in ``catalog``; this module wires them around the dispatch.
+
 작성자: 최진호
 작성일: 2026-04-18
 """
@@ -22,160 +25,28 @@ Every tool call goes through AuthManager + ACLManager + AuditLogger.
 from __future__ import annotations
 
 import asyncio
-import contextvars
-import functools
 import json
 import logging as _logging
-import ssl
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 from starlette.types import ASGIApp
 
 from nerdvana_cli.core.tool import BaseTool, ToolContext
 from nerdvana_cli.server.acl import ACLManager
-from nerdvana_cli.server.audit import AuditLogger
-from nerdvana_cli.server.auth import AuthManager, AuthResult
+from nerdvana_cli.server.audit import AuditLogger, Decision
+from nerdvana_cli.server.auth import AuthManager
+from nerdvana_cli.server.catalog import ToolCatalog
+from nerdvana_cli.server.http_app import build_http_app, request_auth
 from nerdvana_cli.server.quota import QuotaExceeded, QuotaPolicyResolver, QuotaStore
+from nerdvana_cli.server.tls import TlsConfigurationError, TlsSettings, resolve_tls
 
-# ---------------------------------------------------------------------------
-# Per-request auth context — propagated from HTTP middleware to dispatch
-# ---------------------------------------------------------------------------
-
-_request_auth: contextvars.ContextVar[AuthResult | None] = contextvars.ContextVar(
-    "_request_auth", default=None
-)
-
-# ---------------------------------------------------------------------------
-# HTTP Bearer authentication middleware
-# ---------------------------------------------------------------------------
-
-
-class _BearerAuthMiddleware(BaseHTTPMiddleware):
-    """Extract and validate HTTP Authorization: Bearer token per request.
-
-    On success the resolved ``AuthResult`` is stored in ``_request_auth``
-    context-var so that ``_dispatch`` can consume it.  On failure a 401
-    response is returned immediately.
-    """
-
-    def __init__(self, app: ASGIApp, auth_manager: AuthManager) -> None:
-        super().__init__(app)
-        self._auth = auth_manager
-
-    async def dispatch(self, request: Request, call_next: Any) -> Any:
-        from starlette.responses import JSONResponse
-
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.lower().startswith("bearer "):
-            return JSONResponse(
-                {"error": "missing_bearer_token", "message": "Authorization: Bearer <token> required"},
-                status_code=401,
-            )
-        raw_key = auth_header[len("bearer "):].strip()
-        result  = self._auth.authenticate_bearer(raw_key)
-        if not result.authenticated:
-            return JSONResponse(
-                {"error": "invalid_bearer_token", "message": result.reason},
-                status_code=401,
-            )
-
-        token = _request_auth.set(result)
-        try:
-            response = await call_next(request)
-        finally:
-            _request_auth.reset(token)
-        return response
-
+__all__ = ["NerdvanaMcpServer", "TlsConfigurationError"]
 
 _quota_log = _logging.getLogger("nerdvana.quota")
-
-
-class _QuotaErrorMiddleware(BaseHTTPMiddleware):
-    """Convert a ``QuotaExceeded`` that reaches the HTTP layer into a 429 response.
-
-    Tool exceptions do not get this far: the tool registration turns ``QuotaExceeded`` into a
-    ``ToolError``, which the MCP server sends as a tool result with ``isError:true`` and the
-    reason inside an HTTP 200 response. See ``docs/mcp-quota.md``.
-    """
-
-    async def dispatch(self, request: Request, call_next: Any) -> Any:
-        from starlette.responses import JSONResponse
-
-        try:
-            return await call_next(request)
-        except QuotaExceeded as exc:
-            # Reached only by a quota error raised outside a tool call.
-            _quota_log.warning(
-                "quota_exceeded",
-                extra={
-                    "event":       "quota_exceeded",
-                    "limit":       exc.limit_name,
-                    "retry_after": exc.retry_after_seconds,
-                },
-            )
-            return JSONResponse(
-                {
-                    "error":                "quota_exceeded",
-                    "limit":                exc.limit_name,
-                    "retry_after_seconds":  exc.retry_after_seconds,
-                },
-                status_code = 429,
-                headers     = {"Retry-After": str(exc.retry_after_seconds)},
-            )
-
-
-# ---------------------------------------------------------------------------
-# Read-only tool list (v3 §7.2)
-# ---------------------------------------------------------------------------
-
-_READ_ONLY_TOOLS: frozenset[str] = frozenset({
-    "FileRead",
-    "symbol_overview",
-    "find_symbol",
-    "find_referencing_symbols",
-    "ReadMemory",
-    "ListMemories",
-    "GetCurrentConfig",
-})
-
-_WRITE_TOOLS: frozenset[str] = frozenset({
-    "FileEdit",
-    "replace_symbol_body",
-    "insert_before_symbol",
-    "insert_after_symbol",
-    "RenameSymbol",
-    "WriteMemory",
-    "EditMemory",
-    "DeleteMemory",
-    "safe_delete_symbol",
-    "restart_language_server",
-})
-
-
-# ---------------------------------------------------------------------------
-# TLS configuration
-# ---------------------------------------------------------------------------
-
-
-class TlsConfigurationError(RuntimeError):
-    """Raised when TLS material is supplied but cannot be wired to the socket.
-
-    Startup aborts instead of degrading to plaintext: an operator who passes
-    certificate options believes the transport is encrypted, and a silently
-    ignored option would put bearer tokens on the wire in the clear.
-    """
-
-
-# ---------------------------------------------------------------------------
-# NerdvanaMcpServer
-# ---------------------------------------------------------------------------
 
 
 class NerdvanaMcpServer:
@@ -238,13 +109,8 @@ class NerdvanaMcpServer:
         self.project_path  = project_path
         self.mode          = mode
 
-        # uvicorn ssl_* parameters, materialised from the TLS inputs above.
-        # Left at the plaintext defaults only when no TLS option was supplied.
-        self._ssl_certfile:  str | None = None
-        self._ssl_keyfile:   str | None = None
-        self._ssl_ca_certs:  str | None = None
-        self._ssl_cert_reqs: int        = ssl.CERT_NONE
-        self._configure_tls()
+        # Validated at construction, applied in _run_http. Plaintext only when no TLS option was supplied.
+        self._tls: TlsSettings = resolve_tls(transport, tls_cert, tls_key, tls_ca)
 
         self._auth:           AuthManager          = auth_manager   or AuthManager()
         self._acl:            ACLManager           = acl_manager    or ACLManager()
@@ -261,84 +127,7 @@ class NerdvanaMcpServer:
         # name → BaseTool instance map; populated by _build_tool_map()
         self._tool_map: dict[str, BaseTool[Any]] = {}
         self._build_tool_map()
-        self._register_tools()
-
-    # ------------------------------------------------------------------
-    # TLS wiring: validated at construction, applied in _run_http
-    # ------------------------------------------------------------------
-
-    def _configure_tls(self) -> None:
-        """Validate the TLS inputs and derive the uvicorn ssl_* parameters.
-
-        Every failure path raises :class:`TlsConfigurationError`.  There is
-        deliberately no branch that keeps the supplied material unused and
-        falls back to a plaintext listener.
-        """
-        supplied: dict[str, Path | None] = {
-            "--tls-cert": self.tls_cert,
-            "--tls-key":  self.tls_key,
-            "--tls-ca":   self.tls_ca,
-        }
-        given = {flag: path for flag, path in supplied.items() if path is not None}
-        if not given:
-            return
-
-        flags = ", ".join(sorted(given))
-
-        if self.transport != "http":
-            raise TlsConfigurationError(
-                f"{flags} supplied but transport is {self.transport!r}. "
-                "TLS terminates a network socket and has no meaning on stdio; "
-                "start with --transport http or drop the TLS options."
-            )
-
-        if self.tls_cert is None:
-            raise TlsConfigurationError(
-                f"{flags} supplied without --tls-cert. "
-                "A server certificate is required to serve over TLS."
-            )
-
-        for flag, path in given.items():
-            self._require_readable(flag, path)
-
-        if self.tls_key is None and not self._contains_private_key(self.tls_cert):
-            raise TlsConfigurationError(
-                f"certificate {self.tls_cert} carries no private key and no key "
-                "file was supplied. Pass the private key (--tls-key) or point "
-                "--tls-cert at a PEM bundle holding both the certificate and "
-                "its key."
-            )
-
-        self._ssl_certfile = str(self.tls_cert)
-        self._ssl_keyfile  = str(self.tls_key) if self.tls_key is not None else None
-
-        if self.tls_ca is not None:
-            self._ssl_ca_certs  = str(self.tls_ca)
-            # A CA without CERT_REQUIRED verifies nothing: peers that present no
-            # certificate would still be admitted, which is not mTLS.
-            self._ssl_cert_reqs = ssl.CERT_REQUIRED
-
-    @staticmethod
-    def _require_readable(flag: str, path: Path) -> None:
-        """Fail fast when TLS material is missing or unreadable."""
-        try:
-            with path.open("rb"):
-                pass
-        except OSError as exc:
-            raise TlsConfigurationError(
-                f"{flag} {path} cannot be read: {exc.strerror or exc}"
-            ) from exc
-
-    @staticmethod
-    def _contains_private_key(path: Path) -> bool:
-        """Report whether a PEM file embeds a private key block."""
-        try:
-            blob = path.read_bytes()
-        except OSError as exc:
-            raise TlsConfigurationError(
-                f"{path} cannot be read: {exc.strerror or exc}"
-            ) from exc
-        return b"PRIVATE KEY-----" in blob
+        ToolCatalog(self._fmcp, self._dispatch, self._check_write_confirm).register(allow_write)
 
     # ------------------------------------------------------------------
     # Tool map — live BaseTool instances for _execute_tool routing
@@ -405,221 +194,7 @@ class NerdvanaMcpServer:
             pass
 
     # ------------------------------------------------------------------
-    # Tool registration
-    # ------------------------------------------------------------------
-
-    def _register_tools(self) -> None:
-        """Register all MCP tools according to the allow_write flag."""
-        self._register_read_only_tools()
-        if self.allow_write:
-            self._register_write_tools()
-            self._register_file_edit()
-
-    def _register_read_only_tools(self) -> None:
-        """Register the six default read-only tools."""
-        server = self
-
-        async def symbol_overview(relative_path: str, depth: int = 0, with_graph: bool = False) -> str:
-            """List symbols in a source file at the given path."""
-            return await server._dispatch(
-                "symbol_overview",
-                {"relative_path": relative_path, "depth": depth, "with_graph": with_graph},
-            )
-
-        async def find_symbol(
-            name_path: str,
-            substring_matching: bool = False,
-            include_body: bool = False,
-            within_relative_path: str = "",
-        ) -> str:
-            """Find a symbol by qualified name or substring."""
-            return await server._dispatch(
-                "find_symbol",
-                {
-                    "name_path":             name_path,
-                    "substring_matching":    substring_matching,
-                    "include_body":          include_body,
-                    "within_relative_path":  within_relative_path or None,
-                },
-            )
-
-        async def find_referencing_symbols(name_path: str, relative_path: str) -> str:
-            """Find all symbols that reference the given symbol."""
-            return await server._dispatch(
-                "find_referencing_symbols",
-                {"name_path": name_path, "relative_path": relative_path},
-            )
-
-        async def ReadMemory(name: str) -> str:  # noqa: N802
-            """Read a stored memory by name."""
-            return await server._dispatch("ReadMemory", {"name": name})
-
-        async def ListMemories(topic: str = "") -> str:  # noqa: N802
-            """List all stored memories, optionally filtered by topic."""
-            return await server._dispatch("ListMemories", {"topic": topic})
-
-        async def GetCurrentConfig() -> str:  # noqa: N802
-            """Return the current NerdVana configuration as JSON."""
-            return await server._dispatch("GetCurrentConfig", {})
-
-        async def FileRead(path: str, offset: int = 0, limit: int = 0) -> str:  # noqa: N802
-            """Read a file; every line is prefixed with an anchor N#hhhhhh (line number and content hash) that FileEdit accepts."""
-            return await server._dispatch("FileRead", {"path": path, "offset": offset, "limit": limit})
-
-        for fn in (symbol_overview, find_symbol, find_referencing_symbols, FileRead,
-                   ReadMemory, ListMemories, GetCurrentConfig):
-            self._add_tool(fn)
-
-    def _add_tool(self, fn: Any) -> None:
-        """Register ``fn`` so a refusal reaches the client with its reason.
-
-        MCPServer reports an exception it does not know as ``Error executing tool <name>``
-        and keeps the text on the server; a ``ToolError`` keeps its message. A denied, rate
-        limited or malformed call is the client's to read and correct, so those become
-        ``ToolError``.
-        """
-        @functools.wraps(fn)
-        async def surfaced(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return await fn(*args, **kwargs)
-            except (PermissionError, QuotaExceeded, ValueError, KeyError) as exc:
-                raise ToolError(str(exc)) from exc
-
-        self._fmcp.add_tool(surfaced, name=fn.__name__, description=fn.__doc__ or "")
-
-    def _register_write_tools(self) -> None:
-        """Register write tools (requires allow_write=True AND confirm=true in call)."""
-        server = self
-
-        async def replace_symbol_body(
-            name_path: str,
-            new_body: str,
-            relative_path: str = "",
-            confirm: bool = False,
-        ) -> str:
-            """Replace the body of a symbol. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "replace_symbol_body",
-                {"name_path": name_path, "new_body": new_body,
-                 "relative_path": relative_path or None, "confirm": confirm},
-            )
-
-        async def insert_before_symbol(
-            name_path: str,
-            content: str,
-            relative_path: str = "",
-            confirm: bool = False,
-        ) -> str:
-            """Insert content before a symbol. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "insert_before_symbol",
-                {"name_path": name_path, "content": content,
-                 "relative_path": relative_path or None, "confirm": confirm},
-            )
-
-        async def insert_after_symbol(
-            name_path: str,
-            content: str,
-            relative_path: str = "",
-            confirm: bool = False,
-        ) -> str:
-            """Insert content after a symbol. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "insert_after_symbol",
-                {"name_path": name_path, "content": content,
-                 "relative_path": relative_path or None, "confirm": confirm},
-            )
-
-        async def RenameSymbol(  # noqa: N802
-            name_path: str,
-            new_name: str,
-            relative_path: str = "",
-            confirm: bool = False,
-        ) -> str:
-            """Rename a symbol project-wide. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "RenameSymbol",
-                {"name_path": name_path, "new_name": new_name,
-                 "relative_path": relative_path or None, "confirm": confirm},
-            )
-
-        async def WriteMemory(name: str, content: str, scope: str = "local", confirm: bool = False) -> str:  # noqa: N802
-            """Write a memory entry. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "WriteMemory",
-                {"name": name, "content": content, "scope": scope, "confirm": confirm},
-            )
-
-        async def EditMemory(name: str, new_content: str, confirm: bool = False) -> str:  # noqa: N802
-            """Edit an existing memory entry. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "EditMemory",
-                {"name": name, "new_content": new_content, "confirm": confirm},
-            )
-
-        async def DeleteMemory(name: str, confirm: bool = False) -> str:  # noqa: N802
-            """Delete a memory entry. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "DeleteMemory",
-                {"name": name, "confirm": confirm},
-            )
-
-        async def safe_delete_symbol(
-            name_path: str,
-            relative_path: str = "",
-            confirm: bool = False,
-        ) -> str:
-            """Safely delete a symbol after verifying no remaining references. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "safe_delete_symbol",
-                {"name_path": name_path, "relative_path": relative_path or None, "confirm": confirm},
-            )
-
-        async def restart_language_server(confirm: bool = False) -> str:
-            """Restart the language server. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "restart_language_server",
-                {"confirm": confirm},
-            )
-
-        for fn in (replace_symbol_body, insert_before_symbol, insert_after_symbol,
-                   RenameSymbol, WriteMemory, EditMemory, DeleteMemory,
-                   safe_delete_symbol, restart_language_server):
-            self._add_tool(fn)
-
-    def _register_file_edit(self) -> None:
-        """Register FileEdit, the write counterpart of FileRead (requires allow_write=True AND confirm=true in call)."""
-        server = self
-
-        async def FileEdit(  # noqa: N802
-            path: str,
-            new_string: str,
-            anchor_hash: str = "",
-            old_string: str = "",
-            replace_all: bool = False,
-            confirm: bool = False,
-        ) -> str:
-            """Edit a file read with FileRead: replace the line named by anchor_hash (N#hhhhhh), or an exact old_string. Refused when the file changed since this client read it. Requires confirm=true."""
-            server._check_write_confirm(confirm)
-            return await server._dispatch(
-                "FileEdit",
-                {"path": path, "new_string": new_string, "anchor_hash": anchor_hash or None,
-                 "old_string": old_string or None, "replace_all": replace_all},
-            )
-
-        self._add_tool(FileEdit)
-
-    # ------------------------------------------------------------------
-    # Dispatch — auth → ACL → audit → actual tool stub
+    # Dispatch — auth → ACL → quota → audit → actual tool
     # ------------------------------------------------------------------
 
     def _check_write_confirm(self, confirm: bool) -> None:
@@ -634,13 +209,13 @@ class NerdvanaMcpServer:
     def _resolve_identity(self) -> str:
         """Determine the client identity for the current invocation.
 
-        For HTTP transport the identity is extracted from ``_request_auth``
-        context-var (populated by ``_BearerAuthMiddleware``).  For stdio the
+        For HTTP transport the identity is extracted from ``request_auth``
+        context-var (populated by ``BearerAuthMiddleware``).  For stdio the
         server enforces UID equality at start-up; during a live stdio session
         all calls are considered to originate from the authenticated local user.
         """
         if self.transport == "http":
-            auth = _request_auth.get()
+            auth = request_auth.get()
             if auth is None or not auth.authenticated:
                 raise PermissionError("unauthenticated: missing or invalid bearer token")
             return auth.client_identity
@@ -651,6 +226,64 @@ class NerdvanaMcpServer:
         # Unknown transport — deny
         raise PermissionError(f"unauthenticated: unsupported transport {self.transport!r}")
 
+    def _record_call(
+        self,
+        client_identity: str,
+        tool_name:       str,
+        args:            dict[str, Any],
+        decision:        Decision,
+        start_ms:        int,
+        error_class:     str | None = None,
+    ) -> None:
+        """Write one audit row for the call that began at ``start_ms``."""
+        self._audit.record(
+            client_identity = client_identity,
+            transport       = self.transport,
+            tool_name       = tool_name,
+            args            = args,
+            decision        = decision,
+            duration_ms     = int(time.monotonic() * 1000) - start_ms,
+            error_class     = error_class,
+        )
+
+    def _enforce_acl(self, client_identity: str, tool_name: str, args: dict[str, Any], start_ms: int) -> None:
+        """Raise ``PermissionError`` (and audit the denial) when the ACL refuses the call."""
+        acl_decision = self._acl.check(client_identity, tool_name)
+        if not acl_decision.allowed:
+            self._record_call(client_identity, tool_name, args, "denied", start_ms)
+            raise PermissionError(f"ACL denied: {acl_decision.reason}")
+
+    def _enforce_quota(self, client_identity: str, tool_name: str, args: dict[str, Any], start_ms: int) -> None:
+        """Take a quota slot, or raise ``QuotaExceeded`` (and audit the denial).
+
+        ``ACLManager.effective_roles()`` provides the public roles API used to resolve the policy.
+        """
+        quota_policy   = self._quota_resolver.resolve(client_identity, roles=self._acl.effective_roles(client_identity))
+        quota_decision = self._quota_store.check(client_identity, quota_policy)
+        if quota_decision.allowed:
+            return
+        self._record_call(
+            client_identity, tool_name, args, "denied", start_ms,
+            error_class=f"quota_denied:{quota_decision.limit_name}",
+        )
+        # Structured warning for operators: grep logs for event=quota_exceeded.
+        if self.transport == "http":
+            _quota_log.warning(
+                "quota_exceeded",
+                extra={
+                    "event":       "quota_exceeded",
+                    "tenant":      client_identity,
+                    "tool":        tool_name,
+                    "limit":       quota_decision.limit_name,
+                    "retry_after": quota_decision.retry_after_seconds,
+                },
+            )
+        raise QuotaExceeded(
+            reason               = quota_decision.reason,
+            retry_after_seconds  = quota_decision.retry_after_seconds,
+            limit_name           = quota_decision.limit_name,
+        )
+
     async def _dispatch(
         self,
         tool_name: str,
@@ -658,7 +291,7 @@ class NerdvanaMcpServer:
         *,
         client_identity: str | None = None,
     ) -> str:
-        """Route a tool call through auth → ACL → audit → execute.
+        """Route a tool call through auth → ACL → quota → audit → execute.
 
         ``client_identity`` may be supplied directly (e.g. from tests); when
         *None* the identity is resolved from the active transport context via
@@ -668,50 +301,8 @@ class NerdvanaMcpServer:
             client_identity = self._resolve_identity()
         start_ms = int(time.monotonic() * 1000)
         try:
-            # ACL check
-            acl_decision = self._acl.check(client_identity, tool_name)
-            if not acl_decision.allowed:
-                self._audit.record(
-                    client_identity = client_identity,
-                    transport       = self.transport,
-                    tool_name       = tool_name,
-                    args            = args,
-                    decision        = "denied",
-                    duration_ms     = int(time.monotonic() * 1000) - start_ms,
-                )
-                raise PermissionError(f"ACL denied: {acl_decision.reason}")
-
-            # Quota check — resolve policy then evaluate.
-            # ACLManager.effective_roles() provides the public roles API used here.
-            quota_policy   = self._quota_resolver.resolve(client_identity, roles=self._acl.effective_roles(client_identity))
-            quota_decision = self._quota_store.check(client_identity, quota_policy)
-            if not quota_decision.allowed:
-                self._audit.record(
-                    client_identity = client_identity,
-                    transport       = self.transport,
-                    tool_name       = tool_name,
-                    args            = args,
-                    decision        = "denied",
-                    duration_ms     = int(time.monotonic() * 1000) - start_ms,
-                    error_class     = f"quota_denied:{quota_decision.limit_name}",
-                )
-                # Structured warning for operators: grep logs for event=quota_exceeded.
-                if self.transport == "http":
-                    _quota_log.warning(
-                        "quota_exceeded",
-                        extra={
-                            "event":       "quota_exceeded",
-                            "tenant":      client_identity,
-                            "tool":        tool_name,
-                            "limit":       quota_decision.limit_name,
-                            "retry_after": quota_decision.retry_after_seconds,
-                        },
-                    )
-                raise QuotaExceeded(
-                    reason               = quota_decision.reason,
-                    retry_after_seconds  = quota_decision.retry_after_seconds,
-                    limit_name           = quota_decision.limit_name,
-                )
+            self._enforce_acl(client_identity, tool_name, args, start_ms)
+            self._enforce_quota(client_identity, tool_name, args, start_ms)
 
             # Execute — release the quota slot in the finally block.
             # _call_tool_raw returns a ToolResult so tokens can be extracted
@@ -724,28 +315,13 @@ class NerdvanaMcpServer:
                 tokens_used = getattr(raw_result, "tokens", 0) if raw_result is not None else 0
                 self._quota_store.release(client_identity, tokens=tokens_used)
 
-            self._audit.record(
-                client_identity = client_identity,
-                transport       = self.transport,
-                tool_name       = tool_name,
-                args            = args,
-                decision        = "allowed",
-                duration_ms     = int(time.monotonic() * 1000) - start_ms,
-            )
+            self._record_call(client_identity, tool_name, args, "allowed", start_ms)
             return str(raw_result.content)
 
         except (PermissionError, QuotaExceeded):
             raise
         except Exception as exc:
-            self._audit.record(
-                client_identity = client_identity,
-                transport       = self.transport,
-                tool_name       = tool_name,
-                args            = args,
-                decision        = "error",
-                duration_ms     = int(time.monotonic() * 1000) - start_ms,
-                error_class     = type(exc).__name__,
-            )
+            self._record_call(client_identity, tool_name, args, "error", start_ms, error_class=type(exc).__name__)
             raise
 
     def _context_for(self, client_identity: str | None) -> ToolContext:
@@ -877,20 +453,7 @@ class NerdvanaMcpServer:
 
     def _http_app(self) -> ASGIApp:
         """The streamable-HTTP app behind the quota-error and bearer-auth middleware."""
-        from starlette.applications import Starlette
-        from starlette.routing import Mount
-
-        starlette_app = self._fmcp.streamable_http_app(host=self.host)
-        # The session manager starts in the inner app's lifespan; without handing it on,
-        # every MCP request fails with "Task group is not initialized".
-        protected = Starlette(
-            routes=[Mount("/", app=starlette_app)],
-            lifespan=starlette_app.router.lifespan_context,
-        )
-        # Inject middlewares (outermost first: quota error -> auth).
-        protected.add_middleware(_QuotaErrorMiddleware)
-        protected.add_middleware(_BearerAuthMiddleware, auth_manager=self._auth)
-        return protected
+        return build_http_app(self._fmcp, self.host, self._auth)
 
     async def _run_http(self) -> None:
         if self.host == "0.0.0.0":
@@ -901,14 +464,11 @@ class NerdvanaMcpServer:
             )
         import uvicorn
         config = uvicorn.Config(
-            app           = self._http_app(),
-            host          = self.host,
-            port          = self.port,
-            log_level     = "warning",
-            ssl_certfile  = self._ssl_certfile,
-            ssl_keyfile   = self._ssl_keyfile,
-            ssl_ca_certs  = self._ssl_ca_certs,
-            ssl_cert_reqs = self._ssl_cert_reqs,
+            app       = self._http_app(),
+            host      = self.host,
+            port      = self.port,
+            log_level = "warning",
+            **self._tls.uvicorn_options(),
         )
         server = uvicorn.Server(config)
         await server.serve()
