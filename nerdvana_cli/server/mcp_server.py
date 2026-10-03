@@ -1,4 +1,4 @@
-"""NerdVana MCP server — Phase G1.
+"""NerdVana MCP server, Phase G1.
 
 Exposes nerdvana tools over MCP 1.0 (stdio + HTTP JSON-RPC).
 
@@ -94,7 +94,7 @@ class NerdvanaMcpServer:
         audit_logger:     AuditLogger | None       = None,
         quota_resolver:   QuotaPolicyResolver | None = None,
         quota_store:      QuotaStore | None        = None,
-        # Phase H extensions — external project subprocess support
+        # Phase H extensions, external project subprocess support
         project_path:     Path | None              = None,
         mode:             str  | None              = None,
     ) -> None:
@@ -130,7 +130,7 @@ class NerdvanaMcpServer:
         ToolCatalog(self._fmcp, self._dispatch, self._check_write_confirm).register(allow_write)
 
     # ------------------------------------------------------------------
-    # Tool map — live BaseTool instances for _execute_tool routing
+    # Tool map, live BaseTool instances for _execute_tool routing
     # ------------------------------------------------------------------
 
     def _build_tool_map(self) -> None:
@@ -138,7 +138,7 @@ class NerdvanaMcpServer:
 
         Symbol tools require a live language server; they are registered only
         when ``LspClient.has_any_server()`` returns True.  Missing LSP is not
-        an error — the server degrades gracefully to memory + config tools only.
+        an error, the server degrades gracefully to memory + config tools only.
         """
         from nerdvana_cli.core.profiles import ProfileManager
         from nerdvana_cli.tools.memory_tools import (
@@ -175,7 +175,7 @@ class NerdvanaMcpServer:
         pm = ProfileManager(cwd=cwd)
         self._tool_map["GetCurrentConfig"] = GetCurrentConfigTool(profile_manager=pm)
 
-        # Symbol tools — only when a language server is available
+        # Symbol tools, only when a language server is available
         try:
             from nerdvana_cli.core.lsp_client import LspClient
             lsp = LspClient()
@@ -190,11 +190,11 @@ class NerdvanaMcpServer:
                     client=lsp, retriever=retriever, editor=editor
                 ):
                     self._tool_map[sym_tool.name] = sym_tool
-        except Exception:  # noqa: BLE001 — LSP absent or misconfigured; degrade silently
+        except Exception:  # noqa: BLE001, LSP absent or misconfigured; degrade silently
             pass
 
     # ------------------------------------------------------------------
-    # Dispatch — auth → ACL → quota → audit → actual tool
+    # Dispatch, auth → ACL → quota → audit → actual tool
     # ------------------------------------------------------------------
 
     def _check_write_confirm(self, confirm: bool) -> None:
@@ -223,7 +223,7 @@ class NerdvanaMcpServer:
             # stdio identity is validated once at server start via _verify_stdio_auth();
             # return the cached identity.
             return self._stdio_identity
-        # Unknown transport — deny
+        # Unknown transport, deny
         raise PermissionError(f"unauthenticated: unsupported transport {self.transport!r}")
 
     def _record_call(
@@ -304,7 +304,7 @@ class NerdvanaMcpServer:
             self._enforce_acl(client_identity, tool_name, args, start_ms)
             self._enforce_quota(client_identity, tool_name, args, start_ms)
 
-            # Execute — release the quota slot in the finally block.
+            # Execute, release the quota slot in the finally block.
             # _call_tool_raw returns a ToolResult so tokens can be extracted
             # before conversion to str.  On error raw_result stays None and
             # we release with tokens=0.
@@ -458,7 +458,7 @@ class NerdvanaMcpServer:
     async def _run_http(self) -> None:
         if self.host == "0.0.0.0":
             print(
-                "WARNING: server bound to 0.0.0.0 — all network interfaces exposed. "
+                "WARNING: server bound to 0.0.0.0, all network interfaces exposed. "
                 "Ensure firewall rules are in place.",
                 file=sys.stderr,
             )
