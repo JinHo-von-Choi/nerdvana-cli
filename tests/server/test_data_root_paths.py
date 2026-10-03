@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.commands.cost_command import build_cost_report
-from nerdvana_cli.core.analytics import AnalyticsWriter
 from nerdvana_cli.core.config import paths
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.auth import AuthManager

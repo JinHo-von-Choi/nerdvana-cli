@@ -292,9 +292,9 @@ def _check_project_docs() -> CheckResult:
 
 def _check_pricing_coverage() -> CheckResult:
     """The configured model and its fallbacks should have a known price, or a cost limit cannot apply."""
-    from nerdvana_cli.core.analytics import PricingTable
     from nerdvana_cli.core.config.model_routing import parse_fallback
     from nerdvana_cli.core.config.settings import NerdvanaSettings
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
 
     try:
         settings = NerdvanaSettings.load()

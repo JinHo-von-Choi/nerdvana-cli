@@ -11,10 +11,10 @@ from collections import Counter
 from collections.abc import Callable
 
 from nerdvana_cli.core import signals
-from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.budget import Budget
-from nerdvana_cli.core.cache_watch import CacheWatch
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
+from nerdvana_cli.core.telemetry.cache_watch import CacheWatch
 
 logger = logging.getLogger(__name__)
 

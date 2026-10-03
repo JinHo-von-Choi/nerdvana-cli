@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from nerdvana_cli.core.activity_state import summarize_tool_call
 from nerdvana_cli.core.hooks import HookContext, HookEvent, HookResult
-from nerdvana_cli.core.telemetry_otel import observe_loop
+from nerdvana_cli.core.telemetry.telemetry_otel import observe_loop
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop

@@ -188,7 +188,7 @@ def _pricing_status(provider: str, model: str) -> str:
     ``"tbd"``    — entry exists but both rates are explicitly zero.
     ``"unknown"``— entry is absent from pricing.yml.
     """
-    from nerdvana_cli.core.analytics import PricingTable
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
 
     pt   = PricingTable()
     info = pt._prices.get(provider.lower(), {}).get(model.lower(), {})  # noqa: SLF001

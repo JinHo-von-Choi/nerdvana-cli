@@ -45,8 +45,8 @@ def test_haiku_45_keeps_the_200k_window():
 def test_default_model_resolves_in_every_table():
     """The shipped default must have a context window and a price, or cost and
     compaction silently fall back to guesses."""
-    from nerdvana_cli.core.analytics import PricingTable
     from nerdvana_cli.core.config.settings import ModelConfig
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
 
     model = ModelConfig().model
     assert resolve_context_window(ProviderName.ANTHROPIC, model) > 0

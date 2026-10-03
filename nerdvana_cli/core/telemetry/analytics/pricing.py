@@ -32,7 +32,7 @@ class PricingTable:
     def _default_path() -> Path:
         """Resolve the bundled pricing.yml next to this package."""
         # nerdvana_cli/providers/pricing.yml
-        pkg_root = Path(__file__).parent.parent.parent  # nerdvana_cli/
+        pkg_root = Path(__file__).parents[3]  # nerdvana_cli/
         return pkg_root / "providers" / "pricing.yml"
 
     def _load(self, path: Path) -> None:

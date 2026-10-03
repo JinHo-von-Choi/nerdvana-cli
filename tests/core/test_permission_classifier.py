@@ -15,7 +15,6 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.analytics import AnalyticsReader, AnalyticsWriter, PricingTable
 from nerdvana_cli.core.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
@@ -29,6 +28,7 @@ from nerdvana_cli.core.signals import (
     PERMISSION_POLICY,
     PERMISSION_USER,
 )
+from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderEvent
@@ -290,7 +290,7 @@ class SimpleLoop:
     """The parts of an AgentLoop the feed reads."""
 
     def __init__(self, limits: RunLimits) -> None:
-        from nerdvana_cli.core.analytics import CallOrigin
+        from nerdvana_cli.core.telemetry.analytics import CallOrigin
 
         self.limits     = limits
         self.origin     = CallOrigin(agent_id="agent-7", agent_type="Explore", category="deep", parent_session_id="p")

@@ -24,7 +24,7 @@ def _make_app(messages: list[str], raw_messages: list[str] | None = None) -> Mag
 
 @pytest.fixture
 def db_writer(tmp_path: Path):
-    from nerdvana_cli.core.analytics import AnalyticsWriter
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
     w = AnalyticsWriter(db_path=tmp_path / "analytics.sqlite", enabled=True)
     w.start_session("health-test-sess")
     ts = datetime.now(UTC).isoformat()
@@ -47,7 +47,7 @@ class TestHandleHealth:
     @pytest.mark.asyncio
     async def test_default_output(self, db_writer: Path) -> None:
         from nerdvana_cli.commands.observability_commands import handle_health
-        from nerdvana_cli.core.analytics import AnalyticsReader
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
         messages: list[str] = []
         app = _make_app(messages)
@@ -67,7 +67,7 @@ class TestHandleHealth:
     @pytest.mark.asyncio
     async def test_json_flag(self, db_writer: Path) -> None:
         from nerdvana_cli.commands.observability_commands import handle_health
-        from nerdvana_cli.core.analytics import AnalyticsReader
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
         messages:     list[str] = []
         raw_messages: list[str] = []
@@ -87,7 +87,7 @@ class TestHandleHealth:
     @pytest.mark.asyncio
     async def test_days_flag(self, db_writer: Path) -> None:
         from nerdvana_cli.commands.observability_commands import handle_health
-        from nerdvana_cli.core.analytics import AnalyticsReader
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
         messages: list[str] = []
         app = _make_app(messages)

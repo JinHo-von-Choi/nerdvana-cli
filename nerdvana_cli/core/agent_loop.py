@@ -24,7 +24,6 @@ from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_hooks import register_activity_hooks
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.advisor import Advisor
-from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.builtin_hooks import (
     DirectoryRuleInjector,
@@ -78,6 +77,7 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.subagent_config import LoopFactories
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

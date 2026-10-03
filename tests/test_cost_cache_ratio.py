@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nerdvana_cli.commands.cost_command import build_cost_report, cache_hit_ratio
-from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin
 from nerdvana_cli.main import app
 
 

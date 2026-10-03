@@ -153,8 +153,8 @@ async def test_the_parents_limit_counts_what_its_sub_agents_spent(monkeypatch: p
     from typing import Any
 
     from nerdvana_cli.core.agent_loop import AgentLoop
-    from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
     from nerdvana_cli.core.session import SessionStorage
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
     from nerdvana_cli.core.tool import ToolRegistry
     from nerdvana_cli.providers.base import ProviderEvent
 

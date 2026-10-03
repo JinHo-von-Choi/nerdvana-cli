@@ -45,7 +45,7 @@ class TestHandleTokensCost:
         from datetime import datetime
 
         from nerdvana_cli.commands.session_commands import handle_tokens
-        from nerdvana_cli.core.analytics import AnalyticsReader, AnalyticsWriter
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter
 
         # Populate analytics with known cost
         db = tmp_path / "analytics.sqlite"

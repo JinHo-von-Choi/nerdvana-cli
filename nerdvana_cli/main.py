@@ -36,7 +36,7 @@ from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
-from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
+from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 
 app = typer.Typer(
@@ -206,7 +206,7 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
 def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any] | None:
     """The receipt of a run, or None when it changed nothing and checked nothing."""
     from nerdvana_cli.cli.receipt import build_receipt
-    from nerdvana_cli.core.analytics import AnalyticsReader
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
     receipt = build_receipt(loop, verification, AnalyticsReader().cost_breakdown(loop.session.session_id))
     return receipt if receipt["files_changed"] or verification else None

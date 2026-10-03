@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from nerdvana_cli.core.analytics.db import ATTRIBUTION_COLUMNS, DDL, connect, default_db_path
-from nerdvana_cli.core.analytics.pricing import PricingTable
+from nerdvana_cli.core.telemetry.analytics.db import ATTRIBUTION_COLUMNS, DDL, connect, default_db_path
+from nerdvana_cli.core.telemetry.analytics.pricing import PricingTable
 
 logger = logging.getLogger(__name__)
 

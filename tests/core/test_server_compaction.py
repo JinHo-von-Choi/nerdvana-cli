@@ -14,13 +14,13 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.agent_loop import COMPACT_STATUS_PREFIX, AgentLoop
-from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.compaction_block import carries_compaction, last_compaction_index
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context_budget import ContextBudget
 from nerdvana_cli.core.loop_state import LoopFlow, LoopTurn
 from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
 from nerdvana_cli.core.session import SessionStorage, messages_from_transcript
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.providers.errors import CONTEXT_LIMIT, ProviderFailure
