@@ -20,8 +20,8 @@ from nerdvana_cli.cli.context_report import (
     system_prompt_items,
 )
 from nerdvana_cli.core.config.settings import SessionConfig
-from nerdvana_cli.core.observation_mask import placeholder_for
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.observation_mask import placeholder_for
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.types import Message, Role
 
 PROMPT = "\n\n".join([

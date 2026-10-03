@@ -40,17 +40,17 @@ def _run_in(args: list[str], data_home: str, cwd: Path) -> object:
 class TestResolveScope:
     def test_project(self) -> None:
         from nerdvana_cli.commands.memory_command import _resolve_scope
-        from nerdvana_cli.core.memories import MemoryScope
+        from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("project") == MemoryScope.PROJECT_KNOWLEDGE
 
     def test_global(self) -> None:
         from nerdvana_cli.commands.memory_command import _resolve_scope
-        from nerdvana_cli.core.memories import MemoryScope
+        from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("global") == MemoryScope.USER_GLOBAL
 
     def test_rule(self) -> None:
         from nerdvana_cli.commands.memory_command import _resolve_scope
-        from nerdvana_cli.core.memories import MemoryScope
+        from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("rule") == MemoryScope.PROJECT_RULE
 
     def test_invalid_raises(self) -> None:

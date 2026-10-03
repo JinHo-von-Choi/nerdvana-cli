@@ -1,7 +1,7 @@
 """Tests for context block splitting and summarization."""
 from __future__ import annotations
 
-from nerdvana_cli.core.compact import (
+from nerdvana_cli.core.context.compact import (
     compact_with_blocks,
     split_into_blocks,
     summarize_block,

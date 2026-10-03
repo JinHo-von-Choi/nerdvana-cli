@@ -272,8 +272,8 @@ PROJECT_DOC_WARN_TOKENS = 3_000
 def _check_project_docs() -> CheckResult:
     """Project documents ride along on every request; say how much they add."""
     from nerdvana_cli.core.config.settings import NerdvanaSettings
-    from nerdvana_cli.core.nirnamd import fit_to_budget, load_nirna_files
-    from nerdvana_cli.core.token_estimator import approx_tokens
+    from nerdvana_cli.core.context.nirnamd import fit_to_budget, load_nirna_files
+    from nerdvana_cli.core.context.token_estimator import approx_tokens
 
     try:
         settings = NerdvanaSettings.load()

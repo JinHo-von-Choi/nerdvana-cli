@@ -11,7 +11,7 @@ Commands:
   memory forget  : delete a memory after confirmation
   memory stale   : list memories not modified for N days and never read
 
-Storage: core/memories.py MemoriesManager — same helper that /memories
+Storage: core/context/memories.py MemoriesManager — same helper that /memories
 slash command (memory_commands.py:handle_memories) uses.
 
 Author: 최진호
@@ -29,8 +29,8 @@ from rich.console import Console
 from rich.markup import escape
 
 from nerdvana_cli.commands import memory_review_text as review
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_index import MemorySource
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_index import MemorySource
 
 console = Console()
 

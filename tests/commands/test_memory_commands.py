@@ -14,7 +14,7 @@ import pytest
 
 from nerdvana_cli.commands import memory_commands as mc
 from nerdvana_cli.core.checkpoint import CheckpointEntry
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
 
 # ---------------------------------------------------------------------------
 # Doubles
@@ -160,7 +160,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "proj"
     root.mkdir()
     monkeypatch.setattr(
-        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        "nerdvana_cli.core.context.memories.core_paths.global_memories_dir",
         lambda: tmp_path / "global",
     )
     return root

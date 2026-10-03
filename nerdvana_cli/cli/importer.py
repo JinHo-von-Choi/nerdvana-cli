@@ -7,7 +7,7 @@ Claude Code and Codex keep slash commands as markdown files and, for Claude Code
 ``settings.json``. This module finds them and converts what has an equivalent here:
 
 * slash commands (``.claude/commands``, ``~/.claude/commands``, ``~/.codex/prompts``) become files in
-  ``.nerdvana/commands`` (see ``core/user_commands.py``); an existing file is never replaced;
+  ``.nerdvana/commands`` (see ``core/context/user_commands.py``); an existing file is never replaced;
 * ``permissions.allow`` and ``permissions.deny`` rules of a Claude Code ``settings.json`` become
   ``always_allow`` and ``always_deny`` rules, with ``Tool(prefix:*)`` turned into ``Tool(prefix *)``.
 

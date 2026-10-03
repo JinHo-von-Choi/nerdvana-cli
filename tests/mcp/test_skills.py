@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 
-from nerdvana_cli.core.skills import SkillLoader
+from nerdvana_cli.core.context.skills import SkillLoader
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.mcp.config import McpServerConfig

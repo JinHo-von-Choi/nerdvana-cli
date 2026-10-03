@@ -6,8 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
+from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
-from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.types import ToolResult
 
 

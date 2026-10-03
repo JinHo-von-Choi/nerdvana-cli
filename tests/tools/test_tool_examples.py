@@ -68,7 +68,7 @@ def test_an_escaped_newline_in_an_example_is_not_a_line_break(tools: dict[str, A
 
 
 def test_the_added_examples_stay_small(tools: dict[str, Any]) -> None:
-    from nerdvana_cli.core.token_estimator import approx_tokens
+    from nerdvana_cli.core.context.token_estimator import approx_tokens
 
     for name in WITH_EXAMPLES:
         assert approx_tokens(_example_text(tools[name].description_text)) <= 160, name

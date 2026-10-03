@@ -27,8 +27,8 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_index import MemorySource
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_index import MemorySource
 
 logger = logging.getLogger(__name__)
 

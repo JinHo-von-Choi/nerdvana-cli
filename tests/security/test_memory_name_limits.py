@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.memories import (
+from nerdvana_cli.core.context.memories import (
     MAX_CONTENT_BYTES,
     MAX_NAME_LENGTH,
     MemoriesManager,
     MemoryScope,
 )
-from nerdvana_cli.core.memory_review import MemoryInbox
+from nerdvana_cli.core.context.memory_review import MemoryInbox
 
 pytestmark = pytest.mark.security
 

@@ -16,7 +16,7 @@ SANDBOX_MODES = ("off", "auto", "require")
 class SkillsConfig(BaseModel):
     # Also scan ~/.claude/skills and <cwd>/.claude/skills, one tier below the
     # matching .agents and nerdvana skill directories. Skills under <cwd> load
-    # only for a trusted project. See core.skills.
+    # only for a trusted project. See core.context.skills.
     include_claude_skills: bool = False
 
 

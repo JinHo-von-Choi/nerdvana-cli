@@ -1,7 +1,7 @@
 """Tests for NIRNA.md loading."""
 
 
-from nerdvana_cli.core.nirnamd import NirnaFile, format_nirna_for_prompt, load_nirna_files
+from nerdvana_cli.core.context.nirnamd import NirnaFile, format_nirna_for_prompt, load_nirna_files
 
 
 class TestNirnaMdLoading:

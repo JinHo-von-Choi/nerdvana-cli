@@ -48,10 +48,10 @@ from typing import Any, NamedTuple
 ROOT        = Path(__file__).resolve().parent.parent
 SEED_FILES  = (
     "nerdvana_cli/core/session.py",
-    "nerdvana_cli/core/token_estimator.py",
-    "nerdvana_cli/core/context_budget.py",
-    "nerdvana_cli/core/observation_mask.py",
-    "nerdvana_cli/core/nirnamd.py",
+    "nerdvana_cli/core/context/token_estimator.py",
+    "nerdvana_cli/core/context/context_budget.py",
+    "nerdvana_cli/core/context/observation_mask.py",
+    "nerdvana_cli/core/context/nirnamd.py",
     "nerdvana_cli/commands/cost_command.py",
 )
 SCAN_DIRS   = ("nerdvana_cli", "tests", "scripts")

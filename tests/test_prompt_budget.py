@@ -13,9 +13,9 @@ from types import ModuleType
 
 import pytest
 
-from nerdvana_cli.core.nirnamd import NirnaFile, fit_to_budget
-from nerdvana_cli.core.prompts import build_system_prompt
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.nirnamd import NirnaFile, fit_to_budget
+from nerdvana_cli.core.context.prompts import build_system_prompt
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "measure_prompt_overhead.py"
 

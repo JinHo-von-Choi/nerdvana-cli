@@ -16,7 +16,7 @@ import pytest
 
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentTypeRegistry
-from nerdvana_cli.core.compact import CompactionState, _messages_to_text, ai_compact
+from nerdvana_cli.core.context.compact import CompactionState, _messages_to_text, ai_compact
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 from nerdvana_cli.types import Message, PermissionBehavior, Role

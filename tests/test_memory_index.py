@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_index import (
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_index import (
     INDEX_NAME,
     MemoryIndex,
     MemoryMeta,

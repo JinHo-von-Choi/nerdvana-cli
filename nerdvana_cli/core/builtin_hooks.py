@@ -7,8 +7,8 @@ import os
 import re
 from typing import Any
 
+from nerdvana_cli.core.context.nirnamd import is_within_root, read_rule_file
 from nerdvana_cli.core.hooks.hooks import HookContext, HookResult
-from nerdvana_cli.core.nirnamd import is_within_root, read_rule_file
 
 
 def session_start_context_injection(ctx: HookContext) -> HookResult:
@@ -106,7 +106,7 @@ def session_start_memory_hint(ctx: HookContext) -> HookResult:
         return HookResult()
 
     try:
-        from nerdvana_cli.core.memories import MemoriesManager
+        from nerdvana_cli.core.context.memories import MemoriesManager
         mgr  = MemoriesManager(cwd)
         hint = mgr.session_start_hint()
     except Exception:  # noqa: BLE001

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.memories import MemoriesManager
+from nerdvana_cli.core.context.memories import MemoriesManager
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.memory_tools import (
     CheckOnboardingPerformedTool,

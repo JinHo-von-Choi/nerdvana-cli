@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.types import Role
 
 # Tools whose output can be fetched again. Anything else (edits, writes, todos, diagnostics) is kept.

@@ -122,7 +122,7 @@ A second `session/prompt` while one is running in the same session is refused (`
 
 ### Slash commands
 
-The user commands (`<project>/.nerdvana/commands/*.md` and `~/.nerdvana/commands/*.md`, see `core/user_commands.py`) are published as available commands, with their description and a free-form argument hint. A prompt that starts with `/<name> arguments` is expanded into the template before it reaches the model. Built-in commands of the terminal UI (`/model`, `/clear` and so on) and skills are not exposed; a prompt that starts with an unknown `/word` goes to the model as typed.
+The user commands (`<project>/.nerdvana/commands/*.md` and `~/.nerdvana/commands/*.md`, see `core/context/user_commands.py`) are published as available commands, with their description and a free-form argument hint. A prompt that starts with `/<name> arguments` is expanded into the template before it reaches the model. Built-in commands of the terminal UI (`/model`, `/clear` and so on) and skills are not exposed; a prompt that starts with an unknown `/word` goes to the model as typed.
 
 ### MCP servers
 

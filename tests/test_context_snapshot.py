@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
+from nerdvana_cli.core.context.context_snapshot import collect_snapshot, format_snapshot
 
 
 @pytest.fixture

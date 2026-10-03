@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.context_budget import IMAGE_TOKENS, message_tokens
+from nerdvana_cli.core.context.context_budget import IMAGE_TOKENS, message_tokens
 from nerdvana_cli.core.images import (
     MAX_IMAGE_BYTES,
     ImageError,

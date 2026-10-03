@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from rich.markup import escape
 
 from nerdvana_cli.cli.context_report import ContextReport, advice, build_report, render
-from nerdvana_cli.core.tool_index import ToolIndex
+from nerdvana_cli.core.context.tool_index import ToolIndex
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop

@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.cli import setup
-from nerdvana_cli.core import nirnamd
 from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.context import nirnamd
+from nerdvana_cli.core.context.skills import SkillLoader
 from nerdvana_cli.core.hooks import user_hooks
-from nerdvana_cli.core.skills import SkillLoader
 
 
 def test_setup_config_path_uses_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

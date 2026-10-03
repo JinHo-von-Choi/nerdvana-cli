@@ -14,7 +14,7 @@ import threading
 import time
 from typing import Any
 
-from nerdvana_cli.core.nirnamd import fit_to_budget, format_nirna_for_prompt, load_nirna_files
+from nerdvana_cli.core.context.nirnamd import fit_to_budget, format_nirna_for_prompt, load_nirna_files
 
 
 def build_system_prompt(

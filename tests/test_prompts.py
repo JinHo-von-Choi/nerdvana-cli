@@ -2,7 +2,7 @@
 
 import subprocess
 
-from nerdvana_cli.core.prompts import build_system_prompt
+from nerdvana_cli.core.context.prompts import build_system_prompt
 
 
 class TestSystemPromptBuilder:

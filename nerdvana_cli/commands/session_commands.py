@@ -84,7 +84,7 @@ async def handle_skills(app: NerdvanaApp, args: str) -> None:
 
 def show_session_context(app: NerdvanaApp, registry: Any) -> None:
     """Show session startup context summary."""
-    from nerdvana_cli.core.nirnamd import load_nirna_files
+    from nerdvana_cli.core.context.nirnamd import load_nirna_files
     from nerdvana_cli.mcp.tools import McpToolAdapter
 
     parts = []

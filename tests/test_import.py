@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nerdvana_cli.cli.importer import apply_commands, convert_rule, plan_import, read_permissions
-from nerdvana_cli.core.user_commands import UserCommandLoader
+from nerdvana_cli.core.context.user_commands import UserCommandLoader
 from nerdvana_cli.main import app
 
 

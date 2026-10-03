@@ -14,8 +14,8 @@ import shlex
 
 from rich.markup import escape
 
-from nerdvana_cli.core.memories import MemoriesManager, MemoryEntry
-from nerdvana_cli.core.memory_review import (
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryEntry
+from nerdvana_cli.core.context.memory_review import (
     ChangeKind,
     MemoryInbox,
     ProposalNotFoundError,

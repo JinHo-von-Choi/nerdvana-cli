@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nerdvana_cli.core.compact import (
+from nerdvana_cli.core.context.compact import (
     FALLBACK_PROMPT,
     MAX_CONSECUTIVE_FAILURES,
     CompactionState,

@@ -191,7 +191,7 @@ in `nerdvana_cli/core/`:
 | `model_failover.py` | `ModelFailover` | advice and escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
 | `advisor.py` | `Advisor` | the consultations of the `Advisor` tool and of the signal-triggered advice: what is sent, the call cap, the cost (see [advisor.md](advisor.md)) |
 | `phase_effort.py` | `PhaseEffort`, `phase_level` | reasoning effort per phase: planning, implementation, verification |
-| `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/compact.py` as the fallback |
+| `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/context/compact.py` as the fallback |
 | `compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |
 | `goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |
 | `input_queue.py` | `InputQueue` | text typed while the agent works |
