@@ -433,6 +433,12 @@ def _check_pricing_coverage() -> CheckResult:
     return CheckResult("pricing_coverage", "warn" if limited else "ok", f"no price for {', '.join(unpriced)}; a cost limit does not apply to them (session.max_total_tokens does)")
 
 
+def _check_mcp_sandbox() -> CheckResult:
+    """Report which stdio MCP servers start confined, from the configuration; no server is started."""
+    from nerdvana_cli.mcp.sandbox import confinement_report
+    return CheckResult("mcp_sandbox", *confinement_report(os.getcwd()))
+
+
 def _check_sandbox() -> CheckResult:
     """Report whether shell commands can be confined, and what the configuration asks for."""
     from nerdvana_cli.core.egress_proxy import describe_egress
@@ -524,6 +530,7 @@ _ALL_CHECKS = [
     _check_lsp_servers,
     _check_mcp_servers,
     _check_mcp_config,
+    _check_mcp_sandbox,
     _check_sandbox,
     _check_pricing_coverage,
     _check_project_docs,

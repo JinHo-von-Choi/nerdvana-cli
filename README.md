@@ -483,7 +483,9 @@ Both use the `mcpServers` object:
 `nerdvana mcp add`, `nerdvana mcp list`, and `nerdvana mcp remove` edit these
 files for you.
 
-Use `/mcp` in the REPL to check connection status, and `/tools` to see all available tools including MCP-discovered ones.
+A stdio server can be started confined to a write scope with `"sandbox": "auto"` (or `"require"`), `"write_paths"` and `"network"`; servers that offer skills over MCP add them to the skill catalog. See [`docs/mcp-client.md`](docs/mcp-client.md).
+
+Use `/mcp` in the REPL to check connection status (and how each stdio server is confined), and `/tools` to see all available tools including MCP-discovered ones.
 
 ## NIRNA.md — Project Instructions
 
@@ -645,6 +647,7 @@ mypy nerdvana_cli/
 | [docs/configuration.md](docs/configuration.md) | Full config reference |
 | [docs/hooks.md](docs/hooks.md) | Hook event system and bridge protocol |
 | [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
+| [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
 | [docs/testing-live.md](docs/testing-live.md) | Live provider test matrix and secrets setup |
 | [docs/adr/0004-lsp-cache-strategy.md](docs/adr/0004-lsp-cache-strategy.md) | ADR: LSP result cache strategy |

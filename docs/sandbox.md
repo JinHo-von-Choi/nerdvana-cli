@@ -144,8 +144,9 @@ An agent definition can narrow the policy for its sub-agents with `write_scope` 
 - It does not restrict running programs, UDP, or local sockets. With `network: false` or
   `allowlist`, DNS over UDP still works and a command can still talk to a local service on a socket
   file.
-- It applies to the `Bash` tool only. Other tools, language servers and MCP servers
-  started by the application run as the user.
+- It applies to the `Bash` tool only. Other tools and language servers started by the
+  application run as the user. Stdio MCP servers can be confined with their own `sandbox`
+  setting, see [mcp-client.md](mcp-client.md).
 - macOS and Windows are not supported. There `auto` runs commands unconfined and
   `require` refuses them.
 

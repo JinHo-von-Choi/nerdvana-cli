@@ -213,6 +213,24 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 |-------|------|---------|-------------|
 | `proxy_credentials` | map | `{}` | Domain (or `*.suffix`) to the name of an environment variable of the application. With `sandbox.network: allowlist` the egress proxy adds that credential to the plain HTTP requests it forwards to the domain: `VARIABLE` sends `Authorization: Bearer <value>`, `Header-Name:VARIABLE` sends the value as it is in that header. The token never enters the command's environment. The domain must also be in `sandbox.allowed_domains`; a TLS tunnel cannot carry an added header. Cannot be set with `--set`. See [sandbox.md](sandbox.md). |
 
+### MCP servers (`mcp.json`)
+
+Servers are declared in JSON, not in `nerdvana.yml`: `~/.nerdvana/mcp.json` and `<cwd>/.mcp.json`, in a `mcpServers` object keyed by server name (a project entry overrides a global one of the same name). `${VAR}` in `env`, `url`, `headers` and `write_paths` expands from the environment. The connection behaviour, skills over MCP and the answers to `input_required` results are described in [mcp-client.md](mcp-client.md).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | string | `stdio` | `stdio`, `http` or `sse` (both of the latter use streamable HTTP). |
+| `command` | string | | stdio only: the server executable. |
+| `args` | list | `[]` | stdio only: its arguments. |
+| `env` | dict | `{}` | stdio only: variables added to the environment the server inherits from nerdvana. |
+| `url` | string | | http only: the endpoint. |
+| `headers` | dict | `{}` | http only: sent with every request, for example `Authorization: Bearer ${KEY}`. |
+| `sandbox` | string | `off` | stdio only: `off` starts the server as before, `auto` confines it where the system supports it and logs a warning where it does not, `require` fails the connection when it cannot be confined. Any other value fails the connection naming the server. |
+| `write_paths` | list | `[]` | stdio only: paths a confined server may write, besides `/tmp`, `/var/tmp`, the system temporary directory and `/dev`. The project directory is not writable unless listed. `~` expands; a relative path is relative to the directory nerdvana was started in. |
+| `network` | bool | `true` | stdio only: `false` also refuses TCP connections and binds from a confined server; needs Linux 6.7 (Landlock ABI 4). Anything but `true` or `false` fails the connection. |
+
+`/mcp` shows how each connected stdio server is confined and `nerdvana doctor` lists it in the `mcp_sandbox` check. Confinement uses the launcher described in [sandbox.md](sandbox.md) and has the same limits: it restricts writing, not reading.
+
 ### `goal` (GoalConfig)
 
 | Field | Type | Default | Description |

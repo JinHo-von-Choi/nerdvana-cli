@@ -57,9 +57,11 @@ async def handle_mcp(app: NerdvanaApp, args: str) -> None:
             app._add_chat_message("[dim]No MCP servers configured.[/dim]")
         else:
             app._add_chat_message("[bold]MCP Servers:[/bold]")
+            confinement = app.mcp_manager.get_confinement()
             for name, connected in status.items():
                 icon = "[green]ON[/green]" if connected else "[red]OFF[/red]"
-                app._add_chat_message(f"  {icon} {name}")
+                note = f"  [dim]{confinement[name]}[/dim]" if confinement.get(name, "not applicable") != "not applicable" else ""
+                app._add_chat_message(f"  {icon} {name}{note}")
     else:
         app._add_chat_message("[dim]No .mcp.json found.[/dim]")
 
