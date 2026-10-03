@@ -6,7 +6,7 @@ Hooks are registered against a `HookEvent` and receive a `HookContext` describin
 
 ## Events
 
-`HookEvent` is a `StrEnum` with six members:
+`HookEvent` is a `StrEnum` with twelve members:
 
 | Event | When it fires |
 |-------|---------------|
@@ -16,6 +16,24 @@ Hooks are registered against a `HookEvent` and receive a `HookContext` describin
 | `AFTER_TOOL` | Immediately after a tool has executed. Handlers receive the tool result; messages they inject are appended after the batch's tool results, never between a call and its result. |
 | `BEFORE_API_CALL` | Before each request to the model. |
 | `AFTER_API_CALL` | After each model response. The `stop_reason` field carries `"max_tokens"`, `"end_turn"`, or `"tool_use"`. |
+| `PERMISSION_DENIED` | A tool call was refused: by the permission policy (`always_deny`, a mode that hides the tool, a tool's own refusal), by the user answering no, or by the action classifier. `tool_name` and `tool_input` name the call. A handler may return a `message`: it is appended to the refusal the model reads as `[Retry hint from a hook: ...]`. Refusals made by the executor itself (a malformed input, a repeated call, `BEFORE_TOOL` vetoes, edit scopes) do not fire it. |
+| `PRE_COMPACT` | Before the conversation is compacted, whether the window filled up or the provider asked for it. A handler that returns `allow=False` cancels this compaction; the `message` is the reason, which is logged and written to the session transcript, and the history is left as it is. |
+| `POST_COMPACT` | After a compaction finished. Cannot change anything. |
+| `PRE_MODEL_SWITCH` | Just before the model in use changes. Observation only. |
+| `POST_MODEL_SWITCH` | Just after the model in use changed. Observation only. |
+| `INSTRUCTIONS_LOADED` | Once per session, at its first prompt, with the project instruction documents (`NIRNA.md`, `AGENTS.md`, `CLAUDE.md` and the user's own) the system prompt carries. Rule files injected later when a file in a subdirectory is first touched do not fire it. Observation only. |
+
+The payload of the last five and the extra fields of `PERMISSION_DENIED` are in `HookContext.extra`:
+
+| Event | `extra` keys |
+|-------|--------------|
+| `PERMISSION_DENIED` | `source` (`policy`, `user` or `classifier`), `reason` (the refusal text before any hint) |
+| `PRE_COMPACT` | `tokens` (estimated context size), `messages` (message count) |
+| `POST_COMPACT` | `tokens_before`, `messages_before`, `messages_after`, `strategy` (`ai`, or `naive` when the model summary failed or its circuit breaker is open) |
+| `PRE_MODEL_SWITCH`, `POST_MODEL_SWITCH` | `from_provider`, `from_model`, `to_provider`, `to_model`, `reason` (`escalation` for `session.escalation_model`, `fallback` after a failed request, `restore` when a prompt ends and the loop goes back to the model it started on) |
+| `INSTRUCTIONS_LOADED` | `files`: a list of `{path, type, chars}` (`type` is `global`, `project` or `local`) |
+
+There is no `ConfigChange` event: settings are changed in several places (the model and provider pickers, `/thinking`, `/activity` and others) that write the configuration file themselves, with no single point that could report a change to the hook engine.
 
 ## HookContext
 
@@ -62,8 +80,8 @@ class HookResult:
     system_prompt_append: str = ""
 ```
 
-- `allow=False` vetoes the current tool call (only meaningful for `BEFORE_TOOL`). The loop skips execution and propagates `message` to the model.
-- `message` is a short, human-readable explanation. It is included in the synthetic tool error when a call is blocked.
+- `allow=False` vetoes the current tool call (`BEFORE_TOOL`) or the compaction about to run (`PRE_COMPACT`). A vetoed tool call is not executed and `message` goes to the model; a vetoed compaction is skipped and `message` is logged. On any other event `allow` is ignored.
+- `message` is a short, human-readable explanation. It is included in the synthetic tool error when a call is blocked, and on `PERMISSION_DENIED` it is the retry hint appended to the refusal.
 - `inject_messages` is a list of fully-formed message dicts (`{"role": ..., "content": ...}`) that the loop appends to the conversation before the next API call. This is the canonical mechanism for context recovery and continuation prompts.
 - `system_prompt_append` is exclusive to `SESSION_START` hooks. The returned string is cumulatively appended to the system prompt on every turn, persisting for the model across the entire session.
 
@@ -112,7 +130,28 @@ When `FileRead`, `FileEdit` or `FileWrite` first touches a file in a subdirector
 
 ## Command hooks
 
-Shell commands can be declared without writing Python, in `~/.nerdvana/hooks.yml` and `<project>/.nerdvana/hooks.yml`; see "Custom Commands and Command Hooks" in the README for the format. They attach to `BEFORE_TOOL`, `AFTER_TOOL`, `SESSION_START` and `SESSION_END`. An exit code of 2 makes a `BEFORE_TOOL` command veto the call (`HookResult(allow=False)` with the command's output as the message) and makes an `AFTER_TOOL` command inject its output as a user message; every other outcome is ignored. A project `hooks.yml` is subject to the same opt-in and digest approval as project Python hooks.
+Shell commands can be declared without writing Python, in `~/.nerdvana/hooks.yml` and `<project>/.nerdvana/hooks.yml`; see "Custom Commands and Command Hooks" in the README for the format. Each entry names an event (`before_tool`, `after_tool`, `session_start`, `session_end`, `permission_denied`, `pre_compact`, `post_compact`, `pre_model_switch`, `post_model_switch` or `instructions_loaded`), an optional `match` glob on the tool name (the tool events `before_tool`, `after_tool` and `permission_denied` only), a `command` and a `timeout`.
+
+The command receives one JSON object on standard input: `event`, `cwd`, then `tool_name` and `tool_input` for the three tool events, a shortened `tool_result` for `after_tool`, and `details` (the `extra` keys of the table above) for `permission_denied`, `pre_compact`, `post_compact`, `pre_model_switch`, `post_model_switch` and `instructions_loaded`.
+
+An exit code of 2 means:
+
+| Event | Effect of exit code 2 |
+|-------|-----------------------|
+| `before_tool` | Vetoes the call (`HookResult(allow=False)`), the command's output is the message. |
+| `after_tool` | Injects the command's output as a user message. |
+| `permission_denied` | The command's output is appended to the refusal as a retry hint. |
+| `pre_compact` | Cancels this compaction, the output is the reason. |
+| every other event | Ignored. |
+
+Exit code 0 carries on, and every other outcome (another exit code, a timeout, a command that cannot start) is logged and ignored. A project `hooks.yml` is subject to the same opt-in and digest approval as project Python hooks.
+
+```yaml
+hooks:
+  - event: permission_denied
+    match: "Bash"
+    command: "scripts/explain-denial.sh"   # prints a sentence on stdout and exits 2: the model reads it next to the refusal
+```
 
 ## User hook directories
 

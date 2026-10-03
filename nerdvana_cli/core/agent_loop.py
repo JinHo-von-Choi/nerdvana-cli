@@ -52,6 +52,7 @@ from nerdvana_cli.core.input_queue import InputQueue
 from nerdvana_cli.core.loop_context import background_reports, open_todos_note, provider_messages, session_start_context
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
+from nerdvana_cli.core.loop_support import with_compaction_hooks
 from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.plan_gate import plan_for
@@ -487,12 +488,11 @@ class AgentLoop:
                 self.provider = self.create_provider_from_settings()
             self.limits.record_session_totals()
 
+    @with_compaction_hooks
     async def _maybe_compact_messages(self, cur_toks: int, thr: int) -> AsyncGenerator[str, None]:
         """Compress message history when the token threshold is exceeded.
 
-        Yields ``COMPACT_STATUS_PREFIX`` status strings the UI consumes; mutates
-        ``self.state.messages`` in place. Falls back to naive truncation when
-        AI compaction returns None or the circuit breaker is open.
+        Yields ``COMPACT_STATUS_PREFIX`` status strings for the UI and mutates ``self.state.messages`` in place; falls back to naive truncation when AI compaction fails or the circuit is open.
         """
         before = len(self.state.messages)
         self.rewinder.marks.clear()   # compaction rewrites the history the marks point into
