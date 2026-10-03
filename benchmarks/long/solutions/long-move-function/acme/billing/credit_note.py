@@ -59,7 +59,7 @@ NOTE_16 = (
 
 def amount_label(cents: int) -> str:
     """Label an amount of this module."""
-    return f"billing.credit_note: {format_money(cents, "USD")}"
+    return f"billing.credit_note: {format_money(cents, 'USD')}"
 
 
 def demo() -> str:

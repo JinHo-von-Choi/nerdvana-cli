@@ -59,7 +59,7 @@ NOTE_16 = (
 
 def amount_label(cents: int) -> str:
     """Label an amount of this module."""
-    return f"api.serializers: {format_money(cents, "USD")}"
+    return f"api.serializers: {format_money(cents, 'USD')}"
 
 
 def parse_total(text: str) -> int:

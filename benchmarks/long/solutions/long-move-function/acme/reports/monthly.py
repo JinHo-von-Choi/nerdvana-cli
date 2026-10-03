@@ -60,7 +60,7 @@ NOTE_16 = (
 
 def amount_label(cents: int) -> str:
     """Label an amount of this module."""
-    return f"reports.monthly: {formatting.format_money(cents, "USD")}"
+    return f"reports.monthly: {formatting.format_money(cents, 'USD')}"
 
 
 def parse_total(text: str) -> int:

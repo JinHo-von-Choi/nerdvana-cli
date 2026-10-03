@@ -60,7 +60,7 @@ NOTE_16 = (
 
 def amount_label(cents: int) -> str:
     """Label an amount of this module."""
-    return f"cli.console: {formatting.format_money(cents, "USD")}"
+    return f"cli.console: {formatting.format_money(cents, 'USD')}"
 
 
 def tag(text: str) -> str:
