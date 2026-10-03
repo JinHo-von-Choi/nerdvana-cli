@@ -233,7 +233,7 @@ def test_the_loop_hands_the_policy_to_every_tool_call(tmp_path: Path) -> None:
     settings.sandbox.mode        = "require"
     settings.sandbox.write_paths = ["/srv/cache"]
     holder = type("Loop", (), {"settings": settings, "_task_registry": None, "_on_ask_user": None, "_on_confirm": None,
-                               "session": type("S", (), {"session_id": "s"})(), "budget": None,
+                               "session": type("S", (), {"session_id": "s"})(), "budget": None, "_tool_index": None,
                                "session_cost_usd": lambda self: 0.0})()
     context = AgentLoop._new_tool_context(holder)  # type: ignore[arg-type]
     assert context.state["sandbox"] == SandboxPolicy("require", True, ("/srv/cache",))

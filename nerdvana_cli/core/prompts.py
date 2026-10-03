@@ -25,6 +25,7 @@ def build_system_prompt(
     cwd: str = ".",
     active_tool_mode: bool = False,
     project_doc_max_tokens: int = 0,
+    deferred_tools: list[str] | None = None,
 ) -> str:
     """Build the complete system prompt from ordered sections.
 
@@ -41,6 +42,7 @@ def build_system_prompt(
         _tool_judgment_section(),
         _active_tool_augment_section() if active_tool_mode else None,
         _using_tools_section(tools),
+        _deferred_tools_section(deferred_tools or []),
         _parism_section() if parism_active else None,
         _tone_and_style_section(),
         _output_efficiency_section(),
@@ -179,6 +181,19 @@ def _using_tools_section(tools: list[Any] | None) -> str:
         *lines,
         "",
         "Call multiple independent tools in parallel. Sequential if dependent.",
+    ])
+
+
+def _deferred_tools_section(lines: list[str]) -> str:
+    """The names of tools that are not declared yet, with the way to load them."""
+    if not lines:
+        return ""
+    return "\n".join([
+        "# Deferred tools",
+        "",
+        "These tools are not declared in this request. Call ToolSearch with 'select:<name>' (or keywords) to load "
+        "one, then call it from your next step on.",
+        *lines,
     ])
 
 

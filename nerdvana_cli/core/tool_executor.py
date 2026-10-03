@@ -173,6 +173,10 @@ class ToolExecutor:
         context:  ToolContext,
     ) -> ToolResult:
         """Run one call: refuse it when a check fails, otherwise execute and record it."""
+        index = context.state.get("tool_index")
+        if index is not None and index.is_unloaded(tool_use["name"]):
+            name = tool_use["name"]
+            return self._refusal(tool_use["id"], f"Tool {name} is not loaded yet. Call ToolSearch with query 'select:{name}' first.")
         repeats = self._repeats.observe(tool_use["name"], tool_use["input"])
         parsed_args, refusal = self._check_input(tool_use, tool, repeats)
         if refusal is not None:

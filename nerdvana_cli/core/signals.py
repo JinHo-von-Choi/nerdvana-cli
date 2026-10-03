@@ -35,6 +35,7 @@ PROVIDER_FALLBACK   = "provider_fallback"
 COMPACTION          = "compaction"
 WRAP_UP             = "wrap_up"
 VERIFY_FAILED       = "verify_failed"
+TOOL_NOT_LOADED     = "tool_not_loaded"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (
@@ -69,6 +70,8 @@ def classify_result(content: str, is_error: bool, *, shell_confined: bool = Fals
     for prefix, signal in _ERROR_PREFIXES:
         if content.startswith(prefix):
             return [*found, signal]
+    if "is not loaded yet. Call ToolSearch" in content:
+        return [*found, TOOL_NOT_LOADED]
     if any(phrase in content for phrase in _STALE_PHRASES):
         return [*found, CAS_REJECTED]
     if shell_confined and "Permission denied" in content:

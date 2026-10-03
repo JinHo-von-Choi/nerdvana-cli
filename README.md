@@ -37,7 +37,7 @@
 - **Claude Code compatible instructions**: root `AGENTS.md` and `CLAUDE.md` load after `NIRNA.md`; rule files in subdirectories are injected when a file there is first touched. Skills may be `SKILL.md` directories.
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
-- **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`)
+- **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`); when their declarations get large they are listed by name and loaded on demand, see [`docs/mcp-deferred-tools.md`](docs/mcp-deferred-tools.md)
 - **MCP server per-tenant quota** — `nerdvana serve` supports rpm / rph / daily_tokens / max_concurrent limits per client, configured via `mcp_quota.yml`. See [`docs/mcp-quota.md`](docs/mcp-quota.md).
 - **Session Persistence**: JSONL transcripts; `nerdvana session resume <id>` restores the conversation
 - **Auto Provider Detection** — picks the right provider from model name
