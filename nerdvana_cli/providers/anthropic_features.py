@@ -187,6 +187,11 @@ def is_deferrable(tool: ToolSpec) -> bool:
     return "mcp" in getattr(tool, "tags", frozenset())
 
 
+def uses_server_search(model: str, search: str) -> bool:
+    """True when *search* (``model.anthropic_tool_search``) is on and *model* is a Claude model: the API then searches the MCP tools itself."""
+    return search in TOOL_SEARCH_TOOLS and model.startswith("claude-")
+
+
 def declare_tools(tools: Sequence[ToolSpec], model: str, search: str = "off") -> list[dict[str, Any]]:
     """The ``tools`` array of a request.
 
@@ -196,9 +201,9 @@ def declare_tools(tools: Sequence[ToolSpec], model: str, search: str = "off") ->
     deferred and no search tool is added.
     """
     declared = [(tool, api_tool(tool, model)) for tool in tools]
-    search_tool = TOOL_SEARCH_TOOLS.get(search)
-    if search_tool is None or not model.startswith("claude-"):
+    if not uses_server_search(model, search):
         return [item for _, item in declared]
+    search_tool = TOOL_SEARCH_TOOLS[search]
     deferred = [{**item, "defer_loading": True} for tool, item in declared if is_deferrable(tool)]
     if not deferred:
         return [item for _, item in declared]

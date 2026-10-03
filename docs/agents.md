@@ -189,11 +189,13 @@ in `nerdvana_cli/core/`:
 |-|-|-|
 | `run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
 | `model_failover.py` | `ModelFailover` | escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/compact.py` as the fallback |
+| `compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |
 | `goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |
 | `input_queue.py` | `InputQueue` | text typed while the agent works |
 | `rewind.py` | `Rewinder` | prompt marks and `/rewind` |
 | `plan_gate.py` | `plan_for`, `draft_plan` | the planning gate's plan sub-agent |
-| `loop_context.py` | `provider_messages`, `background_reports`, `open_todos_note`, `session_start_context` | messages and prompt text the loop adds around the history |
+| `loop_context.py` | `provider_messages`, `background_reports`, `open_todos_note`, `session_start_context`, `prepare_tools`, `new_provider` | messages and prompt text the loop adds around the history, the tool list of a run and the provider adapter built from the settings |
 
 `ToolExecutor` (`tool_executor.py`) likewise leaves the permission check to
 `PermissionGate` and `ask_user_permission` (`tool_permission.py`) and the edit
@@ -214,7 +216,9 @@ async def _handle_tool_use_stop(
 
 Async generator. Invoked before each API call when the estimated token count
 exceeds the configured threshold. Yields `COMPACT_STATUS_PREFIX` status strings
-that the UI layer consumes to update the status bar. Runs AI compaction via
+that the UI layer consumes to update the status bar. The context step first offers
+the job to the provider (`ServerCompaction`, `model.anthropic_compaction: on`); this
+method is the client-side compaction that follows when the provider cannot or fails. Runs AI compaction via
 `ai_compact()`; if the circuit breaker is open or `ai_compact` returns `None`,
 falls back to naive truncation via `compact_messages()`. Mutates
 `self.state.messages` in place.

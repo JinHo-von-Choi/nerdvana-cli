@@ -50,7 +50,15 @@ from nerdvana_cli.core.goal_gate import GoalGate
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.images import prompt_content, transcript_text
 from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
-from nerdvana_cli.core.loop_context import background_reports, open_todos_note, provider_messages, session_start_context
+from nerdvana_cli.core.loop_context import (
+    COMPACT_STATUS_PREFIX,
+    background_reports,
+    new_provider,
+    open_todos_note,
+    prepare_tools,
+    provider_messages,
+    session_start_context,
+)
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
 from nerdvana_cli.core.loop_support import classifier_feed, with_compaction_hooks
@@ -62,6 +70,7 @@ from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlann
 from nerdvana_cli.core.rewind import Rewinder
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.sandbox import SandboxPolicy
+from nerdvana_cli.core.server_compaction import ServerCompaction
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import SkillLoader
@@ -73,9 +82,7 @@ from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.core.user_hooks import load_user_hooks
-from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
-from nerdvana_cli.providers.factory import create_provider
 from nerdvana_cli.types import Message, Role, SessionState
 
 if TYPE_CHECKING:
@@ -98,8 +105,6 @@ CONTEXT_USAGE_PREFIX  = "\x00CTX_USAGE:"
 # End-of-turn hooks (unfinished-marker checks and the like) may keep the loop
 # going at most this many times per user prompt.
 _MAX_END_TURN_NUDGES = 3
-
-COMPACT_STATUS_PREFIX = "\x00COMPACT:"
 
 _ULTRAWORK_PATTERN = re.compile(r"\b(ultrawork|ulw)\b", re.IGNORECASE)
 
@@ -159,6 +164,7 @@ class AgentLoop:
         self.last_stop            = "completed"
         self.turns_used           = 0
         self.goal_gate            = GoalGate(self)
+        self.server_compaction    = ServerCompaction(self)
         self.failover             = ModelFailover(self)
         self.rewinder             = Rewinder(self)
         self.loop_hook_engine     = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
@@ -343,13 +349,7 @@ class AgentLoop:
         return injected
 
     def create_provider_from_settings(self) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
-        pname = ProviderName(self.settings.model.provider) if self.settings.model.provider else None
-        return create_provider(provider=pname, model=self.settings.model.model, api_key=self.settings.model.api_key,
-            base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature,
-            prompt_caching=self.settings.model.prompt_caching,
-            extended_thinking=self.settings.model.extended_thinking,
-            thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking,
-            reasoning_effort=self.settings.model.reasoning_effort, openai_api=self.settings.model.openai_api, gemini_api=self.settings.model.gemini_api)
+        return new_provider(self.settings.model)
 
     def queue_input(self, text: str, interrupt: bool | None = None) -> bool:
         """Hold text typed while the agent works for its next step; True when it also interrupts the step in progress."""
@@ -401,24 +401,8 @@ class AgentLoop:
         self.skill_loader.reset_activations()
 
     def _prepare_tools(self) -> list[Any]:
-        """The tools this run may use, with MCP tools deferred behind ToolSearch when their declarations are large.
-
-        What the model has loaded stays loaded across prompts of the session. Sub-agents never defer: they have
-        no ToolSearch. A loop built without a ToolSearch factory never defers either.
-        """
-        visible     = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name) and t.name != "ToolSearch"]
-        session     = self.settings.session
-        search_tool = self._factories.tool_search
-        deferring   = self.origin.agent_type == "main" and search_tool is not None
-        index       = ToolIndex.build(visible, session.defer_tools, session.defer_tools_threshold) if deferring else ToolIndex()
-        if self._tool_index is not None:
-            index.loaded = self._tool_index.loaded & set(index.deferred)
-        self._tool_index = index
-        if index.deferred and search_tool is not None:
-            search = search_tool(index)
-            self.registry.register(search)
-            visible.append(search)
-        return visible
+        """The tools this run may use, with MCP tools deferred behind ToolSearch when their declarations are large."""
+        return prepare_tools(self)
 
     def _declared(self, tools: list[Any]) -> list[Any]:
         """The tools to declare in the next request."""
@@ -637,7 +621,7 @@ class AgentLoop:
                 if flow.finished:
                     return
 
-                async for status in self._prepare_context(state.iteration, flow):
+                async for status in self._prepare_context(state.iteration, flow, system_prompt, tools):
                     yield status
                 state = state.evolve(token_budget_used=flow.context_tokens)
 
@@ -688,7 +672,7 @@ class AgentLoop:
         if notice:
             yield notice
 
-    async def _prepare_context(self, iteration: int, flow: LoopFlow) -> AsyncGenerator[str, None]:
+    async def _prepare_context(self, iteration: int, flow: LoopFlow, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
         """Report finished background work, compact when the window is nearly full, and show usage."""
         self._inject_queued_input()
         self.state.messages.extend(background_reports(self._task_registry))
@@ -699,7 +683,7 @@ class AgentLoop:
         flow.context_tokens = cur_toks
 
         if cur_toks > thr:
-            async for status in self._maybe_compact_messages(cur_toks, thr):
+            async for status in self.server_compaction.run(cur_toks, thr, system_prompt, tools):
                 yield status
 
         yield f"{CONTEXT_USAGE_PREFIX}{min(100, int(cur_toks / max_ctx * 100)) if max_ctx > 0 else 0}"

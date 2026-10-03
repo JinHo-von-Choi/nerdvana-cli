@@ -7,19 +7,76 @@ Date:   2026-10-03
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.nirnamd import load_nirna_files
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings
 from nerdvana_cli.core.todos import describe, load_todos, open_items
+from nerdvana_cli.core.tool_index import ToolIndex
+from nerdvana_cli.providers.anthropic_features import uses_server_search
+from nerdvana_cli.providers.base import ProviderName, detect_provider
+from nerdvana_cli.providers.factory import create_provider
 from nerdvana_cli.types import Message, Role
+
+if TYPE_CHECKING:
+    from nerdvana_cli.core.agent_loop import AgentLoop
+
+    # Provider classes are optional-extras imports: they are only named in the annotation below.
+    from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
+    from nerdvana_cli.providers.gemini_provider import GeminiProvider
+    from nerdvana_cli.providers.openai_provider import OpenAIProvider
 
 logger = logging.getLogger(__name__)
 
+# Status line prefix of a compaction, as the front ends read it.
+COMPACT_STATUS_PREFIX = "\x00COMPACT:"
+
 # Longest background task output quoted in a completion notice.
 _BACKGROUND_REPORT_CHARS = 4_000
+
+
+def new_provider(model: ModelConfig) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
+    """The provider adapter that *model* names, built from its settings."""
+    return create_provider(
+        provider=ProviderName(model.provider) if model.provider else None, model=model.model, api_key=model.api_key,
+        base_url=model.base_url, max_tokens=model.max_tokens, temperature=model.temperature, prompt_caching=model.prompt_caching,
+        extended_thinking=model.extended_thinking, thinking_budget=model.thinking_budget, show_thinking=model.show_thinking,
+        reasoning_effort=model.reasoning_effort, openai_api=model.openai_api, gemini_api=model.gemini_api,
+        anthropic_tool_search=model.anthropic_tool_search, anthropic_compaction=model.anthropic_compaction,
+    )
+
+
+def defer_mode(settings: NerdvanaSettings) -> str:
+    """``session.defer_tools``, except that MCP tools the Anthropic API searches itself are not also deferred behind ToolSearch."""
+    model    = settings.model
+    provider = model.provider or detect_provider(model.model).value
+    if provider == ProviderName.ANTHROPIC.value and uses_server_search(model.model, model.anthropic_tool_search):
+        return "never"
+    return settings.session.defer_tools
+
+
+def prepare_tools(loop: AgentLoop) -> list[Any]:
+    """The tools a run of *loop* may use, with MCP tools deferred behind ToolSearch when their declarations are large.
+
+    What the model has loaded stays loaded across prompts of the session. Sub-agents never defer: they have
+    no ToolSearch. A loop built without a ToolSearch factory never defers either, and neither does one whose
+    provider searches the MCP tools on the server (see ``defer_mode``).
+    """
+    visible     = [t for t in loop.registry.all_tools() if loop.policy.is_visible(t.name) and t.name != "ToolSearch"]
+    session     = loop.settings.session
+    search_tool = loop._factories.tool_search
+    deferring   = loop.origin.agent_type == "main" and search_tool is not None
+    index       = ToolIndex.build(visible, defer_mode(loop.settings), session.defer_tools_threshold) if deferring else ToolIndex()
+    if loop._tool_index is not None:
+        index.loaded = loop._tool_index.loaded & set(index.deferred)
+    loop._tool_index = index
+    if index.deferred and search_tool is not None:
+        search = search_tool(index)
+        loop.registry.register(search)
+        visible.append(search)
+    return visible
 
 
 def provider_messages(messages: list[Message]) -> list[dict[str, Any]]:
