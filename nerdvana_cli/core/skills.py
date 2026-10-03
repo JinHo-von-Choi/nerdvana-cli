@@ -31,7 +31,7 @@ import logging
 import os
 import re
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,10 @@ _YAML_MARKUP = ("'", '"', "[", "{", "|", ">", "&", "*", "!", "#", "%", "@", "`")
 
 # Decides whether the SKILL.md at a project path may be loaded.
 ProjectTrust = Callable[[Path], bool]
+
+
+class SkillLoadError(RuntimeError):
+    """A skill that lives somewhere other than the disk could not be loaded; the message says why."""
 
 
 def name_problems(name: str) -> list[str]:
@@ -156,6 +160,9 @@ class Skill:
     allowed_tools: tuple[str, ...] = ()
     # Extension of this harness (``disable-model-invocation``): hidden from the catalog and ActivateSkill, still a slash command.
     model_invocable: bool = True
+    # A skill fetched from elsewhere (an MCP server) carries a catalog entry only; this returns the full skill when it
+    # is activated, or raises SkillLoadError.
+    remote: Callable[[Skill, Any], Awaitable[Skill]] | None = None
 
     @property
     def directory(self) -> Path | None:
@@ -359,6 +366,18 @@ class SkillLoader:
     def model_skills(self) -> list[Skill]:
         """The skills the model may activate, ordered by name so the catalog is stable between runs."""
         return sorted((s for s in self._skills if s.model_invocable), key=lambda s: s.name)
+
+    def add_skills(self, skills: Iterable[Skill]) -> None:
+        """Add skills that do not come from a skill directory; a name that is taken keeps its first skill."""
+        for skill in skills:
+            if self.get_by_name(skill.name) is None:
+                self._skills.append(skill)
+            else:
+                logger.warning("Skill %r from %s is not added: the name is taken", skill.name, skill.trigger)
+
+    def is_activated(self, name: str) -> bool:
+        """Whether *name* is in the conversation."""
+        return name in self._activated
 
     def mark_activated(self, name: str) -> bool:
         """Record that *name* is in the conversation; False when it already was."""

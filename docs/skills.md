@@ -60,3 +60,7 @@ Frontmatter that is not valid YAML only because a value contains an unquoted col
 ## Permissions for bundled files and scripts
 
 Reading a skill's bundled files needs no extra permission: the file tools read any path they can open without asking, so `references/` and `assets/` are available after `ActivateSkill` lists them. A script under `scripts/` runs through `Bash` like any other command, with the same permission rules and sandbox. There is no automatic allowance for a skill's directory, because that would let a skill run its own scripts unasked; add a `Bash(...)` rule to `permissions.always_allow` for the scripts you trust.
+
+## Skills from MCP servers
+
+A connected MCP server that declares the skills extension adds its skills to the catalog as `server:skill`. Their instructions are fetched and verified when the model activates them, and a skill that declares `allowed-tools` needs your approval first. See [mcp-client.md](mcp-client.md).
