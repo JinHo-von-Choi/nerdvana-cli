@@ -44,6 +44,7 @@ _OUTCOMES: dict[str, tuple[str, bool, int]] = {
     "max_turns":      ("error_max_turns",    True,  EXIT_BUDGET),
     "max_cost":       ("error_max_cost",     True,  EXIT_BUDGET),
     "max_total_tokens": ("error_max_total_tokens", True, EXIT_BUDGET),
+    "goal_unmet":     ("error_goal_unmet",   True,  EXIT_BUDGET),
     "unpriced":       ("error_unpriced",     True,  EXIT_CONFIG),
     "max_tokens":     ("error_max_tokens",   True,  EXIT_FAILURE),
     "provider_error": ("error_provider",     True,  EXIT_FAILURE),
@@ -71,6 +72,7 @@ class RunResult:
     cost_usd:    float               = 0.0
     usage:       dict[str, int]      = field(default_factory=dict)
     signals:     dict[str, int]      = field(default_factory=dict)
+    verification: dict[str, Any] | None = None
     error:       str                 = ""
 
     @property
@@ -101,6 +103,8 @@ class RunResult:
             },
         }
         payload["signals"] = dict(self.signals)
+        if self.verification is not None:
+            payload["verification"] = dict(self.verification)
         if self.error:
             payload["error"] = self.error
         return payload

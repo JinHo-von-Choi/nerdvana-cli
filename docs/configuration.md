@@ -182,6 +182,16 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 | `network` | bool | `true` | `false` also refuses TCP connections and binds from the confined command; needs Linux 6.7 (Landlock ABI 4). |
 | `write_paths` | list | `[]` | Paths a confined command may write in addition to the project directory and the temporary directories. |
 
+### `goal` (GoalConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `verify_timeout` | int | `300` | Seconds before a verification command is stopped, together with everything it started. |
+| `max_attempts` | int | `5` | Failed verifications before the goal is given up and the run ends as unmet. |
+| `output_tail_chars` | int | `4000` | How much of the end of a failing verification output is shown to the model. |
+
+See [goals.md](goals.md).
+
 ### `agents` (AgentsConfig)
 
 | Field | Type | Default | Description |

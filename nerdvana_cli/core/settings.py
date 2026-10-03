@@ -141,7 +141,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "goal",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -224,6 +224,13 @@ class SkillsConfig(BaseModel):
     include_claude_skills: bool = False
 
 
+class GoalConfig(BaseModel):
+    # How a verified goal (a command that decides whether the objective was reached) is run.
+    verify_timeout:    int = 300   # seconds before the verification command is stopped
+    max_attempts:      int = 5     # failed verifications before the goal is given up
+    output_tail_chars: int = 4000  # how much of the end of a failing output is shown to the model
+
+
 class AgentsConfig(BaseModel):
     # Category name -> model for sub-agents, written "model" or "provider:model".
     # An agent type or an Agent call that names a category runs on the mapped model.
@@ -238,6 +245,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("skills",     SkillsConfig,     frozenset()),
     ("sandbox",    SandboxConfig,    _SANDBOX_STRICT_FIELDS),
     ("agents",     AgentsConfig,     frozenset()),
+    ("goal",       GoalConfig,       frozenset()),
 )
 
 
@@ -253,6 +261,7 @@ class NerdvanaSettings(BaseSettings):
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
+    goal: GoalConfig = Field(default_factory=GoalConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.

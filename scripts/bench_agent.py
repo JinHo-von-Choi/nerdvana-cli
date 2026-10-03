@@ -297,6 +297,8 @@ def agent_command(task: Task, options: argparse.Namespace) -> list[str]:
         command += ["--model", options.model]
     if options.provider:
         command += ["--provider", options.provider]
+    if options.gate:
+        command += ["--verify", task.verify]
     return command
 
 
@@ -354,6 +356,7 @@ def worst_case_cost(tasks: list[Task], attempts: int) -> float:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Measure the agent's success rate on fixed repository tasks.")
     parser.add_argument("tasks", type=Path, help="a task file or a directory of *.yml task files")
+    parser.add_argument("--gate", action="store_true", help="hold the agent to each task's verify command (nerdvana run --verify) instead of checking only afterwards")
     parser.add_argument("--tag", action="append", default=[], help="run only tasks carrying this tag (repeatable)")
     parser.add_argument("--attempts", type=int, default=1, help="attempts per task (default 1)")
     parser.add_argument("--k", type=int, default=0, help="k for pass@k (default: the number of attempts)")

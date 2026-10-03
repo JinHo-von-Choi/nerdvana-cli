@@ -310,6 +310,16 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any]) 
             setattr(getattr(settings, section), field, value)
 
 
+def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
+    """Copy what the finished loop measured into the run result."""
+    outcome.turns        = loop.turns_used
+    outcome.cost_usd     = loop.session_cost_usd()
+    outcome.usage        = loop.usage_summary()
+    outcome.signals      = loop.signal_summary()
+    outcome.verification = loop.verification_summary()
+    outcome.duration_ms  = duration_ms
+
+
 def _resolve_run_provider(settings: NerdvanaSettings) -> tuple[str, bool]:
     """Fill in the provider and its API key from the model name and the environment.
 
@@ -346,6 +356,8 @@ def run(
     max_total_tokens: int = typer.Option(0, "--max-total-tokens", help="Stop once input plus output tokens of all requests reach this many (0 = no limit)"),
     require_price: bool = typer.Option(False, "--require-price", help="Refuse to run when --max-cost-usd is set but the model has no known price"),
     sandbox: str = typer.Option("", "--sandbox", help="Confine shell commands to a write scope: off | auto | require (default: sandbox.mode from the configuration)"),
+    verify: str = typer.Option("", "--verify", help="Command that decides whether the task is done: the run goes on until it exits with status 0"),
+    verify_attempts: int = typer.Option(0, "--verify-attempts", help="Failed verifications before giving up (0 = goal.max_attempts)"),
 ) -> None:
     """Run a single prompt non-interactively.
 
@@ -354,6 +366,7 @@ def run(
     """
     import time
 
+    from nerdvana_cli.core.goal import Goal
     from nerdvana_cli.core.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
 
@@ -416,6 +429,8 @@ def run(
     )
     outcome.session_id = session.session_id
     started            = time.monotonic()
+    if verify:
+        loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts))
 
     async def _run() -> None:
         loop.usage_listener = reporter.request
@@ -430,11 +445,7 @@ def run(
             outcome.error = f"{type(exc).__name__}: {exc}"
         else:
             outcome.stop = loop.last_stop
-        outcome.turns       = loop.turns_used
-        outcome.cost_usd    = loop.session_cost_usd()
-        outcome.usage       = loop.usage_summary()
-        outcome.signals     = loop.signal_summary()
-        outcome.duration_ms = int((time.monotonic() - started) * 1000)
+        _fill_outcome(outcome, loop, int((time.monotonic() - started) * 1000))
         reporter.finish(outcome)
 
     try:

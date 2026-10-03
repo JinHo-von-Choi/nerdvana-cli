@@ -173,11 +173,12 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--max-turns N` | Stop after N model turns. |
 | `--max-cost-usd X` | Stop once the estimated cost of the run reaches X USD (needs a known price for the model). |
 | `--max-total-tokens N` | Stop once the input and output tokens of all requests reach N. Needs no price, so it works for any model. |
+| `--verify COMMAND` | The command that decides whether the task is done. When the model says it is finished the command runs, and if it does not exit with status 0 the end of its output goes back to the model, which keeps working. The run ends when it passes, after `--verify-attempts N` failures (default `goal.max_attempts`, 5) or at a turn or cost limit. The result gets a `verification` object. |
 | `--sandbox off\|auto\|require` | Confine what shell commands can write for this run, overriding `sandbox.mode` (see [docs/sandbox.md](docs/sandbox.md)). |
 | `--require-price` | Refuse to run when `--max-cost-usd` is set but the model has no known price. |
 | `--approval-mode default\|auto_edit\|yolo\|plan` | Permission preset. Without a terminal a confirmation is refused, so unattended runs that write files usually need `yolo`. |
 
-Exit codes: `0` success, `1` the run failed (provider error, unexpected error), `2` invalid options or configuration (a missing API key included), `3` a turn, cost or token limit stopped the run.
+Exit codes: `0` success, `1` the run failed (provider error, unexpected error), `2` invalid options or configuration (a missing API key included), `3` a turn, cost, token or verification limit stopped the run.
 
 The result object (`schema_version` 1; fields are only ever added):
 
@@ -189,7 +190,7 @@ The result object (`schema_version` 1; fields are only ever added):
  "signals": {"cas_rejected": 1, "new_diagnostics": 2}}
 ```
 
-`signals` counts what went wrong during the run by kind (`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` and a few more); a kind that did not occur is absent. `subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
+`signals` counts what went wrong during the run by kind (`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` and a few more); a kind that did not occur is absent. `subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
 
 `stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `request` (one provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, and `cost_usd`), `compaction` and `context` (percent of the window used).
 
@@ -335,6 +336,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/route-knowledge` | Classify content → suggest WriteMemory scope |
 | `/dashboard` | Toggle observability dashboard |
 | `/health` | Show 7-day tool call health summary |
+| `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |
 | `/activity` | Toggle activity indicator widget (on/off, persists to config.yml) |
 | `/quit` | Exit (aliases: `/exit`, `/q`) |
@@ -558,6 +560,11 @@ skills:
 
 agents:
   categories: {}                # category -> model for sub-agents, e.g. quick: claude-haiku-4-5-20251001
+
+goal:
+  verify_timeout: 300           # seconds before a verification command is stopped
+  max_attempts: 5               # failed verifications before a goal is given up
+  output_tail_chars: 4000       # how much of a failing output the model sees
 
 sandbox:
   mode: off                     # off | auto | require: confine Bash writes with the OS (Linux Landlock)

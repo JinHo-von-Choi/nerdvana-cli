@@ -25,6 +25,7 @@ from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
+from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
@@ -44,6 +45,7 @@ from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, new_tool_use_id, repair_tool_ids
+from nerdvana_cli.core.verify import run_verify
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
 from nerdvana_cli.providers.factory import create_provider
@@ -191,6 +193,13 @@ class _Turn:
         self.tool_uses.append(call)
 
 
+_VERIFY_FAILED = (
+    "[Verification] `{command}` did not pass ({summary}, attempt {attempt} of {limit}). The end of its output:\n\n"
+    "{tail}\n\n"
+    "The objective is not met until that command exits with status 0. Find the cause and fix it. "
+    "Do not change the verification command or weaken the checks it runs to make it pass."
+)
+
 _WRAP_UP = (
     "[Turn budget] {used} of {limit} turns are used. Stop exploring now and answer with what you have found; "
     "say plainly what you could not find."
@@ -201,6 +210,8 @@ class AgentLoop:
     """Orchestrates provider calls, tool execution, and session recording."""
 
     _queued_input:            list[str]
+    _goal:                    Goal | None
+    _goal_loaded:             bool
     last_stop:                str
     turns_used:               int
     _cost_limit_warned:       bool
@@ -349,6 +360,58 @@ class AgentLoop:
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
 
+    @property
+    def goal(self) -> Goal | None:
+        """The goal this session is held to, loaded from its file the first time it is asked for."""
+        if not self._goal_loaded:
+            self._goal        = load_goal(self.session.session_id)
+            self._goal_loaded = True
+        return self._goal
+
+    def set_goal(self, goal: Goal | None) -> None:
+        """Hold the session to *goal* (None drops it) and save the change."""
+        self._goal        = goal
+        self._goal_loaded = True
+        save_goal(self.session.session_id, goal)
+
+    def verification_summary(self) -> dict[str, Any] | None:
+        """How the goal stands, for the run result; None when the session has no goal."""
+        goal = self.goal
+        if goal is None:
+            return None
+        return {"command": goal.verify, "status": goal.status, "attempts": goal.attempts, "last_exit": goal.last_exit}
+
+    async def _verify_goal(self, flow: _Flow) -> AsyncGenerator[str, None]:
+        """Run the goal's verification command now that the model says it is done.
+
+        A pass ends the run; running out of attempts ends it as unmet; otherwise the failure is put in
+        front of the model and the run goes on (``flow.finished`` stays False).
+        """
+        goal = self.goal
+        assert goal is not None
+        config = self.settings.goal
+        yield f"\n[dim]Verifying: {escape(goal.verify)}[/dim]\n"
+        result = await run_verify(
+            goal.verify, self.settings.cwd or ".", timeout=config.verify_timeout, tail=config.output_tail_chars,
+            policy=SandboxPolicy(self.settings.sandbox.mode, self.settings.sandbox.network, tuple(self.settings.sandbox.write_paths)),
+        )
+        goal.record_attempt(result.passed, result.exit_code, result.tail)
+        save_goal(self.session.session_id, goal)
+        if goal.status == MET:
+            yield f"[green]Goal met: {escape(goal.verify)} passed ({result.summary()}).[/green]\n"
+            flow.finished = True
+            return
+        self._signals[signals.VERIFY_FAILED] += 1
+        if goal.status == UNMET:
+            self.last_stop = "goal_unmet"
+            flow.finished  = True
+            yield f"[bold yellow]Goal not met after {goal.attempts} verification attempts ({result.summary()}). Stopping.[/bold yellow]\n"
+            return
+        yield f"[yellow]Verification failed ({result.summary()}); the agent continues.[/yellow]\n"
+        self.state.messages.append(Message(role=Role.USER, content=_VERIFY_FAILED.format(
+            command=goal.verify, summary=result.summary(), attempt=goal.attempts, limit=goal.max_attempts, tail=result.tail.strip(),
+        )))
+
     def signal_summary(self) -> dict[str, int]:
         """How often each kind of trouble came up in this session (see ``core/signals.py``)."""
         return signals.merge(self._signals, self.tool_executor.signals)
@@ -380,6 +443,8 @@ class AgentLoop:
         self._signals: Counter[str] = Counter()
         # Turn at which the model is told to stop exploring and answer; 0 = never. Sub-agents set it.
         self.wrap_up_at            = 0
+        self._goal                 = None
+        self._goal_loaded          = False
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -968,6 +1033,11 @@ class AgentLoop:
                 return
             if decision.kind == STALLED:
                 yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
+            if self.goal is not None and self.goal.enforced:
+                async for note in self._verify_goal(flow):
+                    yield note
+                if not flow.finished:
+                    return  # the check failed: the model has been told and takes another step
             self._set_activity(phase="idle", label="Ready")
             flow.finished = True
             return

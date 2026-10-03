@@ -156,12 +156,13 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `--output-format text\|json\|stream-json` | `text`(기본)는 사람이 읽는 스트림입니다. `json`은 끝에 결과 객체 하나를 출력합니다. `stream-json`은 한 줄에 이벤트 하나를 출력하고 같은 결과 객체로 끝납니다. 두 JSON 형식에서 stdout에는 JSON만 나가고 안내 문구는 stderr로 갑니다. |
 | `--max-turns N` | 모델 턴이 N번이 되면 멈춥니다. |
 | `--max-total-tokens N` | 모든 요청의 입력과 출력 토큰 합이 N에 이르면 멈춥니다. 가격을 몰라도 모든 모델에서 동작합니다. |
+| `--verify COMMAND` | 작업이 끝났는지 판정하는 명령입니다. 모델이 끝났다고 하면 이 명령을 실행하고, 종료 코드가 0이 아니면 출력의 끝부분을 모델에 돌려주어 계속 일하게 합니다. 통과하거나, `--verify-attempts N`번 실패하거나(기본 `goal.max_attempts`, 5), 턴·비용 한도에 이르면 끝납니다. 결과에 `verification` 객체가 붙습니다. |
 | `--sandbox off\|auto\|require` | 이 실행에서 셸 명령의 쓰기 범위를 제한하며 `sandbox.mode` 보다 우선합니다([docs/sandbox.md](docs/sandbox.md)). |
 | `--require-price` | `--max-cost-usd` 를 줬는데 모델의 가격을 모르면 실행을 거부합니다. |
 | `--max-cost-usd X` | 실행의 추정 비용이 X달러에 이르면 멈춥니다(모델의 가격을 알아야 동작). |
 | `--approval-mode default\|auto_edit\|yolo\|plan` | 권한 프리셋입니다. 터미널이 없으면 확인 요청이 거부되므로, 파일을 쓰는 무인 실행은 대개 `yolo`가 필요합니다. |
 
-종료 코드: `0` 성공, `1` 실행 실패(제공자 오류, 예기치 않은 오류), `2` 옵션이나 설정 오류(API 키 없음 포함), `3` 턴, 비용 또는 토큰 한도로 중단.
+종료 코드: `0` 성공, `1` 실행 실패(제공자 오류, 예기치 않은 오류), `2` 옵션이나 설정 오류(API 키 없음 포함), `3` 턴, 비용, 토큰 또는 검증 한도로 중단.
 
 결과 객체(`schema_version` 1, 필드는 추가만 하고 바꾸지 않음):
 
@@ -173,7 +174,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
  "signals": {"cas_rejected": 1, "new_diagnostics": 2}}
 ```
 
-`signals`는 실행 중 무엇이 잘못됐는지를 종류별로 센 값입니다(`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` 등). 일어나지 않은 종류는 없습니다. `subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
+`signals`는 실행 중 무엇이 잘못됐는지를 종류별로 센 값입니다(`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` 등). 일어나지 않은 종류는 없습니다. `subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
 
 `stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `request`(요청 하나의 `provider`, `model`, `agent_type`, `turn`, `last_tool`, 캐시 토큰을 포함한 토큰 수, `cost_usd`), `compaction`, `context`(창 사용률)입니다.
 
@@ -315,6 +316,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/route-knowledge` | 콘텐츠를 분류하여 WriteMemory 스코프 제안 |
 | `/dashboard` | 관찰 가능성 대시보드 토글 |
 | `/health` | 7일간 도구 호출 건강 요약 표시 |
+| `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |
 | `/activity` | 활동 표시기 위젯 토글 (on/off, config.yml 에 저장) |
 | `/quit` | REPL 종료 (별칭: `/exit`, `/q`) |
@@ -530,6 +532,11 @@ skills:
 
 agents:
   categories: {}                   # 서브에이전트 카테고리별 모델 (예: quick: claude-haiku-4-5-20251001)
+
+goal:
+  verify_timeout: 300              # 검증 명령을 중단하기까지의 초
+  max_attempts: 5                  # 목표를 포기하기까지 허용하는 검증 실패 횟수
+  output_tail_chars: 4000          # 실패한 출력 중 모델에 보여주는 끝부분의 길이
 
 sandbox:
   mode: off                        # off | auto | require: OS 수준으로 Bash 쓰기 범위 제한 (Linux Landlock)

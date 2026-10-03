@@ -164,3 +164,28 @@ def test_the_options_reach_the_settings(env: Path, monkeypatch: pytest.MonkeyPat
 
 def test_a_bad_sandbox_mode_is_rejected(env: Path) -> None:
     assert runner.invoke(app, ["run", "go", "--sandbox", "sometimes"]).exit_code == 2
+
+
+def test_verify_passes_when_the_command_exits_zero(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _provider(monkeypatch, ANSWER)
+    result = runner.invoke(app, ["run", "go", "--output-format", "json", "--verify", "true"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["subtype"] == "success"
+    assert payload["verification"] == {"command": "true", "status": "met", "attempts": 1, "last_exit": 0}
+
+
+def test_verify_that_never_passes_ends_as_unmet_with_exit_code_three(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _provider(monkeypatch, ANSWER)
+    result = runner.invoke(app, ["run", "go", "--output-format", "json", "--verify", "false", "--verify-attempts", "2"])
+    assert result.exit_code == 3, result.output
+    payload = json.loads(result.stdout)
+    assert payload["subtype"] == "error_goal_unmet"
+    assert payload["verification"]["attempts"] == 2 and payload["verification"]["status"] == "unmet"
+    assert payload["signals"]["verify_failed"] == 2
+
+
+def test_without_verify_the_result_has_no_verification_object(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _provider(monkeypatch, ANSWER)
+    payload = json.loads(runner.invoke(app, ["run", "go", "--output-format", "json"]).stdout)
+    assert "verification" not in payload
