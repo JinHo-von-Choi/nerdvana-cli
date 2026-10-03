@@ -18,6 +18,7 @@ from nerdvana_cli.providers.base import (
     ProviderName,
     detect_provider,
 )
+from nerdvana_cli.providers.gemini_interactions import GeminiInteractionsProvider, uses_interactions
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 from nerdvana_cli.providers.openai_provider import OpenAIProvider
 from nerdvana_cli.providers.openai_responses import OpenAIResponsesProvider, uses_responses
@@ -59,7 +60,8 @@ def provider_class_for(
 
 
 def _select_class(config: ProviderConfig) -> type[AnthropicProvider] | type[OpenAIProvider] | type[GeminiProvider]:
-    """The adapter class for *config*: the registered one, or the OpenAI Responses variant when it selects that API."""
+    """The adapter class for *config*: the registered one, or the OpenAI Responses or Gemini Interactions variant
+    when the config selects that API."""
     provider_cls = _PROVIDER_CLASSES.get(config.provider)
     if provider_cls is None:
         logger.warning(
@@ -68,6 +70,8 @@ def _select_class(config: ProviderConfig) -> type[AnthropicProvider] | type[Open
         provider_cls = OpenAIProvider
     if provider_cls is OpenAIProvider and uses_responses(config):
         return OpenAIResponsesProvider
+    if provider_cls is GeminiProvider and uses_interactions(config):
+        return GeminiInteractionsProvider
     return provider_cls
 
 
@@ -94,6 +98,7 @@ def create_provider(
     show_thinking: bool = True,
     reasoning_effort: str = "",
     openai_api: str = "auto",
+    gemini_api: str = "generate_content",
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -131,6 +136,7 @@ def create_provider(
         show_thinking=show_thinking,
         reasoning_effort=reasoning_effort,
         openai_api=openai_api,
+        gemini_api=gemini_api,
     )
 
     return _select_class(config)(config)

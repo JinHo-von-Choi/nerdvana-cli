@@ -22,11 +22,14 @@ import httpx
 import openai
 import pytest
 from google.genai import errors as genai_errors
+from google.genai import interactions
 from openai.types.responses import ResponseFunctionToolCall
 
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
 from nerdvana_cli.providers.errors import AUTH, CONTEXT_LIMIT, RETRYABLE
+from nerdvana_cli.providers.gemini_interactions import GeminiInteractionsProvider
+from nerdvana_cli.providers.gemini_interactions import convert_input as interactions_convert
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 from nerdvana_cli.providers.openai_provider import OpenAIProvider
 from nerdvana_cli.providers.openai_responses import OpenAIResponsesProvider, convert_input
@@ -100,6 +103,26 @@ def _gemini_chunks(turn: Turn) -> list[Any]:
     ]
 
 
+def _interaction_events(turn: Turn) -> list[Any]:
+    prompt, output, cached = turn.usage
+    events: list[Any] = []
+    index = 0
+    if turn.text:
+        events.append(interactions.StepStart(index=index, step=interactions.ModelOutputStep()))
+        events.extend(interactions.StepDelta(index=index, delta=interactions.TextDelta(text=piece)) for piece in turn.text)
+        events.append(interactions.StepStop(index=index))
+        index += 1
+    for call_id, name, fragments in turn.calls:
+        events.append(interactions.StepStart(index=index, step=interactions.FunctionCallStep(id=call_id, name=name, arguments={})))
+        events.extend(interactions.StepDelta(index=index, delta=interactions.ArgumentsDelta(arguments=f)) for f in fragments)
+        events.append(interactions.StepStop(index=index))
+        index += 1
+    usage  = interactions.Usage(total_input_tokens=prompt, total_output_tokens=output, total_cached_tokens=cached)
+    status = "requires_action" if turn.calls else "completed"
+    events.append(interactions.InteractionCompletedEvent(interaction=interactions.InteractionSseEventInteraction(id="v1_x", status=status, usage=usage)))
+    return events
+
+
 def _responses_events(turn: Turn) -> list[Any]:
     prompt, output, cached = turn.usage
     events: list[Any] = [SimpleNamespace(type="response.output_text.delta", delta=piece) for piece in turn.text]
@@ -143,6 +166,12 @@ def _genai_error(status: int, message: str) -> Exception:
     return cls(status, {"error": {"message": message, "status": "ERR"}})
 
 
+def _interactions_error(status: int, message: str) -> Exception:
+    response = httpx.Response(status, request=httpx.Request("POST", "https://generativelanguage.example.test/v1beta/interactions"), headers={"retry-after": "9"})
+    cls      = genai_errors.ServerError if status >= 500 else genai_errors.ClientError
+    return cls(status, {"error": {"message": message, "status": "ERR"}}, response)
+
+
 def _chat(effort: str = "") -> OpenAIProvider:
     return OpenAIProvider(ProviderConfig(provider=ProviderName.GROQ, model="m", api_key="k", reasoning_effort=effort))
 
@@ -157,6 +186,10 @@ def _anthropic(effort: str = "") -> AnthropicProvider:
 
 def _gemini(effort: str = "") -> GeminiProvider:
     return GeminiProvider(ProviderConfig(provider=ProviderName.GEMINI, model="gemini-3.6-flash", api_key="k", reasoning_effort=effort))
+
+
+def _interactions(effort: str = "") -> GeminiInteractionsProvider:
+    return GeminiInteractionsProvider(ProviderConfig(provider=ProviderName.GEMINI, model="gemini-3.6-flash", api_key="k", reasoning_effort=effort, gemini_api="interactions"))
 
 
 def _wire_chat(provider: Any, reply: Any) -> AsyncMock:
@@ -183,11 +216,18 @@ def _wire_gemini(provider: Any, reply: Any) -> AsyncMock:
     return create
 
 
+def _wire_interactions(provider: Any, reply: Any) -> AsyncMock:
+    create = AsyncMock(side_effect=reply) if isinstance(reply, Exception) else AsyncMock(return_value=_replay(reply))
+    provider._client = SimpleNamespace(aio=SimpleNamespace(interactions=SimpleNamespace(create=create)))
+    return create
+
+
 ADAPTERS = [
     Adapter("openai-chat",      _chat,      _wire_chat,      _chat_chunks,      lambda s, m: _http_error(_OPENAI_ERRORS[s], s, m)),
     Adapter("openai-responses", _responses, _wire_responses, _responses_events, lambda s, m: _http_error(_OPENAI_ERRORS[s], s, m)),
     Adapter("anthropic",        _anthropic, _wire_anthropic, _anthropic_events, lambda s, m: _http_error(_ANTHROPIC_ERRORS[s], s, m)),
     Adapter("gemini",           _gemini,    _wire_gemini,    _gemini_chunks,    _genai_error, retry_after_header=False),
+    Adapter("gemini-interactions", _interactions, _wire_interactions, _interaction_events, _interactions_error),
 ]
 EVERY_ADAPTER = pytest.mark.parametrize("adapter", ADAPTERS, ids=[a.name for a in ADAPTERS])
 
@@ -352,6 +392,13 @@ async def test_the_effort_is_the_thinking_level_in_the_gemini_config() -> None:
     assert str(create.await_args.kwargs["config"].thinking_config.thinking_level.value) == "HIGH"
 
 
+async def test_the_effort_is_the_thinking_level_in_the_interactions_generation_config() -> None:
+    adapter = next(a for a in ADAPTERS if a.name == "gemini-interactions")
+    _, create = await _stream(adapter, [], effort="high")
+    assert create.await_args.kwargs["generation_config"]["thinking_level"] == "high"
+    assert "reasoning_effort" not in create.await_args.kwargs
+
+
 async def test_anthropic_requests_do_not_carry_the_effort() -> None:
     adapter = next(a for a in ADAPTERS if a.name == "anthropic")
     _, create = await _stream(adapter, [], effort="high")
@@ -384,3 +431,8 @@ def test_anthropic_takes_images_as_base64_sources() -> None:
 def test_gemini_takes_images_as_inline_data_bytes() -> None:
     [user] = _gemini()._convert_messages(_IMAGE_TURN)
     assert user["parts"][1] == {"inlineData": {"mimeType": "image/png", "data": b"ABC"}}
+
+
+def test_gemini_interactions_takes_images_as_base64_content_blocks() -> None:
+    [step] = interactions_convert(_IMAGE_TURN)
+    assert step["content"][1] == {"type": "image", "data": "QUJD", "mime_type": "image/png"}

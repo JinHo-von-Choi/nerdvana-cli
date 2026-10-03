@@ -80,6 +80,10 @@ model:
   # Chat Completions elsewhere), chat, or responses.
   openai_api: auto
 
+  # Which Gemini API the gemini provider speaks: generate_content, interactions (stateless,
+  # store: false), or auto (picks interactions).
+  gemini_api: generate_content
+
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
 model_history: {}

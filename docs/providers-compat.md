@@ -10,40 +10,41 @@ Created: 2026-10-03
 | Adapter | Class | Providers |
 |-|-|-|
 | Anthropic | `AnthropicProvider` | `anthropic` |
-| Gemini | `GeminiProvider` | `gemini` |
+| Gemini generateContent | `GeminiProvider` | `gemini` when `model.gemini_api` is `generate_content` (the default) |
+| Gemini Interactions | `GeminiInteractionsProvider` | `gemini` when `model.gemini_api` is `interactions` or `auto` |
 | OpenAI Chat Completions | `OpenAIProvider` | the 19 others: `openai`, `groq`, `openrouter`, `xai`, `ollama`, `vllm`, `deepseek`, `mistral`, `cohere`, `together`, `zai`, `featherless`, `xiaomi_mimo`, `moonshot`, `dashscope`, `minimax`, `perplexity`, `fireworks`, `cerebras` |
 | OpenAI Responses | `OpenAIResponsesProvider` | `provider: openai` on `https://api.openai.com/v1` (or an empty `base_url`) when `model.openai_api` is `auto`; any OpenAI-compatible provider when it is `responses` |
 
-`model.openai_api: chat` forces Chat Completions everywhere. An unregistered provider name falls back to the Chat Completions adapter.
+`model.openai_api: chat` forces Chat Completions everywhere. An unregistered provider name falls back to the Chat Completions adapter. `model.gemini_api` defaults to `generate_content` until the Interactions path is verified against the live API; `auto` already picks Interactions.
 
 ## Adapter matrix
 
-| Capability | Anthropic | OpenAI Chat Completions | OpenAI Responses | Gemini |
-|-|-|-|-|-|
-| Streaming | `messages.create(stream=True)` | `chat.completions.create(stream=True)` with `stream_options.include_usage`; resent without it when the server answers 400 or 422 or the client raises `TypeError` | `responses.create(stream=True)` | `generate_content_stream` |
-| Events yielded | `content_delta`, `thinking_delta`, `provider_block`, `tool_use_start`, `tool_use_delta`, `tool_use_complete`, `usage`, `done`, `error` | `content_delta`, `thinking_delta`, `tool_use_complete`, `usage`, `done`, `error` | same as Chat Completions plus `provider_block` | `content_delta`, `tool_use_complete`, `usage`, `done`, `error` |
-| Tool declaration | `name`, `description`, `input_schema` | nested `{"type": "function", "function": {...}}` | flat `{"type": "function", "name", "description", "parameters", "strict": false}` | `FunctionDeclaration` |
-| Tool call assembly | `input_json_delta` fragments joined at `content_block_stop` | argument fragments joined per call slot; a new id on a used index opens a new slot, so a reused index does not merge two calls | whole call taken from `response.output_item.done`; a repeated item is reported once | the whole call arrives in one part |
-| Unparseable arguments | empty input | empty input | empty input | not applicable |
-| Tool call id | the server's `tool_use` id | the server's id | the server's `call_id` | minted client side as `call_<name>_<8 hex>`, unique per call |
-| Usage report | one `usage` event after the content, before `done` | one `usage` event, the last non-empty report of the stream | one `usage` event from the terminal event | one `usage` event, the last cumulative report |
-| `input_tokens` meaning | whole prompt (fresh plus cache writes plus cache reads) | whole prompt | whole prompt | whole prompt |
-| Cached tokens | `cache_read_tokens` and `cache_write_tokens` | `cache_read_tokens` from `prompt_tokens_details.cached_tokens`, or `prompt_cache_hit_tokens` (DeepSeek) | `cache_read_tokens` from `input_tokens_details.cached_tokens`; cache writes are not mapped | `cache_read_tokens` from `cached_content_token_count` |
-| No usage from the server | no `usage` event | estimated at four characters per token when text streamed, nothing for a call-only reply | no `usage` event | no `usage` event |
-| Stop reason | the server's `stop_reason`, default `end_turn` | `stop` and `tool_calls` become `end_turn` or `tool_use` (calls decide), `length` becomes `max_tokens`, other values pass through | `tool_use` when calls were returned, `max_tokens` for an incomplete response, otherwise the incomplete reason or `end_turn` | `tool_use` when calls were returned, else `end_turn`; the finish reason is not read, so a truncated reply ends as `end_turn` |
-| Error classification | `classify_exception`: status, SDK class name, timeouts, text | same | same, plus `response.failed` and `error` events by error code | same, from the exception `code` |
-| `Retry-After` | read from the response headers | read from the response headers | read from the response headers (request failures) | not available |
-| Image input | base64 `image` source in a user block list | `image_url` data URL parts in a user block list | `input_image` data URL parts | `inlineData` bytes in a user block list |
-| Tool results | text only | text only | text only (`function_call_output`) | text only (`functionResponse`) |
-| `reasoning_effort` | ignored | top-level `reasoning_effort`, sent as written on every request when set | `reasoning.effort`; also `reasoning.summary: auto` unless `show_thinking` is off, `include: ["reasoning.encrypted_content"]`, and no `temperature` unless the effort is `none` | `thinking_config.thinking_level`: `minimal`, `low`, `medium`, `high`; any other value stops the request with an error event |
-| Other thinking settings | `extended_thinking`, `thinking_budget`, `show_thinking` per model family (`request_options`) | none | none | none |
-| Thinking text | `thinking_delta` from thinking blocks | `thinking_delta` from `<think>` tags in the content; `reasoning_content` fields are not read | `thinking_delta` from reasoning summary and reasoning text events, and from `<think>` tags | none requested, none shown |
-| Replayed provider blocks | `thinking` and `redacted_thinking` blocks, unchanged and first in the turn; blocks of other types are dropped | none | `reasoning` items that carry `encrypted_content`, before the turn's text and calls; other block types are dropped | none |
-| Statefulness | stateless | stateless | stateless: full input every turn, `store: false`, no `previous_response_id` | stateless |
-| Prompt caching | explicit breakpoints on the last tool, the system prompt and the last block | automatic on the server | automatic on the server | automatic on the server |
-| Output token limit field | `max_tokens` | `max_tokens` (not `max_completion_tokens`) | `max_output_tokens` | `max_output_tokens` |
-| Temperature | omitted for models with fixed sampling | always sent | omitted when a reasoning effort other than `none` is set | always sent |
-| Non-streaming `send` | supported, returns `provider_blocks` | supported | supported, returns `provider_blocks` | supported |
+| Capability | Anthropic | OpenAI Chat Completions | OpenAI Responses | Gemini generateContent | Gemini Interactions |
+|-|-|-|-|-|-|
+| Streaming | `messages.create(stream=True)` | `chat.completions.create(stream=True)` with `stream_options.include_usage`; resent without it when the server answers 400 or 422 or the client raises `TypeError` | `responses.create(stream=True)` | `generate_content_stream` | `interactions.create(stream=True)` |
+| Events yielded | `content_delta`, `thinking_delta`, `provider_block`, `tool_use_start`, `tool_use_delta`, `tool_use_complete`, `usage`, `done`, `error` | `content_delta`, `thinking_delta`, `tool_use_complete`, `usage`, `done`, `error` | same as Chat Completions plus `provider_block` | `content_delta`, `tool_use_complete`, `usage`, `done`, `error` | `content_delta`, `thinking_delta`, `provider_block`, `tool_use_complete`, `usage`, `done`, `error` |
+| Tool declaration | `name`, `description`, `input_schema` | nested `{"type": "function", "function": {...}}` | flat `{"type": "function", "name", "description", "parameters", "strict": false}` | `FunctionDeclaration` | flat `{"type": "function", "name", "description", "parameters"}`, the JSON schema as it is |
+| Tool call assembly | `input_json_delta` fragments joined at `content_block_stop` | argument fragments joined per call slot; a new id on a used index opens a new slot, so a reused index does not merge two calls | whole call taken from `response.output_item.done`; a repeated item is reported once | the whole call arrives in one part | `function_call` step: `arguments_delta` fragments joined at `step.stop`, or the arguments given whole on the step when no fragment follows; calls are reported once the interaction completes and are dropped when it is incomplete |
+| Unparseable arguments | empty input | empty input | empty input | not applicable | empty input |
+| Tool call id | the server's `tool_use` id | the server's id | the server's `call_id` | minted client side as `call_<name>_<8 hex>`, unique per call | the server's `function_call` step id |
+| Usage report | one `usage` event after the content, before `done` | one `usage` event, the last non-empty report of the stream | one `usage` event from the terminal event | one `usage` event, the last cumulative report | one `usage` event from `interaction.completed` |
+| `input_tokens` meaning | whole prompt (fresh plus cache writes plus cache reads) | whole prompt | whole prompt | whole prompt | whole prompt (`total_input_tokens`) |
+| Cached tokens | `cache_read_tokens` and `cache_write_tokens` | `cache_read_tokens` from `prompt_tokens_details.cached_tokens`, or `prompt_cache_hit_tokens` (DeepSeek) | `cache_read_tokens` from `input_tokens_details.cached_tokens`; cache writes are not mapped | `cache_read_tokens` from `cached_content_token_count` | `cache_read_tokens` from `total_cached_tokens`; `output_tokens` also holds `total_thought_tokens` |
+| No usage from the server | no `usage` event | estimated at four characters per token when text streamed, nothing for a call-only reply | no `usage` event | no `usage` event | no `usage` event |
+| Stop reason | the server's `stop_reason`, default `end_turn` | `stop` and `tool_calls` become `end_turn` or `tool_use` (calls decide), `length` becomes `max_tokens`, other values pass through | `tool_use` when calls were returned, `max_tokens` for an incomplete response, otherwise the incomplete reason or `end_turn` | `tool_use` when calls were returned, `max_tokens` when the candidate's finish reason is `MAX_TOKENS`, otherwise `end_turn` | `completed` and `requires_action` give `tool_use` when calls were made, else `end_turn`; `incomplete` gives `max_tokens`; `failed` and `cancelled` are errors |
+| Error classification | `classify_exception`: status, SDK class name, timeouts, text | same | same, plus `response.failed` and `error` events by error code | same, from the exception `code` | same, from the exception `code`; an `error` stream event is classified from its message text |
+| `Retry-After` | read from the response headers | read from the response headers | read from the response headers (request failures) | not available | read from the response headers (request failures) |
+| Image input | base64 `image` source in a user block list | `image_url` data URL parts in a user block list | `input_image` data URL parts | `inlineData` bytes in a user block list | base64 `image` content block in a `user_input` step |
+| Tool results | text only | text only | text only (`function_call_output`) | text only (`functionResponse`) | text only (`function_result` step, with `is_error` when set) |
+| `reasoning_effort` | ignored | top-level `reasoning_effort`, sent as written on every request when set | `reasoning.effort`; also `reasoning.summary: auto` unless `show_thinking` is off, `include: ["reasoning.encrypted_content"]`, and no `temperature` unless the effort is `none` | `thinking_config.thinking_level`: `minimal`, `low`, `medium`, `high`; any other value stops the request with an error event | `generation_config.thinking_level` in lower case (`minimal`, `low`, `medium`, `high`; any other value stops the request with an error event); also `thinking_summaries: auto` unless `show_thinking` is off |
+| Other thinking settings | `extended_thinking`, `thinking_budget`, `show_thinking` per model family (`request_options`) | none | none | none | none |
+| Thinking text | `thinking_delta` from thinking blocks | `thinking_delta` from `<think>` tags in the content; `reasoning_content` fields are not read | `thinking_delta` from reasoning summary and reasoning text events, and from `<think>` tags | none requested, none shown | `thinking_delta` from thought summaries (asked for only when a level is set) |
+| Replayed provider blocks | `thinking` and `redacted_thinking` blocks, unchanged and first in the turn; blocks of other types are dropped | none | `reasoning` items that carry `encrypted_content`, before the turn's text and calls; other block types are dropped | none | `thought` blocks that carry a signature, unchanged, each in the position it had among the turn's calls; other block types are dropped |
+| Statefulness | stateless | stateless | stateless: full input every turn, `store: false`, no `previous_response_id` | stateless | stateless: full input every turn, `store: false`, no `previous_interaction_id` |
+| Prompt caching | explicit breakpoints on the last tool, the system prompt and the last block | automatic on the server | automatic on the server | automatic on the server | automatic on the server |
+| Output token limit field | `max_tokens` | `max_tokens` (not `max_completion_tokens`) | `max_output_tokens` | `max_output_tokens` | `generation_config.max_output_tokens` |
+| Temperature | omitted for models with fixed sampling | always sent | omitted when a reasoning effort other than `none` is set | always sent | always sent (`generation_config.temperature`) |
+| Non-streaming `send` | supported, returns `provider_blocks` | supported | supported, returns `provider_blocks` | supported | supported, returns `provider_blocks` |
 
 Failures are classified into `retryable` (408, 409, 425, 429, 5xx, 529, timeouts, connection errors), `auth` (401, 403), `context_limit` (413, or 400 with a context phrase in the message), `decode` (encoding failures) and `other`. The agent loop retries `retryable` failures with backoff, honours `Retry-After`, and reacts to `context_limit` and `auth` separately. `send()` results carry the error text only, without a kind.
 
@@ -85,9 +86,16 @@ Provider specific handling in the Chat Completions adapter is limited to the Dee
 - The Chat Completions adapter sends `max_tokens`. OpenAI's newer reasoning models expect `max_completion_tokens` on that endpoint; the Responses adapter has no such issue.
 - The Responses adapter does not carry the assistant message `phase` field and does not use `previous_response_id`, `context_management` or `tool_search`.
 
+## Gemini limits to know
+
+- The Interactions path is stateless: it never sends `previous_interaction_id`, so Google stores nothing for the conversation (`store: false`). Thought signatures live on `thought` steps, not on function calls; the adapter keeps each thought as a provider block and replays it unchanged. Switching a session from `generateContent` to Interactions leaves earlier calls without thought steps, because their signatures were stored on the calls.
+- An escalation to `escalation_model` drops stored provider blocks, as for every adapter, so replayed thoughts never reach a different model that way.
+- The generateContent path now reads the finish reason: a reply cut off at the output limit ends as `max_tokens`. A reply that contains function calls stays `tool_use`.
+- Thought tokens count as output on the Interactions path (`total_thought_tokens` is added to `output_tokens`). The generateContent path reports `candidates_token_count` only and leaves thought tokens out.
+
 ## What is verified how
 
-Verified by tests that replay hand-written payloads (no network): every row above for the Anthropic, Chat Completions and Gemini adapters, the Responses request fields, the Item conversion (checked against the openai SDK's own input types), the event to `ProviderEvent` mapping, the usage mapping, the `store: false` request, stateless replay of reasoning items through the session transcript, and the error classification.
+Verified by tests that replay hand-written payloads (no network): every row above for the Anthropic, Chat Completions, Gemini generateContent and Gemini Interactions adapters, the Interactions request (validated against the google-genai SDK's own `CreateModelInteraction` model), the step conversion and the replay of thought blocks through the session transcript, the Responses request fields, the Item conversion (checked against the openai SDK's own input types), the event to `ProviderEvent` mapping, the usage mapping, the `store: false` request, stateless replay of reasoning items through the session transcript, and the error classification.
 
 Checked only against the OpenAI documentation and the typed models of the installed openai SDK, never against a live API:
 
@@ -96,3 +104,12 @@ Checked only against the OpenAI documentation and the typed models of the instal
 - that `include: ["reasoning.encrypted_content"]` and `reasoning.summary: auto` are accepted by every reasoning model for every organization (summaries have required a verified organization on some models; turn `show_thinking` off if a request is refused for that);
 - that omitting `temperature` is required, and `strict: false` accepted, for the models in use;
 - that older reasoning models return encrypted reasoning only when a reasoning effort is set, since the adapter requests it only then.
+
+Checked only against the Gemini documentation and the typed models of the installed google-genai SDK (2.28.0), never against a live API:
+
+- that the live Interactions stream emits exactly the events and fields the adapter reads (`step.start`, `step.delta`, `step.stop`, `interaction.completed`, `error`), including `arguments_delta` fragments for function calls and `thought_signature` deltas for thoughts;
+- that a stateless request holding thought steps (signature, optional summary) before function call steps is accepted with `store: false`, and that restoring thoughts to their recorded position among the calls matches what the server expects;
+- that `total_thought_tokens` is reported apart from `total_output_tokens` (the adapter adds them);
+- that `thinking_summaries: auto` and `generation_config.temperature` are accepted by every model that takes a thinking level;
+- that the JSON schema of a tool is accepted as it is, without the type conversion the generateContent path applies;
+- that a session which switches from generateContent to Interactions mid conversation, so earlier calls have no thought steps, is accepted.
