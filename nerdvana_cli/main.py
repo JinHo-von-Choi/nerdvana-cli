@@ -24,6 +24,7 @@ from nerdvana_cli.cli.runtime import (
     run_migration_once,
 )
 from nerdvana_cli.commands.admin_command import admin_app
+from nerdvana_cli.commands.history_command import history_app
 from nerdvana_cli.commands.hook_command import hook_app
 from nerdvana_cli.commands.mcp_command import mcp_app
 from nerdvana_cli.commands.memory_command import memory_app
@@ -43,6 +44,7 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 app.add_typer(session_app, name="session")
+app.add_typer(history_app, name="history")
 app.add_typer(mcp_app,     name="mcp")
 app.add_typer(skill_app,   name="skill")
 app.add_typer(memory_app,  name="memory")
@@ -477,6 +479,20 @@ def cost(
     from nerdvana_cli.commands.cost_command import cost_command
 
     cost_command(since=since, json_output=json_output, by=by)
+
+
+@app.command()
+def context(
+    session_id:  str  = typer.Argument("", help="Stored session id (default: the most recent session)"),
+    top:         int  = typer.Option(8, "--top", help="Largest tools and tool results to list"),
+    json_output: bool = typer.Option(False, "--json", help="Machine-readable JSON output"),
+) -> None:
+    """Show where the context window goes in a stored session: system prompt, tool declarations, messages, tool results."""
+    from nerdvana_cli.commands.context_command import context_command
+
+    code = context_command(session_id, top, json_output)
+    if code:
+        raise typer.Exit(code)
 
 
 @app.command()
