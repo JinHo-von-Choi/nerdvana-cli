@@ -10,14 +10,18 @@ Date:   2026-10-03
 
 from __future__ import annotations
 
+import json
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
 
+from nerdvana_cli.core.code_editor import CodeEditor
 from nerdvana_cli.core.lsp_client import LspClient
 from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+from nerdvana_cli.core.tool import ToolContext
+from nerdvana_cli.tools.symbol_edit_tools import SafeDeleteSymbolArgs, SafeDeleteSymbolTool
 
 pytestmark = [
     pytest.mark.lsp_integration,
@@ -65,3 +69,17 @@ async def test_a_reference_removed_from_a_file_is_not_reported_afterwards(
     refs = await retriever.find_references(symbols[0])
 
     assert {Path(r.file_path).name for r in refs} == {"core.py", "use_import.py"}
+
+
+async def test_safe_delete_is_blocked_by_uses_in_other_files_but_not_by_the_definition(
+    retriever: LanguageServerSymbolRetriever, project: Path
+) -> None:
+    tool    = SafeDeleteSymbolTool(retriever=retriever, editor=CodeEditor(project_root=str(project)))
+    context = ToolContext(cwd=str(project))
+
+    blocked = json.loads((await tool.call(SafeDeleteSymbolArgs(name_path="compute", relative_path="pkg/core.py"), context)).content)
+    free    = json.loads((await tool.call(SafeDeleteSymbolArgs(name_path="compute_other", relative_path="unrelated.py"), context)).content)
+
+    assert blocked["status"] == "blocked_by_references"
+    assert {Path(r["file"]).name for r in blocked["references"]} == {"use_import.py", "use_module.py"}
+    assert free["kind"] == "delete"
