@@ -81,6 +81,19 @@ def _usage_dict(usage_metadata: Any) -> dict[str, int]:
     return result
 
 
+def _hit_token_limit(candidate: Any) -> bool:
+    """Whether the candidate stopped on the output token limit (its ``finish_reason`` is ``MAX_TOKENS``)."""
+    reason = getattr(candidate, "finish_reason", None)
+    return str(getattr(reason, "value", reason)) == "MAX_TOKENS"
+
+
+def _stop_reason(called: bool, truncated: bool) -> str:
+    """Why the reply ended. Function calls arrive whole, so they win over truncation: a cut-off reply holds none."""
+    if called:
+        return "tool_use"
+    return "max_tokens" if truncated else "end_turn"
+
+
 def make_tool_use_id(tool_name: str) -> str:
     """Build a tool_use_id of the form ``call_<tool name>_<8 hex chars>``.
 
@@ -124,17 +137,22 @@ class GeminiProvider:
             self._client = genai.Client(api_key=self.config.api_key) if self.config.api_key else genai.Client()
         return self._client
 
+    def _thinking_level(self) -> str | None:
+        """``reasoning_effort`` as an upper case Gemini thinking level, None when unset; any other value raises."""
+        if not self.config.reasoning_effort:
+            return None
+        level = self.config.reasoning_effort.upper()
+        if level not in _THINKING_LEVELS:
+            raise ValueError(
+                f"reasoning_effort {self.config.reasoning_effort!r} is not a Gemini thinking level "
+                f"({', '.join(name.lower() for name in sorted(_THINKING_LEVELS))})"
+            )
+        return level
+
     def _generate_config(self, types: Any, system_prompt: str, gemini_tools: Any) -> Any:
         """The request configuration; ``reasoning_effort`` becomes the model's thinking level."""
-        thinking = None
-        if self.config.reasoning_effort:
-            level = self.config.reasoning_effort.upper()
-            if level not in _THINKING_LEVELS:
-                raise ValueError(
-                    f"reasoning_effort {self.config.reasoning_effort!r} is not a Gemini thinking level "
-                    f"({', '.join(name.lower() for name in sorted(_THINKING_LEVELS))})"
-                )
-            thinking = types.ThinkingConfig(thinking_level=level)
+        level    = self._thinking_level()
+        thinking = types.ThinkingConfig(thinking_level=level) if level else None
         return types.GenerateContentConfig(
             system_instruction=system_prompt,
             max_output_tokens=self.config.max_tokens,
@@ -194,11 +212,13 @@ class GeminiProvider:
 
             usage_metadata: Any = None
             called          = False
+            truncated       = False
             async for chunk in stream:
                 # Counts are cumulative; the last chunk that carries them is the total.
                 usage_metadata = getattr(chunk, "usage_metadata", None) or usage_metadata
                 if chunk.candidates:
                     for candidate in chunk.candidates:
+                        truncated = truncated or _hit_token_limit(candidate)
                         if candidate.content and candidate.content.parts:
                             for part in candidate.content.parts:
                                 for event in _part_events(part):
@@ -207,7 +227,7 @@ class GeminiProvider:
 
             if usage_metadata is not None:
                 yield ProviderEvent(type="usage", usage=_usage_dict(usage_metadata))
-            yield ProviderEvent(type="done", stop_reason="tool_use" if called else "end_turn")
+            yield ProviderEvent(type="done", stop_reason=_stop_reason(called, truncated))
 
         except Exception as e:
             yield ProviderEvent(type="error", error=str(e), **error_fields(e))
@@ -248,9 +268,11 @@ class GeminiProvider:
 
             content = ""
             tool_uses = []
+            truncated = False
 
             if response.candidates:
                 for candidate in response.candidates:
+                    truncated = truncated or _hit_token_limit(candidate)
                     if candidate.content and candidate.content.parts:
                         for part in candidate.content.parts:
                             if part.text:
@@ -271,7 +293,7 @@ class GeminiProvider:
             return {
                 "content": content,
                 "tool_uses": tool_uses,
-                "stop_reason": "tool_use" if tool_uses else "end_turn",
+                "stop_reason": _stop_reason(bool(tool_uses), truncated),
                 "usage": usage,
             }
 
