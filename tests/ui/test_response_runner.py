@@ -110,7 +110,7 @@ class _Loop:
         self._thinking_emit      = thinking_emit
         self.prompts: list[str]  = []
 
-    async def run(self, prompt: str) -> AsyncIterator[str]:
+    async def run(self, prompt: str, images: Any = None) -> AsyncIterator[str]:
         self.prompts.append(prompt)
         if self._thinking_emit is not None and self._on_thinking_chunk:
             self._on_thinking_chunk(self._thinking_emit)
@@ -164,6 +164,9 @@ class _App:
         return True
 
     def _wake_for_background(self) -> None:
+        return None
+
+    def take_pending_images(self) -> None:
         return None
 
     def _drain_queued_input(self) -> None:

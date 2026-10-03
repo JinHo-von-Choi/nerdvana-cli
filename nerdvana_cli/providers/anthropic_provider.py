@@ -58,6 +58,13 @@ _THINKING_OPT_IN     = ("claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
 _FIXED_SAMPLING      = _THINKING_DEFAULT_ON + ("claude-opus-4-8", "claude-opus-4-7")
 
 
+def _api_block(block: dict[str, Any]) -> dict[str, Any]:
+    """A content block in the API's shape; the internal image block becomes a base64 image source."""
+    if block.get("type") == "image":
+        return {"type": "image", "source": {"type": "base64", "media_type": block["media_type"], "data": block["data"]}}
+    return dict(block)
+
+
 def _redacted_block(block: Any) -> dict[str, Any]:
     """A redacted thinking block in the shape the API expects back."""
     return {"type": "redacted_thinking", "data": getattr(block, "data", "")}
@@ -409,7 +416,7 @@ class AnthropicProvider:
                 _append("assistant", blocks)
             else:
                 if isinstance(content, list):
-                    _append("user", [dict(block) for block in content if isinstance(block, dict)])
+                    _append("user", [_api_block(block) for block in content if isinstance(block, dict)])
                 elif isinstance(content, str) and content.strip():
                     _append("user", [{"type": "text", "text": content}])
         return api_messages

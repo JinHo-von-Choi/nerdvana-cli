@@ -27,6 +27,7 @@ from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
 from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
+from nerdvana_cli.core.images import prompt_content, transcript_text
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.policy import PermissionPolicy
@@ -720,8 +721,8 @@ class AgentLoop:
                 out.append({"role": "tool", "content": msg.content, "tool_use_id": msg.tool_use_id or "", "is_error": msg.is_error})
         return out
 
-    async def run(self, prompt: str) -> AsyncGenerator[str, None]:
-        """Submit a prompt and run the agent loop until completion."""
+    async def run(self, prompt: str, images: list[dict[str, Any]] | None = None) -> AsyncGenerator[str, None]:
+        """Submit a prompt (with image blocks, see core/images.py) and run the agent loop until completion."""
         self._turn_marks.append((len(self.state.messages), self._checkpoint_depth()))
         async for note in self._plan_first(prompt):
             yield note
@@ -740,8 +741,8 @@ class AgentLoop:
         reminder = self._reminder.build(turn=self._turn)
         if reminder:
             self.state.messages.append(Message(role=Role.USER, content=reminder))
-        self.state.messages.append(Message(role=Role.USER, content=prompt))
-        self.session.record_user_message(prompt)
+        self.state.messages.append(Message(role=Role.USER, content=prompt_content(prompt, images)))
+        self.session.record_user_message(transcript_text(prompt, images))
         tools         = self._prepare_tools()
         system_prompt = self.build_system_prompt()
         if not self._session_started:
