@@ -154,11 +154,11 @@ class TestEditJudgement:
         verdict = bench.judge_edit(SOURCE, bench.expected_after_edit(SOURCE, helper), helper)
         assert verdict.problem is None and verdict.note == ""
 
-    def test_lost_blank_lines_are_a_note_not_a_failure(self, bench: ModuleType, project: Path) -> None:
+    def test_lost_blank_lines_fail_the_edit(self, bench: ModuleType, project: Path) -> None:
         helper = self.symbol(bench, project, "helper")
         result = bench.expected_after_edit(SOURCE, helper).replace("    return value\n\n\n", "    return value\n")
         verdict = bench.judge_edit(SOURCE, result, helper)
-        assert verdict.problem is None and "blank lines" in verdict.note
+        assert verdict.problem is not None and "blank lines" in verdict.problem
 
     def test_a_changed_tree_a_syntax_error_and_a_missing_marker_fail(self, bench: ModuleType, project: Path) -> None:
         helper = self.symbol(bench, project, "helper")

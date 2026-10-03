@@ -164,10 +164,14 @@ async def _locate_symbol_lines(
     retriever:     LanguageServerSymbolRetriever,
     name_path:     str,
     relative_path: str,
+    exact_extent:  bool = False,
 ) -> tuple[str, int, int, list[str]] | ToolResult:
     """Locate a symbol and return (abs_path, start_line, end_line, original_lines).
 
     ``start_line`` and ``end_line`` are 0-based; ``end_line`` is exclusive.
+    The end is the next line at the symbol's indentation, or with *exact_extent*
+    the last line of the symbol as the language server reports it when it does
+    (decorators, multi-line signatures and strings then do not end it early).
     Returns a ``ToolResult`` (error) if the symbol cannot be found.
     """
     try:
@@ -196,6 +200,8 @@ async def _locate_symbol_lines(
 
     start_line = target.location.line - 1   # convert to 0-based
     end_line   = _find_symbol_end(original_lines, start_line)
+    if exact_extent and target.end_line > start_line:
+        end_line = min(target.end_line, len(original_lines))
 
     return abs_path, start_line, end_line, original_lines
 
@@ -246,6 +252,24 @@ def _find_symbol_end(lines: list[str], start_line: int) -> int:
             return i
 
     return len(lines)
+
+
+_COMMENT_PREFIXES = ("#", "//")
+
+
+def _trim_trailing_gap(lines: list[str], start_line: int, end_line: int) -> int:
+    """Return *end_line* moved up past the blank and comment-only lines that end the range.
+
+    ``_find_symbol_end`` runs up to the next line at the symbol's indentation, so the blank lines (and any
+    comment lines) between the symbol's last statement and the next statement are inside the range. A
+    replacement must leave them where they are.
+    """
+    while end_line > start_line + 1:
+        text = lines[end_line - 1].strip()
+        if text and not text.startswith(_COMMENT_PREFIXES):
+            break
+        end_line -= 1
+    return end_line
 
 
 # ---------------------------------------------------------------------------
@@ -351,14 +375,16 @@ class ReplaceSymbolBodyTool(SymbolEditTool[ReplaceSymbolBodyArgs]):
         relative_path: str,
         body:          str,
     ) -> ToolResult:
-        located = await _locate_symbol_lines(self._retriever, name_path, relative_path)
+        located = await _locate_symbol_lines(self._retriever, name_path, relative_path, exact_extent=True)
         if isinstance(located, ToolResult):
             return located
         abs_path, start_line, end_line, original_lines = located
+        end_line = _trim_trailing_gap(original_lines, start_line, end_line)
 
         uri       = _path_to_uri(abs_path)
         new_lines = body.splitlines(keepends=True)
-        if new_lines and not new_lines[-1].endswith("\n"):
+        ends_file_unterminated = end_line == len(original_lines) and not original_lines[-1].endswith("\n")
+        if new_lines and not new_lines[-1].endswith("\n") and not ends_file_unterminated:
             new_lines[-1] += "\n"
 
         workspace_edit: dict[str, Any] = {

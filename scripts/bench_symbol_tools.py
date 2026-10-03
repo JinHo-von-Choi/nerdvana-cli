@@ -17,10 +17,8 @@ The cases are discovered from the source of the seed files, so they follow the c
   files (found by ``ast``: a name, an attribute or an import of that identifier); score: the share of those
   files reached;
 * replace_symbol_body, on a temporary copy of the package: preview and apply a body that has one comment
-  line added; the edited file must parse to the same syntax tree as the original and hold the comment once.
-  Whether the text is also the original plus that one line (the blank lines after the symbol kept) is
-  reported as a note, not as a failure: the tool replaces up to the next line at the symbol's indentation,
-  blank lines included.
+  line added; the edited file must parse to the same syntax tree as the original, hold the comment once and
+  be exactly the original plus that one line (the lines after the symbol kept).
 
 Usage::
 
@@ -245,7 +243,7 @@ def judge_edit(original: str, result: str, symbol: Symbol) -> Verdict:
     if not same_tree:
         return Verdict("the syntax tree of the file changed")
     if result != expected_after_edit(original, symbol):
-        return Verdict(None, "the blank lines after the symbol were not kept")
+        return Verdict("the text around the symbol changed: the blank lines after it were not kept")
     return Verdict()
 
 
