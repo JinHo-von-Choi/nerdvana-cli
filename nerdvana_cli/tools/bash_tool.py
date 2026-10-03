@@ -9,6 +9,7 @@ import re
 from typing import Any, ClassVar
 
 from nerdvana_cli.core import changed_files
+from nerdvana_cli.core.cancellation import stop_process_group
 from nerdvana_cli.core.egress_proxy import prepare_launch
 from nerdvana_cli.core.sandbox import Launch
 from nerdvana_cli.core.secrets import SENSITIVE_ENV
@@ -22,11 +23,14 @@ _warned: set[str] = set()
 _SENSITIVE_ENV = SENSITIVE_ENV
 
 async def _spawn(launch: Launch, command: str, cwd: str, env: dict[str, str]) -> asyncio.subprocess.Process:
-    """Start *command* through the sandbox launcher when the plan has one, else through the shell."""
+    """Start *command* through the sandbox launcher when the plan has one, else through the shell.
+
+    The command leads a process group of its own, so cancelling the call can end everything it started.
+    """
     pipe = asyncio.subprocess.PIPE
     if launch.argv:
-        return await asyncio.create_subprocess_exec(*launch.argv, stdout=pipe, stderr=pipe, cwd=cwd, env=env)
-    return await asyncio.create_subprocess_shell(command, stdout=pipe, stderr=pipe, cwd=cwd, env=env)
+        return await asyncio.create_subprocess_exec(*launch.argv, stdout=pipe, stderr=pipe, cwd=cwd, env=env, start_new_session=True)
+    return await asyncio.create_subprocess_shell(command, stdout=pipe, stderr=pipe, cwd=cwd, env=env, start_new_session=True)
 
 
 def _warn_once(notice: str) -> None:
@@ -219,13 +223,15 @@ Examples:
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=args.timeout)
             except TimeoutError:
-                proc.kill()
-                await proc.wait()
+                await stop_process_group(proc)
                 return ToolResult(
                     tool_use_id="",
                     content=f"Command timed out after {args.timeout}s: {args.command}",
                     is_error=True,
                 )
+            except asyncio.CancelledError:
+                await asyncio.shield(stop_process_group(proc))
+                raise
 
             output = ""
             if stdout:
