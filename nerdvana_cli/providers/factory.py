@@ -99,6 +99,8 @@ def create_provider(
     reasoning_effort: str = "",
     openai_api: str = "auto",
     gemini_api: str = "generate_content",
+    anthropic_tool_search: str = "off",
+    anthropic_compaction: str = "off",
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -137,6 +139,8 @@ def create_provider(
         reasoning_effort=reasoning_effort,
         openai_api=openai_api,
         gemini_api=gemini_api,
+        anthropic_tool_search=anthropic_tool_search,
+        anthropic_compaction=anthropic_compaction,
     )
 
     return _select_class(config)(config)

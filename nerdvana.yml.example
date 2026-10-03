@@ -74,6 +74,9 @@ model:
   # Show thinking: asks Anthropic models for thinking summaries and renders <think>...</think>
   # blocks as a dim italic prefix above the answer.
   show_thinking: true
+
+  # How hard the model reasons. Anthropic models: low, medium, high, xhigh or max (which of them a model
+  # accepts differs); OpenAI and Gemini take their own words. Empty keeps the provider's default.
   reasoning_effort: ""
 
   # Which OpenAI API OpenAI-compatible providers speak: auto (Responses on OpenAI's own endpoint,
@@ -83,6 +86,11 @@ model:
   # Which Gemini API the gemini provider speaks: generate_content, interactions (stateless,
   # store: false), or auto (picks interactions).
   gemini_api: generate_content
+  # Anthropic only. Server-side tool search for MCP tools: off, bm25 or regex.
+  anthropic_tool_search: "off"
+
+  # Anthropic only. Server-side compaction (beta) on the models that support it: off or on.
+  anthropic_compaction: "off"
 
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
