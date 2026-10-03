@@ -17,6 +17,7 @@ from nerdvana_cli.core.settings import (
     ModelConfig,
     NerdvanaSettings,
     SandboxConfig,
+    SecretsConfig,
     SessionConfig,
     SkillsConfig,
 )
@@ -42,6 +43,7 @@ def _make_settings(**overrides) -> NerdvanaSettings:
     settings.session = SessionConfig(**session_kw)
     settings.skills = SkillsConfig()
     settings.sandbox = SandboxConfig()
+    settings.secrets = SecretsConfig()
     settings.goal = GoalConfig()
     settings.cwd = "/tmp"
     settings.verbose = False

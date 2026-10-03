@@ -9,7 +9,8 @@ import re
 from typing import Any, ClassVar
 
 from nerdvana_cli.core import changed_files
-from nerdvana_cli.core.sandbox import Launch, plan_launch
+from nerdvana_cli.core.egress_proxy import prepare_launch
+from nerdvana_cli.core.sandbox import Launch
 from nerdvana_cli.core.secrets import SENSITIVE_ENV
 from nerdvana_cli.core.telemetry_otel import trace_environment
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
@@ -207,7 +208,9 @@ Examples:
     ) -> ToolResult:
         try:
             env    = _build_env(context.cwd)
-            launch = plan_launch(context.state.get("sandbox"), args.command, context.cwd)
+            prepared = await prepare_launch(context.state.get("sandbox"), args.command, context.cwd)
+            launch   = prepared.launch
+            env.update(launch.env)
             if launch.refused:
                 return ToolResult(tool_use_id="", content=launch.notice, is_error=True)
             if launch.notice:
@@ -233,6 +236,7 @@ Examples:
                 if err_text.strip():
                     output += f"\n[stderr]\n{err_text}" if output else err_text
 
+            output += prepared.denial_note()
             exit_code = proc.returncode or 0
             if exit_code != 0:
                 output = f"[exit code: {exit_code}]\n{output}"

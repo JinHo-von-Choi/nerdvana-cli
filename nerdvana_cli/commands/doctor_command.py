@@ -435,22 +435,24 @@ def _check_pricing_coverage() -> CheckResult:
 
 def _check_sandbox() -> CheckResult:
     """Report whether shell commands can be confined, and what the configuration asks for."""
+    from nerdvana_cli.core.egress_proxy import describe_egress
     from nerdvana_cli.core.sandbox import landlock_abi
     from nerdvana_cli.core.settings import NerdvanaSettings
 
     try:
-        sandbox = NerdvanaSettings.load().sandbox
+        settings = NerdvanaSettings.load()
     except Exception:  # noqa: BLE001 - config problems are reported by the config check
         return CheckResult("sandbox", "skip", "config could not be loaded")
+    sandbox = settings.sandbox
     abi = landlock_abi()
     if abi < 1:
         detail = "Landlock is not available on this system"
         if sandbox.mode == "require":
             return CheckResult("sandbox", "fail", f"sandbox.mode is require but {detail}")
         return CheckResult("sandbox", "warn" if sandbox.mode == "auto" else "ok", f"{detail}; mode {sandbox.mode}")
-    if not sandbox.network and abi < 4:
-        return CheckResult("sandbox", "fail" if sandbox.mode == "require" else "warn", f"Landlock ABI {abi}; sandbox.network false needs ABI 4 (Linux 6.7)")
-    return CheckResult("sandbox", "ok", f"Landlock ABI {abi} available; mode {sandbox.mode}")
+    if sandbox.network is not True and abi < 4:
+        return CheckResult("sandbox", "fail" if sandbox.mode == "require" else "warn", f"Landlock ABI {abi}; sandbox.network {sandbox.network} needs ABI 4 (Linux 6.7)")
+    return CheckResult("sandbox", "ok", f"Landlock ABI {abi} available; mode {sandbox.mode}; egress {describe_egress(sandbox, settings.secrets)}")
 
 
 def _check_pricing_freshness() -> CheckResult:

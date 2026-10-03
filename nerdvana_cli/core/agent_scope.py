@@ -42,7 +42,7 @@ def apply_write_scope(settings: NerdvanaSettings, definition: Any, cwd: str = ""
         sandbox.write_paths      = [str((root / entry).resolve()) for entry in scope]
         sandbox.edit_scope       = [str(entry) for entry in scope]
         changed = True
-    if network is not None:
+    if network is not None and not (network and sandbox.network == "allowlist"):
         sandbox.network = bool(network)
         changed = True
     if changed and sandbox.mode == "off":

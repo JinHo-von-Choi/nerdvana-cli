@@ -157,7 +157,8 @@ def test_tcp_connections_are_refused_only_when_the_network_is_off(tmp_path: Path
         command = f'{sys.executable} -c "{CONNECT.format(port=port)}"'
         assert "connected" in _run(command, [tmp_path], network=True).stdout
         blocked = _run(command + " 2>&1", [tmp_path], network=False)
-        assert "connected" not in blocked.stdout
+        assert "connected" not in blocked.stdout.splitlines()
+        assert "Permission denied" in blocked.stdout
     finally:
         server.close()
 

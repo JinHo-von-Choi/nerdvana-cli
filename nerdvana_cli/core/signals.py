@@ -14,6 +14,7 @@ to one of those messages has to change the matching prefix here; the tests pin e
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 # Signal names, as they appear in a run result and in the benchmark summary.
@@ -44,6 +45,7 @@ ESCALATED           = "escalated"
 NO_PROGRESS         = "no_progress"
 UNTRUSTED_SOURCE    = "untrusted_source"
 CACHE_MISS          = "cache_miss"
+EGRESS_DENIED       = "egress_denied"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (
@@ -55,6 +57,7 @@ _ERROR_PREFIXES = (
     ("Validation error",            VALIDATION_ERROR),
     ("Tool execution error",        TOOL_EXCEPTION),
 )
+_EGRESS_DENIED_NOTE = re.compile(r"\[egress denied: (\d+) connection")
 _STALE_PHRASES = ("has not been read in this session", "changed since it was last read")
 
 
@@ -71,6 +74,7 @@ def classify_result(content: str, is_error: bool, *, shell_confined: bool = Fals
         found.append(REPEAT_WARNED)
     if "New errors reported by the language server after this edit" in content:
         found.append(NEW_DIAGNOSTICS)
+    found.extend([EGRESS_DENIED] * sum(int(n) for n in _EGRESS_DENIED_NOTE.findall(content)))
     if not is_error:
         if shell_confined and "Permission denied" in content:
             found.append(SANDBOX_DENIED)

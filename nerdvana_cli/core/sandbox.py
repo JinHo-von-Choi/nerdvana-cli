@@ -10,13 +10,15 @@ restrict them with AppArmor.
 
 What is confined: creating, writing, truncating, renaming and deleting files outside
 the writable paths. With a kernel that has Landlock ABI 4 (Linux 6.7), TCP connect and
-bind can be refused too. What is not: reading files, running programs, UDP and local
-sockets. A confined command can still read a secret and print it.
+bind can be refused too, except to the ports named with ``--connect-port``: that is how a
+command is limited to the local egress proxy (see ``egress_proxy.py``). What is not:
+reading files, running programs, UDP and local sockets. A confined command can still read
+a secret and print it.
 
-The module is also a launcher. ``python sandbox.py [--write PATH]... [--no-network] --
-COMMAND`` restricts itself and then replaces itself with ``/bin/sh -c COMMAND``. It
-imports nothing from the package, so a command starts without loading the rest of
-the application.
+The module is also a launcher. ``python sandbox.py [--write PATH]... [--no-network]
+[--connect-port PORT]... -- COMMAND`` restricts itself and then replaces itself with
+``/bin/sh -c COMMAND``. It imports nothing from the package, so a command starts without
+loading the rest of the application.
 """
 
 from __future__ import annotations
@@ -28,8 +30,11 @@ import platform
 import struct
 import sys
 import tempfile
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
 
 MODES = ("off", "auto", "require")
 
@@ -42,6 +47,7 @@ _SYS_ADD_RULE       = 445
 _SYS_RESTRICT_SELF  = 446
 _CREATE_VERSION     = 1 << 0
 _RULE_PATH_BENEATH  = 1
+_RULE_NET_PORT      = 2
 _PR_SET_NO_NEW_PRIVS = 38
 
 _FS_WRITE_FILE  = 1 << 1
@@ -81,6 +87,24 @@ class SandboxPolicy:
     write_paths: tuple[str, ...]    = ()
     project:     bool               = True   # the project directory is writable
     scratch:     bool               = True   # /tmp and the system temporary directory are writable
+    # Set (even empty) when the command may reach only the egress proxy, which lets through these
+    # domains; None for plain on or off. ``credentials`` are (domain, spec) pairs the proxy adds.
+    allowed_domains: tuple[str, ...] | None      = None
+    credentials:     tuple[tuple[str, str], ...] = ()
+
+    @classmethod
+    def from_config(cls, config: Any, credentials: Mapping[str, str] | None = None) -> SandboxPolicy:
+        """The policy a ``sandbox`` configuration section describes, with the proxy credentials of ``secrets``."""
+        allowlist = config.network == "allowlist"
+        return cls(
+            config.mode,
+            config.network is True,
+            tuple(config.write_paths),
+            config.project_writable,
+            config.scratch_writable,
+            tuple(config.allowed_domains) if allowlist else None,
+            tuple((credentials or {}).items()) if allowlist else (),
+        )
 
 
 @dataclass(frozen=True)
@@ -90,6 +114,7 @@ class Launch:
     argv:    list[str] | None = None
     notice:  str              = ""
     refused: bool             = False
+    env:     dict[str, str]   = field(default_factory=dict)   # variables to add to the command's environment
 
 
 def _libc() -> ctypes.CDLL:
@@ -126,16 +151,17 @@ def _fs_mask(abi: int) -> int:
     return mask
 
 
-def confine(write_paths: list[str], allow_network: bool) -> None:
+def confine(write_paths: list[str], allow_network: bool, connect_ports: tuple[int, ...] = ()) -> None:
     """Restrict this process and its future children; irreversible.
 
+    ``connect_ports`` are TCP ports that stay reachable when the network is otherwise refused.
     Raises SandboxError, leaving the process unrestricted, when Landlock is missing
     or cannot express the request.
     """
     abi = landlock_abi()
     if abi < 1:
         raise SandboxError("Landlock is not available on this system")
-    if not allow_network and abi < 4:
+    if (not allow_network or connect_ports) and abi < 4:
         raise SandboxError(f"this kernel offers Landlock ABI {abi}; refusing network access needs ABI 4 (Linux 6.7)")
 
     fs_mask  = _fs_mask(abi)
@@ -155,6 +181,9 @@ def confine(write_paths: list[str], allow_network: bool) -> None:
                 _syscall(_SYS_ADD_RULE, ruleset, _RULE_PATH_BENEATH, rule, 0)
             finally:
                 os.close(handle)
+        for port in connect_ports:
+            rule = ctypes.create_string_buffer(struct.pack("<QQ", _NET_CONNECT_TCP, port), 16)
+            _syscall(_SYS_ADD_RULE, ruleset, _RULE_NET_PORT, rule, 0)
         _syscall_prctl()
         _syscall(_SYS_RESTRICT_SELF, ruleset, 0)
     finally:
@@ -186,27 +215,48 @@ def writable_paths(policy: SandboxPolicy, cwd: str) -> list[str]:
     return seen
 
 
-def wrap_command(command: str, write_paths: list[str], allow_network: bool) -> list[str]:
+def wrap_command(command: str, write_paths: list[str], allow_network: bool, connect_ports: tuple[int, ...] = ()) -> list[str]:
     """The argument list that runs *command* through the launcher below."""
     argv = [sys.executable or "python3", "-I", str(Path(__file__).resolve())]
     for path in write_paths:
         argv += ["--write", path]
     if not allow_network:
         argv.append("--no-network")
+    for port in connect_ports:
+        argv += ["--connect-port", str(port)]
     return [*argv, "--", command]
 
 
-def plan_launch(policy: SandboxPolicy | None, command: str, cwd: str) -> Launch:
-    """Decide how to start *command* under *policy*."""
+def proxy_environment(proxy_url: str) -> dict[str, str]:
+    """The variables that send a command's HTTP traffic to the egress proxy at *proxy_url*.
+
+    ``NO_PROXY`` is emptied so that nothing is tried directly: a direct connection is refused anyway.
+    """
+    env = {"NO_PROXY": "", "no_proxy": ""}
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+        env[name] = env[name.lower()] = proxy_url
+    return env
+
+
+def plan_launch(policy: SandboxPolicy | None, command: str, cwd: str, proxy_url: str = "") -> Launch:
+    """Decide how to start *command* under *policy*.
+
+    With ``allowed_domains`` set, *proxy_url* is the egress proxy the command may reach and nothing
+    else; an empty one leaves the command without any network.
+    """
     if policy is None or policy.mode == "off":
         return Launch()
-    abi = landlock_abi()
+    abi       = landlock_abi()
+    allowlist = policy.allowed_domains is not None
     if abi < 1:
         reason = "Landlock is not available on this system"
-    elif not policy.network and abi < 4:
+    elif (allowlist or not policy.network) and abi < 4:
         reason = f"this kernel offers Landlock ABI {abi}; refusing network access needs ABI 4 (Linux 6.7)"
+    elif allowlist and proxy_url:
+        ports = (urlsplit(proxy_url).port or 0,)
+        return Launch(argv=wrap_command(command, writable_paths(policy, cwd), False, ports), env=proxy_environment(proxy_url))
     else:
-        return Launch(argv=wrap_command(command, writable_paths(policy, cwd), policy.network))
+        return Launch(argv=wrap_command(command, writable_paths(policy, cwd), policy.network and not allowlist))
     if policy.mode == "require":
         return Launch(notice=f"sandbox required but unavailable: {reason}", refused=True)
     return Launch(notice=f"sandbox unavailable ({reason}); the command runs without confinement")
@@ -215,6 +265,7 @@ def plan_launch(policy: SandboxPolicy | None, command: str, cwd: str) -> Launch:
 def main(argv: list[str]) -> int:
     """Launcher entry: confine, then become ``/bin/sh -c COMMAND``."""
     write_paths: list[str] = []
+    ports: list[int] = []
     network = True
     rest    = list(argv)
     command = ""
@@ -224,6 +275,8 @@ def main(argv: list[str]) -> int:
             write_paths.append(rest.pop(0))
         elif item == "--no-network":
             network = False
+        elif item == "--connect-port" and rest and rest[0].isdigit():
+            ports.append(int(rest.pop(0)))
         elif item == "--" and rest:
             command = rest.pop(0)
             break
@@ -234,7 +287,7 @@ def main(argv: list[str]) -> int:
         print("sandbox: no command given", file=sys.stderr)
         return SETUP_FAILED
     try:
-        confine(write_paths, network)
+        confine(write_paths, network, tuple(ports))
     except SandboxError as exc:
         print(f"sandbox: {exc}", file=sys.stderr)
         return SETUP_FAILED

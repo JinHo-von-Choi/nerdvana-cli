@@ -196,11 +196,18 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | string | `off` | `off`, `auto` (confine where the system supports it) or `require` (refuse a command that cannot be confined). An invalid value stops startup. See [sandbox.md](sandbox.md). |
-| `network` | bool | `true` | `false` also refuses TCP connections and binds from the confined command; needs Linux 6.7 (Landlock ABI 4). |
+| `network` | bool or `allowlist` | `true` | `false` also refuses TCP connections and binds from the confined command; needs Linux 6.7 (Landlock ABI 4). `allowlist` lets the command reach only a local egress proxy that passes the hosts in `allowed_domains`; same kernel requirement. A session in `allowlist` mode cannot be widened by an agent definition. See [sandbox.md](sandbox.md). |
+| `allowed_domains` | list | `[]` | With `network: allowlist`, the hosts the proxy lets through: a host name, `*.suffix` (any subdomain) or an IP address. An entry that is not one stops startup. An empty list allows nothing. |
 | `write_paths` | list | `[]` | Paths a confined command may write in addition to the project directory and the temporary directories. |
 | `project_writable` | bool | `true` | The project directory is writable to confined commands. Agent definitions with a `write_scope` turn it off; see [agents.md](agents.md). |
 | `scratch_writable` | bool | `true` | `/tmp` and the system temporary directory are writable to confined commands. |
 | `edit_scope` | list | unset | Paths (relative to the project) that `FileWrite`, `FileEdit` and the symbol edit tools may change; an edit elsewhere is refused. Unset means anywhere the permissions allow. These tools run in the application, so Landlock cannot confine them. |
+
+### `secrets` (SecretsConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `proxy_credentials` | map | `{}` | Domain (or `*.suffix`) to the name of an environment variable of the application. With `sandbox.network: allowlist` the egress proxy adds that credential to the plain HTTP requests it forwards to the domain: `VARIABLE` sends `Authorization: Bearer <value>`, `Header-Name:VARIABLE` sends the value as it is in that header. The token never enters the command's environment. The domain must also be in `sandbox.allowed_domains`; a TLS tunnel cannot carry an added header. Cannot be set with `--set`. See [sandbox.md](sandbox.md). |
 
 ### `goal` (GoalConfig)
 

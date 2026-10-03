@@ -308,8 +308,7 @@ class AgentLoop:
 
     def _sandbox_policy(self) -> SandboxPolicy:
         """The sandbox policy of this loop, from its settings."""
-        sandbox = self.settings.sandbox
-        return SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths), sandbox.project_writable, sandbox.scratch_writable)
+        return SandboxPolicy.from_config(self.settings.sandbox, self.settings.secrets.proxy_credentials)
 
     def _edit_count(self) -> int:
         """How many edits the edit tools have applied in this session so far."""

@@ -26,6 +26,13 @@ verification command (see [goals.md](goals.md)) is masked the same way.
 
 This is a mitigation, not a boundary.
 
+## Keeping a credential out of the command
+
+Masking works on output after the fact. A token a command needs for one web service can instead stay out of
+its environment: with `sandbox.network: allowlist`, `secrets.proxy_credentials` names an environment variable
+per domain and the egress proxy adds it to the plain HTTP requests for that domain. See
+[sandbox.md](sandbox.md) for the setup and its limits (TLS tunnels cannot carry an added header).
+
 ## Configuration
 
 ```yaml
