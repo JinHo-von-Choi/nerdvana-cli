@@ -22,7 +22,8 @@ import pytest
 from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.auth import AuthManager, AuthResult
-from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, _request_auth
+from nerdvana_cli.server.http_app import request_auth
+from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -105,26 +106,26 @@ def stdio_server(tmp_audit, acl_all, tmp_path):
 
 @pytest.mark.asyncio
 async def test_http_dispatch_fails_without_bearer(http_server) -> None:
-    """HTTP dispatch without setting _request_auth must raise PermissionError."""
+    """HTTP dispatch without setting request_auth must raise PermissionError."""
     # Ensure context var is unset
-    token = _request_auth.set(None)
+    token = request_auth.set(None)
     try:
         with pytest.raises(PermissionError, match="unauthenticated"):
             await http_server._dispatch("ListMemories", {})
     finally:
-        _request_auth.reset(token)
+        request_auth.reset(token)
 
 
 @pytest.mark.asyncio
 async def test_http_dispatch_fails_with_bad_auth(http_server) -> None:
     """HTTP dispatch with authenticated=False must raise PermissionError."""
     bad_result = AuthResult(authenticated=False, client_identity="", reason="invalid_key")
-    token = _request_auth.set(bad_result)
+    token = request_auth.set(bad_result)
     try:
         with pytest.raises(PermissionError, match="unauthenticated"):
             await http_server._dispatch("ListMemories", {})
     finally:
-        _request_auth.reset(token)
+        request_auth.reset(token)
 
 
 @pytest.mark.asyncio
@@ -135,12 +136,12 @@ async def test_http_dispatch_succeeds_with_valid_bearer(http_server, tmp_audit) 
         client_identity = "known-client",
         roles           = ["read-only"],
     )
-    token = _request_auth.set(good_result)
+    token = request_auth.set(good_result)
     try:
         result = await http_server._dispatch("ListMemories", {"topic": ""})
         assert isinstance(result, str)
     finally:
-        _request_auth.reset(token)
+        request_auth.reset(token)
     rows = tmp_audit.recent(10)
     assert any(r["client_identity"] == "known-client" and r["decision"] == "allowed" for r in rows)
 
