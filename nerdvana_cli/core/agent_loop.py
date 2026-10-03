@@ -455,6 +455,41 @@ class AgentLoop:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
 
+    async def _plan_first(self, prompt: str) -> AsyncGenerator[str, None]:
+        """When the planning gate asks for it, have a plan drafted and put in front of the model."""
+        if self.settings.session.planning_gate and _needs_planning(prompt):
+            plan = await self._run_plan_agent(prompt)
+            if plan:
+                yield f"\n[Plan]\n{plan}\n[/Plan]\n"
+                self.state.messages.append(Message(role=Role.USER, content=f"[Auto-generated plan]\n{plan}"))
+
+    def _checkpoint_depth(self) -> int:
+        """How many file checkpoints this session has (0 where there is no git repository)."""
+        with contextlib.suppress(Exception):
+            return sum(1 for c in self._checkpoint_manager.list_checkpoints() if c.kind == "snapshot")
+        return 0
+
+    def rewind(self, prompts: int = 1) -> str:
+        """Go back before the last *prompts* prompts: drop their messages and undo the edits they made.
+
+        Files come back through the checkpoints taken before each edit, so only edits made by the edit
+        tools are undone (not what a shell command changed). A compaction since a prompt ends how far back
+        this can go. The session transcript records the rewind so a resumed session agrees.
+        """
+        if not self._turn_marks:
+            return "Nothing to rewind: no earlier prompt is available (compaction or a reset ends how far back it goes)."
+        prompts = min(max(prompts, 1), len(self._turn_marks))
+        index, depth = self._turn_marks[-prompts]
+        del self._turn_marks[-prompts:]
+        undone = 0
+        while self._checkpoint_depth() > depth and "Undone" in self._checkpoint_manager.undo():
+            undone += 1
+        removed = len(self.state.messages) - index
+        del self.state.messages[index:]
+        self.session.record_system("rewind", {"prompts": prompts})
+        self._context_budget.reset()
+        return f"Rewound {prompts} prompt(s): {removed} message(s) removed, {undone} edit(s) undone."
+
     def _maybe_escalate(self) -> str:
         """Switch to ``session.escalation_model`` once, when the run's signals reach their thresholds.
 
@@ -493,6 +528,7 @@ class AgentLoop:
         self._budget               = None
         self._tool_index           = None
         self._escalated            = False
+        self._turn_marks: list[tuple[int, int]] = []   # per prompt: (messages before it, checkpoints before it)
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -631,6 +667,7 @@ class AgentLoop:
         self._queued_input = []
         self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
+        self._turn_marks.clear()
         self._dir_rules.reset()
         self._context_budget.reset()
 
@@ -685,11 +722,9 @@ class AgentLoop:
 
     async def run(self, prompt: str) -> AsyncGenerator[str, None]:
         """Submit a prompt and run the agent loop until completion."""
-        if self.settings.session.planning_gate and _needs_planning(prompt):
-            plan = await self._run_plan_agent(prompt)
-            if plan:
-                yield f"\n[Plan]\n{plan}\n[/Plan]\n"
-                self.state.messages.append(Message(role=Role.USER, content=f"[Auto-generated plan]\n{plan}"))
+        self._turn_marks.append((len(self.state.messages), self._checkpoint_depth()))
+        async for note in self._plan_first(prompt):
+            yield note
 
         original_et = self.settings.model.extended_thinking
         if _is_ultrawork(prompt):
@@ -767,6 +802,7 @@ class AgentLoop:
         AI compaction returns None or the circuit breaker is open.
         """
         before = len(self.state.messages)
+        self._turn_marks.clear()   # compaction rewrites the history the marks point into
         self._signals[signals.COMPACTION] += 1
         if not self._compaction_state.is_circuit_open:
             yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."

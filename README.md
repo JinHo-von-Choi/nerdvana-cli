@@ -336,6 +336,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/update` | Check and install updates (`/update parism` refreshes the bundled Parism MCP package to its latest version) |
 | `/memories` | List project memories |
 | `/undo` | Restore pre-edit git checkpoint |
+| `/rewind` | `/rewind [N]` goes back before the last N prompts: their messages are dropped and the edits the edit tools made in them are undone (edits made by shell commands are not) |
 | `/redo` | Re-apply last undone checkpoint |
 | `/checkpoints` | List session checkpoints |
 | `/route-knowledge` | Classify content → suggest WriteMemory scope |

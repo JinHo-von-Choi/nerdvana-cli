@@ -208,3 +208,20 @@ async def handle_route_knowledge(app: NerdvanaApp, args: str) -> None:
         f"{action}"
     )
     app._add_chat_message(msg)
+
+
+# ---------------------------------------------------------------------------
+# /rewind
+# ---------------------------------------------------------------------------
+
+async def handle_rewind(app: NerdvanaApp, args: str) -> None:
+    """Handle /rewind [N] — go back before the last N prompts, undoing their file edits."""
+    loop = getattr(app, "_agent_loop", None)
+    if loop is None or getattr(app, "_is_generating", False):
+        app._add_chat_message("[dim]/rewind works while the agent is idle.[/dim]")
+        return
+    text = args.strip()
+    if text and not (text.isdigit() and int(text) >= 1):
+        app._add_chat_message("[red]Usage: /rewind [N][/red]")
+        return
+    app._add_chat_message(f"[dim]{loop.rewind(int(text) if text else 1)}[/dim]")
