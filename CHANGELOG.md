@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - A turn made of tool calls only (no text) is now saved in the session transcript, so resuming a session no longer drops those calls and their results.
 - Escape closes a tool permission prompt instead of being swallowed by the app-wide focus binding.
+- OpenAI-compatible streams that report usage on the chunk that carries the finish reason (MiniMax among them) were counted by an estimate that left out the tool declarations and cached tokens. The reported figures are used, once per response, with cached tokens, and the estimate counts the tool declarations. MiniMax-M3 and M2.7 prices carry their cache rates.
 - Anthropic tool calls are sent as `tool_use` blocks and their results merged into one user message.
 - Duplicate tool call ids no longer reach the API: a stream stops after its tool-use stop, OpenAI-compatible streams emit each call once and keep parallel calls apart, repeated ids are renamed, and ids are repaired before each request.
 - Gemini token usage is reported from the stream.

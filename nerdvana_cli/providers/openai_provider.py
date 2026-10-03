@@ -77,6 +77,28 @@ def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:
     return finish_reason or "end_turn"
 
 
+def _collect_tool_call(tc: Any, slots: list[dict[str, str]], slot_by_index: dict[int | None, dict[str, str]]) -> None:
+    """Fold one streamed tool call delta into its slot.
+
+    A provider may reuse an index for a different call, so a new id on a used index opens a new slot.
+    """
+    call_id = tc.id or ""
+    slot    = slot_by_index.get(tc.index)
+    if slot is not None and call_id and slot["id"] and call_id != slot["id"]:
+        slot = None
+    if slot is None:
+        slot = {"id": call_id, "name": "", "arguments": ""}
+        slots.append(slot)
+        slot_by_index[tc.index] = slot
+    if call_id and not slot["id"]:
+        slot["id"] = call_id
+    if tc.function:
+        if tc.function.name and not slot["name"]:
+            slot["name"] = _safe_str(tc.function.name)
+        if tc.function.arguments:
+            slot["arguments"] += _safe_str(tc.function.arguments)
+
+
 def _safe_str(value: Any) -> str:
     """Safely convert any value to string, handling encoding errors."""
     if value is None:
@@ -174,16 +196,18 @@ class OpenAIProvider:
             slots:         list[dict[str, str]]         = []
             slot_by_index: dict[int | None, dict[str, str]] = {}
             finish_reason: str | None                   = None
-            usage_received = False
+            reported:      Any                          = None
             total_completion_chars = 0
             parser = ThinkBlockParser()
 
             async for chunk in stream:
                 try:
+                    # Servers put the usage on a chunk of its own (OpenAI) or on the last chunk that also
+                    # carries the finish reason (others), and some repeat it on every chunk. The last
+                    # report that says anything is the total, and it is emitted once, after the stream.
+                    if getattr(chunk, "usage", None) and _usage_dict(chunk.usage)["input_tokens"] + _usage_dict(chunk.usage)["output_tokens"] > 0:
+                        reported = chunk.usage
                     if not chunk.choices:
-                        if chunk.usage:
-                            usage_received = True
-                            yield ProviderEvent(type="usage", usage=_usage_dict(chunk.usage))
                         continue
 
                     choice = chunk.choices[0]
@@ -198,23 +222,8 @@ class OpenAIProvider:
                             yield ProviderEvent(type="thinking_delta", thinking=parsed.thinking)
 
                     # Tool call deltas
-                    if choice.delta.tool_calls:
-                        for tc in choice.delta.tool_calls:
-                            call_id = tc.id or ""
-                            slot    = slot_by_index.get(tc.index)
-                            if slot is not None and call_id and slot["id"] and call_id != slot["id"]:
-                                slot = None
-                            if slot is None:
-                                slot = {"id": call_id, "name": "", "arguments": ""}
-                                slots.append(slot)
-                                slot_by_index[tc.index] = slot
-                            if call_id and not slot["id"]:
-                                slot["id"] = call_id
-                            if tc.function:
-                                if tc.function.name and not slot["name"]:
-                                    slot["name"] = _safe_str(tc.function.name)
-                                if tc.function.arguments:
-                                    slot["arguments"] += _safe_str(tc.function.arguments)
+                    for tc in choice.delta.tool_calls or ():
+                        _collect_tool_call(tc, slots, slot_by_index)
 
                     # The first finish reason wins; later chunks may repeat it.
                     if choice.finish_reason and finish_reason is None:
@@ -245,12 +254,14 @@ class OpenAIProvider:
                         tool_input_complete=input_data,
                     )
 
-            # Emit estimated usage if no usage event received
-            if not usage_received and total_completion_chars > 0:
+            if reported is not None:
+                yield ProviderEvent(type="usage", usage=_usage_dict(reported))
+            elif total_completion_chars > 0:
+                # The server reported nothing: estimate from the characters sent and received.
                 yield ProviderEvent(
                     type="usage",
                     usage={
-                        "input_tokens": len(str(api_messages)) // 4,
+                        "input_tokens": len(str(api_messages) + str(api_tools)) // 4,
                         "output_tokens": total_completion_chars // 4,
                     },
                 )

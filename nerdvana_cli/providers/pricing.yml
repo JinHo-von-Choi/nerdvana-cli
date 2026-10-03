@@ -138,8 +138,9 @@ dashscope:
   qwen-vl-max:                  {input_per_1m:  3.0,   output_per_1m:  9.0}  # rate unverified 2026-09-10: Model Studio intl price table not published in a retrievable form
 
 minimax:
-  # 2026-09-10 snapshot — https://www.minimaxi.chat/document/pricing
-  MiniMax-M3:                   {input_per_1m:  0.3,   output_per_1m: 1.2}
+  # 2026-10-03 snapshot — https://platform.minimax.io/docs/guides/pricing-paygo (standard tier, prompts up to 512k tokens)
+  MiniMax-M3:                   {input_per_1m:  0.3,   output_per_1m: 1.2, cache_read_per_1m: 0.06}
+  MiniMax-M2.7:                 {input_per_1m:  0.3,   output_per_1m: 1.2, cache_read_per_1m: 0.06, cache_write_per_1m: 0.375}
   MiniMax-M2:                   {input_per_1m:  0.3,   output_per_1m: 1.2}
   minimax-m2:                   {input_per_1m:  0.3,   output_per_1m: 1.2}
   abab6.5s-chat:                {input_per_1m: 0.0, output_per_1m: 0.0}  # rate unverified 2026-09-10: legacy model absent from the current pricing page
