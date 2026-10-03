@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.skills import MAX_BUNDLED_FILES, Skill, SkillLoader
+from nerdvana_cli.core.skills import MAX_BUNDLED_FILES, Skill, SkillLoader, SkillLoadError
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
@@ -79,9 +79,15 @@ class ActivateSkillTool(BaseTool[ActivateSkillArgs]):
         if skill is None or not skill.model_invocable:
             known = ", ".join(s.name for s in self.loader.model_skills())
             return ToolResult(tool_use_id="", content=f"No skill named '{args.name}'. Available skills: {known}.", is_error=True)
-        if not self.loader.mark_activated(skill.name):
+        if self.loader.is_activated(skill.name):
             return ToolResult(
                 tool_use_id="",
                 content=f"Skill '{skill.name}' is already active in this conversation. Follow the instructions loaded earlier.",
             )
+        if skill.remote is not None:
+            try:
+                skill = await skill.remote(skill, context)
+            except SkillLoadError as exc:
+                return ToolResult(tool_use_id="", content=f"Skill '{skill.name}' was not loaded: {exc}", is_error=True)
+        self.loader.mark_activated(skill.name)
         return ToolResult(tool_use_id="", content=format_activation(skill))

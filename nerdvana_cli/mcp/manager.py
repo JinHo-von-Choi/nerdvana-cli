@@ -8,6 +8,7 @@ import logging
 
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.mcp.config import McpServerConfig
+from nerdvana_cli.mcp.skills import SKILLS_EXTENSION, McpSkillFileTool, McpSkillLibrary
 from nerdvana_cli.mcp.tools import McpToolAdapter, build_mcp_tool
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,8 @@ class McpManager:
         self._clients: dict[str, McpClient] = {}
         self._tools: list[McpToolAdapter] = []
         self._status: dict[str, bool] = {}
+        self._skills = McpSkillLibrary()
+        self._skill_tool: McpSkillFileTool | None = None
 
     async def _connect_one(
         self,
@@ -47,7 +50,7 @@ class McpManager:
             ]
             self._clients[name] = client
             self._status[name]  = True
-            msg = f"connected ({len(adapters)} tools)"
+            msg = f"connected ({len(adapters)} tools{await self._discover_skills(name, client)})"
             logger.info("MCP %s: %s", name, msg)
             return name, msg, adapters
 
@@ -58,6 +61,17 @@ class McpManager:
             with contextlib.suppress(Exception):
                 await client.disconnect()
             return name, msg, []
+
+    async def _discover_skills(self, name: str, client: McpClient) -> str:
+        """List the skills of a server that declares the skills extension; the text to append to its status."""
+        if SKILLS_EXTENSION not in client.extensions:
+            return ""
+        try:
+            count = await self._skills.discover(name, client)
+        except Exception as exc:
+            logger.warning("MCP %s: skills could not be listed: %s", name, exc)
+            return ""
+        return f", {count} skills" if count else ""
 
     async def connect_all(self, timeout: float = 30.0) -> dict[str, str]:
         """Connect to all configured servers in parallel and discover tools.
@@ -92,12 +106,22 @@ class McpManager:
 
         self._clients.clear()
         self._tools.clear()
+        self._skills = McpSkillLibrary()
+        self._skill_tool = None
         self._status.clear()
         logger.info("All MCP clients disconnected")
 
-    def get_all_tools(self) -> list[McpToolAdapter]:
-        """Return all discovered MCP tool adapters."""
-        return list(self._tools)
+    def get_all_tools(self) -> list[McpToolAdapter | McpSkillFileTool]:
+        """Return all discovered MCP tool adapters, and the skill file reader when a server offers skills."""
+        tools: list[McpToolAdapter | McpSkillFileTool] = list(self._tools)
+        if self._skills.skills():
+            self._skill_tool = self._skill_tool or McpSkillFileTool(self._skills)
+            tools.append(self._skill_tool)
+        return tools
+
+    def get_confinement(self) -> dict[str, str]:
+        """Return how each connected server process is confined (``confined``, ``unconfined`` or ``not applicable``)."""
+        return {name: client.confinement for name, client in self._clients.items()}
 
     def get_status(self) -> dict[str, bool]:
         """Return connection status per server (True = connected)."""
