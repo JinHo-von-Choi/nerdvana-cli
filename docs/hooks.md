@@ -276,7 +276,7 @@ def retry_on_network_error(ctx: HookContext) -> HookResult | None:
 
 ## Built-in recovery hooks
 
-Three recovery hooks are defined in `nerdvana_cli/core/builtin_hooks.py` and registered automatically inside `AgentLoop.__init__`. Users do not need to register them; they are always active.
+Three recovery hooks are defined in `nerdvana_cli/core/loop/builtin_hooks.py` and registered automatically inside `AgentLoop.__init__`. Users do not need to register them; they are always active.
 
 - **`context_limit_recovery`** — registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "max_tokens"`; injects a continuation message asking the model to resume from where it left off, optionally including the last user message (up to 200 characters) as context.
 - **`json_parse_recovery`** — registered on `AFTER_TOOL`: triggers when `ctx.extra["json_error"]` is populated by the loop after a tool call whose arguments could not be parsed; injects a correction message containing the tool name and parse error, instructing the model to retry with valid JSON.

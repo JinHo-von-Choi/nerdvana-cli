@@ -21,7 +21,7 @@ from nerdvana_cli.providers.factory import create_provider
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
     # Provider classes are optional-extras imports: they are only named in the annotation below.
     from nerdvana_cli.providers.anthropic_provider import AnthropicProvider

@@ -13,9 +13,9 @@ from typing import Any, ClassVar
 import pytest
 
 from nerdvana_cli.cli.bootstrap import loop_factories
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.tool_index import ToolIndex, declaration_tokens
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent

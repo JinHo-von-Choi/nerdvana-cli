@@ -1,6 +1,6 @@
 """Tests for tool status markers."""
 
-from nerdvana_cli.core.agent_loop import TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
+from nerdvana_cli.core.loop.agent_loop import TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
 
 
 class TestToolStatusMarkers:

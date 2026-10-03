@@ -10,7 +10,7 @@ import contextlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 
 class Rewinder:

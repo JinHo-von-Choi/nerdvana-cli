@@ -76,7 +76,7 @@ Failures are classified into `retryable` (408, 409, 425, 429, 5xx, 529, timeouts
 
 ## Duplicate tool ids
 
-An adapter reports each call once and never reuses an id inside one response. Across turns a server can still repeat an id, so the agent loop repairs the history before every request (`core/tool_ids.py`): a repeated or empty id gets a fresh one on the call and on the result that answers it. The Responses adapter pairs a call with its result by `call_id` only and does not send the item `id`, so a repaired id stays consistent.
+An adapter reports each call once and never reuses an id inside one response. Across turns a server can still repeat an id, so the agent loop repairs the history before every request (`core/loop/tool_ids.py`): a repeated or empty id gets a fresh one on the call and on the result that answers it. The Responses adapter pairs a call with its result by `call_id` only and does not send the item `id`, so a repaired id stays consistent.
 
 ## OpenAI-compatible families
 

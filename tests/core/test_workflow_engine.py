@@ -30,7 +30,7 @@ from nerdvana_cli.core.delegation.workflow import (
 )
 from nerdvana_cli.core.delegation.workflow_engine import RunContext, RunReport, WorkflowRun, effective_scope, tally
 from nerdvana_cli.core.delegation.workflow_store import RunStore
-from nerdvana_cli.core.subagent_config import SubagentConfig
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
 Answer = Callable[[SubagentConfig], str]

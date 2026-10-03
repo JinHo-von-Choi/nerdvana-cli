@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX, AgentLoop
 from nerdvana_cli.core.config.settings import (
     AdvisorConfig,
     GoalConfig,
@@ -22,6 +21,7 @@ from nerdvana_cli.core.config.settings import (
     SessionConfig,
     SkillsConfig,
 )
+from nerdvana_cli.core.loop.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX, AgentLoop
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, Role, ToolResult

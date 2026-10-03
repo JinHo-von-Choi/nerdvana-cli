@@ -21,9 +21,9 @@ from nerdvana_cli.core.delegation.worktree import (
     has_changes,
     remove_worktree,
 )
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.core.safety.agent_scope import apply_write_scope
 from nerdvana_cli.core.state.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
-from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult

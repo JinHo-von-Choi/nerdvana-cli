@@ -30,9 +30,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import cancellation
-from nerdvana_cli.core.cancellation import stop_process_group
 from nerdvana_cli.core.delegation.worktree import Worktree, WorktreeError, create_worktree, has_changes, remove_worktree
+from nerdvana_cli.core.loop import cancellation
+from nerdvana_cli.core.loop.cancellation import stop_process_group
 from nerdvana_cli.core.state import run_store
 from nerdvana_cli.core.state.run_store import (
     FAILED,

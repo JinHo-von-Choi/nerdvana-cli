@@ -15,7 +15,7 @@ Audit gap I4 (unbounded tool_use events per turn) is NOT exercised here:
 AgentLoop has no explicit cap and fixturing a full provider + loop roundtrip
 just to xfail-mark the gap is more noise than signal. The gap is tracked by
 this comment so the next audit pass can pick it up. See:
-    nerdvana_cli/core/agent_loop.py — no MAX_TOOL_USES_PER_TURN constant.
+    nerdvana_cli/core/loop/agent_loop.py — no MAX_TOOL_USES_PER_TURN constant.
 """
 
 from __future__ import annotations

@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.builtin_hooks import RULE_BUDGET_BYTES, DirectoryRuleInjector
 from nerdvana_cli.core.context.nirnamd import format_nirna_for_prompt, load_nirna_files
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
+from nerdvana_cli.core.loop.builtin_hooks import RULE_BUDGET_BYTES, DirectoryRuleInjector
 
 
 def _load(root: Path) -> list[Any]:

@@ -49,8 +49,8 @@ def test_the_default_prompt_and_declarations_stay_under_their_ceilings(empty_pro
 
 
 def test_no_tool_description_is_repeated_in_the_system_prompt(empty_project: Path) -> None:
-    from nerdvana_cli.core.agent_loop import AgentLoop
     from nerdvana_cli.core.config.settings import NerdvanaSettings
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
     from nerdvana_cli.tools.registry import create_tool_registry
 
     settings     = NerdvanaSettings()

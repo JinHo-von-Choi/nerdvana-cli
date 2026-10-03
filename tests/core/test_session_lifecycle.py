@@ -13,10 +13,10 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.stream_guard import StreamTimeoutError, guarded_stream
 from nerdvana_cli.core.state.session import SessionStorage, messages_from_transcript, resume_session_id
-from nerdvana_cli.core.stream_guard import StreamTimeoutError, guarded_stream
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import Role

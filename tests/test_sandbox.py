@@ -227,7 +227,7 @@ def test_the_sandbox_section_loads_and_a_bad_mode_stops_startup(tmp_path: Path, 
 
 
 def test_the_loop_hands_the_policy_to_every_tool_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
     from nerdvana_cli.core.state.session import SessionStorage
     from nerdvana_cli.core.tool import ToolRegistry
 

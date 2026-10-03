@@ -10,8 +10,8 @@ import asyncio
 import re
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.phase_effort import PLANNING, phase_level
-from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
+from nerdvana_cli.core.loop.phase_effort import PLANNING, phase_level
+from nerdvana_cli.core.loop.subagent_config import LoopFactories, SubagentConfig
 
 _COMPLEXITY_SIGNALS: list[str] = [
     r"리팩터링|refactor", r"새로운\s+(기능|모듈|서비스|시스템)|new\s+(feature|module|service|system)",

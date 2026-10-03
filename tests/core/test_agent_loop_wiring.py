@@ -17,9 +17,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent, HookResult
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
@@ -314,7 +314,7 @@ async def test_ai_compaction_still_replaces_history_with_a_summary(
     async def _fake_ai_compact(messages: Any, provider: Any, state: Any, *, prompt: str) -> Message:
         return summary
 
-    monkeypatch.setattr("nerdvana_cli.core.agent_loop.ai_compact", _fake_ai_compact)
+    monkeypatch.setattr("nerdvana_cli.core.loop.agent_loop.ai_compact", _fake_ai_compact)
 
     writer = _writer(tmp_path, pricing)
     loop   = _build_loop(monkeypatch, tmp_path, _RecordingProvider([[]]), writer, pricing)

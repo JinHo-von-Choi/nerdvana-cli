@@ -180,7 +180,7 @@ The tool registry and the top-level loop are built in one place,
 each describe their own session, extra tools and callbacks (or agent
 definition) and call it. The bootstrap also hands the loop the factories it
 cannot import from `core`: the sub-agent runner, the sub-agent registry and the
-ToolSearch tool (`LoopFactories` in `nerdvana_cli/core/subagent_config.py`).
+ToolSearch tool (`LoopFactories` in `nerdvana_cli/core/loop/subagent_config.py`).
 
 The loop keeps the request cycle and hands its other concerns to collaborators
 in `nerdvana_cli/core/`:
@@ -203,7 +203,7 @@ in `nerdvana_cli/core/`:
 `PermissionGate` and `ask_user_permission` (`tool_permission.py`) and the edit
 scope, goal scope and pre-edit checkpoint to `edit_guard.py`.
 
-`AgentLoop._loop` (in `nerdvana_cli/core/agent_loop.py`) delegates to four focused helpers:
+`AgentLoop._loop` (in `nerdvana_cli/core/loop/agent_loop.py`) delegates to four focused helpers:
 
 ```python
 async def _maybe_compact_messages(self, cur_toks: int, thr: int) -> AsyncGenerator[str, None]: ...

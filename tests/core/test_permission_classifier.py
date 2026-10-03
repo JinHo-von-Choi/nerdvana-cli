@@ -14,11 +14,11 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
-from nerdvana_cli.core.run_limits import RunLimits
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.run_limits import RunLimits
 from nerdvana_cli.core.safety.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.state.session import SessionStorage
@@ -300,7 +300,7 @@ class SimpleLoop:
 
 
 def test_the_requests_are_booked_under_the_classifier_for_the_model_they_ran_on(tmp_path: Path) -> None:
-    from nerdvana_cli.core.loop_support import classifier_feed
+    from nerdvana_cli.core.loop.loop_support import classifier_feed
 
     limits, loop = _limits(tmp_path)
     loop.session.record_user_message("build it")
@@ -317,7 +317,7 @@ def test_the_requests_are_booked_under_the_classifier_for_the_model_they_ran_on(
 
 
 def test_the_classifier_stops_when_the_cost_limit_is_spent(tmp_path: Path) -> None:
-    from nerdvana_cli.core.loop_support import classifier_feed
+    from nerdvana_cli.core.loop.loop_support import classifier_feed
 
     limits, loop = _limits(tmp_path, max_cost=5.0)
     feed = classifier_feed(loop)                          # type: ignore[arg-type]

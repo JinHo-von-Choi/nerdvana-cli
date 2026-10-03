@@ -5,7 +5,7 @@ Date:   2026-10-03
 
 In ``queue`` mode (``session.steer_mode``) the text waits for the next step. In ``interrupt`` mode, and for text
 sent explicitly as a steer, ``interrupt`` is also set: the loop stops the step in progress (the provider stream
-or the running tools, see ``core.cancellation``) and starts the next one with the text. Only a caller that puts
+or the running tools, see ``core.loop.cancellation``) and starts the next one with the text. Only a caller that puts
 text in the queue can set it, so a run nobody types into (``nerdvana run``, ACP) never sees one.
 """
 

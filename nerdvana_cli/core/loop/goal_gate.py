@@ -12,16 +12,16 @@ from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape
 
-from nerdvana_cli.core.auto_verify import detect_test_command
-from nerdvana_cli.core.loop_state import LoopFlow
-from nerdvana_cli.core.phase_effort import VERIFICATION
+from nerdvana_cli.core.loop.auto_verify import detect_test_command
+from nerdvana_cli.core.loop.loop_state import LoopFlow
+from nerdvana_cli.core.loop.phase_effort import VERIFICATION
+from nerdvana_cli.core.loop.verify import run_verify
 from nerdvana_cli.core.state import signals
 from nerdvana_cli.core.state.goal import MET, UNMET, Goal, load_goal, save_goal
-from nerdvana_cli.core.verify import run_verify
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 _VERIFY_FAILED = (
     "[Verification] `{command}` did not pass ({summary}, attempt {attempt} of {limit}). The end of its output:\n\n"

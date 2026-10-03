@@ -33,7 +33,7 @@ from nerdvana_cli.cli.supervisor import (
     start_run,
     stop_run,
 )
-from nerdvana_cli.core import cancellation
+from nerdvana_cli.core.loop import cancellation
 from nerdvana_cli.core.state import run_store
 from nerdvana_cli.core.state.run_store import (
     FAILED,

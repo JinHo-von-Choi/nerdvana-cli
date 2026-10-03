@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from nerdvana_cli.core.activity_state import ActivityState
+from nerdvana_cli.core.loop.activity_state import ActivityState
 from nerdvana_cli.ui.widgets import ActivityIndicator
 
 

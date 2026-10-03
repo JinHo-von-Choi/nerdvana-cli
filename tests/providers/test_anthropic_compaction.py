@@ -24,8 +24,8 @@ try:
 except ImportError:          # pragma: no cover - older SDKs
     import httpx  # type: ignore[no-redef]
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.anthropic_features import BETA_COMPACTION, BETA_TURN_EFFORT, supports_compaction

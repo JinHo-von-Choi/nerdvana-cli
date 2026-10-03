@@ -1,4 +1,4 @@
-"""Advisor: ask a stronger model for guidance at a decision point (the consultation itself is ``core/advisor.py``)."""
+"""Advisor: ask a stronger model for guidance at a decision point (the consultation itself is ``core/loop/advisor.py``)."""
 
 from __future__ import annotations
 

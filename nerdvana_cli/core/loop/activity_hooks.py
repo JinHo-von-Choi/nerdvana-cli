@@ -6,12 +6,12 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from nerdvana_cli.core.activity_state import summarize_tool_call
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent, HookResult
+from nerdvana_cli.core.loop.activity_state import summarize_tool_call
 from nerdvana_cli.core.telemetry.telemetry_otel import observe_loop
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 _Handler = Callable[[HookContext], HookResult | None]
 

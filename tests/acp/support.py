@@ -19,7 +19,7 @@ from acp.schema import AllowedOutcome, DeniedOutcome, RequestPermissionResponse
 
 from nerdvana_cli.acp.agent import NerdvanaAcpAgent
 from nerdvana_cli.acp.launch import LaunchOptions
-from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.providers.base import ProviderEvent
 
 

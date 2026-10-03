@@ -29,7 +29,7 @@ from nerdvana_cli.core.state import signals
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 logger = logging.getLogger(__name__)
 

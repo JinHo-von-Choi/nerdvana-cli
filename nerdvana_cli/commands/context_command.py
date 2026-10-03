@@ -23,7 +23,7 @@ from nerdvana_cli.cli.context_report import ContextReport, advice, build_report,
 from nerdvana_cli.core.context.tool_index import ToolIndex
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
     from nerdvana_cli.ui.app import NerdvanaApp
 
 # What the loop appends to the system prompt after build_system_prompt: attribute and the label it is shown under.

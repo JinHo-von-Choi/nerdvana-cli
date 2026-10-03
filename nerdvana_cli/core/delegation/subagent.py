@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
-from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.cancellation import race_abort
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.cancellation import race_abort
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.core.state.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.telemetry.analytics import CallOrigin
 from nerdvana_cli.core.tool import ConfirmCallback
 
@@ -50,7 +50,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     it is 0 when no LLM calls were made (e.g. abort before first turn).
 
     Setting *abort* stops the agent where it is, not at the next chunk: the run is cancelled, which ends the
-    provider request, the running tools and the shell commands they started (see ``core.cancellation``).
+    provider request, the running tools and the shell commands they started (see ``core.loop.cancellation``).
     The transcript is kept under the agent's id, so a stopped agent can be resumed from it.
     """
     child_settings = config.settings.model_copy(deep=True)

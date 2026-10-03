@@ -97,7 +97,7 @@ async def test_executor_denies_ask_in_non_tty() -> None:
     from unittest.mock import MagicMock, patch
 
     from nerdvana_cli.core.execution.tool_executor import ToolExecutor
-    from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.loop.loop_state import LoopState
     from nerdvana_cli.core.tool import ToolRegistry
 
     # Build a minimal registry with RegisterExternalProjectTool (ASK).
@@ -134,7 +134,7 @@ async def test_executor_allows_ask_when_user_confirms() -> None:
     from unittest.mock import MagicMock, patch
 
     from nerdvana_cli.core.execution.tool_executor import ToolExecutor
-    from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.loop.loop_state import LoopState
     from nerdvana_cli.core.tool import ToolRegistry
     from nerdvana_cli.external.external_projects import ExternalProjectRegistry
 

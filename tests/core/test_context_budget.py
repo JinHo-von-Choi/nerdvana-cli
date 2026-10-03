@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.context_budget import ContextBudget, message_tokens, request_overhead
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent

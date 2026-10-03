@@ -46,12 +46,12 @@ from nerdvana_cli.core.delegation.workflow_text import (
     validate_schema,
     whole_reference,
 )
+from nerdvana_cli.core.loop.subagent_config import LoopFactories, SubagentConfig, SubagentRegistryFactory
+from nerdvana_cli.core.loop.verify import run_verify
 from nerdvana_cli.core.safety.agent_scope import apply_write_scope
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.core.state.budget import MIN_ENVELOPE, Budget
-from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig, SubagentRegistryFactory
 from nerdvana_cli.core.tool import BaseTool, ConfirmCallback
-from nerdvana_cli.core.verify import run_verify
 
 MAX_RETRIES = 3          # times an agent is asked again to fix an answer that fails its schema
 VERIFY_TAIL = 20_000     # characters of a verify step's output that are kept (the end)

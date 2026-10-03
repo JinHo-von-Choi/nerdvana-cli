@@ -24,7 +24,7 @@ from nerdvana_cli.cli.run_output import (
     RunResult,
     classify_chunk,
 )
-from nerdvana_cli.core.agent_loop import (
+from nerdvana_cli.core.loop.agent_loop import (
     COMPACT_STATUS_PREFIX,
     CONTEXT_USAGE_PREFIX,
     TOOL_DONE_PREFIX,

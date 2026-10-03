@@ -13,12 +13,12 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core import model_failover
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.loop_context import session_start_context
 from nerdvana_cli.core.hooks.command_hooks import CommandHook, make_handler, parse_hooks
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
+from nerdvana_cli.core.loop import model_failover
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state import signals
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import ToolRegistry
@@ -183,7 +183,7 @@ async def test_a_model_summary_is_reported_as_the_ai_strategy(monkeypatch: pytes
         state.record_success()
         return Message(role=Role.USER, content="[summary]")
 
-    monkeypatch.setattr("nerdvana_cli.core.agent_loop.ai_compact", summarise)
+    monkeypatch.setattr("nerdvana_cli.core.loop.agent_loop.ai_compact", summarise)
     statuses = [status async for status in loop._maybe_compact_messages(800, 200)]
     assert statuses[-1].endswith("done")
     assert seen[-1].event == HookEvent.POST_COMPACT and seen[-1].extra["strategy"] == "ai"

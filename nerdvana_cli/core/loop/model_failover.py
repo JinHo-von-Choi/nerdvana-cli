@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.core.hooks.hooks import HookEvent
-from nerdvana_cli.core.loop_hooks import hook_injection_messages
-from nerdvana_cli.core.loop_state import LoopFlow, LoopTurn
-from nerdvana_cli.core.phase_effort import IMPLEMENTATION
-from nerdvana_cli.core.provider_recovery import (
+from nerdvana_cli.core.loop.loop_hooks import hook_injection_messages
+from nerdvana_cli.core.loop.loop_state import LoopFlow, LoopTurn
+from nerdvana_cli.core.loop.phase_effort import IMPLEMENTATION
+from nerdvana_cli.core.loop.provider_recovery import (
     COMPACT,
     FALLBACK,
     RESEND,
@@ -25,16 +25,16 @@ from nerdvana_cli.core.provider_recovery import (
     ProviderCallError,
     RecoveryPlanner,
 )
+from nerdvana_cli.core.loop.tool_ids import repair_tool_ids
 from nerdvana_cli.core.state import signals
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.core.tool_ids import repair_tool_ids
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import classify_exception
 from nerdvana_cli.providers.factory import resolve_api_key
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class ModelFailover:
         """After a prompt, go back to the model it started on, or to the one the session escalated to.
 
         The provider is only rebuilt when the model changed during the prompt, so the effort changes it
-        keeps for the conversation (see ``core/phase_effort.py``) carry over to the next prompt.
+        keeps for the conversation (see ``core/loop/phase_effort.py``) carry over to the next prompt.
         """
         config  = self._loop.settings.model
         target  = self._escalated_to or saved

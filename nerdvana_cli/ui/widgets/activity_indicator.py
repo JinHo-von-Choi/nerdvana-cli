@@ -7,7 +7,7 @@ import time
 from textual.reactive import reactive
 from textual.widgets import Static
 
-from nerdvana_cli.core.activity_state import ActivityState
+from nerdvana_cli.core.loop.activity_state import ActivityState
 
 
 class ActivityIndicator(Static):

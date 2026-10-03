@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from rich.markup import escape
 
-from nerdvana_cli.core.images import ImageError, load_images
+from nerdvana_cli.core.loop.images import ImageError, load_images
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp

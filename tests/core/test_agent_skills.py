@@ -15,12 +15,12 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context import skills as skills_module
 from nerdvana_cli.core.context.prompts import build_system_prompt
 from nerdvana_cli.core.context.skills import Skill, SkillLoader, name_problems, project_skill_trust
 from nerdvana_cli.core.hooks.user_hooks import load_trust_record, trust_project_hook
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.tools.registry import create_tool_registry

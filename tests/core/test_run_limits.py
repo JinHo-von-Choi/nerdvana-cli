@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
@@ -245,7 +245,7 @@ async def test_run_subagent_sets_the_wrap_up_turn_from_the_limit(monkeypatch: py
     import asyncio
 
     from nerdvana_cli.core.delegation.subagent import run_subagent
-    from nerdvana_cli.core.subagent_config import SubagentConfig
+    from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 
     seen: list[int] = []
     original = AgentLoop.run
@@ -272,7 +272,7 @@ async def test_a_sub_agent_that_hits_its_share_returns_what_it_had_and_says_so(m
     import asyncio
 
     from nerdvana_cli.core.delegation.subagent import run_subagent
-    from nerdvana_cli.core.subagent_config import SubagentConfig
+    from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 
     provider = _Endless(usage={"input_tokens": 1_000_000, "output_tokens": 0})
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
@@ -280,7 +280,7 @@ async def test_a_sub_agent_that_hits_its_share_returns_what_it_had_and_says_so(m
     monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
     pricing = tmp_path / "pricing.yml"
     pricing.write_text(PRICING, encoding="utf-8")
-    monkeypatch.setattr("nerdvana_cli.core.run_limits.PricingTable", lambda: PricingTable(pricing_path=pricing))
+    monkeypatch.setattr("nerdvana_cli.core.loop.run_limits.PricingTable", lambda: PricingTable(pricing_path=pricing))
     settings = NerdvanaSettings()
     settings.cwd = str(tmp_path)
     settings.model.provider = "acme"

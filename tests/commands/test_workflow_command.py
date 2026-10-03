@@ -12,7 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nerdvana_cli.core.delegation.workflow_store import RunStore
-from nerdvana_cli.core.subagent_config import SubagentConfig
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.main import app
 
 WORKFLOW = """

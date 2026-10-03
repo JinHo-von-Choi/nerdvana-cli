@@ -128,7 +128,7 @@ async def test_agent_tool_hands_its_front_end_to_the_child() -> None:
 
 
 async def test_a_loop_given_a_front_end_puts_it_on_the_tool_context(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
     from nerdvana_cli.core.state.session import SessionStorage
     from nerdvana_cli.providers.base import ProviderEvent
 

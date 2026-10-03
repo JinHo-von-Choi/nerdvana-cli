@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.loop_state import LoopTurn
+from nerdvana_cli.core.loop.loop_state import LoopTurn
 from nerdvana_cli.providers.base import ProviderConfig, ProviderName
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 
