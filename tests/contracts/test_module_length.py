@@ -16,7 +16,7 @@ from tests.contracts.import_graph import ROOT
 LIMIT = 600
 
 KNOWN_LARGE: dict[str, int] = {
-    "core/loop/agent_loop.py": 836,
+    "core/loop/agent_loop.py": 825,
     "tools/file_tools.py": 706,
     "core/state/checkpoint.py": 642,
 }

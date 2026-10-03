@@ -669,6 +669,7 @@ mypy nerdvana_cli/
 | [docs/scheduling.md](docs/scheduling.md) | 예약 실행: 크론과 간격 작업, 데몬, 비용 상한 |
 | [docs/workflows.md](docs/workflows.md) | 선언형 다중 에이전트 워크플로: 단계, 병렬 실행, 교차 검증, 재개, 비용 상한 |
 | [docs/agents.md](docs/agents.md) | 에이전트 타입, 도구 예산, 스웜 패턴 |
+| [docs/architecture.md](docs/architecture.md) | 패키지와 core 하위 패키지, 허용된 의존 방향 |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP 서버 테넌트별 쿼터 스키마 |
 | [docs/testing-live.md](docs/testing-live.md) | 실 제공자 시험 행렬과 비밀값 설정 |
 | [CHANGELOG.md](CHANGELOG.md) | 판올림 기록 |
