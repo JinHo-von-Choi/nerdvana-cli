@@ -1,0 +1,47 @@
+name: review-fanout
+description: Review the files changed since a revision with one code-reviewer agent per file in parallel, keep only the findings a majority of independent reviewers confirm, and summarize them.
+inputs:
+  base:
+    default: HEAD
+    description: Revision the working tree is compared with
+steps:
+  - id: files
+    kind: verify
+    command: git diff --name-only ${inputs.base}
+  - id: review
+    agent: code-reviewer
+    foreach: ${steps.files.items}
+    prompt: |
+      Read the file ${item} of this project and review it for defects: wrong logic, unhandled errors,
+      unsafe input handling and broken edge cases. Report only concrete problems you can point to.
+      Answer with JSON only: {"items": [{"file": "<path>", "line": <number>, "claim": "<the problem in one sentence>"}]}.
+      Use an empty list when you find nothing.
+    output: json
+    schema:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [file, claim]
+            properties:
+              file: {type: string}
+              line: {type: integer}
+              claim: {type: string}
+  - id: confirm
+    kind: cross_check
+    agent: code-reviewer
+    claims: ${steps.review.items}
+    reviewers: 3
+    prompt: Each claim names a file and a line. Read that code before you judge.
+  - id: summary
+    agent: Explore
+    max_turns: 4
+    prompt: |
+      Summarize this review for the person who changed the code. Start with the confirmed findings, most
+      serious first, each with its file and line. Then list the unverified claims as unverified, without
+      presenting them as defects. Answer from the data below; do not search the project.
+
+      ${steps.confirm.output}

@@ -237,7 +237,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory", "workflow",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -255,6 +255,7 @@ def _is_project_file(path: str) -> bool:
     """True for the ``nerdvana.yml`` / ``nerdvana.yaml`` found in the working directory."""
     return os.path.abspath(path) in {os.path.abspath(os.path.join(os.getcwd(), name)) for name in ("nerdvana.yml", "nerdvana.yaml")}
 _MEMORY_STRICT_FIELDS = frozenset({"review"})
+_WORKFLOW_STRICT_FIELDS = frozenset({"enabled"})
 
 
 def _strict_bool(path: str, value: object) -> bool:
@@ -335,6 +336,13 @@ class GoalConfig(BaseModel):
     auto_verify:       bool = False  # without a goal, check a run that changed files with the project's detected test command
 
 
+class WorkflowConfig(BaseModel):
+    # Declarative multi-agent workflows (core/workflow.py); see docs/workflows.md.
+    enabled:      bool = False   # offer the Workflow tool to the model (`nerdvana workflow run` always works)
+    max_parallel: int  = 4       # agents of one run working at once; never above session.max_parallel_agents
+    max_agents:   int  = 50      # most agent runs one `foreach` fan-out may start; a longer list stops the run
+
+
 class OtelConfig(BaseModel):
     # OpenTelemetry traces of the agent, the model requests and the tool calls. Needs the `otel`
     # extra (pip install 'nerdvana-cli[otel]'). See docs/observability.md.
@@ -400,6 +408,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("goal",       GoalConfig,       frozenset()),
     ("telemetry",  TelemetryConfig,  frozenset()),
     ("memory",     MemoryConfig,     _MEMORY_STRICT_FIELDS),
+    ("workflow",   WorkflowConfig,   _WORKFLOW_STRICT_FIELDS),
 )
 
 
@@ -419,6 +428,7 @@ class NerdvanaSettings(BaseSettings):
     goal: GoalConfig = Field(default_factory=GoalConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.
