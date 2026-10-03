@@ -145,6 +145,7 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `stream_total_timeout` | float | `3600.0` | Seconds one response may take in total. `0` disables. |
 | `post_edit_diagnostics` | bool | `true` | After a file or symbol edit, ask the running language server for errors and append only the errors the edit introduced to the tool result. |
 | `max_parallel_agents` | int | `5` | Sub-agents (`Agent`, `Swarm`) that may run at once against one provider; the rest wait. |
+| `steer_mode` | string | `queue` | What text typed while the agent works does: `queue` holds it for the next step; `interrupt` also stops the step in progress, cancelling the model's response or the running tools (a tool that is still running a second later; its shell commands are ended with SIGTERM, then SIGKILL after five seconds), and starts the next step with the text. `/steer <text>` and Ctrl+T always interrupt. `nerdvana run` and ACP never do. See [background.md](background.md). |
 | `update_check` | bool | `true` | Check GitHub Releases for a newer version on every CLI invocation. The result is cached for 24 hours at `~/.nerdvana/cache/update_check.json`. A one-line notice is printed when a newer version is available. Override priority (highest to lowest): `--no-update-check` flag > `NERDVANA_NO_UPDATE_CHECK=1` env > this setting. |
 
 ### `parism` (ParismConfig)

@@ -167,6 +167,7 @@ class NerdvanaApp(App[object]):
         Binding("ctrl+s", "save_editor",      "Save",      show=True,  priority=True),
         Binding("ctrl+l", "clear_chat",       "Clear",     show=True),
         Binding("ctrl+d", "toggle_dashboard", "Dashboard", show=True),
+        Binding("ctrl+t", "steer_input",      "Steer",     show=True,  priority=True),
         Binding("escape", "focus_input",      "Input",     show=False, priority=True),
     ]
 
@@ -389,19 +390,7 @@ class NerdvanaApp(App[object]):
             await self._handle_command(user_text)
             return
 
-        if self._is_generating:
-            if self._agent_loop is not None:
-                self._agent_loop.queue_input(user_text)
-                self._add_chat_message(
-                    f"\n[bold green]> {escape(user_text)}[/bold green] [dim](queued, applied at the next step)[/dim]",
-                    raw_text=user_text,
-                )
-            return
-
-        self._add_chat_message(f"\n[bold green]> {user_text}[/bold green]", raw_text=user_text)
-        self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
-
-        self._generate_response(user_text)
+        self._start_prompt(user_text, user_text)
 
     def _user_commands(self) -> list[UserCommand]:
         """The user's command templates, rescanned at most every two seconds."""
@@ -415,11 +404,8 @@ class NerdvanaApp(App[object]):
         """Send *prompt* as if the user had typed *shown*, queueing it behind a running response."""
         if self._is_generating:
             if self._agent_loop is not None:
-                self._agent_loop.queue_input(prompt)
-                self._add_chat_message(
-                    f"\n[bold green]> {escape(shown)}[/bold green] [dim](queued, applied at the next step)[/dim]",
-                    raw_text=shown,
-                )
+                note = "interrupting the current step" if self._agent_loop.queue_input(prompt) else "queued, applied at the next step"
+                self._add_chat_message(f"\n[bold green]> {escape(shown)}[/bold green] [dim]({note})[/dim]", raw_text=shown)
             return
         self._add_chat_message(f"\n[bold green]> {escape(shown)}[/bold green]", raw_text=shown)
         self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
@@ -511,6 +497,15 @@ class NerdvanaApp(App[object]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Handle command menu, model selector, or provider selector."""
         handle_option_selected(self, event)
+
+    def action_steer_input(self) -> None:
+        """Send the typed text as a steer: it interrupts the step in progress (Ctrl+T)."""
+        widget = self.query_one("#user-input", MultilineAwareInput)
+        text   = (widget._pending_multiline or widget.value).strip()
+        widget._pending_multiline = None
+        widget.value              = ""
+        if text:
+            asyncio.create_task(self._handle_command(f"/steer {text}"))
 
     def action_clear_chat(self) -> None:
         """Clear chat action (Ctrl+L)."""

@@ -39,6 +39,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         observability_commands,
         profile_commands,
         session_commands,
+        steer_command,
         system_commands,
     )
 
@@ -68,6 +69,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         "/health":          observability_commands.handle_health,
         "/dashboard":       observability_commands.handle_dashboard,
         "/btw":             btw_command.handle_btw,
+        "/steer":           steer_command.handle_steer,
         "/image":           image_command.handle_image,
         "/goal":            goal_command.handle_goal,
         "/history":         history_command.handle_history,

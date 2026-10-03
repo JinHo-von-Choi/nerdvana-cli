@@ -127,6 +127,9 @@ session:
   # Clearable old output (estimated tokens) that must pile up before one batch clears it
   mask_trigger_tokens: 20000
   report_bash_changes: false
+  # Text typed while the agent works: queue = held for the next step, interrupt = also stops the
+  # step in progress and starts the next one with the text (/steer and Ctrl+T always interrupt).
+  steer_mode: queue
   # Spawn a Plan subagent on complex prompts before execution
   planning_gate: false
   # Tell the model once when this many edits in a row to one file all failed, or this many turns

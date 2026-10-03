@@ -33,6 +33,7 @@ from nerdvana_cli.core.builtin_hooks import (
     session_start_context_injection,
     session_start_memory_hint,
 )
+from nerdvana_cli.core.cancellation import race_abort, until_interrupted
 from nerdvana_cli.core.checkpoint import CheckpointManager
 from nerdvana_cli.core.command_hooks import load_command_hooks
 from nerdvana_cli.core.compact import (
@@ -48,7 +49,7 @@ from nerdvana_cli.core.goal import Goal
 from nerdvana_cli.core.goal_gate import GoalGate
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.images import prompt_content, transcript_text
-from nerdvana_cli.core.input_queue import InputQueue
+from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
 from nerdvana_cli.core.loop_context import background_reports, open_todos_note, provider_messages, session_start_context
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
@@ -154,7 +155,7 @@ class AgentLoop:
         self._init_history(settings, registry, role_prompt)
         self.provider             = self.create_provider_from_settings()
         self._init_execution(settings, pricing_table, analytics_writer)
-        self.input_queue          = InputQueue()
+        self.input_queue          = InputQueue(settings.session.steer_mode)
         self.last_stop            = "completed"
         self.turns_used           = 0
         self.goal_gate            = GoalGate(self)
@@ -350,13 +351,9 @@ class AgentLoop:
             thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking,
             reasoning_effort=self.settings.model.reasoning_effort, openai_api=self.settings.model.openai_api, gemini_api=self.settings.model.gemini_api)
 
-    def queue_input(self, text: str) -> None:
-        """Hold text the user typed while the agent was working.
-
-        It reaches the model at the start of the next step, after any tool results
-        already in the history, or becomes the next prompt when the run ends first.
-        """
-        self.input_queue.put(text)
+    def queue_input(self, text: str, interrupt: bool | None = None) -> bool:
+        """Hold text typed while the agent works for its next step; True when it also interrupts the step in progress."""
+        return self.input_queue.put(text, interrupt)
 
     def has_queued_input(self) -> bool:
         """True when typed-ahead text is waiting for the model."""
@@ -573,7 +570,8 @@ class AgentLoop:
         for tu in tool_uses:
             yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
         names_by_id = {tu["id"]: tu["name"] for tu in tool_uses}
-        results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
+        raced   = await race_abort(self.tool_executor.run_batch(tool_uses, tool_ctx), self.input_queue.interrupt, patience=self.input_queue.patience)
+        results = interrupted_results(tool_uses) if raced.aborted else raced.value or []
         self._last_tool = tool_uses[-1]["name"] if tool_uses else self._last_tool
         for tr in results:
             tname = names_by_id.get(tr.tool_use_id, "unknown")
@@ -739,11 +737,12 @@ class AgentLoop:
         flow:          LoopFlow,
     ) -> AsyncGenerator[str, None]:
         """Consume one provider response, acting on each event until it reports ``done``."""
-        async for ev in guarded_stream(
+        events = guarded_stream(
             self.provider.stream(system_prompt, turn.messages, self._declared(tools)),
             idle  = self.settings.session.stream_idle_timeout,
             total = self.settings.session.stream_total_timeout,
-        ):
+        )
+        async for ev in until_interrupted(events, self.input_queue.interrupt):
             if ev.type == "content_delta":
                 self._set_activity(
                     phase="streaming",

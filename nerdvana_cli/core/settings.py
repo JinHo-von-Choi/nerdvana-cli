@@ -192,6 +192,9 @@ class SessionConfig(BaseModel):
     post_edit_diagnostics: bool = True
     # Sub-agents (Agent, Swarm) running at once against one provider.
     max_parallel_agents: int = 5
+    # What text typed while the agent works does: "queue" holds it for the next step, "interrupt" also
+    # stops the step in progress (stream or running tools) and starts the next one with the text.
+    steer_mode: Literal["queue", "interrupt"] = "queue"
 
 
 class ParismConfig(BaseModel):
