@@ -6,7 +6,9 @@ import asyncio
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.analytics import CallOrigin
+from nerdvana_cli.core.cancellation import race_abort
 from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
+from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ConfirmCallback
 
@@ -29,6 +31,16 @@ def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallbac
     return _labelled
 
 
+async def _collect(loop: AgentLoop, prompt: str, parts: list[str], abort: asyncio.Event) -> bool:
+    """Run *loop* on *prompt*, keeping the model's text (not the protocol markers) in *parts*; True when *abort* ended it."""
+    async for chunk in loop.run(prompt):
+        if abort.is_set():
+            return True
+        if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
+            parts.append(chunk)
+    return False
+
+
 async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
     """Run an isolated AgentLoop and return (output_text, total_tokens).
 
@@ -36,6 +48,10 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     so the parent receives only model-generated text.  ``total_tokens`` is
     the sum of input + output tokens recorded by the AgentLoop's usage tracker;
     it is 0 when no LLM calls were made (e.g. abort before first turn).
+
+    Setting *abort* stops the agent where it is, not at the next chunk: the run is cancelled, which ends the
+    provider request, the running tools and the shell commands they started (see ``core.cancellation``).
+    The transcript is kept under the agent's id, so a stopped agent can be resumed from it.
     """
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
@@ -44,7 +60,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
     loop   = AgentLoop(
         settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin,
-        factories=config.factories,
+        factories=config.factories, session=SessionStorage(session_id=config.agent_id),
     )
     loop.wrap_up_at = max(2, int(config.max_turns * config.wrap_up_fraction)) if config.wrap_up_fraction > 0 else 0
     parts: list[str] = []
@@ -52,11 +68,9 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)
     try:
         async with agent_slot(child_settings.model.provider, limit):
-            async for chunk in loop.run(config.prompt):
-                if abort.is_set():
-                    return "".join(parts) + "\n[aborted]", 0
-                if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
-                    parts.append(chunk)
+            raced = await race_abort(_collect(loop, config.prompt, parts, abort), abort)
+            if raced.aborted or raced.value:
+                return "".join(parts) + "\n[aborted]", 0
     finally:
         config.cost_usd = loop.session_cost_usd()
         if config.absorb is not None:
