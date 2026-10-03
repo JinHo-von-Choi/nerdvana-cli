@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.core.loop_state import LoopState
+from nerdvana_cli.core.loop.loop_state import LoopState
 
 
 @pytest.fixture

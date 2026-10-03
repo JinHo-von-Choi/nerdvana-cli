@@ -20,13 +20,13 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.activity_state import ActivityState
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.context.compact import compact_messages
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
-from nerdvana_cli.core.loop_hooks import LoopHookEngine
+from nerdvana_cli.core.loop.activity_state import ActivityState
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.state.checkpoint import CheckpointManager
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
@@ -252,9 +252,9 @@ def test_dead_after_tool_dispatcher_is_gone() -> None:
 def test_before_api_call_has_a_production_fire_site(tmp_path: Path) -> None:
     """BEFORE_API_CALL is dispatched from the loop, so the handler runs.
 
-    The handler lives in core/activity_hooks.py and moves the indicator into its
+    The handler lives in core/loop/activity_hooks.py and moves the indicator into its
     waiting_api phase. It only means anything if something fires the event on
-    the way to the provider, which core/agent_loop.py now does.
+    the way to the provider, which core/loop/agent_loop.py now does.
     """
     root       = Path(__file__).resolve().parents[2] / "nerdvana_cli"
     definition = root / "core" / "hooks.py"
@@ -267,7 +267,7 @@ def test_before_api_call_has_a_production_fire_site(tmp_path: Path) -> None:
         and "HookEvent.BEFORE_API_CALL" in path.read_text(encoding="utf-8")
     )
 
-    assert "core/agent_loop.py" in fire_sites, (
+    assert "core/loop/agent_loop.py" in fire_sites, (
         "no production code dispatches BEFORE_API_CALL; the handler and the "
         "docs advertise an extension point that never runs"
     )
@@ -416,8 +416,8 @@ async def test_agent_loop_wires_the_analytics_writer(
 def test_naive_compaction_leaves_an_orphan_tool_result() -> None:
     """Naive truncation can start the history with a tool result and no tool_use.
 
-    The AI compaction path at core/agent_loop.py:299-301 drops leading TOOL
-    messages; the naive fallback at core/agent_loop.py:306 does not, so the
+    The AI compaction path at core/loop/agent_loop.py:299-301 drops leading TOOL
+    messages; the naive fallback at core/loop/agent_loop.py:306 does not, so the
     provider receives a tool_result whose tool_use is gone and answers 400. The
     fix belongs next to that assignment, applying the same leading-TOOL trim
     that the AI path already performs.
@@ -438,7 +438,7 @@ def test_naive_compaction_leaves_an_orphan_tool_result() -> None:
 
     assert compacted[0].role == Role.TOOL, (
         "naive compaction no longer starts with an orphan tool result; if the "
-        "leading-TOOL trim was added at core/agent_loop.py:306, delete this test"
+        "leading-TOOL trim was added at core/loop/agent_loop.py:306, delete this test"
     )
 
 

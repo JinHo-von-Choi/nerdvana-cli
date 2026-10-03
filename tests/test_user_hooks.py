@@ -110,7 +110,7 @@ def test_session_start_context_injection_has_no_third_party_guidance():
     """
     import inspect
 
-    from nerdvana_cli.core.builtin_hooks import session_start_context_injection
+    from nerdvana_cli.core.loop.builtin_hooks import session_start_context_injection
 
     src = inspect.getsource(session_start_context_injection)
     # No hardcoded MCP tool names
@@ -121,7 +121,7 @@ def test_session_start_context_injection_has_no_third_party_guidance():
 
 def test_session_start_context_injection_returns_system_prompt_append():
     """builtin hook must use system_prompt_append, not inject_messages."""
-    from nerdvana_cli.core.builtin_hooks import session_start_context_injection
+    from nerdvana_cli.core.loop.builtin_hooks import session_start_context_injection
 
     class _Tool:
         name = "FileRead"

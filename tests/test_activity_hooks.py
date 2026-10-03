@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from nerdvana_cli.core.activity_hooks import (
+from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
+from nerdvana_cli.core.config.settings_sections import SkillsConfig
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
+from nerdvana_cli.core.loop.activity_hooks import (
     make_after_api_call_handler,
     make_after_tool_handler,
     make_before_api_call_handler,
     make_before_tool_handler,
 )
-from nerdvana_cli.core.activity_state import ActivityState, summarize_tool_call
-from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
-from nerdvana_cli.core.config.settings_sections import SkillsConfig
-from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
+from nerdvana_cli.core.loop.activity_state import ActivityState, summarize_tool_call
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.tool import ToolRegistry
 
 # ---------------------------------------------------------------------------

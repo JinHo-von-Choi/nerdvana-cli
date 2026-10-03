@@ -19,10 +19,10 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, Sp
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter  # noqa: E402
 from opentelemetry.trace import StatusCode  # noqa: E402
 
-from nerdvana_cli.core.agent_loop import AgentLoop  # noqa: E402
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.config.settings_sections import OtelConfig  # noqa: E402
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent  # noqa: E402
+from nerdvana_cli.core.loop.agent_loop import AgentLoop  # noqa: E402
 from nerdvana_cli.core.safety.secrets import MARKER  # noqa: E402
 from nerdvana_cli.core.state.session import SessionStorage  # noqa: E402
 from nerdvana_cli.core.telemetry import telemetry_otel  # noqa: E402

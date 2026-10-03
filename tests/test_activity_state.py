@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.core.activity_state import (
+from nerdvana_cli.core.loop.activity_state import (
     ActivityState,
     summarize_tool_call,
 )
@@ -73,9 +73,9 @@ class TestBash:
 class TestFileTools:
     @pytest.mark.parametrize("tool", ["FileRead", "FileWrite", "FileEdit"])
     def test_absolute_path_shortened(self, tool: str) -> None:
-        label, detail = summarize_tool_call(tool, {"file_path": "/workspace/nerdvana-cli/nerdvana_cli/core/agent_loop.py"})
+        label, detail = summarize_tool_call(tool, {"file_path": "/workspace/nerdvana-cli/nerdvana_cli/core/loop/agent_loop.py"})
         assert label  == tool
-        assert detail == "core/agent_loop.py"
+        assert detail == "loop/agent_loop.py"
 
     @pytest.mark.parametrize("tool", ["FileRead", "FileWrite", "FileEdit"])
     def test_two_level_path(self, tool: str) -> None:
@@ -357,7 +357,7 @@ class TestSymbolTools:
     ])
     def test_file_and_symbol(self, tool: str) -> None:
         label, detail = summarize_tool_call(tool, {
-            "relative_path": "nerdvana_cli/core/agent_loop.py",
+            "relative_path": "nerdvana_cli/core/loop/agent_loop.py",
             "name_path": "AgentLoop/run",
         })
         assert label  == tool

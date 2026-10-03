@@ -15,13 +15,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
-from nerdvana_cli.core.phase_effort import IMPLEMENTATION, PLANNING, VERIFICATION, phase_level, phases_configured
-from nerdvana_cli.core.plan_gate import draft_plan
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.phase_effort import IMPLEMENTATION, PLANNING, VERIFICATION, phase_level, phases_configured
+from nerdvana_cli.core.loop.plan_gate import draft_plan
+from nerdvana_cli.core.loop.subagent_config import LoopFactories
 from nerdvana_cli.core.state.goal import Goal
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider
 from nerdvana_cli.providers.base import ProviderEvent
@@ -182,7 +182,7 @@ async def test_a_level_the_model_does_not_accept_is_left_out_with_one_warning(
     provider = _TurnProvider(error=ValueError("reasoning_effort 'max' is not an effort level of m"))
     loop     = _loop(monkeypatch, tmp_path, provider, _settings(tmp_path, implementation="max", verification="max"))
     loop.set_goal(_failing_goal(3))
-    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.phase_effort"):
+    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.loop.phase_effort"):
         await _drain(loop)
     assert provider.efforts == ["", "", ""]
     assert [r.getMessage().startswith("phase effort not applied") for r in caplog.records].count(True) == 1

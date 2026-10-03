@@ -25,7 +25,7 @@ KNOWN_LONG: dict[str, int] = {
     "providers/openai_provider.py:OpenAIProvider.stream": 141,
     "main.py:run": 111,
     "tools/file_tools.py:FileEditTool.call": 116,
-    "core/activity_state.py:summarize_tool_call": 108,
+    "core/loop/activity_state.py:summarize_tool_call": 108,
     "commands/model_commands.py:switch_provider": 95,
     "core/config/settings.py:NerdvanaSettings.load": 92,
     "cli/updater.py:run_self_update": 91,

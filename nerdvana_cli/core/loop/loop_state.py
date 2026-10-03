@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from nerdvana_cli.core.tool_ids import new_tool_use_id
+from nerdvana_cli.core.loop.tool_ids import new_tool_use_id
 
 
 @dataclasses.dataclass(frozen=True)

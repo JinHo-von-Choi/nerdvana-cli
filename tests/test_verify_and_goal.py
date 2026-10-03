@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
+from nerdvana_cli.core.loop.verify import run_verify
 from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.core.state.goal import ACTIVE, MET, PAUSED, UNMET, Goal, GoalError, load_goal, save_goal
-from nerdvana_cli.core.verify import run_verify
 
 # ---------------------------------------------------------------------------
 # Running the command
@@ -87,7 +87,7 @@ async def test_the_sandbox_policy_confines_the_verification_command(tmp_path: Pa
 
 
 def test_the_summary_names_the_outcome() -> None:
-    from nerdvana_cli.core.verify import VerifyResult
+    from nerdvana_cli.core.loop.verify import VerifyResult
 
     assert VerifyResult(True, 0, False, 1.25, "").summary() == "exit 0 in 1.2s"
     assert "timed out" in VerifyResult(False, -1, True, 30.0, "").summary()

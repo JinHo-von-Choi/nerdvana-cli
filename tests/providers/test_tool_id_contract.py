@@ -367,8 +367,8 @@ class RecordingSession:
 
 class TestSessionLogToolName:
     async def test_session_log_names_the_executed_tool(self):
-        from nerdvana_cli.core.agent_loop import AgentLoop
-        from nerdvana_cli.core.input_queue import InputQueue
+        from nerdvana_cli.core.loop.agent_loop import AgentLoop
+        from nerdvana_cli.core.loop.input_queue import InputQueue
         from nerdvana_cli.types import SessionState, ToolResult
 
         first  = make_tool_use_id(TOOL_NAME)

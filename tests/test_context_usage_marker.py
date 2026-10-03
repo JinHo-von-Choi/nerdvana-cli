@@ -1,6 +1,6 @@
 """Tests for context usage markers."""
 
-from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX
+from nerdvana_cli.core.loop.agent_loop import CONTEXT_USAGE_PREFIX
 
 
 def test_context_usage_prefix_format():

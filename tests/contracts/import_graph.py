@@ -56,8 +56,8 @@ def runtime_imports(tree: ast.AST) -> list[tuple[int, str]]:
 def runtime_import_targets(tree: ast.AST, known_modules: frozenset[str]) -> list[tuple[int, str]]:
     """(line, module) of every runtime import, resolved to the module that is bound.
 
-    ``from nerdvana_cli.core import agent_loop`` binds the submodule
-    ``nerdvana_cli.core.agent_loop``; when the imported name is not a module the
+    ``from nerdvana_cli.core.loop import agent_loop`` binds the submodule
+    ``nerdvana_cli.core.loop.agent_loop``; when the imported name is not a module the
     import binds the package (or module) named by the ``from`` clause.
     """
     found: list[tuple[int, str]] = []

@@ -8,8 +8,8 @@ import os
 import re
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.cancellation import stop_process_group
 from nerdvana_cli.core.execution import changed_files
+from nerdvana_cli.core.loop.cancellation import stop_process_group
 from nerdvana_cli.core.safety.egress_proxy import prepare_launch
 from nerdvana_cli.core.safety.sandbox import Launch
 from nerdvana_cli.core.safety.secrets import SENSITIVE_ENV

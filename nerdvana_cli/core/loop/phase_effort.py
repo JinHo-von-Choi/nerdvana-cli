@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 from nerdvana_cli.core.config.settings import ModelConfig
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 logger = logging.getLogger(__name__)
 

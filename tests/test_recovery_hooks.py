@@ -2,11 +2,11 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from nerdvana_cli.core.builtin_hooks import (
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
+from nerdvana_cli.core.loop.builtin_hooks import (
     context_limit_recovery,
     json_parse_recovery,
 )
-from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
 
 def test_context_limit_recovery_injects_message() -> None:

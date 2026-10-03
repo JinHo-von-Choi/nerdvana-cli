@@ -20,18 +20,6 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.markup import escape
 
-from nerdvana_cli.core.activity_hooks import register_activity_hooks
-from nerdvana_cli.core.activity_state import ActivityState
-from nerdvana_cli.core.advisor import Advisor
-from nerdvana_cli.core.builtin_hooks import (
-    DirectoryRuleInjector,
-    context_limit_recovery,
-    json_parse_recovery,
-    ralph_loop_check,
-    session_start_context_injection,
-    session_start_memory_hint,
-)
-from nerdvana_cli.core.cancellation import race_abort, until_interrupted
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.compact import (
     FALLBACK_PROMPT,
@@ -56,20 +44,35 @@ from nerdvana_cli.core.context.skills import SkillLoader
 from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.execution.context_reminder import ContextReminder
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
-from nerdvana_cli.core.goal_gate import GoalGate
 from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.hooks.user_hooks import load_user_hooks
-from nerdvana_cli.core.images import prompt_content, transcript_text
-from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
-from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
-from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
-from nerdvana_cli.core.loop_support import classifier_feed, with_compaction_hooks
-from nerdvana_cli.core.model_failover import ModelFailover
-from nerdvana_cli.core.phase_effort import PhaseEffort
-from nerdvana_cli.core.plan_gate import plan_for
-from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
-from nerdvana_cli.core.run_limits import RunLimits
+from nerdvana_cli.core.loop.activity_hooks import register_activity_hooks
+from nerdvana_cli.core.loop.activity_state import ActivityState
+from nerdvana_cli.core.loop.advisor import Advisor
+from nerdvana_cli.core.loop.builtin_hooks import (
+    DirectoryRuleInjector,
+    context_limit_recovery,
+    json_parse_recovery,
+    ralph_loop_check,
+    session_start_context_injection,
+    session_start_memory_hint,
+)
+from nerdvana_cli.core.loop.cancellation import race_abort, until_interrupted
+from nerdvana_cli.core.loop.goal_gate import GoalGate
+from nerdvana_cli.core.loop.images import prompt_content, transcript_text
+from nerdvana_cli.core.loop.input_queue import InputQueue, interrupted_results
+from nerdvana_cli.core.loop.loop_hooks import LoopHookEngine, hook_injection_messages
+from nerdvana_cli.core.loop.loop_state import LoopFlow, LoopState, LoopTurn
+from nerdvana_cli.core.loop.loop_support import classifier_feed, with_compaction_hooks
+from nerdvana_cli.core.loop.model_failover import ModelFailover
+from nerdvana_cli.core.loop.phase_effort import PhaseEffort
+from nerdvana_cli.core.loop.plan_gate import plan_for
+from nerdvana_cli.core.loop.provider_recovery import ProviderCallError, RecoveryPlanner
+from nerdvana_cli.core.loop.run_limits import RunLimits
+from nerdvana_cli.core.loop.stream_guard import guarded_stream
+from nerdvana_cli.core.loop.subagent_config import LoopFactories
+from nerdvana_cli.core.loop.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.core.state import signals
@@ -79,11 +82,8 @@ from nerdvana_cli.core.state.goal import Goal
 from nerdvana_cli.core.state.rewind import Rewinder
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.state.todos import CONTINUE, STALLED, TodoGuard
-from nerdvana_cli.core.stream_guard import guarded_stream
-from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.types import Message, Role, SessionState
 
@@ -431,7 +431,7 @@ class AgentLoop:
         return provider_messages(self.state.messages)
 
     async def run(self, prompt: str, images: list[dict[str, Any]] | None = None) -> AsyncGenerator[str, None]:
-        """Submit a prompt (with image blocks, see core/images.py) and run the agent loop until completion."""
+        """Submit a prompt (with image blocks, see core/loop/images.py) and run the agent loop until completion."""
         self.rewinder.mark()
         async for note in self._plan_first(prompt):
             yield note

@@ -12,11 +12,11 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core import model_failover
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.provider_recovery import (
+from nerdvana_cli.core.loop import model_failover
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.provider_recovery import (
     COMPACT,
     FALLBACK,
     GIVE_UP,

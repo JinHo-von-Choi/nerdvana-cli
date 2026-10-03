@@ -259,7 +259,7 @@ class SecretsConfig(BaseModel):
 
 
 class AdvisorConfig(BaseModel):
-    # A stronger model the agent consults at decision points through the Advisor tool (core/advisor.py).
+    # A stronger model the agent consults at decision points through the Advisor tool (core/loop/advisor.py).
     enabled:              bool = False
     # "model" (on the current provider) or "provider:model", the same form as session.escalation_model.
     model:                str  = ""

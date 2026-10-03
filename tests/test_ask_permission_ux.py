@@ -104,7 +104,7 @@ async def test_tty_oserror_denies() -> None:
 @pytest.mark.asyncio
 async def test_run_batch_ask_non_tty_returns_error() -> None:
     """run_batch with an ASK tool in non-TTY must return is_error=True."""
-    from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.loop.loop_state import LoopState
     from nerdvana_cli.core.tool import BaseTool, ToolRegistry
     from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
@@ -140,7 +140,7 @@ async def test_run_batch_ask_non_tty_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_run_batch_ask_tty_yes_proceeds() -> None:
     """run_batch with an ASK tool in TTY where user types 'y' must execute."""
-    from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.loop.loop_state import LoopState
     from nerdvana_cli.core.tool import BaseTool, ToolRegistry
     from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
@@ -179,7 +179,7 @@ async def test_run_batch_ask_tty_yes_proceeds() -> None:
 @pytest.mark.asyncio
 async def test_run_batch_deny_unchanged() -> None:
     """DENY permission must still produce is_error=True and never call _ask."""
-    from nerdvana_cli.core.loop_state import LoopState
+    from nerdvana_cli.core.loop.loop_state import LoopState
     from nerdvana_cli.core.tool import BaseTool, ToolRegistry
     from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 

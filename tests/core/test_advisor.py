@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.advisor import MAX_REPLY_TOKENS, Advisor, Reply, provider_completion, render_context
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.loop.advisor import MAX_REPLY_TOKENS, Advisor, Reply, provider_completion, render_context
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state import signals
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
@@ -334,7 +334,7 @@ def _capture(monkeypatch: pytest.MonkeyPatch, client: _Client) -> list[dict[str,
         built.append(kwargs)
         return client
 
-    monkeypatch.setattr("nerdvana_cli.core.advisor.create_provider", _create)
+    monkeypatch.setattr("nerdvana_cli.core.loop.advisor.create_provider", _create)
     return built
 
 

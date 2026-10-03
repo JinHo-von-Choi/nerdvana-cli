@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any
 from rich.text import Text
 from textual.containers import VerticalScroll
 
-from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
 from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX
+from nerdvana_cli.core.loop.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp

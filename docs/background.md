@@ -119,7 +119,7 @@ cancelling it reaches every place it waits:
 | An MCP call, a web request | The request is cancelled at its next await |
 | A sub-agent | The run is cancelled, and with it everything above |
 
-`core/cancellation.py` holds the helpers. Aborting a sub-agent (the abort event of
+`core/loop/cancellation.py` holds the helpers. Aborting a sub-agent (the abort event of
 `run_subagent`, `TaskStop`) cancels its run; cancelling the main run (the TUI, ACP) does the same.
 A command that exceeds its `timeout` is ended the same way. Work that does not stop within the grace
 period plus two seconds is left cancelled and a warning is logged.

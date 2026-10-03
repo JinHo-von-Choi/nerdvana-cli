@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import (
+from nerdvana_cli.core.loop.agent_loop import (
     COMPACT_STATUS_PREFIX,
     CONTEXT_USAGE_PREFIX,
     TOOL_DONE_PREFIX,

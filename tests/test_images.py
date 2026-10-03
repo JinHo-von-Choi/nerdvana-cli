@@ -14,10 +14,10 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.context_budget import IMAGE_TOKENS, message_tokens
-from nerdvana_cli.core.images import (
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.images import (
     MAX_IMAGE_BYTES,
     ImageError,
     load_image,

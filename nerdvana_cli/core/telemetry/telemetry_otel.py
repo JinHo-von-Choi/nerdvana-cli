@@ -45,8 +45,8 @@ from nerdvana_cli.core.telemetry import otel_semconv as sc
 from nerdvana_cli.core.telemetry.otel_semconv import Attr, Operation
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.agent_loop import AgentLoop
     from nerdvana_cli.core.config.settings_sections import OtelConfig
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
 
 logger = logging.getLogger(__name__)
 

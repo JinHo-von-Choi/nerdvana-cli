@@ -33,8 +33,8 @@ from nerdvana_cli.commands.schedule_command import schedule_app
 from nerdvana_cli.commands.session_command import session_app
 from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.commands.workflow_command import workflow_app
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
@@ -215,7 +215,7 @@ def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any
 def _load_run_images(paths: list[str], cwd: str, reporter: Any, outcome: Any) -> list[dict[str, Any]]:
     """The image blocks named by ``--image``; a file that cannot be sent ends the command with the configuration exit code."""
     from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.images import ImageError, load_images
+    from nerdvana_cli.core.loop.images import ImageError, load_images
 
     try:
         return load_images(paths, cwd)

@@ -13,8 +13,8 @@ import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.delegation.task_state import TaskRegistry
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.core.state.budget import MIN_ENVELOPE, Budget
-from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 
@@ -152,7 +152,7 @@ async def test_the_parents_limit_counts_what_its_sub_agents_spent(monkeypatch: p
     from collections.abc import AsyncIterator
     from typing import Any
 
-    from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.agent_loop import AgentLoop
     from nerdvana_cli.core.state.session import SessionStorage
     from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
     from nerdvana_cli.core.tool import ToolRegistry

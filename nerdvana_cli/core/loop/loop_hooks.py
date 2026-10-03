@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from nerdvana_cli.core.loop_state import LoopState  # noqa: TC001
+from nerdvana_cli.core.loop.loop_state import LoopState  # noqa: TC001
 from nerdvana_cli.types import Message, Role
 
 _RETRYABLE_PATTERNS = re.compile(

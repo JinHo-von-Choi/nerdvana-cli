@@ -21,12 +21,12 @@ from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 
 from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
-from nerdvana_cli.core.activity_state import ActivityState
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.skills import Skill
 from nerdvana_cli.core.context.user_commands import UserCommand, UserCommandLoader
 from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState
+from nerdvana_cli.core.loop.activity_state import ActivityState
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.ui.banner import build_banner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab

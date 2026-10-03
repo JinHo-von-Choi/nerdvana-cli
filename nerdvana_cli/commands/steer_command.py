@@ -6,7 +6,7 @@ Date:   2026-10-03
     /steer <text>
 
 While the agent works, the text interrupts the step in progress (the model's response or the running tools, see
-``core.cancellation``) and the next step starts with it, whatever ``session.steer_mode`` says. When the agent is
+``core.loop.cancellation``) and the next step starts with it, whatever ``session.steer_mode`` says. When the agent is
 idle it is an ordinary prompt. Ctrl+T sends what is typed in the input line the same way.
 """
 

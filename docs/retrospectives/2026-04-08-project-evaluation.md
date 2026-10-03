@@ -15,7 +15,7 @@ NerdVana CLI 프로젝트 분석 및 평가
 ## 평가 범위
 
 - 저장소 구조 및 계층 분리 상태
-- 핵심 실행 흐름(`main.py`, `core/agent_loop.py`)
+- 핵심 실행 흐름(`main.py`, `core/loop/agent_loop.py`)
 - 설정 및 Provider 추상화
 - MCP 및 내장 도구 통합 방식
 - 파일/검색/셸 도구의 안전성

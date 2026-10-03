@@ -14,8 +14,8 @@ import pytest
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.delegation.workflow_store import RunStore
+from nerdvana_cli.core.loop.subagent_config import SubagentConfig
 from nerdvana_cli.core.state.budget import Budget
-from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolCategory, ToolContext
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry

@@ -15,7 +15,7 @@ import os
 import sys
 from typing import Any
 
-from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.main import app
 from nerdvana_cli.providers.base import ProviderEvent
 

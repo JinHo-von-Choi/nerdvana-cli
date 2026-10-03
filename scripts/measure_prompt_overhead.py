@@ -26,9 +26,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.token_estimator import approx_tokens
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.tools.registry import create_tool_registry
 
 _SECTION = re.compile(r"\n(?=#{1,3} )")
