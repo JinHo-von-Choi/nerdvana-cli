@@ -193,6 +193,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana providers` | 지원하는 모든 AI 제공자 목록 표시 |
 | `nerdvana version` | 버전 표시 |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
+| `nerdvana acp` | Zed 같은 편집기를 위해 Agent Client Protocol 에이전트로 stdio 에서 실행 (`acp` extra 필요). [docs/acp.md](docs/acp.md) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
 | `nerdvana import claude\|codex` | 슬래시 명령(`.claude/commands`, `~/.codex/prompts`)을 덮어쓰지 않고 `.nerdvana/commands` 로 가져오고, Claude Code `settings.json` 의 권한 규칙을 이 도구의 문법으로 바꿔 출력합니다. `--write` 전에는 계획만 보여 줍니다 |
 | `nerdvana review` | 작업 트리를 git ref 와 비교해, 바뀐 함수와 그것을 쓰는 줄에서 출발하는 읽기 전용 에이전트로 리뷰합니다(`--base`, `--context-only`, `--fail-on`). [docs/review.md](docs/review.md) |

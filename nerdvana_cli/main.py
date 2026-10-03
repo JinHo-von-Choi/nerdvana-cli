@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 
 from nerdvana_cli import __version__
+from nerdvana_cli.acp.command import acp_command
 from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
@@ -45,6 +46,7 @@ app.add_typer(skill_app,   name="skill")
 app.add_typer(memory_app,  name="memory")
 app.add_typer(hook_app)
 app.add_typer(admin_app)
+app.command(name="acp")(acp_command)
 
 
 def _maybe_show_update_notice(target: Console | None = None) -> None:
