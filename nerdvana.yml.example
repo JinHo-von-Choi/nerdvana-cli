@@ -106,6 +106,7 @@ session:
   mask_keep_last: 6
   # Clearable old output (estimated tokens) that must pile up before one batch clears it
   mask_trigger_tokens: 20000
+  report_bash_changes: false
   # Spawn a Plan subagent on complex prompts before execution
   planning_gate: false
   # Tell the model once when this many edits in a row to one file all failed, or this many turns

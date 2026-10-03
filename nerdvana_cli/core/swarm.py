@@ -40,6 +40,8 @@ class SwarmConfig:
     parent_session_id: str = ""
     # (Budget, callable returning the leader's own spend) from the leader's tool context, or None.
     budget:        Any = None
+    # Adds a finished worker's token totals and signals to the leader's.
+    absorb:        Any = None
 
 
 async def run_swarm(
@@ -80,6 +82,7 @@ async def run_swarm(
             confirm   = label_confirm(config.confirm, agent_id),
             category  = task.category,
             parent_session_id = config.parent_session_id,
+            absorb    = config.absorb,
         )
 
         try:

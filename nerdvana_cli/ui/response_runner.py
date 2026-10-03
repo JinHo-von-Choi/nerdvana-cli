@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
 from textual.containers import VerticalScroll
@@ -26,6 +26,19 @@ from nerdvana_cli.core.agent_loop import (
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
     from nerdvana_cli.ui.widgets import StatusBar, StreamingOutput, ToolStatusLine
+
+
+def _status_fields(app: NerdvanaApp, usage: Any) -> dict[str, Any]:
+    """What the status bar shows once a response is finished: model, token totals, cache share and tools."""
+    return {
+        "model":      app.settings.model.model,
+        "provider":   app.settings.model.provider,
+        "tokens_in":  usage.input_tokens,
+        "tokens_out": usage.output_tokens,
+        "tools":      len(app._agent_loop.registry.all_tools()) if app._agent_loop else 0,
+        "parism":     app.parism_client is not None,
+        "cache_read": usage.cache_read_tokens,
+    }
 
 
 async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
@@ -155,14 +168,7 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
             f"[dim]({elapsed:.1f}s | {usage.input_tokens} in / {usage.output_tokens} out)[/dim]"
         )
 
-        status_bar.update_status(
-            model      = app.settings.model.model,
-            provider   = app.settings.model.provider,
-            tokens_in  = usage.input_tokens,
-            tokens_out = usage.output_tokens,
-            tools      = len(app._agent_loop.registry.all_tools()),
-            parism     = app.parism_client is not None,
-        )
+        status_bar.update_status(**_status_fields(app, usage))
     except asyncio.CancelledError:
         # CancelledError derives from BaseException, so the handler below never
         # sees it. Without this branch a cancelled worker leaks the timer task,

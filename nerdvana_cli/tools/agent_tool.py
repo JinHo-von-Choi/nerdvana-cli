@@ -221,6 +221,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
             confirm       = label_confirm(context.confirm, task_id),
             category      = args.category or agent_defn.category,
             parent_session_id = str(context.state.get("session_id", "")),
+            absorb        = context.state.get("absorb"),
         )
 
         if args.run_in_background:

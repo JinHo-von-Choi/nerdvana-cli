@@ -8,6 +8,7 @@ import os
 import re
 from typing import Any, ClassVar
 
+from nerdvana_cli.core import changed_files
 from nerdvana_cli.core.sandbox import Launch, plan_launch
 from nerdvana_cli.core.secrets import SENSITIVE_ENV
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
@@ -209,6 +210,7 @@ Examples:
                 return ToolResult(tool_use_id="", content=launch.notice, is_error=True)
             if launch.notice:
                 _warn_once(launch.notice)
+            before = await changed_files.snapshot(context.cwd) if context.state.get("report_bash_changes") else None
             proc = await _spawn(launch, args.command, context.cwd, env)
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=args.timeout)
@@ -233,6 +235,9 @@ Examples:
             if exit_code != 0:
                 output = f"[exit code: {exit_code}]\n{output}"
 
+            after = await changed_files.snapshot(context.cwd) if before is not None else None
+            if before is not None and after is not None:
+                output += changed_files.report(changed_files.changed(before, after))
             return ToolResult(tool_use_id="", content=self.truncate_result(output))
 
         except Exception as e:

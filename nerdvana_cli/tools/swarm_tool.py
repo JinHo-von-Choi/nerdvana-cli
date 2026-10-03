@@ -104,6 +104,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
             confirm       = context.confirm,
             parent_session_id = str(context.state.get("session_id", "")),
             budget        = context.state.get("budget"),
+            absorb        = context.state.get("absorb"),
         )
         parent_tools = self._parent_registry.all_tools() if self._parent_registry else None
         results      = await run_swarm(config, partial(create_subagent_registry, parent_tools=parent_tools))

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- `session.report_bash_changes` (off by default) names the files a `Bash` command changed in a git working tree at the end of its output.
+- The `cache_miss` signal counts requests whose prompt-cache read fell to zero with nothing in the loop to explain it (no compaction, masking, or model switch), and the status bar shows the cache share of the last request's input. `CONTRIBUTING.md` describes the benchmark procedure for a change to the system prompt, the tools or the loop.
 - `permissions.gate_untrusted_sources` (on by default): a `Bash` command or a state-changing MCP call whose arguments repeat text returned earlier by `WebFetch`, `WebSearch` or an MCP tool asks first, counted as the `untrusted_source` signal.
 - `model.openai_api` (`auto`, `chat`, `responses`): provider `openai` on OpenAI's own endpoint uses the Responses API (stateless, `store: false`, encrypted reasoning items kept in the session); every other OpenAI-compatible endpoint keeps Chat Completions. A warning is logged when tools and a `reasoning_effort` other than `none` go to the Chat Completions endpoint. `docs/providers-compat.md` and adapter contract tests describe and check what each adapter supports.
 - Skills follow the Agent Skills standard: `~/.agents/skills` and `<project>/.agents/skills` are scanned, parsing is lenient, the system prompt carries a skill catalog, and the `ActivateSkill` tool loads a skill as `<skill_content name="...">` plus a listing of its bundled files. `nerdvana skill trust <path>` approves a project skill. See `docs/skills.md`.
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A sub-agent's token totals and signal counts are added to its parent's run result (they were left out; the cost already was), for the `Agent` tool and for swarm workers. A sub-agent that was aborted reported a spend of zero to the cost envelope; it now reports what it spent.
 - The MCP server key, ACL and audit files follow `NERDVANA_DATA_HOME`; files that exist only under `~/.nerdvana` are still read from there with one warning. Nothing is copied or deleted.
 - A streamed Gemini response that called tools now ends as `tool_use`; it ended as `end_turn` before and the run stopped without executing the calls.
 - The git status in the system prompt is taken once per session, so editing files no longer invalidates the provider prompt cache on the next prompt.
