@@ -6,7 +6,9 @@ import asyncio
 import copy
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
+from nerdvana_cli.core.budget import Budget, Envelope
 from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
@@ -36,6 +38,8 @@ class SwarmConfig:
     max_turns:     int = 50
     confirm:       ConfirmCallback | None = None
     parent_session_id: str = ""
+    # (Budget, callable returning the leader's own spend) from the leader's tool context, or None.
+    budget:        Any = None
 
 
 async def run_swarm(
@@ -49,6 +53,9 @@ async def run_swarm(
     Partial failures are captured and returned as "[swarm error] ..." strings
     so the leader can inspect them without crashing.
     """
+    spent: list[float] = []
+    share  = _reserve_share(config)
+
     async def _run_one(task: SwarmTask) -> tuple[str, str]:
         agent_id   = f"{task.name}@{config.team_name}"
         abort      = asyncio.Event()
@@ -60,9 +67,7 @@ async def run_swarm(
         )
         config.task_registry.register(task_state)
 
-        child_settings            = copy.deepcopy(config.settings)
-        child_settings.session.max_turns = config.max_turns
-        apply_model_spec(child_settings, select_model(task.model, task.category, "", "", child_settings.agents.categories))
+        child_settings = _child_settings(config, task, share)
 
         child_registry = registry_factory(child_settings)
         sub_config     = SubagentConfig(
@@ -79,6 +84,7 @@ async def run_swarm(
 
         try:
             output, _          = await run_subagent(sub_config, abort)
+            spent.append(sub_config.cost_usd)
             task_state.status  = TaskStatus.COMPLETED
             task_state.output  = output
             return agent_id, output
@@ -87,5 +93,28 @@ async def run_swarm(
             task_state.error  = str(exc)
             return agent_id, f"[swarm error] {exc}"
 
-    results_list = await asyncio.gather(*[_run_one(t) for t in config.tasks])
+    try:
+        results_list = await asyncio.gather(*[_run_one(t) for t in config.tasks])
+    finally:
+        if share is not None:
+            share[1].settle(share[0], sum(spent))
     return dict(results_list)
+
+
+def _child_settings(config: SwarmConfig, task: SwarmTask, share: tuple[Envelope, Budget] | None) -> NerdvanaSettings:
+    """The settings a worker runs with: the turn limit, its share of the cost limit and its model."""
+    child = copy.deepcopy(config.settings)
+    child.session.max_turns = config.max_turns
+    if share is not None:
+        child.session.max_cost_usd = share[0].amount / len(config.tasks)
+    apply_model_spec(child, select_model(task.model, task.category, "", "", child.agents.categories))
+    return child
+
+
+def _reserve_share(config: SwarmConfig) -> tuple[Envelope, Budget] | None:
+    """Set aside the swarm's share of the leader's cost limit, to be split between its tasks."""
+    fraction = config.settings.session.subagent_budget_fraction
+    if config.budget is None or config.budget[0].limit <= 0 or fraction <= 0 or not config.tasks:
+        return None
+    budget, own_spend = config.budget
+    return budget.reserve(fraction, own_spend()), budget

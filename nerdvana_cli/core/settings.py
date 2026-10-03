@@ -87,6 +87,9 @@ class SessionConfig(BaseModel):
     project_doc_max_tokens: int = 0
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
+    # Share of the cost still unspent that one sub-agent (Agent call or Swarm) may use; it stops at its
+    # share and its spend counts against max_cost_usd. 0 = no share, sub-agents run unbounded.
+    subagent_budget_fraction: float = 0.5
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures

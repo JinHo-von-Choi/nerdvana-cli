@@ -23,6 +23,7 @@ from rich.markup import escape
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
+from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
 from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
@@ -212,6 +213,7 @@ class AgentLoop:
     _queued_input:            list[str]
     _goal:                    Goal | None
     _goal_loaded:             bool
+    _budget:                  Budget | None
     last_stop:                str
     turns_used:               int
     _cost_limit_warned:       bool
@@ -361,6 +363,14 @@ class AgentLoop:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
 
     @property
+    def budget(self) -> Budget:
+        """The session's cost limit as shared with its sub-agents (rebuilt when the limit changes)."""
+        limit = self.settings.session.max_cost_usd
+        if self._budget is None or self._budget.limit != limit:
+            self._budget = Budget(limit=limit)
+        return self._budget
+
+    @property
     def goal(self) -> Goal | None:
         """The goal this session is held to, loaded from its file the first time it is asked for."""
         if not self._goal_loaded:
@@ -430,7 +440,7 @@ class AgentLoop:
         limit = self.settings.session.max_cost_usd
         if limit <= 0:
             return ""
-        spent = self.session_cost_usd()
+        spent = self.session_cost_usd() + self.budget.spent
         if spent < limit:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
@@ -445,6 +455,7 @@ class AgentLoop:
         self.wrap_up_at            = 0
         self._goal                 = None
         self._goal_loaded          = False
+        self._budget               = None
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -840,6 +851,7 @@ class AgentLoop:
             confirm       = self._on_confirm,
         )
         context.state["session_id"] = self.session.session_id
+        context.state["budget"]     = (self.budget, self.session_cost_usd)
         sandbox = self.settings.sandbox
         context.state["sandbox"]    = SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths))
         return context
