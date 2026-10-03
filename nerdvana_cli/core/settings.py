@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
-from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, field_validator
 from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
