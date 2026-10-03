@@ -265,3 +265,30 @@ async def test_run_subagent_sets_the_wrap_up_turn_from_the_limit(monkeypatch: py
             asyncio.Event(),
         )
         assert seen[-1] == expected
+
+
+async def test_a_sub_agent_that_hits_its_share_returns_what_it_had_and_says_so(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import asyncio
+
+    from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+
+    provider = _Endless(usage={"input_tokens": 1_000_000, "output_tokens": 0})
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setattr(AgentLoop, "create_provider_from_settings", lambda self: provider)
+    monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
+    pricing = tmp_path / "pricing.yml"
+    pricing.write_text(PRICING, encoding="utf-8")
+    monkeypatch.setattr("nerdvana_cli.core.agent_loop.PricingTable", lambda: PricingTable(pricing_path=pricing))
+    settings = NerdvanaSettings()
+    settings.cwd = str(tmp_path)
+    settings.model.provider = "acme"
+    settings.model.model    = "priced"
+    settings.session.max_cost_usd = 2_000_000.0
+    registry = ToolRegistry()
+    registry.register(_Echo())
+    config = SubagentConfig(agent_id="a", name="Explore", prompt="p", settings=settings, registry=registry, max_turns=20)
+    output, tokens = await run_subagent(config, asyncio.Event())
+    assert config.stopped_for == "max_cost"
+    assert config.cost_usd == pytest.approx(2_000_000.0)
+    assert "used its share of the cost budget" in output
+    assert tokens == 2_000_000          # the tokens of every request, not only the last one

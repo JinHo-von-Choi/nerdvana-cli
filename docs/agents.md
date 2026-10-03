@@ -50,6 +50,16 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 - **System prompt:** "You are a test-writing agent. Write thorough tests using the project's existing test framework. Follow TDD: write failing test first, then implement minimal code to pass. Do not refactor existing code."
 - **Use:** TDD test generation and execution.
 
+## Sharing the cost limit
+
+With `session.max_cost_usd` set, a sub-agent does not get the whole limit. Each `Agent` call is
+given `session.subagent_budget_fraction` (0.5) of what is still unspent and unpromised, so the first of
+several parallel agents gets half, the next a quarter, and together they cannot promise the same money
+twice. A `Swarm` takes one share and splits it between its tasks. A sub-agent that reaches its share
+stops and returns what it has, ending with a note that the result is partial. When it finishes, its
+actual spend is charged to the session and the unused part goes back. A sub-agent on a model with no
+known price cannot be bounded this way; see `session.require_price` and `session.max_total_tokens`.
+
 ## Running out of turns
 
 Every sub-agent gets a reminder at 60% of its turn limit: the turn budget is stated and the

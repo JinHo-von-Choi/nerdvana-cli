@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -24,6 +25,21 @@ class AgentToolArgs:
     model:             str  = ""
     category:          str  = ""
     run_in_background: bool = False
+
+
+def open_envelope(context: ToolContext, child_settings: NerdvanaSettings) -> Callable[[float], None] | None:
+    """Give a sub-agent its share of the parent's cost limit; returns the call that settles it afterwards.
+
+    Nothing is reserved when the parent has no cost limit or ``session.subagent_budget_fraction`` is 0.
+    """
+    shared = context.state.get("budget")
+    fraction = child_settings.session.subagent_budget_fraction
+    if shared is None or shared[0].limit <= 0 or fraction <= 0:
+        return None
+    budget, own_spend = shared
+    envelope = budget.reserve(fraction, own_spend())
+    child_settings.session.max_cost_usd = envelope.amount
+    return lambda actual: budget.settle(envelope, actual)
 
 
 def _agent_types() -> Any:
@@ -128,6 +144,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         registry.register(task)
 
         child_settings = copy.deepcopy(self._settings)
+        settle         = open_envelope(context, child_settings)
 
         from nerdvana_cli.tools.registry import create_subagent_registry
 
@@ -166,7 +183,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         if args.run_in_background:
             task.background = True
             bg = asyncio.get_event_loop().create_task(
-                self._run_and_record(config, task, abort, registry)
+                self._run_and_record(config, task, abort, registry, settle)
             )
             task.bg_task = bg
             return ToolResult(
@@ -174,7 +191,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 content     = f"Agent started in background. Task ID: {task_id}",
             )
 
-        output, total_tokens = await self._run_and_record(config, task, abort, registry)
+        output, total_tokens = await self._run_and_record(config, task, abort, registry, settle)
         return ToolResult(tool_use_id="", content=output, tokens=total_tokens)
 
     async def _run_and_record(
@@ -183,6 +200,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         task:     TaskState,
         abort:    asyncio.Event,
         registry: TaskRegistry,
+        settle:   Callable[[float], None] | None = None,
     ) -> tuple[str, int]:
         try:
             output, total_tokens = await run_subagent(config, abort)
@@ -194,4 +212,6 @@ class AgentTool(BaseTool[AgentToolArgs]):
             task.error  = str(exc)
             return f"[agent error] {exc}", 0
         finally:
+            if settle is not None:
+                settle(config.cost_usd)
             registry.mark_finished(task)

@@ -33,6 +33,9 @@ class SubagentConfig:
     parent_session_id: str = ""
     # Fraction of max_turns after which the agent is told to wrap up and answer (0 = never).
     wrap_up_fraction: float = 0.6
+    # Set by run_subagent: what the agent spent (USD) and why it stopped.
+    cost_usd:      float = 0.0
+    stopped_for:   str   = ""
 
 
 def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
@@ -70,8 +73,12 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
             if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
                 parts.append(chunk)
 
-    total_tokens = loop.state.usage.input_tokens + loop.state.usage.output_tokens
-    return "".join(parts), total_tokens
+    config.cost_usd    = loop.session_cost_usd()
+    config.stopped_for = loop.last_stop
+    if loop.last_stop == "max_cost":
+        parts.append(f"\n[Stopped: this agent used its share of the cost budget (${config.cost_usd:.4f}); the result above is partial.]")
+    totals = loop.usage_summary()
+    return "".join(parts), totals["input_tokens"] + totals["output_tokens"]
 
 def create_shared_context(
     messages: list[dict[str, str]],
