@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.commands.doctor_result import CheckResult
+from nerdvana_cli.cli.commands.doctor_result import CheckResult
 
 
 def _check_mcp_servers() -> CheckResult:

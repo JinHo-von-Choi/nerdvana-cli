@@ -376,7 +376,7 @@ class TestEntryPoints:
     async def test_the_model_command_refuses_with_the_reason(self, managed: Path, tmp_path: Path) -> None:
         from unittest.mock import MagicMock
 
-        from nerdvana_cli.commands.model_commands import handle_model
+        from nerdvana_cli.ui.slash.model_commands import handle_model
 
         path = _write(managed, "10-a.yml", "model:\n  denied_models: ['gpt-*']\n")
         settings = _settings_with(tmp_path)
@@ -393,7 +393,7 @@ class TestEntryPoints:
     async def test_the_policy_command_lists_the_files(self, managed: Path, tmp_path: Path) -> None:
         from unittest.mock import MagicMock
 
-        from nerdvana_cli.commands.system_commands import handle_policy
+        from nerdvana_cli.ui.slash.system_commands import handle_policy
 
         _write(managed, "10-a.yml", "sandbox:\n  mode: auto\n")
         app = MagicMock()
@@ -437,19 +437,19 @@ class TestEntryPoints:
 
 class TestDoctor:
     def test_skip_without_files(self, managed: Path) -> None:
-        from nerdvana_cli.commands.doctor_policy import check_managed_policy
+        from nerdvana_cli.cli.commands.doctor_policy import check_managed_policy
 
         assert check_managed_policy().status == "skip"
 
     def test_ok_lists_the_files(self, managed: Path) -> None:
-        from nerdvana_cli.commands.doctor_policy import check_managed_policy
+        from nerdvana_cli.cli.commands.doctor_policy import check_managed_policy
 
         path = _write(managed, "10-a.yml", "sandbox:\n  mode: auto\n")
         result = check_managed_policy()
         assert result.status == "ok" and str(path) in result.detail
 
     def test_fail_gives_the_exact_error_of_every_broken_file(self, managed: Path) -> None:
-        from nerdvana_cli.commands.doctor_policy import check_managed_policy
+        from nerdvana_cli.cli.commands.doctor_policy import check_managed_policy
 
         first  = _write(managed, "10-a.yml", "sandbox:\n  mode: nope\n")
         second = _write(managed, "20-b.yml", "weird:\n  a: 1\n")
@@ -458,7 +458,7 @@ class TestDoctor:
         assert str(first) in result.detail and str(second) in result.detail and "unknown key" in result.detail
 
     def test_the_other_checks_survive_a_broken_file(self, managed: Path) -> None:
-        from nerdvana_cli.commands import doctor_command as dc
+        from nerdvana_cli.cli.commands import doctor_command as dc
 
         _write(managed, "10-a.yml", "sandbox:\n  mode: nope\n")
         assert dc._check_mcp_servers().status == "skip"

@@ -135,7 +135,7 @@ def test_transcript_entries_after_a_rewind_are_kept() -> None:
 
 
 async def test_the_command_reports_and_refuses_bad_input(loop: AgentLoop) -> None:
-    from nerdvana_cli.commands.memory_commands import handle_rewind
+    from nerdvana_cli.ui.slash.memory_commands import handle_rewind
 
     class _App:
         def __init__(self, agent: Any, busy: bool = False) -> None:

@@ -17,8 +17,8 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 | `tools` | the tools the model calls | `core`, `codeintel`, `external`, `mcp` and below |
 | `server` | `nerdvana serve`, the MCP server for other agents | `tools` and below |
 | `acp` | `nerdvana acp`, the Agent Client Protocol agent | `cli`, `mcp`, `core` and below |
-| `ui` | the Textual TUI | `cli`, `core` and below |
-| `cli` | startup, the composition root (`cli/bootstrap.py`) and the modules only commands use | everything but `main` (`ui` only to start the TUI) |
+| `ui` | the Textual TUI and its slash command handlers (`ui/slash`) | `cli`, `core` and below |
+| `cli` | startup, the composition root (`cli/bootstrap.py`), the sub-commands (`cli/commands`) and the modules only they use | everything but `main` (`ui` only to start the TUI) |
 | `main` | the Typer entry point | everything |
 
 ## Core subpackages

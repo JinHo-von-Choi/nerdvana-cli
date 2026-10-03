@@ -2,7 +2,7 @@
 
 Extracted from ``NerdvanaApp._handle_command``. The dispatcher receives the
 App reference and routes ``/cmd args`` strings to the per-area handler modules
-under ``nerdvana_cli.commands``. Adding a new slash command means appending
+under ``nerdvana_cli.ui.slash``. Adding a new slash command means appending
 one row to ``_HANDLERS`` here — App needs no edits.
 """
 
@@ -28,11 +28,10 @@ def _build_handler_map() -> dict[str, CommandHandler]:
     command surface at process start. The map is rebuilt per dispatch — cheap
     (~µs) and keeps the dispatcher pure (no module-level mutable state).
     """
-    from nerdvana_cli.commands import (
+    from nerdvana_cli.cli.commands import context_command, history_command
+    from nerdvana_cli.ui.slash import (
         btw_command,
-        context_command,
         goal_command,
-        history_command,
         image_command,
         memory_commands,
         model_commands,

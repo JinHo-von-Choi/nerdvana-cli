@@ -69,7 +69,7 @@ def handle_option_selected(app: NerdvanaApp, event: OptionList.OptionSelected) -
         selector.remove_class("visible")
         provider_name = event.option.id
         if provider_name:
-            from nerdvana_cli.commands.model_commands import handle_provider_selection
+            from nerdvana_cli.ui.slash.model_commands import handle_provider_selection
             asyncio.create_task(handle_provider_selection(app, provider_name))
         return
 

@@ -20,7 +20,7 @@ import pytest
 
 
 def _result(name: str, status: str, detail: str = ""):
-    from nerdvana_cli.commands.doctor_command import CheckResult
+    from nerdvana_cli.cli.commands.doctor_command import CheckResult
     return CheckResult(name=name, status=status, detail=detail)  # type: ignore[arg-type]
 
 
@@ -31,21 +31,21 @@ def _result(name: str, status: str, detail: str = ""):
 
 class TestCheckPythonVersion:
     def test_ok_when_311(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_python_version
+        from nerdvana_cli.cli.commands.doctor_command import _check_python_version
         with patch.object(sys, "version_info", (3, 11, 0)):
             r = _check_python_version()
         assert r.status == "ok"
         assert "3.11" in r.detail
 
     def test_fail_when_310(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_python_version
+        from nerdvana_cli.cli.commands.doctor_command import _check_python_version
         with patch.object(sys, "version_info", (3, 10, 9)):
             r = _check_python_version()
         assert r.status == "fail"
         assert "3.11" in r.detail
 
     def test_ok_when_312(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_python_version
+        from nerdvana_cli.cli.commands.doctor_command import _check_python_version
         with patch.object(sys, "version_info", (3, 12, 1)):
             r = _check_python_version()
         assert r.status == "ok"
@@ -58,14 +58,14 @@ class TestCheckPythonVersion:
 
 class TestCheckUvInstalled:
     def test_ok_when_found(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_uv_installed
+        from nerdvana_cli.cli.commands.doctor_command import _check_uv_installed
         with patch("shutil.which", return_value="/usr/local/bin/uv"):
             r = _check_uv_installed()
         assert r.status == "ok"
         assert "/usr/local/bin/uv" in r.detail
 
     def test_fail_when_missing(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_uv_installed
+        from nerdvana_cli.cli.commands.doctor_command import _check_uv_installed
         with patch("shutil.which", return_value=None):
             r = _check_uv_installed()
         assert r.status == "fail"
@@ -78,7 +78,7 @@ class TestCheckUvInstalled:
 
 class TestCheckInstallPaths:
     def test_ok_when_writable(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_install_paths
+        from nerdvana_cli.cli.commands.doctor_command import _check_install_paths
 
         data_dir    = tmp_path / "data"
         install_dir = tmp_path / "install"
@@ -94,7 +94,7 @@ class TestCheckInstallPaths:
         assert r.status == "ok"
 
     def test_fail_when_missing(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_install_paths
+        from nerdvana_cli.cli.commands.doctor_command import _check_install_paths
 
         missing = tmp_path / "nonexistent"
 
@@ -108,7 +108,7 @@ class TestCheckInstallPaths:
         assert "Missing" in r.detail
 
     def test_warn_when_read_only(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_install_paths
+        from nerdvana_cli.cli.commands.doctor_command import _check_install_paths
 
         ro_dir = tmp_path / "readonly"
         ro_dir.mkdir()
@@ -133,7 +133,7 @@ class TestCheckInstallPaths:
 
 class TestCheckProviderKeys:
     def test_warn_when_no_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_provider_keys
+        from nerdvana_cli.cli.commands.doctor_command import _check_provider_keys
         from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS
 
         for env_vars in PROVIDER_KEY_ENVVARS.values():
@@ -145,7 +145,7 @@ class TestCheckProviderKeys:
         assert "0/" in r.detail
 
     def test_ok_when_one_key_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_provider_keys
+        from nerdvana_cli.cli.commands.doctor_command import _check_provider_keys
         from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS
 
         # Clear all then set exactly one
@@ -168,14 +168,14 @@ class TestCheckProviderKeys:
 
 class TestCheckParism:
     def test_warn_when_npx_missing(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_parism
+        from nerdvana_cli.cli.commands.doctor_command import _check_parism
         with patch("shutil.which", return_value=None):
             r = _check_parism()
         assert r.status == "warn"
         assert "npx" in r.detail
 
     def test_ok_when_parism_succeeds(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_parism
+        from nerdvana_cli.cli.commands.doctor_command import _check_parism
 
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -192,7 +192,7 @@ class TestCheckParism:
         assert "1.2.3" in r.detail
 
     def test_warn_when_parism_fails(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_parism
+        from nerdvana_cli.cli.commands.doctor_command import _check_parism
 
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -208,7 +208,7 @@ class TestCheckParism:
         assert r.status == "warn"
 
     def test_warn_on_timeout(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_parism
+        from nerdvana_cli.cli.commands.doctor_command import _check_parism
 
         with (
             patch("shutil.which", return_value="/usr/bin/npx"),
@@ -227,14 +227,14 @@ class TestCheckParism:
 
 class TestCheckLspServers:
     def test_ok_when_both_found(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_lsp_servers
+        from nerdvana_cli.cli.commands.doctor_command import _check_lsp_servers
         with patch("shutil.which", side_effect=lambda b: f"/usr/bin/{b}"):
             r = _check_lsp_servers()
         assert r.status == "ok"
         assert "pyright" in r.detail
 
     def test_ok_when_one_found(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_lsp_servers
+        from nerdvana_cli.cli.commands.doctor_command import _check_lsp_servers
 
         def _which(binary: str) -> str | None:
             return "/usr/bin/pyright-langserver" if binary == "pyright-langserver" else None
@@ -246,7 +246,7 @@ class TestCheckLspServers:
         assert "pyright" in r.detail
 
     def test_warn_when_none_found(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_lsp_servers
+        from nerdvana_cli.cli.commands.doctor_command import _check_lsp_servers
         with patch("shutil.which", return_value=None):
             r = _check_lsp_servers()
         assert r.status == "warn"
@@ -259,13 +259,13 @@ class TestCheckLspServers:
 
 class TestCheckMcpServers:
     def test_skip_when_no_config(self) -> None:
-        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
+        from nerdvana_cli.cli.commands.doctor_mcp import _check_mcp_servers
         with patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={}):
             r = _check_mcp_servers()
         assert r.status == "skip"
 
     def test_ok_for_stdio_with_existing_command(self) -> None:
-        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
+        from nerdvana_cli.cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="test", transport="stdio", command="python3")
@@ -278,7 +278,7 @@ class TestCheckMcpServers:
         assert r.status == "ok"
 
     def test_warn_for_stdio_with_missing_command(self) -> None:
-        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
+        from nerdvana_cli.cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="test", transport="stdio", command="nonexistent-tool")
@@ -291,26 +291,26 @@ class TestCheckMcpServers:
         assert r.status == "warn"
 
     def test_ok_for_http_200(self) -> None:
-        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
+        from nerdvana_cli.cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="remote", transport="http", url="http://localhost:10830")
         with (
             patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={"remote": cfg}),
-            patch("nerdvana_cli.commands.doctor_mcp._ping_http", return_value=200),
+            patch("nerdvana_cli.cli.commands.doctor_mcp._ping_http", return_value=200),
         ):
             r = _check_mcp_servers()
 
         assert r.status == "ok"
 
     def test_warn_for_http_unreachable(self) -> None:
-        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
+        from nerdvana_cli.cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="dead", transport="http", url="http://localhost:19999")
         with (
             patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={"dead": cfg}),
-            patch("nerdvana_cli.commands.doctor_mcp._ping_http", return_value=-1),
+            patch("nerdvana_cli.cli.commands.doctor_mcp._ping_http", return_value=-1),
         ):
             r = _check_mcp_servers()
 
@@ -324,17 +324,17 @@ class TestCheckMcpServers:
 
 class TestCheckPricingFreshness:
     def test_skip_when_script_missing(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_pricing_freshness
+        from nerdvana_cli.cli.commands.doctor_command import _check_pricing_freshness
         # Override repo-root detection by patching __file__
         with patch(
-            "nerdvana_cli.commands.doctor_command.__file__",
-            str(tmp_path / "commands" / "doctor_command.py"),
+            "nerdvana_cli.cli.commands.doctor_command.__file__",
+            str(tmp_path / "cli" / "commands" / "doctor_command.py"),
         ):
             r = _check_pricing_freshness()
         assert r.status == "skip"
 
     def test_ok_when_exit_0(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_pricing_freshness
+        from nerdvana_cli.cli.commands.doctor_command import _check_pricing_freshness
 
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -347,8 +347,8 @@ class TestCheckPricingFreshness:
 
         with (
             patch(
-                "nerdvana_cli.commands.doctor_command.__file__",
-                str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+                "nerdvana_cli.cli.commands.doctor_command.__file__",
+                str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
             ),
             patch("subprocess.run", return_value=mock_result),
         ):
@@ -357,7 +357,7 @@ class TestCheckPricingFreshness:
         assert r.status == "ok"
 
     def test_warn_when_exit_1(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_pricing_freshness
+        from nerdvana_cli.cli.commands.doctor_command import _check_pricing_freshness
 
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -370,8 +370,8 @@ class TestCheckPricingFreshness:
 
         with (
             patch(
-                "nerdvana_cli.commands.doctor_command.__file__",
-                str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+                "nerdvana_cli.cli.commands.doctor_command.__file__",
+                str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
             ),
             patch("subprocess.run", return_value=mock_result),
         ):
@@ -387,7 +387,7 @@ class TestCheckPricingFreshness:
 
 class TestCheckCollectBaseline:
     def test_skip_when_baseline_missing(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_collect_baseline
+        from nerdvana_cli.cli.commands.doctor_command import _check_collect_baseline
 
         # Create only the script, not the baseline
         script = tmp_path / "scripts" / "check_test_collection.py"
@@ -395,15 +395,15 @@ class TestCheckCollectBaseline:
         script.touch()
 
         with patch(
-            "nerdvana_cli.commands.doctor_command.__file__",
-            str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+            "nerdvana_cli.cli.commands.doctor_command.__file__",
+            str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
         ):
             r = _check_collect_baseline()
 
         assert r.status == "skip"
 
     def test_skip_when_script_missing(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_collect_baseline
+        from nerdvana_cli.cli.commands.doctor_command import _check_collect_baseline
 
         # Create only the baseline, not the script
         baseline = tmp_path / "tests" / ".collect-baseline"
@@ -411,15 +411,15 @@ class TestCheckCollectBaseline:
         baseline.write_text("total: 100\n")
 
         with patch(
-            "nerdvana_cli.commands.doctor_command.__file__",
-            str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+            "nerdvana_cli.cli.commands.doctor_command.__file__",
+            str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
         ):
             r = _check_collect_baseline()
 
         assert r.status == "skip"
 
     def test_ok_when_exit_0(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_collect_baseline
+        from nerdvana_cli.cli.commands.doctor_command import _check_collect_baseline
 
         (tmp_path / "tests").mkdir()
         (tmp_path / "tests" / ".collect-baseline").write_text("total: 100\n")
@@ -433,8 +433,8 @@ class TestCheckCollectBaseline:
 
         with (
             patch(
-                "nerdvana_cli.commands.doctor_command.__file__",
-                str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+                "nerdvana_cli.cli.commands.doctor_command.__file__",
+                str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
             ),
             patch("subprocess.run", return_value=mock_result),
         ):
@@ -444,7 +444,7 @@ class TestCheckCollectBaseline:
         assert "105" in r.detail
 
     def test_warn_when_exit_1(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_collect_baseline
+        from nerdvana_cli.cli.commands.doctor_command import _check_collect_baseline
 
         (tmp_path / "tests").mkdir()
         (tmp_path / "tests" / ".collect-baseline").write_text("total: 200\n")
@@ -458,8 +458,8 @@ class TestCheckCollectBaseline:
 
         with (
             patch(
-                "nerdvana_cli.commands.doctor_command.__file__",
-                str(tmp_path / "nerdvana_cli" / "commands" / "doctor_command.py"),
+                "nerdvana_cli.cli.commands.doctor_command.__file__",
+                str(tmp_path / "nerdvana_cli" / "cli" / "commands" / "doctor_command.py"),
             ),
             patch("subprocess.run", return_value=mock_result),
         ):
@@ -500,7 +500,7 @@ class TestDoctorCliCommand:
         assert "checks"    in data
         assert "exit_code" in data
         assert isinstance(data["checks"], list)
-        from nerdvana_cli.commands.doctor_command import _ALL_CHECKS
+        from nerdvana_cli.cli.commands.doctor_command import _ALL_CHECKS
         assert len(data["checks"]) == len(_ALL_CHECKS)
         for item in data["checks"]:
             assert "name"   in item
@@ -509,11 +509,11 @@ class TestDoctorCliCommand:
 
     def test_strict_mode_exits_1_on_warn(self) -> None:
         """--strict causes exit 1 when any check is warn."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         warn_results = [CheckResult("x", "warn", "test warn")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=warn_results,
         ):
             result = self._run(["doctor", "--strict"])
@@ -522,11 +522,11 @@ class TestDoctorCliCommand:
 
     def test_strict_mode_exits_0_all_ok(self) -> None:
         """--strict exits 0 when all checks pass."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         ok_results = [CheckResult("x", "ok", "all good")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=ok_results,
         ):
             result = self._run(["doctor", "--strict"])
@@ -535,11 +535,11 @@ class TestDoctorCliCommand:
 
     def test_non_strict_warn_exits_0(self) -> None:
         """Without --strict, warn-only result exits 0."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         warn_results = [CheckResult("x", "warn", "test warn")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=warn_results,
         ):
             result = self._run(["doctor"])
@@ -548,11 +548,11 @@ class TestDoctorCliCommand:
 
     def test_fail_exits_1(self) -> None:
         """Any fail result exits 1 regardless of --strict."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         fail_results = [CheckResult("x", "fail", "something broken")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=fail_results,
         ):
             result = self._run(["doctor"])
@@ -561,11 +561,11 @@ class TestDoctorCliCommand:
 
     def test_skip_does_not_affect_exit_code(self) -> None:
         """skip status has no effect on exit code."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         skip_results = [CheckResult("x", "skip", "not configured")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=skip_results,
         ):
             result = self._run(["doctor"])
@@ -574,11 +574,11 @@ class TestDoctorCliCommand:
 
     def test_json_with_fail_has_exit_code_1(self) -> None:
         """JSON output includes exit_code=1 when fail is present."""
-        from nerdvana_cli.commands.doctor_command import CheckResult
+        from nerdvana_cli.cli.commands.doctor_command import CheckResult
 
         results = [CheckResult("broken", "fail", "oops")]
         with patch(
-            "nerdvana_cli.commands.doctor_command.run_all_checks",
+            "nerdvana_cli.cli.commands.doctor_command.run_all_checks",
             return_value=results,
         ):
             result = self._run(["doctor", "--json"])

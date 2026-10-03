@@ -436,12 +436,12 @@ class NerdvanaApp(App[object]):
 
     async def _handle_api_key_input(self, api_key: str) -> None:
         """Handle API key input for /provider flow."""
-        from nerdvana_cli.commands.model_commands import handle_api_key_input
+        from nerdvana_cli.ui.slash.model_commands import handle_api_key_input
         await handle_api_key_input(self, api_key)
 
     def _show_session_context(self, registry: Any) -> None:
         """Show session startup context summary."""
-        from nerdvana_cli.commands.session_commands import show_session_context
+        from nerdvana_cli.ui.slash.session_commands import show_session_context
         show_session_context(self, registry)
 
     def _add_chat_message(self, markup: str, raw_text: str = "", thinking: str = "") -> None:

@@ -6,7 +6,7 @@ Date:   2026-10-03
 
 from __future__ import annotations
 
-from nerdvana_cli.commands.doctor_result import CheckResult
+from nerdvana_cli.cli.commands.doctor_result import CheckResult
 
 
 def check_managed_policy() -> CheckResult:

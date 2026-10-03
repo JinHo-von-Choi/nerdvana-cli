@@ -186,7 +186,7 @@ def test_run_sends_the_image_with_the_prompt(tmp_path: Path, monkeypatch: pytest
 
 
 async def test_the_image_command_attaches_leading_files_and_asks_the_rest(tmp_path: Path, picture: Path) -> None:
-    from nerdvana_cli.commands.image_command import handle_image, split_args
+    from nerdvana_cli.ui.slash.image_command import handle_image, split_args
 
     assert split_args("shot.png what is it", str(tmp_path)) == (["shot.png"], "what is it")
     assert split_args("what is it", str(tmp_path)) == ([], "what is it")

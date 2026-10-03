@@ -52,7 +52,7 @@ SEED_FILES  = (
     "nerdvana_cli/core/context/context_budget.py",
     "nerdvana_cli/core/context/observation_mask.py",
     "nerdvana_cli/core/context/nirnamd.py",
-    "nerdvana_cli/commands/cost_command.py",
+    "nerdvana_cli/cli/commands/cost_command.py",
 )
 SCAN_DIRS   = ("nerdvana_cli", "tests", "scripts")
 EDIT_MARKER = "# bench-symbol-tools marker"

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.commands import doctor_command as dc
-from nerdvana_cli.commands import doctor_mcp
+from nerdvana_cli.cli.commands import doctor_command as dc
+from nerdvana_cli.cli.commands import doctor_mcp
 
 
 @pytest.fixture(autouse=True)

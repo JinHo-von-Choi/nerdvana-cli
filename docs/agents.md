@@ -263,7 +263,7 @@ accounting reflects actual sub-agent token spend.
   loop and streams output tokens, tool-status markers, and compaction notices to
   the chat widgets.
 - `command_dispatcher.py` — `dispatch_command(app, cmd)`: routes slash commands
-  to per-area handlers in `nerdvana_cli/commands/`.
+  to per-area handlers in `nerdvana_cli/ui/slash/`.
 
 `ui/widgets/` contains one class per file: `ActivityIndicator`, `ChatMessage`,
 `CommandMenu`, `ModelSelector`, `MultilineAwareInput`, `ProviderSelector`,

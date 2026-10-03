@@ -13,7 +13,6 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.commands.steer_command import USAGE, handle_steer
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.loop.input_queue import INTERRUPTED_NOTE, InputQueue
@@ -22,6 +21,7 @@ from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.ui.app import NerdvanaApp
+from nerdvana_cli.ui.slash.steer_command import USAGE, handle_steer
 
 # ---------------------------------------------------------------------------
 # The queue

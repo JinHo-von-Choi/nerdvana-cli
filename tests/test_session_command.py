@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.commands.session_command.
+"""Tests for nerdvana_cli.cli.commands.session_command.
 
 Author: 최진호
 Date:   2026-04-29
@@ -32,21 +32,21 @@ def _make_session(sessions_dir: Path, sid: str, messages: list[dict]) -> Path:
 
 class TestParseDuration:
     def test_days(self) -> None:
-        from nerdvana_cli.commands.session_command import _parse_duration
+        from nerdvana_cli.cli.commands.session_command import _parse_duration
         assert _parse_duration("7d") == 7 * 86400
 
     def test_hours(self) -> None:
-        from nerdvana_cli.commands.session_command import _parse_duration
+        from nerdvana_cli.cli.commands.session_command import _parse_duration
         assert _parse_duration("24h") == 86400
 
     def test_all_returns_none(self) -> None:
-        from nerdvana_cli.commands.session_command import _parse_duration
+        from nerdvana_cli.cli.commands.session_command import _parse_duration
         assert _parse_duration("all") is None
 
     def test_invalid_raises(self) -> None:
         import typer
 
-        from nerdvana_cli.commands.session_command import _parse_duration
+        from nerdvana_cli.cli.commands.session_command import _parse_duration
         with pytest.raises(typer.BadParameter):
             _parse_duration("2w")
 
@@ -57,7 +57,7 @@ class TestParseDuration:
 
 class TestFirstMessage:
     def test_returns_first_user_text(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "s1", [
             {"role": "assistant", "content": "hello"},
             {"role": "user", "content": "world request"},
@@ -65,11 +65,11 @@ class TestFirstMessage:
         assert _first_message(path) == "world request"
 
     def test_missing_file_returns_no_preview(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         assert _first_message(tmp_path / "ghost.jsonl") == "(no preview)"
 
     def test_block_content(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "s2", [
             {"role": "user", "content": [{"type": "text", "text": "block message"}]},
         ])
@@ -88,13 +88,13 @@ class TestFirstMessageOfRecordedTranscripts:
         return Path(storage.file_path)
 
     def test_current_format_previews_the_first_user_message(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = self._recorded(tmp_path)
         assert json.loads(path.read_text(encoding="utf-8").splitlines()[0])["subtype"] == "session_start"
         assert _first_message(path) == "fix the parser"
 
     def test_older_format_with_role_still_previews(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "old", [
             {"ts": "2026-01-01T00:00:00", "role": "assistant", "content": "hi"},
             {"ts": "2026-01-01T00:00:01", "role": "user", "content": "older request"},
@@ -102,7 +102,7 @@ class TestFirstMessageOfRecordedTranscripts:
         assert _first_message(path) == "older request"
 
     def test_entries_that_are_not_user_messages_are_skipped(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "mixed", [
             {"type": "system", "subtype": "session_start", "cwd": "/work"},
             {"type": "assistant", "content": "not this", "tool_uses": []},
@@ -112,7 +112,7 @@ class TestFirstMessageOfRecordedTranscripts:
         assert _first_message(path) == "this one"
 
     def test_blank_user_messages_and_lines_that_are_not_objects_are_skipped(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = tmp_path / "odd.jsonl"
         path.write_text(
             'not json\n[1, 2]\n"text"\n' + json.dumps({"type": "user", "content": "  \n "}) + "\n"
@@ -122,20 +122,20 @@ class TestFirstMessageOfRecordedTranscripts:
         assert _first_message(path) == "from a block"
 
     def test_a_multi_line_message_is_one_line_and_cut_at_80_characters(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "long", [{"type": "user", "content": "first line\n" + "word " * 40}])
         preview = _first_message(path)
         assert "\n" not in preview and preview.startswith("first line word") and len(preview) == 80
 
     def test_a_transcript_without_a_user_message_has_no_preview(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _first_message
+        from nerdvana_cli.cli.commands.session_command import _first_message
         path = _make_session(tmp_path, "none", [{"type": "system", "subtype": "session_start", "cwd": "/work"}])
         assert _first_message(path) == "(no preview)"
 
 
 class TestMessageCount:
     def test_counts_lines(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _message_count
+        from nerdvana_cli.cli.commands.session_command import _message_count
         path = _make_session(tmp_path, "s3", [
             {"role": "user", "content": "a"},
             {"role": "assistant", "content": "b"},
@@ -144,7 +144,7 @@ class TestMessageCount:
         assert _message_count(path) == 3
 
     def test_missing_file_returns_zero(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.session_command import _message_count
+        from nerdvana_cli.cli.commands.session_command import _message_count
         assert _message_count(tmp_path / "nope.jsonl") == 0
 
 

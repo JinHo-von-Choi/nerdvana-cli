@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.commands.memory_command.
+"""Tests for nerdvana_cli.cli.commands.memory_command.
 
 Author: 최진호
 Date:   2026-04-29
@@ -23,13 +23,13 @@ def _run(args: list[str], data_home: str) -> object:
 
 
 def _run_in(args: list[str], data_home: str, cwd: Path) -> object:
-    """Run CLI with nerdvana_cli.commands.memory_command._cwd patched to cwd."""
+    """Run CLI with nerdvana_cli.cli.commands.memory_command._cwd patched to cwd."""
     from unittest.mock import patch
 
     from nerdvana_cli.main import app
     runner = CliRunner()
     env    = {"NERDVANA_DATA_HOME": data_home}
-    with patch("nerdvana_cli.commands.memory_command._cwd", return_value=str(cwd)):
+    with patch("nerdvana_cli.cli.commands.memory_command._cwd", return_value=str(cwd)):
         return runner.invoke(app, args, env=env, catch_exceptions=False)
 
 
@@ -39,24 +39,24 @@ def _run_in(args: list[str], data_home: str, cwd: Path) -> object:
 
 class TestResolveScope:
     def test_project(self) -> None:
-        from nerdvana_cli.commands.memory_command import _resolve_scope
+        from nerdvana_cli.cli.commands.memory_command import _resolve_scope
         from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("project") == MemoryScope.PROJECT_KNOWLEDGE
 
     def test_global(self) -> None:
-        from nerdvana_cli.commands.memory_command import _resolve_scope
+        from nerdvana_cli.cli.commands.memory_command import _resolve_scope
         from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("global") == MemoryScope.USER_GLOBAL
 
     def test_rule(self) -> None:
-        from nerdvana_cli.commands.memory_command import _resolve_scope
+        from nerdvana_cli.cli.commands.memory_command import _resolve_scope
         from nerdvana_cli.core.context.memories import MemoryScope
         assert _resolve_scope("rule") == MemoryScope.PROJECT_RULE
 
     def test_invalid_raises(self) -> None:
         import typer
 
-        from nerdvana_cli.commands.memory_command import _resolve_scope
+        from nerdvana_cli.cli.commands.memory_command import _resolve_scope
         with pytest.raises(typer.BadParameter):
             _resolve_scope("unknown_scope")
 
@@ -156,7 +156,7 @@ class TestMemoryRemove:
         project_dir.mkdir()
         runner = CliRunner()
         env = {"NERDVANA_DATA_HOME": str(tmp_path)}
-        with patch("nerdvana_cli.commands.memory_command._cwd", return_value=str(project_dir)):
+        with patch("nerdvana_cli.cli.commands.memory_command._cwd", return_value=str(project_dir)):
             result = runner.invoke(app, ["memory", "remove", "nonexistent"], env=env)
         assert result.exit_code != 0
 

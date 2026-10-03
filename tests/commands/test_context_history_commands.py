@@ -15,8 +15,8 @@ import pytest
 from rich.text import Text
 from typer.testing import CliRunner
 
+from nerdvana_cli.cli.commands import context_command, history_command
 from nerdvana_cli.cli.history_search import fts5_available
-from nerdvana_cli.commands import context_command, history_command
 from nerdvana_cli.core.config.settings import SessionConfig
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.main import app as cli

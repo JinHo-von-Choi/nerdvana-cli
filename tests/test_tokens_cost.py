@@ -26,7 +26,7 @@ def _make_state(session_id: str = "test-session") -> MagicMock:
 class TestHandleTokensCost:
     @pytest.mark.asyncio
     async def test_shows_basic_token_info(self) -> None:
-        from nerdvana_cli.commands.session_commands import handle_tokens
+        from nerdvana_cli.ui.slash.session_commands import handle_tokens
 
         messages: list[str] = []
         app = MagicMock()
@@ -44,8 +44,8 @@ class TestHandleTokensCost:
     async def test_shows_cost_when_available(self, tmp_path: Path) -> None:
         from datetime import datetime
 
-        from nerdvana_cli.commands.session_commands import handle_tokens
         from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter
+        from nerdvana_cli.ui.slash.session_commands import handle_tokens
 
         # Populate analytics with known cost
         db = tmp_path / "analytics.sqlite"
@@ -69,7 +69,7 @@ class TestHandleTokensCost:
         app._agent_loop       = MagicMock()
         app._agent_loop.state = _make_state("cost-sess")
 
-        with patch("nerdvana_cli.commands.session_commands.AnalyticsReader") as MockReader:
+        with patch("nerdvana_cli.ui.slash.session_commands.AnalyticsReader") as MockReader:
             MockReader.return_value = AnalyticsReader(db_path=db)
             await handle_tokens(app, "")
 
