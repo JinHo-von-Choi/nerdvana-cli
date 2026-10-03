@@ -37,7 +37,8 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import asdict, dataclass
+from collections import Counter
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +85,7 @@ class Attempt:
     cost_usd:     float = 0.0
     duration_s:   float = 0.0
     error:        str   = ""
+    signals:      dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +192,16 @@ def summarize(attempts: list[Attempt], k: int, tags: dict[str, tuple[str, ...]] 
         for tag in (tags or {}).get(task["task"], ()):
             by_tag.setdefault(tag, []).append(task["pass_at_1"])
     low, high = bootstrap_ci([t["pass_at_1"] for t in tasks])
+    failed_signals: dict[str, int] = {}
+    passed_signals: dict[str, int] = {}
+    for attempt in attempts:
+        bucket = passed_signals if attempt.passed else failed_signals
+        for name, count in attempt.signals.items():
+            bucket[name] = bucket.get(name, 0) + count
     return {
+        "signals_in_failed_attempts": dict(sorted(failed_signals.items())),
+        "signals_in_passed_attempts": dict(sorted(passed_signals.items())),
+        "stop_reasons":               dict(sorted(Counter(a.stop or "none" for a in attempts if not a.passed).items())),
         "mean_pass_at_1_ci":   [low, high],
         "by_tag":              {tag: {"tasks": len(rates), "mean_pass_at_1": sum(rates) / len(rates)} for tag, rates in sorted(by_tag.items())},
         "k":                   k,
@@ -217,6 +228,13 @@ def render(summary: dict[str, Any]) -> str:
     if summary["by_tag"]:
         lines += ["", "by tag"]
         lines += [f"  {tag:<20} {data['tasks']:>3} task(s)  mean pass@1 {data['mean_pass_at_1']:.2f}" for tag, data in summary["by_tag"].items()]
+    if summary["stop_reasons"]:
+        lines += ["", "how failed attempts ended"]
+        lines += [f"  {reason:<24} {count:>3}" for reason, count in summary["stop_reasons"].items()]
+    if summary["signals_in_failed_attempts"] or summary["signals_in_passed_attempts"]:
+        names = sorted(set(summary["signals_in_failed_attempts"]) | set(summary["signals_in_passed_attempts"]))
+        lines += ["", f"{'signal (count over attempts)':<30} {'in failed':>9} {'in passed':>9}"]
+        lines += [f"  {name:<28} {summary['signals_in_failed_attempts'].get(name, 0):>9} {summary['signals_in_passed_attempts'].get(name, 0):>9}" for name in names]
     per_solved = summary["cost_per_solved_task"]
     lines.append("")
     lines.append(
@@ -313,6 +331,7 @@ def run_attempt(task: Task, number: int, options: argparse.Namespace, root: Path
         result.stop      = str(report.get("subtype", ""))
         result.turns     = int(report.get("num_turns", 0) or 0)
         result.cost_usd  = float(report.get("total_cost_usd", 0.0) or 0.0)
+        result.signals   = {str(k): int(v) for k, v in (report.get("signals") or {}).items()}
         if not report:
             result.error = f"no result object in the output (exit {agent.returncode}): {agent.stderr.strip()[-300:]}"
         elif report.get("is_error"):

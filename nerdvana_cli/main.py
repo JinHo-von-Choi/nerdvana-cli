@@ -433,6 +433,7 @@ def run(
         outcome.turns       = loop.turns_used
         outcome.cost_usd    = loop.session_cost_usd()
         outcome.usage       = loop.usage_summary()
+        outcome.signals     = loop.signal_summary()
         outcome.duration_ms = int((time.monotonic() - started) * 1000)
         reporter.finish(outcome)
 

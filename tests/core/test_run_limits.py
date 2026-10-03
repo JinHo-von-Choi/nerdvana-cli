@@ -197,3 +197,71 @@ def test_the_new_stop_reasons_map_to_exit_codes() -> None:
     assert RunResult(stop="max_total_tokens").exit_code == EXIT_BUDGET
     assert RunResult(stop="unpriced").exit_code == EXIT_CONFIG
     assert RunResult(stop="unpriced").to_dict()["subtype"] == "error_unpriced"
+
+
+async def test_the_loop_counts_a_todo_nudge_and_a_provider_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from nerdvana_cli.core import signals
+
+    loop = _loop(monkeypatch, tmp_path, _Once([ProviderEvent(type="done", stop_reason="end_turn")]))
+    loop._signals[signals.PROVIDER_RETRY] += 2
+    loop.tool_executor.signals[signals.CAS_REJECTED] += 1
+    assert loop.signal_summary() == {"cas_rejected": 1, "provider_retry": 2}
+
+
+class _Recording:
+    """Calls a tool every request and keeps what it was sent."""
+
+    def __init__(self) -> None:
+        self.payloads: list[list[dict[str, Any]]] = []
+
+    async def stream(self, system_prompt: str, messages: Any, tools: Any) -> AsyncIterator[ProviderEvent]:
+        self.payloads.append([dict(m) for m in messages])
+        n = len(self.payloads)
+        yield ProviderEvent(type="tool_use_complete", tool_use_id=f"c{n}", tool_name="Echo", tool_input_complete={"n": n})
+        yield ProviderEvent(type="done", stop_reason="tool_use")
+
+
+async def test_a_loop_told_to_wrap_up_gets_the_reminder_once_at_that_turn(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = _Recording()
+    loop     = _loop(monkeypatch, tmp_path, provider, max_turns=4)
+    loop.wrap_up_at = 3
+    await _drain(loop)
+    sent = [[str(m.get("content", "")) for m in payload if m["role"] == "user"] for payload in provider.payloads]
+    assert not any("Turn budget" in text for text in sent[0] + sent[1])
+    assert sum("Turn budget" in text for text in sent[2]) == 1
+    assert sum("Turn budget" in text for text in sent[3]) == 1  # the same message stays in the history, it is not added again
+    assert "2 of 4 turns are used" in "".join(sent[2])
+    assert loop.signal_summary()["wrap_up"] == 1
+
+
+async def test_without_a_wrap_up_turn_nothing_is_added(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = _Recording()
+    loop     = _loop(monkeypatch, tmp_path, provider, max_turns=3)
+    await _drain(loop)
+    assert not any("Turn budget" in str(m.get("content", "")) for payload in provider.payloads for m in payload)
+
+
+async def test_run_subagent_sets_the_wrap_up_turn_from_the_limit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import asyncio
+
+    from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+
+    seen: list[int] = []
+    original = AgentLoop.run
+
+    async def spy(self: AgentLoop, prompt: str) -> AsyncIterator[str]:
+        seen.append(self.wrap_up_at)
+        async for chunk in original(self, prompt):
+            yield chunk
+
+    monkeypatch.setattr(AgentLoop, "run", spy)
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setattr(AgentLoop, "create_provider_from_settings", lambda self: _Once([ProviderEvent(type="done", stop_reason="end_turn")]))
+    settings = NerdvanaSettings()
+    settings.cwd = str(tmp_path)
+    for fraction, expected in ((0.6, 12), (0.0, 0)):
+        await run_subagent(
+            SubagentConfig(agent_id="a", name="Explore", prompt="p", settings=settings, registry=ToolRegistry(), max_turns=20, wrap_up_fraction=fraction),
+            asyncio.Event(),
+        )
+        assert seen[-1] == expected

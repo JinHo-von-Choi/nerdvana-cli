@@ -17,21 +17,21 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 
 ### `Explore`
 
-- **Max turns:** 20
+- **Max turns:** 12
 - **Allowed tools:** `Glob`, `Grep`, `FileRead`
 - **System prompt:** "You are an exploration agent. Use search and read tools to answer questions about the codebase. Do not write or edit files. Return a concise factual report."
 - **Use:** fast read-only codebase exploration.
 
 ### `Plan`
 
-- **Max turns:** 20
+- **Max turns:** 15
 - **Allowed tools:** `Glob`, `Grep`, `FileRead`
 - **System prompt:** "You are an architect agent. Analyze the codebase and produce a structured implementation plan. Do not write code — only plan."
 - **Use:** architecture planning without side effects.
 
 ### `code-reviewer`
 
-- **Max turns:** 15
+- **Max turns:** 12
 - **Allowed tools:** `FileRead`, `Grep`, `Glob`
 - **System prompt:** "You are a code review agent. Read files, search for patterns, and identify bugs, security issues, and style problems. Do not modify files. Return a structured review report."
 - **Use:** read-only code quality review. Cannot execute Bash or modify files — safe for review-only workflows.
@@ -49,6 +49,13 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 - **Allowed tools:** `*` (all)
 - **System prompt:** "You are a test-writing agent. Write thorough tests using the project's existing test framework. Follow TDD: write failing test first, then implement minimal code to pass. Do not refactor existing code."
 - **Use:** TDD test generation and execution.
+
+## Running out of turns
+
+Every sub-agent gets a reminder at 60% of its turn limit: the turn budget is stated and the
+agent is told to stop exploring and answer with what it has found, saying plainly what it
+could not find. At the limit the run stops. Exploration agents have low limits because each
+request carries the whole conversation, so a long search costs more than it finds.
 
 ## Custom agent types
 

@@ -17,7 +17,7 @@ def test_code_reviewer_agent() -> None:
     reg = _registry()
     defn = reg.get("code-reviewer")
     assert defn is not None
-    assert defn.max_turns == 15
+    assert defn.max_turns == 12
     assert "FileRead" in defn.allowed_tools or "Read" in defn.allowed_tools
     assert "Bash" not in defn.allowed_tools
     assert "FileWrite" not in defn.allowed_tools
@@ -67,3 +67,9 @@ def test_load_from_nonexistent_dir_is_noop() -> None:
     reg = AgentTypeRegistry()
     reg.load_from_dir("/nonexistent/path/xyz")
     assert reg.all() == []
+
+
+def test_read_only_agents_have_short_turn_limits() -> None:
+    reg = _registry()
+    limits = {name: reg.get(name).max_turns for name in ("Explore", "Plan", "code-reviewer")}  # type: ignore[union-attr]
+    assert limits == {"Explore": 12, "Plan": 15, "code-reviewer": 12}

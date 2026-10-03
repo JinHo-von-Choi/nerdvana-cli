@@ -31,6 +31,8 @@ class SubagentConfig:
     confirm:       ConfirmCallback | None = None
     category:      str = ""
     parent_session_id: str = ""
+    # Fraction of max_turns after which the agent is told to wrap up and answer (0 = never).
+    wrap_up_fraction: float = 0.6
 
 
 def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
@@ -57,6 +59,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
 
     origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
     loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin)
+    loop.wrap_up_at = max(2, int(config.max_turns * config.wrap_up_fraction)) if config.wrap_up_fraction > 0 else 0
     parts: list[str] = []
 
     limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)

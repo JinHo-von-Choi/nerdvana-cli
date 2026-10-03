@@ -103,6 +103,7 @@ def test_result_object_has_the_documented_fields() -> None:
         "result": "answer", "session_id": "s1", "provider": "p", "model": "m",
         "num_turns": 3, "duration_ms": 1200, "total_cost_usd": 0.123457,
         "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 4, "cache_write_tokens": 0},
+        "signals": {},
     }
 
 

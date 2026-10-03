@@ -185,10 +185,11 @@ The result object (`schema_version` 1; fields are only ever added):
 {"type": "result", "schema_version": 1, "subtype": "success", "is_error": false,
  "result": "final answer text", "session_id": "ab12cd34", "provider": "anthropic",
  "model": "claude-sonnet-5-5", "num_turns": 4, "duration_ms": 18234, "total_cost_usd": 0.0421,
- "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000}}
+ "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000},
+ "signals": {"cas_rejected": 1, "new_diagnostics": 2}}
 ```
 
-`subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
+`signals` counts what went wrong during the run by kind (`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` and a few more); a kind that did not occur is absent. `subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
 
 `stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `request` (one provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, and `cost_usd`), `compaction` and `context` (percent of the window used).
 
@@ -387,9 +388,9 @@ The `Agent` and `Swarm` tools dispatch tasks to one of six built-in agent profil
 | Agent Type | Max Turns | Allowed Tools | Purpose |
 |------------|-----------|---------------|---------|
 | `general-purpose` | 50 | `*` | Default catch-all agent |
-| `Explore` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only repo exploration and reconnaissance |
-| `Plan` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only plan drafting; pairs with the `planning_gate` setting |
-| `code-reviewer` | 15 | `FileRead`, `Grep`, `Glob`, `@read` | Diff and source review with no write capability |
+| `Explore` | 12 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only repo exploration and reconnaissance |
+| `Plan` | 15 | `Glob`, `Grep`, `FileRead`, `@read` | Read-only plan drafting; pairs with the `planning_gate` setting |
+| `code-reviewer` | 12 | `FileRead`, `Grep`, `Glob`, `@read` | Diff and source review with no write capability |
 | `git-management` | 20 | `Bash`, `FileRead` | Branch, commit, and merge orchestration via shell |
 | `test-writer` | 30 | `*` | Generates and runs tests across the project |
 

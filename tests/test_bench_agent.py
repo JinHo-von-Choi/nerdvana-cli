@@ -220,3 +220,23 @@ def test_a_failed_run_keeps_the_error_text_the_agent_reported(monkeypatch: pytes
     attempt = _run(monkeypatch, tmp_path, script)
     assert attempt.passed is False  # type: ignore[attr-defined]
     assert "openai package not installed" in attempt.error  # type: ignore[attr-defined]
+
+
+def test_signals_and_stop_reasons_are_split_by_whether_the_attempt_passed() -> None:
+    attempts = [
+        bench.Attempt("a", 1, True,  signals={"new_diagnostics": 1}),
+        bench.Attempt("a", 2, False, stop="error_max_turns", signals={"cas_rejected": 2, "new_diagnostics": 3}),
+        bench.Attempt("b", 1, False, stop="error_provider"),
+    ]
+    summary = bench.summarize(attempts, 2)
+    assert summary["signals_in_failed_attempts"] == {"cas_rejected": 2, "new_diagnostics": 3}
+    assert summary["signals_in_passed_attempts"] == {"new_diagnostics": 1}
+    assert summary["stop_reasons"] == {"error_max_turns": 1, "error_provider": 1}
+    text = bench.render(summary)
+    assert "cas_rejected" in text and "how failed attempts ended" in text
+
+
+def test_the_run_result_signals_are_read_from_the_agent_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    script  = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 1, 'total_cost_usd': 0.0, 'signals': {'cas_rejected': 2}}))\n"
+    attempt = _run(monkeypatch, tmp_path, script)
+    assert attempt.signals == {"cas_rejected": 2}  # type: ignore[attr-defined]
