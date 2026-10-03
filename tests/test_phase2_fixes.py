@@ -1,6 +1,6 @@
 """Phase 2 security/stability fixes — regression tests for M1–M5.
 
-M1: MCP client _write_message now async with drain()
+M1: the MCP stdio transport frames each message as one JSON line
 M2: ai_compact truncates oversized history
 M3: bash_tool blocks long-option rm/chmod variants
 M4: Unknown agent types rejected with error
@@ -9,78 +9,54 @@ M5: Explore/Plan agents no longer have Bash access
 
 from __future__ import annotations
 
-import asyncio
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import anyio
 import pytest
 
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentTypeRegistry
 from nerdvana_cli.core.compact import CompactionState, _messages_to_text, ai_compact
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.mcp.client import McpClient
-from nerdvana_cli.mcp.config import McpServerConfig
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 from nerdvana_cli.types import Message, PermissionBehavior, Role
 
 # ---------------------------------------------------------------------------
-# M1: MCP client _write_message is now async with drain()
+# M1: the MCP stdio transport writes each message as JSON + newline and waits for delivery
 # ---------------------------------------------------------------------------
 
 
 class TestMcpWriteMessageDrain:
-    """_write_message must be async and call drain()."""
+    """A message sent to a stdio MCP server must reach it as one utf-8 JSON line, awaited."""
 
     @pytest.mark.asyncio
-    async def test_write_message_is_coroutine(self):
-        """_write_message should be a coroutine function."""
-        assert asyncio.iscoroutinefunction(McpClient._write_message)
+    async def test_message_is_written_as_json_newline_and_read_back(self):
+        """`cat` echoes what it receives, so a round trip proves the framing in both directions."""
+        import mcp_types as types
+        from mcp.shared.message import SessionMessage
+
+        from nerdvana_cli.mcp.transport import stdio_transport
+
+        sent = types.JSONRPCRequest(jsonrpc="2.0", id=1, method="test", params={"text": "caf\u00e9"})
+        async with stdio_transport(["cat"], {}, name="echo", on_closed=lambda: None) as (read_stream, write_stream):
+            await write_stream.send(SessionMessage(sent))
+            with anyio.fail_after(5):
+                received = await read_stream.receive()
+
+        assert isinstance(received, SessionMessage)
+        assert received.message.model_dump(by_alias=True, exclude_unset=True) == sent.model_dump(by_alias=True, exclude_unset=True)
 
     @pytest.mark.asyncio
-    async def test_write_message_calls_drain(self):
-        """_write_message must call stdin.drain() after write()."""
-        config = McpServerConfig(
-            name="test", transport="stdio", command="echo", args=[],
-        )
-        client = McpClient(config)
+    async def test_a_line_that_is_not_json_rpc_is_reported_not_dropped(self):
+        from nerdvana_cli.mcp.transport import stdio_transport
 
-        mock_stdin = MagicMock()
-        mock_stdin.write = MagicMock()
-        mock_stdin.drain = AsyncMock()
+        async with stdio_transport(
+            ["sh", "-c", "echo not-json"], {}, name="noise", on_closed=lambda: None,
+        ) as (read_stream, _write_stream):
+            with anyio.fail_after(5):
+                received = await read_stream.receive()
 
-        mock_process = MagicMock()
-        mock_process.stdin = mock_stdin
-        client._process = mock_process
-
-        await client._write_message({"jsonrpc": "2.0", "method": "test"})
-
-        mock_stdin.write.assert_called_once()
-        mock_stdin.drain.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_write_message_sends_json_newline(self):
-        """Written data must be JSON + newline, utf-8 encoded."""
-        config = McpServerConfig(
-            name="test", transport="stdio", command="echo", args=[],
-        )
-        client = McpClient(config)
-
-        mock_stdin = MagicMock()
-        mock_stdin.write = MagicMock()
-        mock_stdin.drain = AsyncMock()
-
-        mock_process = MagicMock()
-        mock_process.stdin = mock_stdin
-        client._process = mock_process
-
-        msg = {"jsonrpc": "2.0", "id": 1, "method": "test"}
-        await client._write_message(msg)
-
-        written = mock_stdin.write.call_args[0][0]
-        decoded = written.decode("utf-8")
-        assert decoded.endswith("\n")
-        assert json.loads(decoded.strip()) == msg
+        assert isinstance(received, Exception)
 
 
 # ---------------------------------------------------------------------------

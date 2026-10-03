@@ -181,7 +181,11 @@ async def _connect_mcp(cwd: str) -> Any:
     configs = load_mcp_config(cwd=cwd)
     if not configs:
         return None
-    from nerdvana_cli.mcp.manager import McpManager
+    try:
+        from nerdvana_cli.mcp.manager import McpManager
+    except ImportError:
+        console.print("[dim yellow]MCP servers are configured but the mcp package is not installed (pip install 'nerdvana-cli[mcp]').[/dim yellow]")
+        return None
 
     manager = McpManager(configs)
     for name, status in (await manager.connect_all()).items():

@@ -1,100 +1,189 @@
-"""Generic MCP client — stdio and HTTP transports via JSON-RPC 2.0."""
+"""MCP client for one server over stdio or streamable HTTP, built on the SDK ``Client``.
+
+The SDK client negotiates the protocol revision itself: it asks a server to ``server/discover`` first
+(the 2026-07-28 revision, stateless, no ``initialize``) and falls back to the ``initialize`` handshake of
+the 2025 revisions. It also honours the ``ttlMs`` and ``cacheScope`` hints of list results with an
+in-memory cache, and drives ``input_required`` results (see ``input_requests.py``).
+
+What this module adds on top:
+
+- the transports of ``transport.py``, which cap one server message at 10 MB;
+- one background task per connection that owns the SDK client, because the SDK scopes its resources to
+  the task that entered it, while this class is connected and closed from different tasks;
+- a request timeout of 30 seconds, and ``RuntimeError`` for every failure, as callers expect;
+- results as plain dicts in the shape of the wire format, which ``tools.py`` and ``manager.py`` read;
+- confinement of stdio server processes (``sandbox.py``).
+
+Not exposed to the application by the SDK: tasks (the SDK dropped its experimental client), and the
+client-side halves of sampling, roots and logging, which this client leaves at the SDK defaults (refused).
+"""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
+import os
 from typing import Any
 from urllib.parse import urlparse
 
+import mcp_types as types
+from mcp import Client, MCPError
+from mcp.client.extension import advertise
+from mcp.client.streamable_http import streamable_http_client
+from pydantic import BaseModel, ValidationError
+
+from nerdvana_cli import __version__
 from nerdvana_cli.mcp.config import McpServerConfig
+from nerdvana_cli.mcp.input_requests import answer_elicitation
+from nerdvana_cli.mcp.sandbox import NOT_LOCAL, plan_server_launch
+from nerdvana_cli.mcp.transport import MAX_MESSAGE_BYTES, capped_http_client, stdio_transport
 
 logger = logging.getLogger(__name__)
 
-_REQUEST_TIMEOUT = 30.0
-_MCP_PROTOCOL_VERSION = "2024-11-05"
-_MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10 MB
-_LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+_REQUEST_TIMEOUT    = 30.0
+_MAX_RESPONSE_BYTES = MAX_MESSAGE_BYTES
+_STOP_TIMEOUT       = 10.0
+_MAX_LIST_PAGES     = 100
+_LOCAL_HOSTNAMES    = frozenset({"localhost", "127.0.0.1", "::1"})
+_CLIENT_NAME        = "nerdvana-cli"
+_SKILLS_EXTENSION   = "io.modelcontextprotocol/skills"
+
+
+class _WireResult(types.Result):
+    """Any result, kept as it came: the fields of a method the SDK has no model for."""
+
+    model_config = {**types.Result.model_config, "extra": "allow"}
+
+
+class _WireRequest(types.Request[dict[str, Any], str]):
+    """A request for a method the SDK has no model for (the extensions)."""
+
+
+def _dump(model: BaseModel) -> dict[str, Any]:
+    return model.model_dump(by_alias=True, mode="json", exclude_none=True)
 
 
 class McpClient:
     """Manages a single MCP server connection via stdio or HTTP transport."""
 
     def __init__(self, config: McpServerConfig) -> None:
-        self._config    = config
-        self._process: asyncio.subprocess.Process | None = None
-        self._reader_task: asyncio.Task[None] | None = None
-        self._request_id = 0
-        self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self._config = config
+        self._sdk: Client | None = None
+        self._runner: asyncio.Task[None] | None = None
+        self._stop: asyncio.Event | None = None
         self._connected = False
-        self._session_url: str | None = None  # HTTP: server may return session endpoint
-        self._http_client: Any = None
+        self._confinement = NOT_LOCAL
 
     @property
     def connected(self) -> bool:
         return self._connected
 
+    @property
+    def confinement(self) -> str:
+        """How the server process is confined: ``confined``, ``unconfined`` (with the reason) or ``not applicable``."""
+        return self._confinement
+
+    @property
+    def extensions(self) -> dict[str, Any]:
+        """The extensions the server declared, by identifier; empty until connected."""
+        if self._sdk is None:
+            return {}
+        return dict(self._sdk.server_capabilities.extensions or {})
+
     async def connect(self) -> dict[str, Any]:
-        """Connect to the MCP server and perform the initialize handshake."""
+        """Connect to the MCP server and negotiate the protocol revision.
+
+        Returns:
+            The negotiated ``protocolVersion``, the server's ``capabilities`` and, when it gave one, its ``serverInfo``.
+
+        Raises:
+            RuntimeError: When the server cannot be started, does not answer in time, or refuses the handshake.
+        """
         if self._config.transport in ("http", "sse"):
-            return await self._connect_http()
-        return await self._connect_stdio()
-
-    async def _connect_stdio(self) -> dict[str, Any]:
-        import os
-
-        env = {**os.environ, **self._config.env}
-
+            self._warn_if_insecure_transport(self._config.url)
+        self._stop = asyncio.Event()
+        ready: asyncio.Future[Client] = asyncio.get_running_loop().create_future()
+        self._runner = asyncio.create_task(self._run(ready))
         try:
-            self._process = await asyncio.create_subprocess_exec(
-                self._config.command,
-                *self._config.args,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-                limit=_MAX_RESPONSE_BYTES,
-            )
-        except FileNotFoundError as exc:
-            raise RuntimeError(
-                f"MCP server command not found: {self._config.command}"
-            ) from exc
-
-        self._reader_task = asyncio.create_task(self._read_loop())
-
-        try:
-            result = await self._send_request("initialize", {
-                "protocolVersion": _MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": {"name": "nerdvana-cli", "version": "0.1.1"},
-            })
-            await self._send_notification("notifications/initialized", {})
+            sdk = await asyncio.wait_for(ready, timeout=_REQUEST_TIMEOUT)
+        except TimeoutError as exc:
+            await self._abort()
+            raise RuntimeError(f"MCP request 'initialize' timed out after {_REQUEST_TIMEOUT}s") from exc
         except BaseException:
-            await self._teardown_stdio()
-            self._fail_pending(f"MCP handshake with '{self._config.name}' failed")
+            await self._abort()
             raise
-
-        self._connected = True
+        result: dict[str, Any] = {
+            "protocolVersion": sdk.protocol_version,
+            "capabilities":    _dump(sdk.server_capabilities),
+        }
+        if sdk.server_info is not None:
+            result["serverInfo"] = _dump(sdk.server_info)
         return result
 
-    async def _connect_http(self) -> dict[str, Any]:
-        import httpx
+    async def _run(self, ready: asyncio.Future[Client]) -> None:
+        """Own the SDK client for the life of the connection; runs as the one task that enters and leaves it."""
+        try:
+            async with self._build_client() as sdk:
+                self._sdk       = sdk
+                self._connected = True
+                if not ready.done():
+                    ready.set_result(sdk)
+                assert self._stop is not None
+                await self._stop.wait()
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            if not ready.done():
+                ready.set_exception(self._startup_error(exc))
+            else:
+                logger.debug("MCP connection to '%s' ended with %r", self._config.name, exc)
+        finally:
+            self._connected = False
+            self._sdk       = None
 
-        self._http_client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, verify=True)
-        self._session_url = self._config.url
-        self._warn_if_insecure_transport(self._config.url)
+    def _startup_error(self, exc: BaseException) -> RuntimeError:
+        while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:
+            exc = exc.exceptions[0]
+        if isinstance(exc, RuntimeError):
+            return exc
+        if isinstance(exc, MCPError):
+            return RuntimeError(f"MCP error {exc.code}: {exc.error.message}")
+        if isinstance(exc, FileNotFoundError):
+            return RuntimeError(f"MCP server command not found: {self._config.command}")
+        return RuntimeError(f"MCP handshake with '{self._config.name}' failed: {exc}")
 
-        result = await self._send_request("initialize", {
-            "protocolVersion": _MCP_PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": {"name": "nerdvana-cli", "version": "0.1.1"},
-        })
+    def _build_client(self) -> Client:
+        """The SDK client for this server's transport."""
+        if self._config.transport in ("http", "sse"):
+            http      = capped_http_client(self._config.headers, _MAX_RESPONSE_BYTES)
+            transport = streamable_http_client(self._config.url, http_client=http, max_sse_event_size=_MAX_RESPONSE_BYTES)
+        else:
+            transport = self._stdio_transport()
+        return Client(
+            transport,
+            read_timeout_seconds = _REQUEST_TIMEOUT,
+            client_info          = types.Implementation(name=_CLIENT_NAME, version=__version__),
+            elicitation_callback = answer_elicitation,
+            extensions           = [advertise(_SKILLS_EXTENSION)],
+        )
 
-        await self._send_notification("notifications/initialized", {})
-        self._connected = True
-        return result
+    def _stdio_transport(self) -> Any:
+        """The transport that starts the server process, confined as its ``sandbox`` setting asks."""
+        launch            = plan_server_launch(self._config, os.getcwd())
+        self._confinement = launch.status
+        if launch.status.startswith("unconfined") and self._config.sandbox != "off":
+            logger.warning("MCP server '%s' runs %s", self._config.name, launch.status)
+        return stdio_transport(
+            launch.argv,
+            {**os.environ, **self._config.env},
+            name      = self._config.name,
+            on_closed = self._mark_closed,
+            limit     = _MAX_RESPONSE_BYTES,
+        )
+
+    def _mark_closed(self) -> None:
+        self._connected = False
 
     def _warn_if_insecure_transport(self, url: str) -> None:
         """Log a WARNING when the MCP server uses non-TLS HTTP to a non-local host.
@@ -116,59 +205,54 @@ class McpClient:
     async def disconnect(self) -> None:
         """Gracefully shut down the MCP server connection."""
         self._connected = False
-
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
-
-        await self._teardown_stdio()
-
-        self._fail_pending("Connection closed")
-
-    async def _teardown_stdio(self) -> None:
-        """Release the subprocess and reader task.
-
-        Driven by the resources that were actually created rather than by the
-        `_connected` flag, so a handshake that never completed still reclaims
-        the child process and its reader task.
-        """
-        process     = self._process
-        reader_task = self._reader_task
-
-        self._process     = None
-        self._reader_task = None
-
-        if process is not None and process.stdin is not None:
-            with contextlib.suppress(Exception):
-                process.stdin.close()
-
-        if reader_task is not None and not reader_task.done():
-            reader_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await reader_task
-
-        if process is None or process.returncode is not None:
+        runner, stop    = self._runner, self._stop
+        self._runner    = None
+        if runner is None:
             return
-
-        with contextlib.suppress(ProcessLookupError):
-            process.terminate()
+        if stop is not None:
+            stop.set()
         try:
-            await asyncio.wait_for(process.wait(), timeout=5.0)
+            await asyncio.wait_for(asyncio.shield(runner), timeout=_STOP_TIMEOUT)
         except TimeoutError:
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
-            with contextlib.suppress(Exception):
-                await process.wait()
+            await self._abort(runner)
 
-    def _fail_pending(self, reason: str) -> None:
-        """Resolve every in-flight request with an error instead of letting it time out."""
-        for future in self._pending.values():
-            if not future.done():
-                future.set_exception(RuntimeError(reason))
-        self._pending.clear()
+    async def _abort(self, runner: asyncio.Task[None] | None = None) -> None:
+        """Cancel the connection task, which ends the transport and, with it, the server process."""
+        runner, self._runner = runner or self._runner, None
+        self._connected      = False
+        if runner is not None:
+            runner.cancel()
+            with contextlib.suppress(BaseException):
+                await runner
+
+    def _ensure_connected(self) -> Client:
+        if not self._connected or self._sdk is None:
+            raise RuntimeError(
+                f"MCP client not connected to '{self._config.name}'. "
+                "Call connect() first."
+            )
+        return self._sdk
+
+    def _failure(self, exc: Exception, method: str) -> RuntimeError:
+        """The ``RuntimeError`` that reports *exc*, a failure of the request *method*."""
+        if isinstance(exc, RuntimeError):
+            return exc
+        if isinstance(exc, MCPError):
+            if exc.code == types.CONNECTION_CLOSED:
+                self._connected = False
+            if exc.code == types.REQUEST_TIMEOUT:
+                return RuntimeError(f"MCP request '{method}' timed out after {_REQUEST_TIMEOUT}s")
+            return RuntimeError(f"MCP error {exc.code}: {exc.error.message}")
+        if isinstance(exc, TimeoutError):
+            return RuntimeError(f"MCP request '{method}' timed out after {_REQUEST_TIMEOUT}s")
+        if isinstance(exc, ValidationError):
+            return RuntimeError(f"MCP server '{self._config.name}' sent an invalid '{method}' result: {exc.error_count()} errors")
+        return RuntimeError(f"MCP request '{method}' failed: {exc}")
 
     async def list_tools(self) -> list[dict[str, Any]]:
-        """Request the list of tools from the MCP server.
+        """Request the list of tools from the MCP server, following pagination.
+
+        The first page is served from the SDK cache while the server's ``ttlMs`` has not run out.
 
         Returns:
             List of tool definitions.
@@ -176,31 +260,44 @@ class McpClient:
         Raises:
             RuntimeError: If not connected.
         """
-        self._ensure_connected()
-        result = await self._send_request("tools/list", {})
-        return list(result.get("tools", []))
+        sdk = self._ensure_connected()
+        tools: list[dict[str, Any]] = []
+        cursor: str | None          = None
+        try:
+            for _ in range(_MAX_LIST_PAGES):
+                page   = await sdk.list_tools(cursor=cursor)
+                tools += [_dump(tool) for tool in page.tools]
+                cursor = page.next_cursor
+                if not cursor:
+                    break
+        except Exception as exc:
+            raise self._failure(exc, "tools/list") from exc
+        return tools
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Call a tool on the MCP server.
 
+        A result that asks for more input is answered through the question channel bound with
+        ``input_requests.bind_ask_user`` around the call, or refused when there is none.
+
         Args:
             name: Tool name.
             arguments: Tool arguments.
 
         Returns:
-            Tool call result dict.
+            Tool call result dict (``content``, ``isError`` and, when the server sent it, ``structuredContent``).
 
         Raises:
             RuntimeError: If not connected or call fails.
         """
-        self._ensure_connected()
-        result = await self._send_request("tools/call", {
-            "name": name,
-            "arguments": arguments or {},
-        })
-        return result
+        sdk = self._ensure_connected()
+        try:
+            result = await sdk.call_tool(name, arguments or {})
+        except Exception as exc:
+            raise self._failure(exc, "tools/call") from exc
+        return _dump(result)
 
     async def list_resources(self) -> list[dict[str, Any]]:
         """Request the list of resources from the MCP server.
@@ -211,217 +308,36 @@ class McpClient:
         Raises:
             RuntimeError: If not connected.
         """
-        self._ensure_connected()
-        result = await self._send_request("resources/list", {})
-        return list(result.get("resources", []))
-
-    def _ensure_connected(self) -> None:
-        if not self._connected:
-            raise RuntimeError(
-                f"MCP client not connected to '{self._config.name}'. "
-                "Call connect() first."
-            )
-
-    async def _send_request(
-        self, method: str, params: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Send a JSON-RPC 2.0 request and wait for the response."""
-        self._request_id += 1
-        req_id = self._request_id
-
-        message = {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "method": method,
-            "params": params,
-        }
-
-        if self._http_client:
-            return await self._http_send_request(message)
-
-        if self._reader_task is not None and self._reader_task.done():
-            raise RuntimeError(
-                f"MCP connection to '{self._config.name}' is closed; "
-                f"cannot send '{method}'"
-            )
-
-        loop   = asyncio.get_event_loop()
-        future: asyncio.Future[dict[str, Any]] = loop.create_future()
-        self._pending[req_id] = future
-
-        await self._write_message(message)
-
+        sdk = self._ensure_connected()
         try:
-            result: dict[str, Any] = await asyncio.wait_for(future, timeout=_REQUEST_TIMEOUT)
-        except TimeoutError as err:
-            self._pending.pop(req_id, None)
-            raise RuntimeError(
-                f"MCP request '{method}' timed out after {_REQUEST_TIMEOUT}s"
-            ) from err
+            result = await sdk.list_resources()
+        except Exception as exc:
+            raise self._failure(exc, "resources/list") from exc
+        return [_dump(resource) for resource in result.resources]
 
-        return result
+    async def read_resource(self, uri: str) -> list[dict[str, Any]]:
+        """Read one resource and return its ``contents`` (each with ``text`` or a base64 ``blob``).
 
-    async def _send_notification(
-        self, method: str, params: dict[str, Any]
-    ) -> None:
-        """Send a JSON-RPC 2.0 notification (no id, no response expected)."""
-        message = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        }
-        if self._http_client:
-            await self._http_send_notification(message)
-        else:
-            await self._write_message(message)
-
-    def _http_headers(self) -> dict[str, str]:
-        """Build headers for MCP Streamable HTTP requests."""
-        return {
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-            **self._config.headers,
-        }
-
-    async def _http_send_request(self, message: dict[str, Any]) -> dict[str, Any]:
-        """Send JSON-RPC request over HTTP POST (MCP Streamable HTTP)."""
-        resp = await self._http_client.post(
-            self._session_url,
-            json=message,
-            headers=self._http_headers(),
-        )
-        resp.raise_for_status()
-
-        # Enforce response body size cap to prevent OOM from a hostile MCP server.
-        if len(resp.content) > _MAX_RESPONSE_BYTES:
-            raise RuntimeError(
-                f"MCP response exceeds {_MAX_RESPONSE_BYTES} bytes "
-                f"(got {len(resp.content)})"
-            )
-
-        # Track session endpoint
-        if "mcp-session-id" in resp.headers:
-            session_id = resp.headers["mcp-session-id"]
-            # Store for subsequent requests
-            self._config.headers["Mcp-Session-Id"] = session_id
-
-        content_type = resp.headers.get("content-type", "")
-
-        if "text/event-stream" in content_type:
-            # SSE response — parse last JSON-RPC message from event stream
-            return self._parse_sse_response(resp.text)
-
-        data = resp.json()
-
-        if "error" in data:
-            error = data["error"]
-            raise RuntimeError(
-                f"MCP error {error.get('code', '?')}: {error.get('message', 'unknown')}"
-            )
-        result: dict[str, Any] = data.get("result", {})
-        return result
-
-    def _parse_sse_response(self, text: str) -> dict[str, Any]:
-        """Extract last JSON-RPC result from SSE event stream."""
-        if len(text) > _MAX_RESPONSE_BYTES:
-            raise RuntimeError(
-                f"MCP SSE response exceeds {_MAX_RESPONSE_BYTES} bytes "
-                f"(got {len(text)})"
-            )
-
-        last_data = ""
-        for line in text.split("\n"):
-            if line.startswith("data: "):
-                last_data = line[6:]
-        if not last_data:
-            return {}
+        Raises:
+            RuntimeError: If not connected or the read fails.
+        """
+        sdk = self._ensure_connected()
         try:
-            msg = json.loads(last_data)
-            if "error" in msg:
-                error = msg["error"]
-                raise RuntimeError(
-                    f"MCP error {error.get('code', '?')}: {error.get('message', 'unknown')}"
-                )
-            result: dict[str, Any] = msg.get("result", {})
-            return result
-        except json.JSONDecodeError:
-            return {}
+            result = await sdk.read_resource(uri)
+        except Exception as exc:
+            raise self._failure(exc, "resources/read") from exc
+        return [_dump(content) for content in result.contents]
 
-    async def _http_send_notification(self, message: dict[str, Any]) -> None:
-        """Send JSON-RPC notification over HTTP POST (fire and forget)."""
-        with contextlib.suppress(Exception):
-            await self._http_client.post(
-                self._session_url,
-                json=message,
-                headers=self._http_headers(),
-            )
+    async def request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Send a request of an extension method, which the SDK has no typed call for, and return its result.
 
-    async def _write_message(self, message: dict[str, Any]) -> None:
-        """Write a JSON-RPC message to the subprocess stdin and drain."""
-        if not self._process or not self._process.stdin:
-            raise RuntimeError("No subprocess stdin available")
-
-        data = json.dumps(message) + "\n"
-        self._process.stdin.write(data.encode("utf-8"))
-        await self._process.stdin.drain()
-
-    async def _read_loop(self) -> None:
-        """Continuously read JSON-RPC responses from subprocess stdout."""
-        assert self._process and self._process.stdout
-        stdout = self._process.stdout
-
+        Raises:
+            RuntimeError: If not connected or the server answers with an error.
+        """
+        sdk = self._ensure_connected()
         try:
-            while True:
-                try:
-                    line = await stdout.readline()
-                except ValueError:
-                    logger.error(
-                        "MCP server '%s' sent a line over the %d byte read limit; "
-                        "the stream position is lost, marking the connection dead",
-                        self._config.name,
-                        _MAX_RESPONSE_BYTES,
-                    )
-                    break
-                if not line:
-                    break
+            result = await sdk.session.send_request(_WireRequest(method=method, params=params), _WireResult)
+        except Exception as exc:
+            raise self._failure(exc, method) from exc
+        return _dump(result)
 
-                if len(line) > _MAX_RESPONSE_BYTES:
-                    logger.warning(
-                        "MCP server '%s' sent oversized stdio line (%d bytes); skipping",
-                        self._config.name,
-                        len(line),
-                    )
-                    continue
-
-                line_str = line.decode("utf-8").strip()
-                if not line_str:
-                    continue
-
-                try:
-                    message = json.loads(line_str)
-                except json.JSONDecodeError:
-                    logger.warning("Invalid JSON from MCP server: %s", line_str[:200])
-                    continue
-
-                msg_id = message.get("id")
-                if msg_id is not None and msg_id in self._pending:
-                    future = self._pending.pop(msg_id)
-                    if "error" in message:
-                        error = message["error"]
-                        future.set_exception(
-                            RuntimeError(
-                                f"MCP error {error.get('code', '?')}: "
-                                f"{error.get('message', 'unknown')}"
-                            )
-                        )
-                    else:
-                        future.set_result(message.get("result", {}))
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            logger.exception("MCP read loop error")
-        finally:
-            self._connected = False
-            self._fail_pending(
-                f"MCP connection to '{self._config.name}' closed before a response arrived"
-            )

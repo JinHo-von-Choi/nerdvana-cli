@@ -23,6 +23,10 @@ class McpServerConfig:
     env: dict[str, str] = field(default_factory=dict)
     url: str = ""
     headers: dict[str, str] = field(default_factory=dict)
+    # Confinement of a stdio server process (``off``, ``auto`` or ``require``); see mcp/sandbox.py.
+    sandbox: str = "off"
+    write_paths: list[str] = field(default_factory=list)
+    network: bool = True
 
 
 def _expand_env(value: str) -> str:
@@ -41,6 +45,13 @@ def _expand_env_dict(d: dict[str, str]) -> dict[str, str]:
     return {k: _expand_env(v) for k, v in d.items()}
 
 
+def _expand_paths(value: Any) -> list[str]:
+    """The ``write_paths`` entries with ``${VAR}`` expanded; anything but a list of strings gives an empty list."""
+    if not isinstance(value, list):
+        return []
+    return [_expand_env(path) for path in value if isinstance(path, str)]
+
+
 def _parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig:
     transport = raw.get("type", "stdio")
     return McpServerConfig(
@@ -51,6 +62,9 @@ def _parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig:
         env=_expand_env_dict(raw.get("env", {})),
         url=_expand_env(raw.get("url", "")),
         headers=_expand_env_dict(raw.get("headers", {})),
+        sandbox=raw.get("sandbox", "off"),
+        write_paths=_expand_paths(raw.get("write_paths")),
+        network=raw.get("network", True),
     )
 
 

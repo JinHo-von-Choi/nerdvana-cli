@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
-from nerdvana_cli.mcp.client import McpClient
+from nerdvana_cli.mcp.input_requests import bind_ask_user
 from nerdvana_cli.types import ToolResult
+
+if TYPE_CHECKING:
+    from nerdvana_cli.mcp.client import McpClient
 
 
 def _hint(tool_def: dict[str, Any], key: str) -> bool | None:
@@ -67,7 +70,8 @@ class McpToolAdapter(BaseTool[dict[str, Any]]):
     ) -> ToolResult:
         """Proxy the call to the MCP server."""
         try:
-            result  = await self._client.call_tool(self._tool_name, args)
+            with bind_ask_user(context.ask_user):
+                result = await self._client.call_tool(self._tool_name, args)
             content = result.get("content", [])
             text    = "\n".join(
                 item.get("text", "") for item in content if isinstance(item, dict)
