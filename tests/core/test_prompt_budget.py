@@ -17,7 +17,7 @@ from nerdvana_cli.core.context.nirnamd import NirnaFile, fit_to_budget
 from nerdvana_cli.core.context.prompts import build_system_prompt
 from nerdvana_cli.core.context.token_estimator import approx_tokens
 
-SCRIPT = Path(__file__).parent.parent / "scripts" / "measure_prompt_overhead.py"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "measure_prompt_overhead.py"
 
 # Ceilings for the default tool set measured in an empty directory (2026-10-03: about 1,200 and
 # 4,700). They are not targets; a change that crosses one has to say why in the diff.

@@ -20,7 +20,7 @@ from nerdvana_cli.server.audit import AuditLogger
 from nerdvana_cli.server.auth import AuthManager
 from nerdvana_cli.server.hook_bridge import HookBridge
 from nerdvana_cli.server.sanitizer import SanitizerAudit
-from tests.test_cost_command import _insert_row, _make_db
+from tests.cli.test_cost_command import _insert_row, _make_db
 
 STORE_FILES = ("mcp_keys.yml", "mcp_acl.yml", "audit.sqlite")
 

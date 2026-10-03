@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_lsp_diff.py"
+_SCRIPT = Path(__file__).parents[2] / "scripts" / "bench_lsp_diff.py"
 
 
 # ---------------------------------------------------------------------------

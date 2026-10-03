@@ -17,8 +17,8 @@ from types import ModuleType
 
 import pytest
 
-SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_agent.py"
-TASKS  = Path(__file__).parent.parent / "benchmarks" / "tasks"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "bench_agent.py"
+TASKS  = Path(__file__).parents[2] / "benchmarks" / "tasks"
 
 
 def _load() -> ModuleType:

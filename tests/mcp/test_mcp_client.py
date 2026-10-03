@@ -48,7 +48,7 @@ def _fake_server_config() -> McpServerConfig:
         name="fake",
         transport="stdio",
         command=sys.executable,
-        args=[str(Path(__file__).parent / "mcp" / "fake_server.py")],
+        args=[str(Path(__file__).parent / "fake_server.py")],
     )
 
 
