@@ -1,4 +1,4 @@
-"""Authentication layer for NerdVana MCP server — Phase G1.
+"""Authentication layer for NerdVana MCP server.
 
 Three transport modes:
   - HTTP:  Authorization: Bearer <api_key>  →  sha256 hash match vs mcp_keys.yml
@@ -9,7 +9,7 @@ Three transport modes:
            needed.
   - mTLS:  peer certificate CN used as client_identity
 
-YAML schema for ~/.nerdvana/mcp_keys.yml:
+YAML schema for mcp_keys.yml in the user data root (~/.nerdvana by default):
   keys:
     - key_hash: "sha256:..."
       client_name: "claude-code-prod"
@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
+
+from nerdvana_cli.core import paths
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -83,11 +85,11 @@ class AuthManager:
     Parameters
     ----------
     keys_path:
-        Path to ``mcp_keys.yml``.  Defaults to ``~/.nerdvana/mcp_keys.yml``.
+        Path to ``mcp_keys.yml``.  Defaults to ``mcp_keys.yml`` in the user data root.
     """
 
     def __init__(self, keys_path: Path | None = None) -> None:
-        self._keys_path: Path = keys_path or Path.home() / ".nerdvana" / "mcp_keys.yml"
+        self._keys_path: Path = keys_path or paths.server_store_path("mcp_keys.yml")
         self._entries:   list[KeyEntry] = []
         self._loaded:    bool           = False
 

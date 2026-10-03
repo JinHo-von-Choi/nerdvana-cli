@@ -1,4 +1,4 @@
-"""Hook bridge — Phase G2 full implementation.
+"""Hook bridge.
 
 Reads a JSON payload from stdin, routes to the appropriate hook handler,
 applies sanitisation, records to audit DB, and writes a JSON response to
@@ -26,6 +26,7 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
+from nerdvana_cli.core import paths
 from nerdvana_cli.server.hook_schemas import (
     HOOK_NAMES,
     HookResponse,
@@ -68,10 +69,10 @@ class HookBridge:
     Parameters
     ----------
     db_path:
-        Path to ``audit.sqlite``.  Defaults to ``~/.nerdvana/audit.sqlite``.
+        Path to ``audit.sqlite``.  Defaults to ``audit.sqlite`` in the user data root.
     anchormind_inject:
         When ``True``, the ``prompt-submit`` handler will attempt to inject
-        AnchorMind recall context.  Currently always a placeholder (Phase G2).
+        AnchorMind recall context.  Currently always a placeholder.
     """
 
     def __init__(
@@ -79,7 +80,7 @@ class HookBridge:
         db_path:           Path | None = None,
         anchormind_inject: bool        = False,
     ) -> None:
-        self._db_path          : Path           = db_path or Path.home() / ".nerdvana" / "audit.sqlite"
+        self._db_path          : Path           = db_path or paths.server_store_path("audit.sqlite")
         self._anchormind_inject: bool           = anchormind_inject
         self._audit            : SanitizerAudit | None = None
 
@@ -189,8 +190,7 @@ class HookBridge:
     def _maybe_anchormind_context(self, topic: str) -> str:
         """Return AnchorMind recall context, or empty string.
 
-        In Phase G2 this is always a placeholder when ``anchormind_inject``
-        is True; real MCP recall is deferred to Phase G3+.
+        This is always a placeholder when ``anchormind_inject`` is True.
         """
         if not self._anchormind_inject:
             return ""

@@ -26,7 +26,7 @@ defaults below, never to a lower-priority file.
 |----------|---------|
 | `NERDVANA_CONFIG` | Path to YAML config file |
 | `NERDVANA_HOME` | Install root (read-only at runtime); default `~/.nerdvana-cli` |
-| `NERDVANA_DATA_HOME` | User data root; default `~/.nerdvana` |
+| `NERDVANA_DATA_HOME` | User data root; default `~/.nerdvana`. The MCP server key, ACL and audit files (`mcp_keys.yml`, `mcp_acl.yml`, `audit.sqlite`) live here too; one that exists only in `~/.nerdvana` is still read from there, with a warning |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | Register the external project tools (`external_projects_enabled` without a config file) |
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | Boundary root the external project tools may not escape |
 | `NERDVANA_CWD` | Working directory override |
