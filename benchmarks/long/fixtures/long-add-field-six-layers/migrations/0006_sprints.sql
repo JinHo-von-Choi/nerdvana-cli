@@ -1,0 +1,6 @@
+CREATE TABLE sprints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    goal TEXT NOT NULL DEFAULT ''
+);

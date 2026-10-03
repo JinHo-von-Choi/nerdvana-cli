@@ -1,0 +1,12 @@
+id: long-add-field-six-layers
+path: ../fixtures/long-add-field-six-layers
+prompt: 'Add an integer field severity to tickets (and only tickets), from 1 to 5, default 3, through every layer of the app described in README.md: the schema (as a new migration; existing tickets must read as 3), the model, the repository, the service (validation with a message that names severity), the API (create, read, update, and a severity filter on the ticket list), the text table and CSV export (severity as the last column), and openapi.json. Keep the existing tests passing. `python3 check.py` must pass.'
+verify: python3 check.py
+tags:
+- long
+- python
+- feature
+- multi-file
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

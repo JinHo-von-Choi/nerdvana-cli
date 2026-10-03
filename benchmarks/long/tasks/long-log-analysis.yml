@@ -1,0 +1,12 @@
+id: long-log-analysis
+path: ../fixtures/long-log-analysis
+prompt: 'logs/ holds ten service logs from 2026-03-14 (format notes in README.md). Analyse them and write answer.json with these keys: top_error_codes (the three error codes with the most ERROR lines across all logs, most frequent first), worst_hour_utc (the UTC hour with the most ERROR lines across all logs, as ''YYYY-MM-DD HH''), root_cause_log (file name of the log whose error burst began first in UTC; a burst is 10 or more ERROR lines within 60 seconds), restart_count (total number of lines tagged RESTART in all logs), long_gaps (an object mapping each log file name that has a gap of more than 600 seconds between two consecutive lines to the UTC time of the last line before that gap, formatted ''YYYY-MM-DDTHH:MM:SSZ''). Then make `python3 check.py` pass.'
+verify: python3 check.py
+tags:
+- long
+- python
+- analysis
+- logs
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

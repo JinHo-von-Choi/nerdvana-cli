@@ -1,0 +1,12 @@
+id: long-config-migration
+path: ../fixtures/long-config-migration
+prompt: configs/ holds 15 service configurations in the v1 INI format. MIGRATION.md describes the v2 TOML schema. Write configs/<service>.toml for every configs/<service>.ini following MIGRATION.md exactly, and leave the v1 files untouched. `python3 check.py` must pass.
+verify: python3 check.py
+tags:
+- long
+- python
+- migration
+- config
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

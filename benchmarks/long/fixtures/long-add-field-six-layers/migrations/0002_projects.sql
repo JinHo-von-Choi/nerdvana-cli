@@ -1,0 +1,6 @@
+CREATE TABLE projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    owner_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+);

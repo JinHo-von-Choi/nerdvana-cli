@@ -1,0 +1,12 @@
+id: long-move-function
+path: ../fixtures/long-move-function
+prompt: 'format_money, parse_money and CURRENCY_SYMBOLS are defined in acme/legacy/helpers.py next to a dozen unrelated helpers. Move those three names into a new module acme/money/formatting.py (a new package acme.money) and update everything that uses them: about twenty modules in several packages import them in different ways (plain, aliased, relative, inside functions), and the tests refer to them too. After the move they must not be reachable through acme.legacy.helpers any more, and the helper module''s own functions that need them must keep working. Behaviour must not change. Do not touch modules that only use the other helpers. `python3 check.py` must pass.'
+verify: python3 check.py
+tags:
+- long
+- python
+- refactor
+- multi-file
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800
