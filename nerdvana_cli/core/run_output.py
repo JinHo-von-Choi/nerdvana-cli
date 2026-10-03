@@ -43,6 +43,8 @@ _OUTCOMES: dict[str, tuple[str, bool, int]] = {
     "completed":      ("success",            False, EXIT_OK),
     "max_turns":      ("error_max_turns",    True,  EXIT_BUDGET),
     "max_cost":       ("error_max_cost",     True,  EXIT_BUDGET),
+    "max_total_tokens": ("error_max_total_tokens", True, EXIT_BUDGET),
+    "unpriced":       ("error_unpriced",     True,  EXIT_CONFIG),
     "max_tokens":     ("error_max_tokens",   True,  EXIT_FAILURE),
     "provider_error": ("error_provider",     True,  EXIT_FAILURE),
     "error":          ("error_during_run",   True,  EXIT_FAILURE),

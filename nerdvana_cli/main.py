@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -298,6 +299,17 @@ async def repl_loop(
             await parism_client.disconnect()
 
 
+def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any]) -> None:
+    """Set each ``section.field`` of *settings* from a command-line value, skipping the unset ones.
+
+    Unset means empty, zero or False, the options' defaults.
+    """
+    for dotted, value in overrides.items():
+        if value:
+            section, field = dotted.split(".")
+            setattr(getattr(settings, section), field, value)
+
+
 @app.command()
 def run(
     prompt: str = typer.Argument(..., help="Prompt to run"),
@@ -315,6 +327,9 @@ def run(
     max_turns: int = typer.Option(0, "--max-turns", help="Stop after this many model turns (0 = config value)"),
     max_cost_usd: float = typer.Option(0.0, "--max-cost-usd", help="Stop once the estimated cost reaches this many USD (0 = no limit)"),
     approval_mode: str = typer.Option("", "--approval-mode", help="Preset mode: default | auto_edit | yolo | plan"),
+    max_total_tokens: int = typer.Option(0, "--max-total-tokens", help="Stop once input plus output tokens of all requests reach this many (0 = no limit)"),
+    require_price: bool = typer.Option(False, "--require-price", help="Refuse to run when --max-cost-usd is set but the model has no known price"),
+    sandbox: str = typer.Option("", "--sandbox", help="Confine shell commands to a write scope: off | auto | require (default: sandbox.mode from the configuration)"),
 ) -> None:
     """Run a single prompt non-interactively.
 
@@ -324,9 +339,13 @@ def run(
     import time
 
     from nerdvana_cli.core.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
+    from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
 
     if output_format not in FORMATS:
         console_stderr.print(f"[red]Error: --output-format must be one of {', '.join(FORMATS)}.[/red]")
+        raise typer.Exit(EXIT_CONFIG)
+    if sandbox and sandbox not in SANDBOX_MODES:
+        console_stderr.print(f"[red]Error: --sandbox must be one of {', '.join(SANDBOX_MODES)}.[/red]")
         raise typer.Exit(EXIT_CONFIG)
     resolved_approval = approval_mode.strip().lower()
     if resolved_approval and resolved_approval not in _APPROVAL_MODE_MAP:
@@ -346,18 +365,17 @@ def run(
     _run_migration_once(console_stderr if reporter.machine_readable else None)
     settings.cwd = cwd or os.getcwd()
     settings.verbose = verbose
-    if model:
-        settings.model.model = model
-    if provider:
-        settings.model.provider = provider
-    if max_tokens:
-        settings.model.max_tokens = max_tokens
-    if max_turns > 0:
-        settings.session.max_turns = max_turns
-    if max_cost_usd > 0:
-        settings.session.max_cost_usd = max_cost_usd
-    if resolved_approval:
-        settings.session.default_mode = _APPROVAL_MODE_MAP[resolved_approval][0]
+    _apply_run_overrides(settings, {
+        "model.model":              model,
+        "model.provider":           provider,
+        "model.max_tokens":         max_tokens,
+        "session.max_turns":        max_turns,
+        "session.max_cost_usd":     max_cost_usd,
+        "session.max_total_tokens": max_total_tokens,
+        "session.require_price":    require_price,
+        "sandbox.mode":             sandbox,
+        "session.default_mode":     _APPROVAL_MODE_MAP[resolved_approval][0] if resolved_approval else "",
+    })
 
     from nerdvana_cli.providers import ProviderName, detect_provider
     from nerdvana_cli.providers.factory import resolve_api_key

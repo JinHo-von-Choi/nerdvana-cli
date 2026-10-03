@@ -172,9 +172,12 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--output-format text\|json\|stream-json` | `text` (default) streams for a person to read. `json` prints one result object at the end. `stream-json` prints one JSON event per line and ends with the same result object. In both JSON formats stdout carries only JSON; notices go to stderr. |
 | `--max-turns N` | Stop after N model turns. |
 | `--max-cost-usd X` | Stop once the estimated cost of the run reaches X USD (needs a known price for the model). |
+| `--max-total-tokens N` | Stop once the input and output tokens of all requests reach N. Needs no price, so it works for any model. |
+| `--sandbox off\|auto\|require` | Confine what shell commands can write for this run, overriding `sandbox.mode` (see [docs/sandbox.md](docs/sandbox.md)). |
+| `--require-price` | Refuse to run when `--max-cost-usd` is set but the model has no known price. |
 | `--approval-mode default\|auto_edit\|yolo\|plan` | Permission preset. Without a terminal a confirmation is refused, so unattended runs that write files usually need `yolo`. |
 
-Exit codes: `0` success, `1` the run failed (provider error, unexpected error), `2` invalid options or configuration (a missing API key included), `3` a turn or cost limit stopped the run.
+Exit codes: `0` success, `1` the run failed (provider error, unexpected error), `2` invalid options or configuration (a missing API key included), `3` a turn, cost or token limit stopped the run.
 
 The result object (`schema_version` 1; fields are only ever added):
 
@@ -185,7 +188,7 @@ The result object (`schema_version` 1; fields are only ever added):
  "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000}}
 ```
 
-`subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
+`subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
 
 `stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `compaction` and `context` (percent of the window used).
 

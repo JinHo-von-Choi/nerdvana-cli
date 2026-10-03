@@ -17,8 +17,9 @@ python scripts/bench_agent.py benchmarks/tasks --attempts 3 --yes \
 ```
 
 Run it in a disposable environment such as a container or a throwaway VM. The agent
-runs shell commands with `--approval-mode yolo` by default, and nothing confines
-them to the task's working directory.
+runs shell commands with `--approval-mode yolo` by default. `--sandbox require` (the
+default) limits what they can write to the task's working directory and the temporary
+directories on Linux; it does not stop reading, running programs or UDP.
 
 | Option | Meaning |
 |-|-|
@@ -26,6 +27,7 @@ them to the task's working directory.
 | `--k K` | k for pass@k (default: the number of attempts) |
 | `--model`, `--provider` | passed to `nerdvana run` |
 | `--approval-mode` | `default`, `auto_edit`, `yolo` (default) or `plan` |
+| `--sandbox` | `off`, `auto` or `require` (default); use `off` where Landlock is unavailable |
 | `--out FILE` | JSONL file each attempt is appended to (default `bench-results.jsonl`) |
 | `--keep-workdirs` | keep each attempt's working directory |
 | `--yes` | actually run the agent and spend money |

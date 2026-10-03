@@ -103,6 +103,8 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `persist` | bool | `true` | Save JSONL transcripts |
 | `max_turns` | int | `200` | Agent loop turn limit |
 | `max_cost_usd` | float | `0` | Stop once the estimated cost of this session's provider requests reaches this many USD (`0` = no limit). Needs a known price for the model; without one the limit is not enforced and a notice says so. Also set per run with `nerdvana run --max-cost-usd`. |
+| `max_total_tokens` | int | `0` | Stop once the input and output tokens of all provider requests in the session add up to this many (`0` = no limit). Needs no price list, so it bounds spending for models the price table does not know. Also `nerdvana run --max-total-tokens`. |
+| `require_price` | bool | `false` | Refuse to run when `max_cost_usd` is set but the model has no known price, instead of continuing without a cost limit. Also `nerdvana run --require-price`. |
 | `max_context_tokens` | int | `180000` | Auto-resolved per model (1M-token models resolve to 1,000,000, so compaction starts near 800,000 tokens); set a smaller value to compact earlier |
 | `compact_threshold` | float | `0.8` | Fraction of max_context_tokens that triggers compaction |
 | `compact_max_failures` | int | `3` | AI compaction circuit breaker |
