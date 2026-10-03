@@ -11,7 +11,7 @@ import sys
 from dataclasses import asdict
 from typing import Any
 
-from nerdvana_cli.core.approvals import MIN_APPROVALS, Suggestion, compare_verdicts, suggest_rules
+from nerdvana_cli.core.safety.approvals import MIN_APPROVALS, Suggestion, compare_verdicts, suggest_rules
 
 
 def build_report(

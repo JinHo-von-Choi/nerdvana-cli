@@ -19,7 +19,7 @@ sub-agents and background tasks all reach the same decision for the same call:
   6. otherwise the tool's own verdict
 
 ``permissions.classifier`` adds a last, optional judgment of a call this order lets through; it is made by
-the permission gate (core/tool_permission.py) and can only make a verdict stricter.
+the permission gate (core/safety/tool_permission.py) and can only make a verdict stricter.
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ class PermissionPolicy:
         over ``permissions.mode``; an unknown mode name falls back to the
         default mode with a warning instead of failing the session.
         """
-        from nerdvana_cli.core.profiles import ProfileManager
+        from nerdvana_cli.core.safety.profiles import ProfileManager
 
         permissions = getattr(settings, "permissions", None)
         session     = getattr(settings, "session", None)

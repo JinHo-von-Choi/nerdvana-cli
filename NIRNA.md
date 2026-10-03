@@ -11,7 +11,7 @@
 
 ## Architecture
 - 21 AI providers with unified BaseProvider Protocol (OpenAIProvider covers 19, Anthropic/Gemini separate)
-- Tool pipeline: schema check (core/schema_check.py) -> parse_args -> check_permissions combined with PermissionPolicy (core/policy.py: always_deny, mode exclusions, tool verdict, always_allow, trust level) -> BEFORE_TOOL hooks -> validate_input -> call -> token-bounded truncation (full output kept under the data home) -> post-edit diagnostics
+- Tool pipeline: schema check (core/schema_check.py) -> parse_args -> check_permissions combined with PermissionPolicy (core/safety/policy.py: always_deny, mode exclusions, tool verdict, always_allow, trust level) -> BEFORE_TOOL hooks -> validate_input -> call -> token-bounded truncation (full output kept under the data home) -> post-edit diagnostics
 - Concurrency: read-only tools parallel (asyncio.gather), write tools serial
 - Session: JSONL append-only logs, messages recorded after API response
 - State: SessionState mutable (state.messages.append), context compaction at threshold

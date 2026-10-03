@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.policy import PermissionPolicy
+from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.tool import PermissionBehavior, PermissionResult, ToolCategory
 from nerdvana_cli.mcp.tools import McpDestructiveToolAdapter, McpToolAdapter, build_mcp_tool
 

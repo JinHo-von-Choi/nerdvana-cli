@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli import __version__
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent, HookResult
-from nerdvana_cli.core.secrets import SecretMasker
+from nerdvana_cli.core.safety.secrets import SecretMasker
 from nerdvana_cli.core.telemetry import otel_semconv as sc
 from nerdvana_cli.core.telemetry.otel_semconv import Attr, Operation
 

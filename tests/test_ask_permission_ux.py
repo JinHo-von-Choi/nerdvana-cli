@@ -17,9 +17,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nerdvana_cli.core.safety.tool_permission import ask_user_permission
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.core.tool_executor import ToolExecutor
-from nerdvana_cli.core.tool_permission import ask_user_permission
 
 # ---------------------------------------------------------------------------
 # ask_user_permission unit tests
@@ -205,7 +205,7 @@ async def test_run_batch_deny_unchanged() -> None:
     context   = ToolContext()
     _         = LoopState(iteration=1, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id="test")
 
-    with patch("nerdvana_cli.core.tool_permission.ask_user_permission") as mock_ask:
+    with patch("nerdvana_cli.core.safety.tool_permission.ask_user_permission") as mock_ask:
         results = await executor.run_batch([fake_call], context=context)
 
     mock_ask.assert_not_called()

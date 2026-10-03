@@ -4,7 +4,7 @@ Author: 최진호
 Date:   2026-10-03
 
 An agent type can narrow what its sub-agents change, in two places that need two mechanisms. Shell commands
-are confined by the operating system (Landlock, see ``core/sandbox.py``); file and symbol edit tools run in
+are confined by the operating system (Landlock, see ``core/safety/sandbox.py``); file and symbol edit tools run in
 the application and are held to ``sandbox.edit_scope`` by the tool executor. ``write_scope`` sets both:
 
     ""  or  "project"   no change, the session's policy applies

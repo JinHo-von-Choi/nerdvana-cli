@@ -10,9 +10,9 @@ from typing import Any, ClassVar
 
 from nerdvana_cli.core import changed_files
 from nerdvana_cli.core.cancellation import stop_process_group
-from nerdvana_cli.core.egress_proxy import prepare_launch
-from nerdvana_cli.core.sandbox import Launch
-from nerdvana_cli.core.secrets import SENSITIVE_ENV
+from nerdvana_cli.core.safety.egress_proxy import prepare_launch
+from nerdvana_cli.core.safety.sandbox import Launch
+from nerdvana_cli.core.safety.secrets import SENSITIVE_ENV
 from nerdvana_cli.core.telemetry.telemetry_otel import trace_environment
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult

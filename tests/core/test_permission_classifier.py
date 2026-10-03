@@ -15,11 +15,11 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
-from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.run_limits import RunLimits
+from nerdvana_cli.core.safety.classifier import ClassifierFeed, Completion
+from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.signals import (
     CLASSIFIER_ASK,
@@ -84,7 +84,7 @@ class _Rig:
         self.tool     = tool or _Tool()
         self.answers: list[bool] = []
         self.asked:   list[str]  = []
-        monkeypatch.setattr("nerdvana_cli.core.classifier.provider_completion", lambda settings: fake)
+        monkeypatch.setattr("nerdvana_cli.core.safety.classifier.provider_completion", lambda settings: fake)
         settings = NerdvanaSettings()
         settings.permissions.classifier = mode  # type: ignore[assignment]
         registry = ToolRegistry()
@@ -366,7 +366,7 @@ async def test_a_loop_feeds_the_classifier_the_users_prompt_and_pays_for_it_in_i
         answer = "check" if max_tokens < 100 else DENY_JSON
         return Completion(answer, {"input_tokens": 10, "output_tokens": 1}, "acme", "small")
 
-    monkeypatch.setattr("nerdvana_cli.core.classifier.provider_completion", lambda settings: fake)
+    monkeypatch.setattr("nerdvana_cli.core.safety.classifier.provider_completion", lambda settings: fake)
     pricing = tmp_path / "pricing.yml"
     pricing.write_text(PRICING, encoding="utf-8")
     table    = PricingTable(pricing_path=pricing)

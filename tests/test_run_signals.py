@@ -98,7 +98,8 @@ def test_the_run_result_carries_the_signals() -> None:
 def test_the_phrases_the_classifier_looks_for_still_exist_in_the_code_that_writes_them() -> None:
     import inspect
 
-    from nerdvana_cli.core import edit_guard, tool_executor, tool_permission
+    from nerdvana_cli.core import tool_executor
+    from nerdvana_cli.core.safety import edit_guard, tool_permission
     from nerdvana_cli.tools import file_tools
 
     written = "".join(inspect.getsource(module) for module in (tool_executor, tool_permission, edit_guard, file_tools))

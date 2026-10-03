@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import egress_proxy, sandbox
-from nerdvana_cli.core.sandbox import SandboxPolicy
+from nerdvana_cli.core.safety import egress_proxy, sandbox
+from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.core.signals import EGRESS_DENIED, classify_result
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool

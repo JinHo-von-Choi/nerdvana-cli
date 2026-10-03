@@ -140,7 +140,7 @@ class NerdvanaMcpServer:
         when ``LspClient.has_any_server()`` returns True.  Missing LSP is not
         an error, the server degrades gracefully to memory + config tools only.
         """
-        from nerdvana_cli.core.profiles import ProfileManager
+        from nerdvana_cli.core.safety.profiles import ProfileManager
         from nerdvana_cli.tools.memory_tools import (
             DeleteMemoryTool,
             EditMemoryTool,

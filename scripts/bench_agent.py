@@ -55,7 +55,7 @@ import yaml
 
 from nerdvana_cli import __version__
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.sandbox import landlock_abi
+from nerdvana_cli.core.safety.sandbox import landlock_abi
 
 DEFAULT_MAX_TURNS    = 30
 DEFAULT_MAX_COST     = 1.0

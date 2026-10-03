@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nerdvana_cli.core.edit_tools import edited_path, is_applied_edit
+from nerdvana_cli.core.safety.edit_tools import edited_path, is_applied_edit
 
 READ  = "read"    # a read-only tool: reading, searching, listing
 EDIT  = "edit"    # a tool that changes a file

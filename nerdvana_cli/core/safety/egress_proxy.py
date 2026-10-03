@@ -40,9 +40,9 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
-from nerdvana_cli.core import sandbox
 from nerdvana_cli.core.config.egress_rules import ProxyCredential, normalize_host, normalize_pattern
-from nerdvana_cli.core.sandbox import Launch, SandboxPolicy, plan_launch
+from nerdvana_cli.core.safety import sandbox
+from nerdvana_cli.core.safety.sandbox import Launch, SandboxPolicy, plan_launch
 
 logger = logging.getLogger(__name__)
 

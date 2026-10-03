@@ -28,7 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.secrets import SecretMasker
+from nerdvana_cli.core.safety.secrets import SecretMasker
 
 logger = logging.getLogger(__name__)
 

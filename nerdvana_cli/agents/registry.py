@@ -16,7 +16,7 @@ class AgentDefinition:
     system_prompt: str       = ""
     model:         str       = ""
     category:      str       = ""
-    # What the agent may write: "" or "project" (the session's policy), "none", or a list of paths. See core/agent_scope.py.
+    # What the agent may write: "" or "project" (the session's policy), "none", or a list of paths. See core/safety/agent_scope.py.
     write_scope:   str | list[str] = ""
     network:       bool | None = None
 

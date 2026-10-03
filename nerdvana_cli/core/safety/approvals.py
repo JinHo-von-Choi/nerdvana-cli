@@ -23,7 +23,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.policy import _SHELL_META, _SHELL_TOOLS
+from nerdvana_cli.core.safety.policy import _SHELL_META, _SHELL_TOOLS
 
 MIN_APPROVALS = 3
 _GLOB_CHARS   = re.compile(r"[*?\[\]]")

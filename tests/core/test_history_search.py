@@ -16,7 +16,7 @@ import pytest
 
 from nerdvana_cli.cli import history_search
 from nerdvana_cli.cli.history_search import HistoryIndex, fts_match, make_snippet, search_history, stamp_of
-from nerdvana_cli.core.secrets import SecretMasker
+from nerdvana_cli.core.safety.secrets import SecretMasker
 from nerdvana_cli.core.session import SessionStorage
 
 NOW = datetime.now(UTC)
