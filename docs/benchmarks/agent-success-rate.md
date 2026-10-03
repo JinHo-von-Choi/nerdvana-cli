@@ -234,3 +234,14 @@ limit). Nothing is written for you.
 A handful of tasks says little. Use enough tasks and attempts that a change of a few
 points is larger than the spread between repeated runs of the same build, and compare
 builds only on the same tasks, model and attempt count.
+
+## Observation masking, measured
+
+`session.observation_masking` clears old read-type tool output in batches (see `docs/configuration.md`). It was measured twice with MiniMax-M3, which caches 95 percent of its input, so cached input is already cheap.
+
+| Task set | Attempts per arm | Pass off / on | Mean input tokens | Mean cost | Masking fired |
+|-|-|-|-|-|-|
+| 20 short tasks (about 8 turns) | 80 | 76 of 80 / 76 of 80 | +0.3 percent | +2.6 percent | 0 of 80 |
+| 8 long tasks (`benchmarks/long`, about 32 turns) | 24 | 23 of 24 / 22 of 24 | -5.1 percent | +13.4 percent | 16 of 24 |
+
+On the long tasks masking cleared 712 results in total and the runs took 30 percent more turns (41.5 against 31.9 on average): the model read the cleared files again. The cache share of input fell from 95.1 to 88.9 percent, because a cleared message changes the start of the request. The pass rates cannot be told apart (95 percent interval of the difference -0.21 to +0.04). On this model and these tasks masking saves nothing, so it stays off by default. A model without cheap cached input, or a task set whose reads are never repeated, may behave differently and has not been measured.
