@@ -151,6 +151,29 @@ def server_store_path(filename: str) -> Path:
     return legacy
 
 
+def system_managed_dir() -> Path:
+    """Administrator-owned drop-in directory for managed settings."""
+    return Path("/etc/nerdvana/managed-settings.d")
+
+
+def managed_settings_dirs() -> list[Path]:
+    """Directories searched for managed settings files, in the order they are read.
+
+    The system directory comes first. $NERDVANA_MANAGED_DIR adds one more directory;
+    managed files only ever restrict, so an extra directory cannot loosen the system one.
+    """
+    dirs = [system_managed_dir()]
+    env  = os.environ.get("NERDVANA_MANAGED_DIR", "").strip()
+    if env:
+        dirs.append(Path(env).expanduser())
+    return dirs
+
+
+def managed_audit_path() -> Path:
+    """Append-only record of the managed policy applied at each startup."""
+    return user_data_home() / "logs" / "managed-policy.jsonl"
+
+
 def ensure_user_dirs() -> None:
     """Create all user subdirectories if they do not exist. Idempotent."""
     root = user_data_home()

@@ -15,6 +15,7 @@ SLASH_COMMANDS = [
     ("/mode", "Activate/deactivate mode profile"),
     ("/context", "Set context profile"),
     ("/mcp", "MCP server status"),
+    ("/policy", "Show the managed policy that applies"),
     ("/tokens", "Show token usage"),
     ("/skills", "List available skills"),
     ("/tools", "List tools"),

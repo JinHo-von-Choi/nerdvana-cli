@@ -19,6 +19,7 @@ from nerdvana_cli.commands.doctor_mcp import (
     _check_mcp_sandbox,
     _check_mcp_servers,
 )
+from nerdvana_cli.commands.doctor_policy import check_managed_policy
 from nerdvana_cli.commands.doctor_result import CheckResult
 
 if TYPE_CHECKING:
@@ -396,6 +397,7 @@ _ALL_CHECKS = [
     _check_uv_installed,
     _check_install_paths,
     _check_provider_keys,
+    check_managed_policy,
     _check_config_warnings,
     _check_model_resolution,
     _check_fallback_models,

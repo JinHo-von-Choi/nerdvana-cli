@@ -2,6 +2,9 @@
 
 NerdVana CLI reads configuration from, in order of decreasing priority:
 
+0. Managed policy files an administrator placed in `/etc/nerdvana/managed-settings.d/`
+   (and `$NERDVANA_MANAGED_DIR`): they apply above everything below, and the user cannot
+   override them. See [managed-policy.md](managed-policy.md).
 1. Command-line flags (`--config`, `--provider`, `--model`, `--max-tokens`, `--cwd`, `--verbose`)
 2. Environment variables (the `NERDVANA_` names listed below, plus provider-specific API keys)
 3. The config file
@@ -27,6 +30,7 @@ defaults below, never to a lower-priority file.
 | `NERDVANA_CONFIG` | Path to YAML config file |
 | `NERDVANA_HOME` | Install root (read-only at runtime); default `~/.nerdvana-cli` |
 | `NERDVANA_DATA_HOME` | User data root; default `~/.nerdvana`. The MCP server key, ACL and audit files (`mcp_keys.yml`, `mcp_acl.yml`, `audit.sqlite`) live here too; one that exists only in `~/.nerdvana` is still read from there, with a warning |
+| `NERDVANA_MANAGED_DIR` | One more directory of managed settings files, read after `/etc/nerdvana/managed-settings.d/`. It must exist when set. Managed files only restrict, so it cannot loosen the system directory. See [managed-policy.md](managed-policy.md) |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | Register the external project tools (`external_projects_enabled` without a config file) |
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | Boundary root the external project tools may not escape |
 | `NERDVANA_CWD` | Working directory override |
@@ -163,6 +167,11 @@ Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, 
 |-------|------|---------|-------------|
 | `external_projects_enabled` | bool | `false` | Register `ListQueryableProjects`, `RegisterExternalProject`, and `QueryExternalProject`. These hand a registered directory to a read-capable subprocess, so the family stays unregistered until this is set. |
 | `model_history` | dict[str, str] | `{}` | Per-provider last-used model, written by `/model` and `/provider`. |
+
+### Managed policy
+
+It has no field in `nerdvana.yml`. It is read from its own drop-in files
+([managed-policy.md](managed-policy.md)).
 
 ### MCP server quota
 

@@ -56,6 +56,7 @@ async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     """Run the read-only code-reviewer agent on *prompt* and return its answer."""
     from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
     from nerdvana_cli.cli.runtime import resolve_run_provider
+    from nerdvana_cli.core.managed_policy import ManagedPolicyError
     from nerdvana_cli.core.model_routing import apply_model_spec, select_model
     from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
@@ -72,6 +73,10 @@ async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     name, key_missing = resolve_run_provider(settings)
     if key_missing:
         raise ReviewError(f"No API key found for {name}.")
+    try:
+        settings.managed_policy.enforce(settings)
+    except ManagedPolicyError as exc:
+        raise ReviewError(str(exc)) from exc
     definition = next(d for d in BUILTIN_AGENTS if d.agent_type == "code-reviewer")
     registry   = create_subagent_registry(settings=settings, allowed_tools=definition.allowed_tools)
     config     = SubagentConfig(

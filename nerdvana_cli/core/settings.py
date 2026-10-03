@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, ValidationInfo, field_validator
@@ -13,6 +13,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from nerdvana_cli.core import paths as core_paths
 from nerdvana_cli.core.egress_proxy import normalize_pattern
 from nerdvana_cli.core.secrets import ProxyCredential
+
+if TYPE_CHECKING:
+    from nerdvana_cli.core.managed_policy import ManagedPolicy
 
 _SectionT = TypeVar("_SectionT", bound=BaseModel)
 
@@ -425,11 +428,21 @@ class NerdvanaSettings(BaseSettings):
     verbose: bool = False
     config_path: str = ""
     _load_warnings: list[SettingsWarning] = PrivateAttr(default_factory=list)
+    _managed_policy: ManagedPolicy | None = PrivateAttr(default=None)
 
     @property
     def load_warnings(self) -> list[SettingsWarning]:
         """Recoverable problems recorded by the last ``load`` call."""
         return self._load_warnings
+
+    @property
+    def managed_policy(self) -> ManagedPolicy:
+        """The managed policy read by the last ``load``; an empty policy for settings built another way."""
+        if self._managed_policy is None:
+            from nerdvana_cli.core.managed_policy import ManagedPolicy
+
+            self._managed_policy = ManagedPolicy()
+        return self._managed_policy
 
     @classmethod
     def load(cls, config_path: str | None = None) -> NerdvanaSettings:
@@ -498,18 +511,34 @@ class NerdvanaSettings(BaseSettings):
                 settings.config_path = path
                 break
 
+        settings._finish_defaults(user_set_context)
+        settings._apply_managed_policy()
+        return settings
+
+    def _apply_managed_policy(self) -> None:
+        """Read the managed settings files and force their controls onto these settings; a malformed file stops the start."""
+        from nerdvana_cli.core.managed_policy import ManagedPolicyError, load_managed_policy
+
+        try:
+            self._managed_policy = load_managed_policy()
+        except ManagedPolicyError as exc:
+            raise SettingsLoadError(str(exc)) from exc
+        self._managed_policy.apply(self)
+
+    def _finish_defaults(self, user_set_context: bool) -> None:
+        """Fill the provider, API key and context window the config file left open."""
         # Use canonical detect_provider from providers.base
-        if not settings.model.provider:
+        if not self.model.provider:
             from nerdvana_cli.providers.base import detect_provider
-            settings.model.provider = detect_provider(settings.model.model).value
+            self.model.provider = detect_provider(self.model.model).value
 
         # Use canonical resolve_api_key from providers.factory
-        if not settings.model.api_key:
+        if not self.model.api_key:
             from nerdvana_cli.providers.base import ProviderName
             from nerdvana_cli.providers.factory import resolve_api_key
             try:
-                prov = ProviderName(settings.model.provider)
-                settings.model.api_key = resolve_api_key(prov)
+                prov = ProviderName(self.model.provider)
+                self.model.api_key = resolve_api_key(prov)
             except ValueError:
                 pass
 
@@ -517,12 +546,10 @@ class NerdvanaSettings(BaseSettings):
         if not user_set_context:
             from nerdvana_cli.providers.base import ProviderName, resolve_context_window
             try:
-                prov = ProviderName(settings.model.provider)
-                settings.session.max_context_tokens = resolve_context_window(prov, settings.model.model)
+                prov = ProviderName(self.model.provider)
+                self.session.max_context_tokens = resolve_context_window(prov, self.model.model)
             except ValueError:
                 pass
-
-        return settings
 
     def to_api_params(self) -> dict[str, Any]:
         return {

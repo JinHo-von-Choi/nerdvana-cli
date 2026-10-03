@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.managed_policy import load_managed_policy
 
 
 @dataclass
@@ -79,7 +80,8 @@ def load_mcp_config(
         global_path: Path to global config. Defaults to ~/.nerdvana/mcp.json.
 
     Search order: global then project (cwd/.mcp.json).
-    Project settings override global settings.
+    Project settings override global settings. Servers outside the managed
+    ``mcp.allowed_servers`` list are left out.
     """
     configs: dict[str, McpServerConfig] = {}
 
@@ -96,4 +98,4 @@ def load_mcp_config(
             except (json.JSONDecodeError, OSError):
                 pass
 
-    return configs
+    return load_managed_policy().filter_mcp_servers(configs)

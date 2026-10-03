@@ -358,6 +358,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/image` | `/image <path> [<path> ...] <question>` sends a prompt with the image files at the start attached; the transcript keeps the file names, not the pictures |
 | `/btw` | `/btw <question>` asks a side question with the conversation as context; neither the question nor the answer is added to the history, and the cached start of the request is reused |
 | `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
+| `/policy` | Show the managed policy files that apply and what each control did (see [docs/managed-policy.md](docs/managed-policy.md)) |
 | `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |
 | `/activity` | Toggle activity indicator widget (on/off, persists to config.yml) |
 | `/quit` | Exit (aliases: `/exit`, `/q`) |
@@ -646,6 +647,7 @@ mypy nerdvana_cli/
 |-|-|
 | [docs/configuration.md](docs/configuration.md) | Full config reference |
 | [docs/hooks.md](docs/hooks.md) | Hook event system and bridge protocol |
+| [docs/managed-policy.md](docs/managed-policy.md) | Machine-wide settings an administrator sets above every user and project setting |
 | [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
 | [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |

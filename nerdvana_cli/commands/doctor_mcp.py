@@ -13,9 +13,13 @@ from nerdvana_cli.commands.doctor_result import CheckResult
 
 def _check_mcp_servers() -> CheckResult:
     """Check reachability of configured MCP servers."""
+    from nerdvana_cli.core.managed_policy import ManagedPolicyError
     from nerdvana_cli.mcp.config import McpServerConfig, load_mcp_config
 
-    configs: dict[str, McpServerConfig] = load_mcp_config()
+    try:
+        configs: dict[str, McpServerConfig] = load_mcp_config()
+    except ManagedPolicyError:
+        return CheckResult("mcp_servers", "skip", "managed policy could not be loaded (see managed_policy)")
     if not configs:
         return CheckResult("mcp_servers", "skip", "no MCP servers configured")
 

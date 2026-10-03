@@ -61,7 +61,10 @@ def test_settings_default_model_history_is_dict():
 
 def _make_app_mock(model_history: dict, current_provider: str = "anthropic") -> MagicMock:
     """Build a minimal NerdvanaApp mock for switch_provider tests."""
+    from nerdvana_cli.core.managed_policy import ManagedPolicy
+
     app = MagicMock()
+    app.settings.managed_policy = ManagedPolicy()
     app.settings.model.provider = current_provider
     app.settings.model.model = "claude-sonnet-4-20250514"
     app.settings.model.api_key = "test-key"
