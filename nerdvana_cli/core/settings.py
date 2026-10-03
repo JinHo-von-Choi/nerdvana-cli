@@ -87,6 +87,10 @@ class SessionConfig(BaseModel):
     project_doc_max_tokens: int = 0
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
+    # Replace secret-looking values (credential-named environment values, key and token shapes) with
+    # [REDACTED] in the output of commands and external tools before the model sees it. See core/secrets.py.
+    mask_secrets: bool = True
+    mask_extra_patterns: list[str] = Field(default_factory=list)
     # Model to switch to, once per session, when the run shows trouble ("model" or "provider:model"); empty = never.
     escalation_model: str = ""
     # Signal name -> how many occurrences trigger the switch (see core/signals.py).

@@ -51,7 +51,9 @@ An agent definition can narrow the policy for its sub-agents with `write_scope` 
 
 - It does not stop reading. A confined command can read any file the user can, including
   credentials, and print them. The `Bash` tool already withholds environment variables
-  whose names look like secrets; that is a mitigation, not a boundary.
+  whose names look like secrets, and secret-looking values in command output are replaced
+  before the model sees them (see [secret-masking.md](secret-masking.md)); both are
+  mitigations, not a boundary.
 - It does not restrict running programs, UDP, or local sockets. With `network: false`,
   DNS over UDP still works and a command can still talk to a local service on a socket
   file.
