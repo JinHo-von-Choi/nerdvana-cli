@@ -34,7 +34,7 @@
 - **Permission policy**: `--approval-mode`, `permissions.mode`, `always_allow` and `always_deny` apply to every tool call, including sub-agents. See [Permissions and Approval Modes](#permissions-and-approval-modes).
 - **Clarifying questions**: the `AskUser` tool lets the model ask instead of guessing. Text you type while the agent is working is applied at its next step, and a confirmation for a file change shows the diff.
 - **Your own commands and hooks**: markdown command templates and shell command hooks. See [Custom Commands and Command Hooks](#custom-commands-and-command-hooks).
-- **Claude Code compatible instructions**: root `AGENTS.md` and `CLAUDE.md` load after `NIRNA.md`; rule files in subdirectories are injected when a file there is first touched. Skills may be `SKILL.md` directories.
+- **Claude Code compatible instructions**: root `AGENTS.md` and `CLAUDE.md` load after `NIRNA.md`; rule files in subdirectories are injected when a file there is first touched. Skills follow the Agent Skills standard: `SKILL.md` directories from `.agents/skills`, `.nerdvana/skills` and `.claude/skills`, listed to the model as a catalog and loaded on demand (see [docs/skills.md](docs/skills.md)).
 - **Live activity indicator + think-tag rendering** — `<think>...</think>` blocks from DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 are split into a dim italic block; an `ActivityIndicator` widget shows the current phase (idle / thinking / waiting_api / streaming / tool_running) and active tool target.
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
 - **GitHub comments**: an example workflow runs `nerdvana run` when a collaborator comments `/nerdvana <task>`, with cost, turn and sandbox limits and a read-only token; see [docs/github-action.md](docs/github-action.md)
@@ -241,6 +241,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana skill show <name>` | Print one skill's frontmatter and body |
 | `nerdvana skill install <source>` | Install a skill into `~/.nerdvana/skills/` |
 | `nerdvana skill remove <name>` | Delete an installed skill |
+| `nerdvana skill trust <path>` | Approve a project skill so it may load (see [docs/skills.md](docs/skills.md)) |
 
 ### Project memories (`nerdvana memory ...`)
 
@@ -354,7 +355,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 
 ## Built-in Tools
 
-The registry assembles 30 built-in tools. Bash, file, search, task, web and agent
+The registry assembles 31 built-in tools. Bash, file, search, task, web and agent
 tools are always present. `Parism` appears when the bundled Parism MCP
 package is reachable. The LSP and symbol tools appear only when a compatible
 language server is installed; with none detected they are simply omitted from
@@ -370,6 +371,7 @@ the registry. The three external project tools stay unregistered until
 | `Glob` | Read | File pattern matching |
 | `Grep` | Read | Content search with regex |
 | `TodoWrite` | Write | Maintain the task list the agent works through |
+| `ActivateSkill` | Meta | Load the instructions of a skill from the catalog in the system prompt; the result lists the files the skill bundles. Registered only when at least one skill can be activated by the model. See [docs/skills.md](docs/skills.md) |
 | `AskUser` | Meta | Ask the user a clarifying question with 2-4 suggested options plus free text; errors when no user is reachable (one-shot runs, MCP server, subagents) |
 | `WebFetch` | Read | Fetch a URL and return its readable text |
 | `WebSearch` | Read | Brave Search query; raises at call time when `BRAVE_API_KEY` is unset |
@@ -564,7 +566,7 @@ session:
   max_parallel_agents: 5     # sub-agents at once per provider
 
 hooks:
-  allow_project_hooks: false # see docs/hooks.md before turning this on
+  allow_project_hooks: false # project hooks and project skills; see docs/hooks.md and docs/skills.md
 
 skills:
   include_claude_skills: false  # also read ~/.claude/skills and ./.claude/skills

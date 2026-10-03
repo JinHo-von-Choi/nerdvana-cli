@@ -9,14 +9,14 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 - **다중 제공자 지원** — 하나의 CLI로 21개 AI 플랫폼 사용 가능
 - **대화형 REPL** — 스트리밍 출력과 슬래시 명령어, 토큰 사용량 표시기
 - **비대화형 모드** — 스크립팅을 위한 단일 프롬프트 실행 (`nerdvana run`)
-- **30개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·스웜·태스크 관리 도구
+- **31개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·스웜·태스크 관리 도구
 - **편집 무결성**: `FileRead`가 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙입니다. `FileEdit`와 `FileWrite`는 세션에서 읽지 않았거나 읽은 뒤 바뀐 파일을 고치지 않으며, 자기 편집으로 밀린 앵커는 다시 찾아 맞춥니다. `find_symbol`에 `include_body`를 주면 심볼 소스가 앵커와 함께 나오고, 그 줄들은 파일 전체를 읽지 않고도 고칠 수 있습니다. 편집 직후 언어 서버가 그 편집으로 새로 생긴 오류를 알려 줍니다.
 - **서브에이전트와 백그라운드 작업**: `Agent` / `Swarm`이 서브에이전트를 각자의 시스템 프롬프트, 턴 한도, 도구 범위로 실행합니다. 제공자당 동시 실행 수는 `session.max_parallel_agents`로 묶입니다. 백그라운드 작업이 끝나면 결과가 모델에게 자동으로 전달되고, 쉬고 있던 세션은 스스로 깨어나 결과를 검토합니다.
 - **복구와 완주**: 제공자 실패를 분류해 백오프로 재시도한 뒤 다른 모델이나 제공자로 넘어갑니다. 컨텍스트 초과는 압축 후 재시도하고, 멈춘 스트림은 시간 제한으로 끊습니다. 열린 todo 항목이 있으면 진척이 멈출 때까지 작업을 이어 갑니다. [자동 복구](#자동-복구) 참고.
 - **권한 정책**: `--approval-mode`, `permissions.mode`, `always_allow`, `always_deny`가 서브에이전트를 포함한 모든 도구 호출에 적용됩니다. [권한과 승인 모드](#권한과-승인-모드) 참고.
 - **되묻기**: `AskUser` 도구로 모델이 추측 대신 사용자에게 묻습니다. 에이전트가 일하는 동안 입력한 글은 다음 단계에 반영되고, 파일 변경 확인에는 diff가 표시됩니다.
 - **사용자 명령과 훅**: 마크다운 명령 템플릿과 셸 명령 훅. [사용자 명령과 명령 훅](#사용자-명령과-명령-훅) 참고.
-- **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 `SKILL.md` 디렉터리 형식도 지원합니다.
+- **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 Agent Skills 표준을 따릅니다. `.agents/skills`, `.nerdvana/skills`, `.claude/skills`의 `SKILL.md` 디렉터리를 모델에게 목록으로 보여 주고 필요할 때 불러옵니다([docs/skills.md](docs/skills.md)).
 - **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
 - **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알린다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끈다.
 - **세션 지속성**: JSONL 트랜스크립트를 저장하고 `nerdvana session resume <id>`로 대화를 복원합니다
@@ -223,6 +223,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana skill show <이름>` | 스킬의 프론트매터와 본문 출력 |
 | `nerdvana skill install <소스>` | `~/.nerdvana/skills/`에 스킬 설치 |
 | `nerdvana skill remove <이름>` | 설치된 스킬 삭제 |
+| `nerdvana skill trust <경로>` | 프로젝트 스킬을 승인해 로드되게 함 ([docs/skills.md](docs/skills.md) 참조) |
 
 ### 프로젝트 메모리 (`nerdvana memory ...`)
 
@@ -332,7 +333,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 
 ## 내장 도구
 
-레지스트리는 30개의 내장 도구를 조립합니다. 셸·파일·검색·작업 목록·웹·에이전트·태스크 도구는 항상 등록됩니다.
+레지스트리는 31개의 내장 도구를 조립합니다. 셸·파일·검색·작업 목록·웹·에이전트·태스크 도구는 항상 등록됩니다.
 `Parism`은 번들된 Parism MCP 패키지에 접근할 수 있을 때 등록됩니다. LSP·심볼 도구는 호환 언어 서버가 설치된
 경우에만 등록되며, 없으면 조용히 생략됩니다. 외부 프로젝트 도구 3종은 설정에서 `external_projects_enabled: true`
 를 켜기 전까지 등록되지 않습니다.
@@ -346,6 +347,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `Glob` | 읽기 | 파일 패턴 매칭 |
 | `Grep` | 읽기 | 정규식 기반 콘텐츠 검색 |
 | `TodoWrite` | 쓰기 | 에이전트가 수행할 작업 목록 관리 |
+| `ActivateSkill` | 메타 | 시스템 프롬프트의 스킬 목록에 있는 스킬의 지침을 불러오고, 결과에 그 스킬이 담은 파일 목록을 붙임. 모델이 켤 수 있는 스킬이 하나라도 있을 때만 등록. [docs/skills.md](docs/skills.md) 참조 |
 | `AskUser` | 메타 | 모호한 요구사항에서 사용자에게 선택지 2~4개와 자유 입력으로 질문. 사용자가 없는 실행(단발 실행, MCP 서버, 서브에이전트)에서는 오류 반환 |
 | `WebFetch` | 읽기 | URL을 가져와 읽을 수 있는 본문으로 변환 |
 | `WebSearch` | 읽기 | Brave Search 질의. `BRAVE_API_KEY`가 없으면 호출 시점에 오류 |

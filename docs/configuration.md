@@ -143,7 +143,7 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `allow_project_hooks` | bool | `false` | Permit `<cwd>/.nerdvana/hooks/*.py` to run. Off by default, and an opt-in alone is not enough: each file must also match an approved SHA-256 digest. See [hooks.md](hooks.md). |
+| `allow_project_hooks` | bool | `false` | Permit `<cwd>/.nerdvana/hooks/*.py` to run, and project skills (`<cwd>/.agents/skills`, `<cwd>/.nerdvana/skills`, `<cwd>/.claude/skills`) to load. Off by default, and an opt-in alone is not enough: each file must also match an approved SHA-256 digest. See [hooks.md](hooks.md) and [skills.md](skills.md). |
 
 Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, `ralph_loop_check`) are auto-registered in `AgentLoop.__init__` and are not listed here.
 
@@ -183,7 +183,7 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `include_claude_skills` | bool | `false` | Also load skills from `~/.claude/skills` and `<cwd>/.claude/skills`, one tier below the matching nerdvana skill directories. Only each skill's `SKILL.md` is read; bundled files are never run. |
+| `include_claude_skills` | bool | `false` | Also load skills from `~/.claude/skills` and `<cwd>/.claude/skills`, one tier below the matching `.agents/skills` and nerdvana skill directories. `.agents/skills` (user and project) is always read. Only each skill's `SKILL.md` is read; bundled files are listed to the model on activation and never run by the loader. Skills under `<cwd>` load only for a trusted project (`hooks.allow_project_hooks` plus `nerdvana skill trust`). See [skills.md](skills.md). |
 
 ### `sandbox` (SandboxConfig)
 
