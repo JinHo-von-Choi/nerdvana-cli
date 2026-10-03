@@ -91,6 +91,7 @@ permissions:
     - "Glob"
     - "Grep"
   always_deny: []
+  gate_untrusted_sources: true
 
 session:
   persist: true

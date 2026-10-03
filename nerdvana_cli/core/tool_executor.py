@@ -27,6 +27,7 @@ from nerdvana_cli.core.secrets import MARKER, SecretMasker
 from nerdvana_cli.core.signals import NO_PROGRESS, OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
+from nerdvana_cli.core.untrusted import UntrustedTracker
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
 if TYPE_CHECKING:
@@ -75,6 +76,7 @@ class ToolExecutor:
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
         self._progress            = ProgressMonitor.from_settings(settings)
         self.signals: Counter[str] = Counter()
+        self._untrusted           = UntrustedTracker.from_settings(settings, self.signals)
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []
@@ -163,6 +165,7 @@ class ToolExecutor:
         confined  = tool_use["name"] == "Bash" and sandbox is not None and getattr(sandbox, "mode", "off") != "off"
         self.signals.update(classify_result(result.content, result.is_error, shell_confined=confined))
         self._progress.observe_call(tool_use["name"], tool_use["input"], tool.is_read_only, result.is_error)
+        self._untrusted.record(tool, result.content)
         return result
 
     async def _run_checked(
@@ -231,6 +234,7 @@ class ToolExecutor:
         """Apply the permission policy; ask the user when it says so. None means allowed."""
         tool_id     = tool_use["id"]
         perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context), tool_use["input"])
+        perm_result = self._untrusted.gate(tool, tool_use["input"], perm_result, self._policy.trust_level)
         if perm_result.behavior == PermissionBehavior.DENY:
             return self._refusal(tool_id, f"Permission denied: {perm_result.message}")
         if perm_result.behavior == PermissionBehavior.ASK:

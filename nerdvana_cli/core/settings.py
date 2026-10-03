@@ -77,6 +77,8 @@ class PermissionConfig(BaseModel):
     mode: str = "default"  # default, accept-edits, bypass, plan
     always_allow: list[str] = Field(default_factory=list)
     always_deny: list[str] = Field(default_factory=list)
+    # Ask before a Bash command or a state-changing MCP call that repeats text returned by the web or an MCP server.
+    gate_untrusted_sources: bool = True
 
 
 class SessionConfig(BaseModel):
