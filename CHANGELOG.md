@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-04
+
 ### Added
 
 - `session.report_bash_changes` (off by default) names the files a `Bash` command changed in a git working tree at the end of its output.
@@ -18,12 +20,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - A note, counted as `no_progress`, after 3 failed edits in a row to one file or 12 read-only turns in a row (`session.no_progress_failed_edits`, `session.no_progress_read_turns`). `goal.auto_verify` runs the detected test command (pytest, npm test, cargo test, go test) before a run that changed files and has no goal is accepted.
 - `nerdvana cost` shows the cache hit ratio per row and in total (`Hit %`, `cache_hit_ratio` in `--json`).
 - `scripts/bench_agent.py` reports pass^k, records the run environment, and has `--isolate` (one-commit repository per attempt), `--no-network` and an audit of solution-lookup behaviour; `scripts/bench_compare.py` compares two result files with a seeded bootstrap interval.
+- `model.reasoning_effort` sets OpenAI `reasoning_effort` and the Gemini thinking level for a session or, with `--set model.reasoning_effort=high`, for one run. The value is sent as written; a Gemini value other than `minimal`, `low`, `medium` or `high` stops the request with an error, and an OpenAI value the model does not accept is refused by the API. Empty (the default) changes nothing.
+- `nerdvana acp` runs NerdVana as an Agent Client Protocol (v1) agent over stdio for editors such as Zed (`pip install 'nerdvana-cli[acp]'`): messages, thoughts, tool calls with kinds, locations and diffs, plans, usage and cost, permission questions through `session/request_permission`, `session/cancel`, `session/load`, MCP servers passed by the editor and project slash commands. See `docs/acp.md`.
+- Optional OpenTelemetry tracing (`pip install 'nerdvana-cli[otel]'`, `telemetry.otel.*`, user config only): `invoke_agent`, `chat` and `execute_tool` spans with token and cache usage, sub-agent parenting, opt-in secret-masked content capture, and `TRACEPARENT` for `Bash` commands. See `docs/observability.md`.
+- The MCP client uses the SDK client: it reaches servers of the 2026-07-28 revision and the 2025 revisions, honours `ttlMs` cache hints, answers `input_required` results through the AskUser channel, offers the skills of servers that declare `io.modelcontextprotocol/skills` (`server:skill`, files checked against the server's SHA-256 manifest), and starts stdio servers confined to a write scope (`sandbox`, `write_paths`, `network` per server). See `docs/mcp-client.md`.
+- Anthropic: `model.reasoning_effort` is sent as `output_config.effort` (`AnthropicProvider.set_turn_effort` changes it between turns without restarting the cache on models that support it); `model.anthropic_tool_search` (`off`, `bm25`, `regex`) and `model.anthropic_compaction` (`off`, `on`) use the API's server-side tool search and compaction (the loop falls back to client-side compaction on any error); `model.anthropic_memory_tool` registers the `memory` tool kept in a per-project directory; usage reports `thinking_tokens`.
+- `model.gemini_api` (`auto`, `generate_content`, `interactions`; default `generate_content`): a stateless Gemini Interactions API path with thought steps and signatures replayed unchanged.
+- `model.effort_planning`, `effort_implementation` and `effort_verification` set the reasoning effort per phase of a run.
+- `Advisor` tool and `advisor.*` settings (off by default): a bounded, secret-masked excerpt of the conversation goes to a stronger model at a decision point; `advisor.on_signals` asks it once before a signal-based escalation. See `docs/advisor.md`.
+- `permissions.classifier` (`off`, `shadow`, `enforce`) and `permissions.classifier_model`: a two-stage model judge for calls that would run unasked; shadow records verdicts and `nerdvana approvals` compares them with your answers, enforce turns an allow into an ask or deny. Fails to ask. Signals `classifier_ask`, `classifier_deny`, `classifier_error`; cost under agent type `classifier`.
+- Hook events `permission_denied` (the handler's message is appended to the refusal as a retry hint), `pre_compact` (can cancel a compaction), `post_compact`, `pre_model_switch`, `post_model_switch` and `instructions_loaded`, bindable in `hooks.yml`. `ConfigChange` is not implemented (see `docs/hooks.md`).
+- `tools.max_result_chars` caps the size of a tool's result per tool name or glob, including `mcp__server__*`; the full output is saved to a file.
+- `sandbox.network: allowlist` with `sandbox.allowed_domains`: a confined `Bash` command can connect only to a local egress proxy that forwards to the listed domains (exact or `*.suffix`, Landlock ABI 4). `secrets.proxy_credentials` makes the proxy add a token to plain HTTP requests so it never enters the command's environment. Signal `egress_denied`; `nerdvana doctor` reports the network mode.
+- Managed settings drop-ins (`/etc/nerdvana/managed-settings.d/*.yml`, `NERDVANA_MANAGED_DIR`) applied above user and project settings: model allow and deny globs, an MCP server allow-list, project hooks forced off, extra `always_deny` rules, a cost ceiling and a sandbox floor; a malformed file refuses to start. `/policy` and a `managed_policy` doctor check. See `docs/managed-policy.md`.
+- `nerdvana schedule add|list|remove|run|daemon|install-systemd`: cron and `every 15m` jobs, read-only by default, per-job and daily cost ceilings, overlap locks. See `docs/scheduling.md`.
+- Declarative multi-agent workflows (YAML in `.nerdvana/workflows`): dependency-ordered steps, `foreach` fan-out, JSON schema retries, `cross_check` majority voting, a shared cost ceiling and resume from stored results; `nerdvana workflow list|show|run`, a bundled `review-fanout` workflow and a `Workflow` tool (`workflow.enabled`, off by default). See `docs/workflows.md`.
+- Background runs: aborting a run cancels the provider request, running `Bash` commands (SIGTERM to the process group, SIGKILL after 5 seconds), MCP calls and web requests at once; background `Agent` tasks and `nerdvana agents start|list|show|attach|stop|resume|clean` keep a durable record with a lease (runs whose process died show as `orphaned`); `nerdvana run --resume SESSION_ID`. See `docs/background.md`.
+- `session.steer_mode` (`queue`, `interrupt`), the `/steer` command and Ctrl+T redirect an agent that is working.
+- Reviewable memory: entries record created and modified times, source and last read; `memory.review` holds memory-tool changes in an inbox until approved; `nerdvana memory inbox|approve|reject|forget|stale` with an audit log. See `docs/memory.md`.
+- `/context` and `nerdvana context [session-id]` show where the context window goes; `/history` and `nerdvana history search` search past session transcripts (FTS5 index, substring fallback, secrets masked). See `docs/context-history.md`.
+- `scripts/bench_symbol_tools.py` measures symbol tool success and latency without a model; eight long-horizon benchmark tasks in `benchmarks/long` (tag `long`) with a deterministic generator.
+- Token estimates go through one interface that weighs Hangul at 1.5 tokens per character and uses tiktoken for OpenAI-compatible sessions when it is installed.
+- `docs/architecture.md` describes the package layout and the allowed dependency direction.
 
 ### Changed
 
 - Project skills (`<project>/.agents/skills`, `.nerdvana/skills`, `.claude/skills`) load only when `hooks.allow_project_hooks` is true and the `SKILL.md` digest is approved. Existing project skills stop loading until then.
 - MCP tools run next to other calls only when the server marks them `readOnlyHint`, and a tool marked `destructiveHint` asks before it runs; a tool with no annotations is serialized.
 - `nerdvana session resume` passes the session id to the TUI as an argument instead of setting `NERDVANA_RESUME`.
+- `nerdvana serve` runs on `mcp` 2.x (`pyproject.toml` now asks for `mcp>=2.0.0,<3.0`): the server is an `MCPServer`, the tool list and calls were checked with the mcp 2.x client over stdio and over HTTP with a bearer token. A refused call (access denied, over the quota, malformed) still reaches the client with its reason.
+- The provider SDK ranges now allow anthropic 1.x, openai 3.x and google-genai 2.x (the adapters were exercised against anthropic 1.11, openai 3.24 and google-genai 2.28: their test suites pass and a MiniMax tool loop runs through openai 3.24; the Anthropic and Gemini adapters were not called against their real APIs).
+- Core is split into subpackages (`config`, `hooks`, `state`, `context`, `safety`, `telemetry`, `execution`, `loop`, `delegation`); LSP and symbol code moved to `codeintel`, external projects to `external`, sub-commands to `cli/commands` and slash handlers to `ui/slash`. The agent loop and the tool executor were decomposed (`agent_loop.py` 836 lines, `tool_executor.py` 463) and everything that builds a loop goes through `cli/bootstrap.py`. Import paths changed, with no compatibility re-exports.
+- Korean text now reaches the compaction trigger, the masking trigger, `NIRNA.md` truncation, the tool result caps and the doctor's size check sooner, because Hangul counts 1.5 tokens per character; `compact_messages` sizes messages the same way as the totals.
+- A sub-agent's `Agent` and swarm results now report to the parent through `SubagentConfig.absorb`.
+- Transcripts start with a `session_start` entry that records the working directory.
+- The descriptions of `FileEdit`, `replace_symbol_body`, `Grep`, `Bash`, `Agent`, `Swarm`, `ActivateSkill` and `WebFetch` carry one example call.
 
 ### Fixed
 
@@ -31,21 +62,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - The MCP server key, ACL and audit files follow `NERDVANA_DATA_HOME`; files that exist only under `~/.nerdvana` are still read from there with one warning. Nothing is copied or deleted.
 - A streamed Gemini response that called tools now ends as `tool_use`; it ended as `end_turn` before and the run stopped without executing the calls.
 - The git status in the system prompt is taken once per session, so editing files no longer invalidates the provider prompt cache on the next prompt.
-
-### Changed
-
-- `nerdvana serve` runs on `mcp` 2.x (`pyproject.toml` now asks for `mcp>=2.0.0,<3.0`): the server is an `MCPServer`, the tool list and calls were checked with the mcp 2.x client over stdio and over HTTP with a bearer token. A refused call (access denied, over the quota, malformed) still reaches the client with its reason.
-- The provider SDK ranges now allow anthropic 1.x, openai 3.x and google-genai 2.x (the adapters were exercised against anthropic 1.11, openai 3.24 and google-genai 2.28: their test suites pass and a MiniMax tool loop runs through openai 3.24; the Anthropic and Gemini adapters were not called against their real APIs).
-
-### Fixed
-
 - The `total_cost_usd` of a `run` result and the check against `session.max_cost_usd` left out what the session's sub-agents spent, and a session that switched models priced all its tokens at the last model's rates. The total now adds the sub-agents' spend, and each request is priced for the model that served it.
 - After an escalation (`session.escalation_model`) the next prompt of the same session went back to the first model, and the escalation could not happen again. The escalated model now stays for the session, and the `run` result names the model that finished the run.
 - `nerdvana serve --transport http` answered every MCP request with a 500 ("Task group is not initialized"), because the bearer-auth wrapper did not hand on the lifespan that starts the session manager. A test now completes the handshake through the real app.
+- `find_referencing_symbols` and `lsp_find_references` returned only the definition (0 of 33 benchmark runs); they now return references from other files and `lsp_rename` sees them too. The result says when files were left out.
+- `replace_symbol_body` kept dropping the blank and comment lines after the symbol and ended at a decorator or the `)` of a multi-line signature; it now keeps them and replaces decorated symbols whole. `safe_delete_symbol` no longer reports every symbol as referenced because of its own definition.
+- `nerdvana session list` shows the first user message for current and older transcripts.
+- The MCP server's `EditMemory` wrapper takes `needle`, `repl` and `mode`, and `WriteMemory` requires a valid `scope`; neither call could succeed before.
 
-### Added
+### Removed
 
-- `model.reasoning_effort` sets OpenAI `reasoning_effort` and the Gemini thinking level for a session or, with `--set model.reasoning_effort=high`, for one run. The value is sent as written; a Gemini value other than `minimal`, `low`, `medium` or `high` stops the request with an error, and an OpenAI value the model does not accept is refused by the API. Empty (the default) changes nothing.
+- The unused `anchormind_inject` option of `HookBridge`, and definitions nothing referenced (`ProviderResponse`, `ClientACL`, `ToolProgress`).
 
 ## [1.7.0] - 2026-10-03
 
