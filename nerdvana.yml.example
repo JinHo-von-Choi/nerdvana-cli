@@ -92,6 +92,9 @@ model:
   # Anthropic only. Server-side compaction (beta) on the models that support it: off or on.
   anthropic_compaction: "off"
 
+  # Anthropic only. Registers Anthropic's memory tool (/memories files kept per project in the data root).
+  anthropic_memory_tool: false
+
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
 model_history: {}
