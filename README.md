@@ -341,6 +341,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/route-knowledge` | Classify content → suggest WriteMemory scope |
 | `/dashboard` | Toggle observability dashboard |
 | `/health` | Show 7-day tool call health summary |
+| `/btw` | `/btw <question>` asks a side question with the conversation as context; neither the question nor the answer is added to the history, and the cached start of the request is reused |
 | `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |
 | `/activity` | Toggle activity indicator widget (on/off, persists to config.yml) |
