@@ -15,6 +15,9 @@ import re
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.memory_index import MemorySource
+from nerdvana_cli.core.memory_review import MemoryInbox
+from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
@@ -38,6 +41,27 @@ def _scan_secrets(content: str) -> list[str]:
         if pattern.search(content):
             warnings.append(label)
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Review gate
+# ---------------------------------------------------------------------------
+
+# Sentence every tool that changes memory carries in its description.
+_REVIEW_NOTE = (
+    "\n\nWhen the user has turned on memory review (memory.review), this call only queues a "
+    "proposal: nothing is stored until the user approves it, and ReadMemory and ListMemories "
+    "do not show it before then. The result says when a proposal was queued; do not repeat the call."
+)
+
+
+def _review_on(context: ToolContext) -> bool:
+    """Whether memory changes wait for review: ``context.state["memory_review"]`` when the
+    host set it, else ``memory.review`` read once from the settings. Raises SettingsLoadError
+    when the settings cannot be read, so a broken gate never lets a write through."""
+    if "memory_review" not in context.state:
+        context.state["memory_review"] = NerdvanaSettings.load().memory.review
+    return bool(context.state["memory_review"])
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +121,7 @@ class WriteMemoryTool(BaseTool[WriteMemoryArgs]):
         "  user_global       — saved to ~/.nerdvana/memories/global/\n"
         "  agent_experience  — delegates to AnchorMind (returns instructions)\n\n"
         "Use slash namespaces in name (e.g. 'auth/login/rules')."
+        + _REVIEW_NOTE
     )
     input_schema = {
         "type": "object",
@@ -147,9 +172,11 @@ class WriteMemoryTool(BaseTool[WriteMemoryArgs]):
                 is_error=True,
             )
 
-        mgr = MemoriesManager(context.cwd)
         try:
-            msg = mgr.write(args.name, args.content, scope)
+            if _review_on(context):
+                msg = MemoryInbox(context.cwd).propose_write(args.name, args.content, scope).queued_message()
+            else:
+                msg = MemoriesManager(context.cwd).write(args.name, args.content, scope, source=MemorySource.AGENT)
         except (NotImplementedError, ValueError, OSError) as exc:
             return ToolResult(tool_use_id="", content=str(exc), is_error=True)
         return ToolResult(tool_use_id="", content=msg, is_error=False)
@@ -206,7 +233,7 @@ class ListMemoriesTool(BaseTool[ListMemoriesArgs]):
     description_text = (
         "List all memory entries.\n\n"
         "Optional topic filter uses slash-namespace prefix (e.g. 'auth/login').\n"
-        "Returns name, scope, size, and last-modified time for each entry."
+        "Returns name, scope, size, last-modified time and source (user, agent, import) for each entry."
     )
     input_schema = {
         "type": "object",
@@ -238,8 +265,8 @@ class ListMemoriesTool(BaseTool[ListMemoriesArgs]):
         lines: list[str] = []
         for e in entries:
             dt  = datetime.datetime.fromtimestamp(e.mtime).strftime("%Y-%m-%d %H:%M")
-            lines.append(f"  {e.name:<40}  {e.scope:<20}  {e.size:>6}B  {dt}")
-        header = f"{'Name':<40}  {'Scope':<20}  {'Size':>7}  {'Modified'}"
+            lines.append(f"  {e.name:<40}  {e.scope:<20}  {e.size:>6}B  {dt}  {e.source}")
+        header = f"{'Name':<40}  {'Scope':<20}  {'Size':>7}  {'Modified':<16}  {'Source'}"
         body   = "\n".join([header, "-" * 80] + lines)
         return ToolResult(tool_use_id="", content=body, is_error=False)
 
@@ -256,6 +283,7 @@ class DeleteMemoryTool(BaseTool[DeleteMemoryArgs]):
         "Delete a named memory entry.\n\n"
         "Only use this when explicitly requested. "
         "Searches PROJECT_KNOWLEDGE then USER_GLOBAL scope."
+        + _REVIEW_NOTE
     )
     input_schema = {
         "type": "object",
@@ -276,10 +304,12 @@ class DeleteMemoryTool(BaseTool[DeleteMemoryArgs]):
         can_use_tool: Any,
         on_progress: Any = None,
     ) -> ToolResult:
-        mgr = MemoriesManager(context.cwd)
         try:
-            msg = mgr.delete(args.name)
-        except FileNotFoundError as exc:
+            if _review_on(context):
+                msg = MemoryInbox(context.cwd).propose_delete(args.name).queued_message()
+            else:
+                msg = MemoriesManager(context.cwd).delete(args.name)
+        except (FileNotFoundError, ValueError) as exc:
             return ToolResult(tool_use_id="", content=str(exc), is_error=True)
         return ToolResult(tool_use_id="", content=msg, is_error=False)
 
@@ -296,6 +326,7 @@ class RenameMemoryTool(BaseTool[RenameMemoryArgs]):
         "Rename a memory entry and optionally move it to a different scope.\n\n"
         "new_scope is optional; if omitted the original scope is preserved.\n"
         "Scope values: project_knowledge, user_global."
+        + _REVIEW_NOTE
     )
     input_schema = {
         "type": "object",
@@ -332,9 +363,12 @@ class RenameMemoryTool(BaseTool[RenameMemoryArgs]):
                     content=f"Invalid new_scope {args.new_scope!r}.",
                     is_error=True,
                 )
-        mgr = MemoriesManager(context.cwd)
         try:
-            msg = mgr.rename(args.old_name, args.new_name, new_scope=target_scope)
+            if _review_on(context):
+                proposals = MemoryInbox(context.cwd).propose_rename(args.old_name, args.new_name, target_scope)
+                msg = "\n".join(p.queued_message() for p in proposals)
+            else:
+                msg = MemoriesManager(context.cwd).rename(args.old_name, args.new_name, new_scope=target_scope)
         except (FileNotFoundError, ValueError) as exc:
             return ToolResult(tool_use_id="", content=str(exc), is_error=True)
         return ToolResult(tool_use_id="", content=msg, is_error=False)
@@ -352,6 +386,7 @@ class EditMemoryTool(BaseTool[EditMemoryArgs]):
         "Apply a search-and-replace edit to an existing memory.\n\n"
         "mode: 'literal' (default) for exact string match, 'regex' for re.sub.\n"
         "All occurrences are replaced."
+        + _REVIEW_NOTE
     )
     input_schema = {
         "type": "object",
@@ -380,9 +415,11 @@ class EditMemoryTool(BaseTool[EditMemoryArgs]):
         can_use_tool: Any,
         on_progress: Any = None,
     ) -> ToolResult:
-        mgr = MemoriesManager(context.cwd)
         try:
-            msg = mgr.edit(args.name, args.needle, args.repl, mode=args.mode)
+            if _review_on(context):
+                msg = MemoryInbox(context.cwd).propose_edit(args.name, args.needle, args.repl, args.mode).queued_message()
+            else:
+                msg = MemoriesManager(context.cwd).edit(args.name, args.needle, args.repl, mode=args.mode)
         except (FileNotFoundError, ValueError) as exc:
             return ToolResult(tool_use_id="", content=str(exc), is_error=True)
         return ToolResult(tool_use_id="", content=msg, is_error=False)

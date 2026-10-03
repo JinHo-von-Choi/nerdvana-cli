@@ -215,7 +215,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -232,6 +232,7 @@ _SANDBOX_STRICT_FIELDS = frozenset({"mode", "network", "allowed_domains"})
 def _is_project_file(path: str) -> bool:
     """True for the ``nerdvana.yml`` / ``nerdvana.yaml`` found in the working directory."""
     return os.path.abspath(path) in {os.path.abspath(os.path.join(os.getcwd(), name)) for name in ("nerdvana.yml", "nerdvana.yaml")}
+_MEMORY_STRICT_FIELDS = frozenset({"review"})
 
 
 def _strict_bool(path: str, value: object) -> bool:
@@ -327,6 +328,13 @@ class TelemetryConfig(BaseModel):
     otel: OtelConfig = Field(default_factory=OtelConfig)
 
 
+class MemoryConfig(BaseModel):
+    # true: a memory the agent writes, edits, renames or deletes with the memory tools waits in
+    # an inbox until the user approves it (nerdvana memory inbox); nothing is stored or shown
+    # to the agent before that. See docs/memory.md.
+    review: bool = False
+
+
 class AgentsConfig(BaseModel):
     # Category name -> model for sub-agents, written "model" or "provider:model".
     # An agent type or an Agent call that names a category runs on the mapped model.
@@ -369,6 +377,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("agents",     AgentsConfig,     frozenset()),
     ("goal",       GoalConfig,       frozenset()),
     ("telemetry",  TelemetryConfig,  frozenset()),
+    ("memory",     MemoryConfig,     _MEMORY_STRICT_FIELDS),
 )
 
 
@@ -387,6 +396,7 @@ class NerdvanaSettings(BaseSettings):
     secrets: SecretsConfig = Field(default_factory=SecretsConfig)
     goal: GoalConfig = Field(default_factory=GoalConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.

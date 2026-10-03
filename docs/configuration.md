@@ -220,6 +220,12 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 
 See [goals.md](goals.md).
 
+### `memory` (MemoryConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `review` | bool | `false` | `true`: a memory the agent writes, edits, renames or deletes with the memory tools is not applied. It waits in the project's inbox until the user approves it with `nerdvana memory approve` or `/memory approve`, and neither the prompt hint nor `ReadMemory` and `ListMemories` show it before then. A value that is not a boolean stops startup, so a typo never turns review off. See [memory.md](memory.md). |
+
 ### `agents` (AgentsConfig)
 
 | Field | Type | Default | Description |
