@@ -78,6 +78,7 @@ def create_provider(
     extended_thinking: bool = False,
     thinking_budget: int = 8192,
     show_thinking: bool = True,
+    reasoning_effort: str = "",
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -113,6 +114,7 @@ def create_provider(
         extended_thinking=extended_thinking,
         thinking_budget=thinking_budget,
         show_thinking=show_thinking,
+        reasoning_effort=reasoning_effort,
     )
 
     provider_cls = _PROVIDER_CLASSES.get(provider)

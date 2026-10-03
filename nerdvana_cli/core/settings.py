@@ -65,6 +65,9 @@ class ModelConfig(BaseModel):
     extended_thinking: bool = False
     thinking_budget: int = 8192
     show_thinking: bool = True
+    # How hard OpenAI-compatible and Gemini models reason, in the provider's own words
+    # (OpenAI ``reasoning_effort``, Gemini ``thinking_level``). Empty keeps the provider default.
+    reasoning_effort: str = ""
 
 
 class PermissionConfig(BaseModel):

@@ -79,6 +79,7 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | `extended_thinking` | bool | `false` | Turns on thinking for Anthropic models where it is optional (Opus 4.6 to 4.8, Sonnet 4.6 and the manual-budget models such as Haiku 4.5); the `ultrawork`/`ulw` keyword turns it on for one prompt. Claude 5 models (Fable, Opus, Sonnet) think by default, so the switch has no effect on them. Other providers are unaffected. |
 | `thinking_budget` | int | `8192` | Thinking token budget for models that take a manual budget (Haiku 4.5 and earlier). Models with adaptive thinking choose their own depth and ignore it. |
 | `show_thinking` | bool | `true` | Asks Anthropic models for thinking summaries (they omit them by default) and renders the thinking content from the response stream as a dim italic block above the answer. Toggled via `/thinking on|off`. |
+| `reasoning_effort` | string | `` | How hard OpenAI-compatible and Gemini models reason, in the provider's own words, sent as it is: OpenAI `reasoning_effort` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`; which values a model accepts differs, and an unsupported one is refused by the API) and the Gemini thinking level (`minimal`, `low`, `medium`, `high`; any other value stops the request with an error, and which levels a model accepts also differs). Empty leaves the provider's default. Anthropic models ignore it. `nerdvana run --set model.reasoning_effort=high` sets it for one run. |
 
 ### `model_history` (dict[str, str])
 
@@ -289,6 +290,7 @@ model:
   extended_thinking: false
   thinking_budget: 8192
   show_thinking: true
+  reasoning_effort: ""
 
 permissions:
   mode: default

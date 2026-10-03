@@ -191,6 +191,7 @@ class OpenAIProvider:
                 "tools": api_tools,
                 "stream": True,
             }
+            create_kwargs.update(self._effort_kwargs())
             try:
                 stream = await client.chat.completions.create(
                     **create_kwargs,
@@ -318,6 +319,7 @@ class OpenAIProvider:
                 temperature=self.config.temperature,
                 messages=api_messages,  # type: ignore[arg-type]
                 tools=api_tools,  # type: ignore[arg-type]
+                **self._effort_kwargs(),
             )
 
             content = ""
@@ -355,6 +357,10 @@ class OpenAIProvider:
             return {"content": f"UTF-8 decoding error: {e}", "is_error": True}
         except Exception as e:
             return {"content": str(e), "is_error": True}
+
+    def _effort_kwargs(self) -> dict[str, Any]:
+        """The ``reasoning_effort`` request field, present only when the setting is."""
+        return {"reasoning_effort": self.config.reasoning_effort} if self.config.reasoning_effort else {}
 
     def _build_tools(self, tools: Sequence[ToolSpec]) -> list[dict[str, Any]]:
         """Build tool definitions for API call."""

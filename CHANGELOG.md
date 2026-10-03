@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `model.reasoning_effort` sets OpenAI `reasoning_effort` and the Gemini thinking level for a session or, with `--set model.reasoning_effort=high`, for one run. The value is sent as written; a Gemini value other than `minimal`, `low`, `medium` or `high` stops the request with an error, and an OpenAI value the model does not accept is refused by the API. Empty (the default) changes nothing.
+
 ## [1.7.0] - 2026-10-03
 
 ### Added

@@ -87,6 +87,9 @@ def tool_name_from_id(tool_use_id: str) -> str:
     return match.group("name") if match else ""
 
 
+_THINKING_LEVELS = frozenset({"MINIMAL", "LOW", "MEDIUM", "HIGH"})
+
+
 class GeminiProvider:
     """Google Gemini API provider."""
 
@@ -105,6 +108,25 @@ class GeminiProvider:
 
             self._client = genai.Client(api_key=self.config.api_key) if self.config.api_key else genai.Client()
         return self._client
+
+    def _generate_config(self, types: Any, system_prompt: str, gemini_tools: Any) -> Any:
+        """The request configuration; ``reasoning_effort`` becomes the model's thinking level."""
+        thinking = None
+        if self.config.reasoning_effort:
+            level = self.config.reasoning_effort.upper()
+            if level not in _THINKING_LEVELS:
+                raise ValueError(
+                    f"reasoning_effort {self.config.reasoning_effort!r} is not a Gemini thinking level "
+                    f"({', '.join(name.lower() for name in sorted(_THINKING_LEVELS))})"
+                )
+            thinking = types.ThinkingConfig(thinking_level=level)
+        return types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            tools=gemini_tools,
+            thinking_config=thinking,
+        )
 
     async def stream(
         self,
@@ -147,14 +169,8 @@ class GeminiProvider:
         # Convert messages
         contents = self._convert_messages(messages)
 
-        config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=self.config.max_tokens,
-            temperature=self.config.temperature,
-            tools=gemini_tools,  # type: ignore[arg-type]
-        )
-
         try:
+            config = self._generate_config(types, system_prompt, gemini_tools)
             stream = await client.aio.models.generate_content_stream(
                 model=self.config.model,
                 contents=contents,
@@ -214,14 +230,8 @@ class GeminiProvider:
             gemini_tools = [types.Tool(function_declarations=function_declarations)]
 
         contents = self._convert_messages(messages)
-        config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=self.config.max_tokens,
-            temperature=self.config.temperature,
-            tools=gemini_tools,  # type: ignore[arg-type]
-        )
-
         try:
+            config = self._generate_config(types, system_prompt, gemini_tools)
             response = await client.aio.models.generate_content(
                 model=self.config.model,
                 contents=contents,
