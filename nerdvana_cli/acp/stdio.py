@@ -21,7 +21,8 @@ from acp.core import DEFAULT_STDIO_BUFFER_LIMIT_BYTES
 async def protocol_streams() -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """The reader and writer for the protocol, with the process's own stdin and stdout detached from it."""
     if sys.platform == "win32":
-        return await stdio_streams(limit=DEFAULT_STDIO_BUFFER_LIMIT_BYTES)
+        reader, writer = await stdio_streams(limit=DEFAULT_STDIO_BUFFER_LIMIT_BYTES)
+        return reader, writer
     sys.stdout.flush()
     protocol_in  = os.fdopen(os.dup(0), "rb", buffering=0)
     protocol_out = os.fdopen(os.dup(1), "wb", buffering=0)
