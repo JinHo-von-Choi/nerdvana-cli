@@ -96,3 +96,12 @@ def test_every_tool_result_has_a_matching_tool_use_before_it() -> None:
                 seen.add(block["id"])
             if block["type"] == "tool_result":
                 assert block["tool_use_id"] in seen
+
+
+def test_blocks_another_provider_left_on_a_turn_are_not_sent() -> None:
+    thinking  = {"type": "thinking", "thinking": "t", "signature": "s"}
+    reasoning = {"type": "reasoning", "id": "rs_1", "summary": [], "encrypted_content": "enc"}
+    out = _provider()._convert_messages([
+        {"role": "assistant", "content": "hi", "provider_blocks": [reasoning, thinking]},
+    ])
+    assert out[0]["content"] == [thinking, {"type": "text", "text": "hi"}]

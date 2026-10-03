@@ -76,6 +76,10 @@ model:
   show_thinking: true
   reasoning_effort: ""
 
+  # Which OpenAI API OpenAI-compatible providers speak: auto (Responses on OpenAI's own endpoint,
+  # Chat Completions elsewhere), chat, or responses.
+  openai_api: auto
+
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.
 model_history: {}

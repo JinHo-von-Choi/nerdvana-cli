@@ -68,6 +68,9 @@ class ModelConfig(BaseModel):
     # How hard OpenAI-compatible and Gemini models reason, in the provider's own words
     # (OpenAI ``reasoning_effort``, Gemini ``thinking_level``). Empty keeps the provider default.
     reasoning_effort: str = ""
+    # Which OpenAI API OpenAI-compatible providers use: "auto" speaks Responses to OpenAI's own endpoint and
+    # Chat Completions to every other server (Groq, Ollama, OpenRouter, ...); "chat" and "responses" force one.
+    openai_api: Literal["auto", "chat", "responses"] = "auto"
 
 
 class PermissionConfig(BaseModel):

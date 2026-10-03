@@ -27,7 +27,7 @@ _UNSUPPORTED_PARAM_STATUS = frozenset({400, 422})
 
 _EFFORT_WITH_TOOLS_NOTE = (
     "reasoning_effort {effort!r} is sent with tools to the OpenAI Chat Completions endpoint, which supports "
-    "tool calling only with reasoning_effort 'none' on GPT-5.4 and later; set model.reasoning_effort to 'none'"
+    "tool calling only with reasoning_effort 'none' on GPT-5.4 and later; set model.reasoning_effort to 'none' or model.openai_api to 'auto'"
 )
 
 
