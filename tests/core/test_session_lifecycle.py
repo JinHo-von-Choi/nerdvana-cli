@@ -83,6 +83,18 @@ def test_resume_id_accepts_session_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resume_session_id() == "a1b2c3d4"
 
 
+def test_resume_id_argument_wins_over_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NERDVANA_RESUME", "from-env")
+    assert resume_session_id("from-arg") == "from-arg"
+
+
+def test_resume_id_argument_that_is_unsafe_does_not_fall_back_to_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NERDVANA_RESUME", "from-env")
+    assert resume_session_id("../etc") is None
+
+
 def test_persist_false_writes_nothing(tmp_path: Path) -> None:
     storage = SessionStorage(session_id="quiet", storage_dir=str(tmp_path / "s"), persist=False)
     storage.record_user_message("hello")

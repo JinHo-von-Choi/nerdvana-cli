@@ -20,7 +20,6 @@ KNOWN_LARGE: dict[str, int] = {
     "server/mcp_server.py": 935,
     "ui/app.py": 779,
     "tools/file_tools.py": 706,
-    "main.py": 678,
     "core/tool_executor.py": 650,
     "core/checkpoint.py": 642,
     "core/lsp_client.py": 626,
