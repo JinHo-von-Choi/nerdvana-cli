@@ -1,0 +1,218 @@
+[
+  {
+    "sku": "SKU-0025",
+    "title": "gasket 2mm",
+    "prices": {
+      "USD": 2399,
+      "EUR": 2160,
+      "GBP": 2100
+    }
+  },
+  {
+    "sku": "SKU-0026",
+    "title": "valve 25mm",
+    "prices": {
+      "USD": 2233,
+      "EUR": 2010,
+      "GBP": 1954
+    }
+  },
+  {
+    "sku": "SKU-0027",
+    "title": "clamp 24mm",
+    "prices": {
+      "USD": 5927,
+      "EUR": 5335,
+      "GBP": 5187
+    }
+  },
+  {
+    "sku": "SKU-0028",
+    "title": "bearing 30mm",
+    "prices": {
+      "USD": 7502,
+      "EUR": 6752,
+      "GBP": 6565
+    }
+  },
+  {
+    "sku": "SKU-0029",
+    "title": "valve 12mm",
+    "prices": {
+      "USD": 1780,
+      "EUR": 1602,
+      "GBP": 1558
+    }
+  },
+  {
+    "sku": "SKU-0030",
+    "title": "washer 23mm",
+    "prices": {
+      "USD": 6886,
+      "EUR": 6198,
+      "GBP": 6026
+    }
+  },
+  {
+    "sku": "SKU-0031",
+    "title": "bolt 24mm",
+    "prices": {
+      "USD": 8517,
+      "EUR": 7666,
+      "GBP": 7453
+    }
+  },
+  {
+    "sku": "SKU-0032",
+    "title": "gasket 23mm",
+    "prices": {
+      "USD": 3773,
+      "EUR": 3396,
+      "GBP": 3302
+    }
+  },
+  {
+    "sku": "SKU-0033",
+    "title": "clamp 12mm",
+    "prices": {
+      "USD": 7730,
+      "EUR": 6957,
+      "GBP": 6764
+    }
+  },
+  {
+    "sku": "SKU-0034",
+    "title": "valve 18mm",
+    "prices": {
+      "USD": 1269,
+      "EUR": 1143,
+      "GBP": 1111
+    }
+  },
+  {
+    "sku": "SKU-0035",
+    "title": "bolt 10mm",
+    "prices": {
+      "USD": 4329,
+      "EUR": 3897,
+      "GBP": 3788
+    }
+  },
+  {
+    "sku": "SKU-0036",
+    "title": "washer 33mm",
+    "prices": {
+      "USD": 6633,
+      "EUR": 5970,
+      "GBP": 5804
+    }
+  },
+  {
+    "sku": "SKU-0037",
+    "title": "sensor 6mm",
+    "prices": {
+      "USD": 5545,
+      "EUR": 4991,
+      "GBP": 4852
+    }
+  },
+  {
+    "sku": "SKU-0038",
+    "title": "washer 27mm",
+    "prices": {
+      "USD": 3000,
+      "EUR": 2700,
+      "GBP": 2625
+    }
+  },
+  {
+    "sku": "SKU-0039",
+    "title": "bolt 6mm",
+    "prices": {
+      "USD": 4797,
+      "EUR": 4318,
+      "GBP": 4198
+    }
+  },
+  {
+    "sku": "SKU-0040",
+    "title": "coupler 24mm",
+    "prices": {
+      "USD": 3966,
+      "EUR": 3570,
+      "GBP": 3471
+    }
+  },
+  {
+    "sku": "SKU-0041",
+    "title": "sensor 31mm",
+    "prices": {
+      "USD": 4155,
+      "EUR": 3740,
+      "GBP": 3636
+    }
+  },
+  {
+    "sku": "SKU-0042",
+    "title": "sensor 21mm",
+    "prices": {
+      "USD": 1064,
+      "EUR": 958,
+      "GBP": 931
+    }
+  },
+  {
+    "sku": "SKU-0043",
+    "title": "clamp 22mm",
+    "prices": {
+      "USD": 6379,
+      "EUR": 5742,
+      "GBP": 5582
+    }
+  },
+  {
+    "sku": "SKU-0044",
+    "title": "coupler 18mm",
+    "prices": {
+      "USD": 3887,
+      "EUR": 3499,
+      "GBP": 3402
+    }
+  },
+  {
+    "sku": "SKU-0045",
+    "title": "spring 25mm",
+    "prices": {
+      "USD": 2110,
+      "EUR": 1899,
+      "GBP": 1847
+    }
+  },
+  {
+    "sku": "SKU-0046",
+    "title": "bearing 9mm",
+    "prices": {
+      "USD": 2539,
+      "EUR": 2286,
+      "GBP": 2222
+    }
+  },
+  {
+    "sku": "SKU-0047",
+    "title": "nozzle 11mm",
+    "prices": {
+      "USD": 5176,
+      "EUR": 4659,
+      "GBP": 4529
+    }
+  },
+  {
+    "sku": "SKU-0048",
+    "title": "bracket 13mm",
+    "prices": {
+      "USD": 5211,
+      "EUR": 4690,
+      "GBP": 4560
+    }
+  }
+]

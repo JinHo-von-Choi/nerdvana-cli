@@ -1,0 +1,15 @@
+{
+  "top_error_codes": [
+    "E1001",
+    "E5107",
+    "E1007"
+  ],
+  "worst_hour_utc": "2026-03-14 12",
+  "root_cause_log": "billing.log",
+  "restart_count": 154,
+  "long_gaps": {
+    "auth.log": "2026-03-14T13:26:57Z",
+    "reports.log": "2026-03-14T14:43:20Z",
+    "scheduler.log": "2026-03-14T12:56:12Z"
+  }
+}

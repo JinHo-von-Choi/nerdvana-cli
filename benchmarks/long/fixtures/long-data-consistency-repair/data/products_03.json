@@ -1,0 +1,218 @@
+[
+  {
+    "sku": "SKU-0049",
+    "title": "coupler 22mm",
+    "prices": {
+      "USD": 1217,
+      "EUR": 1096,
+      "GBP": 1065
+    }
+  },
+  {
+    "sku": "SKU-0050",
+    "title": "gasket 3mm",
+    "prices": {
+      "USD": 7965,
+      "EUR": 7169,
+      "GBP": 6970
+    }
+  },
+  {
+    "sku": "SKU-0051",
+    "title": "nozzle 11mm",
+    "prices": {
+      "USD": 264,
+      "EUR": 238,
+      "GBP": 231
+    }
+  },
+  {
+    "sku": "SKU-0052",
+    "title": "bracket 11mm",
+    "prices": {
+      "USD": 275,
+      "EUR": 248,
+      "GBP": 241
+    }
+  },
+  {
+    "sku": "SKU-0053",
+    "title": "nozzle 25mm",
+    "prices": {
+      "USD": 8289,
+      "EUR": 7461,
+      "GBP": 7253
+    }
+  },
+  {
+    "sku": "SKU-0054",
+    "title": "coupler 31mm",
+    "prices": {
+      "USD": 5975,
+      "EUR": 5378,
+      "GBP": 5229
+    }
+  },
+  {
+    "sku": "SKU-0055",
+    "title": "hinge 27mm",
+    "prices": {
+      "USD": 8530,
+      "EUR": 7677,
+      "GBP": 7464
+    }
+  },
+  {
+    "sku": "SKU-0056",
+    "title": "bolt 3mm",
+    "prices": {
+      "USD": 2873,
+      "EUR": 2586,
+      "GBP": 2514
+    }
+  },
+  {
+    "sku": "SKU-0057",
+    "title": "coupler 12mm",
+    "prices": {
+      "USD": 6375,
+      "EUR": 5738,
+      "GBP": 5579
+    }
+  },
+  {
+    "sku": "SKU-0058",
+    "title": "bracket 30mm",
+    "prices": {
+      "USD": 4792,
+      "EUR": 4313,
+      "GBP": 4193
+    }
+  },
+  {
+    "sku": "SKU-0059",
+    "title": "clamp 29mm",
+    "prices": {
+      "USD": 3953,
+      "EUR": 3558,
+      "GBP": 3459
+    }
+  },
+  {
+    "sku": "SKU-0060",
+    "title": "coupler 34mm",
+    "prices": {
+      "USD": 6902,
+      "EUR": 6212,
+      "GBP": 6040
+    }
+  },
+  {
+    "sku": "SKU-0061",
+    "title": "nozzle 11mm",
+    "prices": {
+      "USD": 1521,
+      "EUR": 1369,
+      "GBP": 1331
+    }
+  },
+  {
+    "sku": "SKU-0062",
+    "title": "valve 13mm",
+    "prices": {
+      "USD": 4878,
+      "EUR": 4391,
+      "GBP": 4269
+    }
+  },
+  {
+    "sku": "SKU-0063",
+    "title": "washer 14mm",
+    "prices": {
+      "USD": 3015,
+      "EUR": 2714,
+      "GBP": 2639
+    }
+  },
+  {
+    "sku": "SKU-0064",
+    "title": "sensor 10mm",
+    "prices": {
+      "USD": 4468,
+      "EUR": 4022,
+      "GBP": 3910
+    }
+  },
+  {
+    "sku": "SKU-0065",
+    "title": "washer 17mm",
+    "prices": {
+      "USD": 3645,
+      "EUR": 3281,
+      "GBP": 3190
+    }
+  },
+  {
+    "sku": "SKU-0066",
+    "title": "hinge 32mm",
+    "prices": {
+      "USD": 5305,
+      "EUR": 4775,
+      "GBP": 4642
+    }
+  },
+  {
+    "sku": "SKU-0067",
+    "title": "clamp 20mm",
+    "prices": {
+      "USD": 5826,
+      "EUR": 5244,
+      "GBP": 5098
+    }
+  },
+  {
+    "sku": "SKU-0068",
+    "title": "bracket 36mm",
+    "prices": {
+      "USD": 3177,
+      "EUR": 2860,
+      "GBP": 2780
+    }
+  },
+  {
+    "sku": "SKU-0069",
+    "title": "clamp 4mm",
+    "prices": {
+      "USD": 5630,
+      "EUR": 5067,
+      "GBP": 4927
+    }
+  },
+  {
+    "sku": "SKU-0070",
+    "title": "washer 11mm",
+    "prices": {
+      "USD": 4104,
+      "EUR": 3694,
+      "GBP": 3591
+    }
+  },
+  {
+    "sku": "SKU-0071",
+    "title": "gasket 21mm",
+    "prices": {
+      "USD": 1662,
+      "EUR": 1496,
+      "GBP": 1455
+    }
+  },
+  {
+    "sku": "SKU-0072",
+    "title": "bolt 6mm",
+    "prices": {
+      "USD": 8921,
+      "EUR": 8029,
+      "GBP": 7806
+    }
+  }
+]

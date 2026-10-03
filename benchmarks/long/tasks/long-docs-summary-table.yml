@@ -1,0 +1,12 @@
+id: long-docs-summary-table
+path: ../fixtures/long-docs-summary-table
+prompt: docs/ holds eight project records, each long and each revised over time. Write summary.csv with the header doc,owner,final_budget_usd,go_live,vendor,open_risks and one row per document (doc is the file name without .md). owner is the person who owns the project according to the latest dated decision; final_budget_usd is the project budget in force after the latest dated budget decision, as digits only (ignore pilot, training and contingency figures); go_live is the latest dated go-live date as YYYY-MM-DD; vendor is the contracted vendor according to the latest dated decision; open_risks is the number of rows of the risk register table whose status is exactly Open. When a document revises a value, the sentence with the latest date wins wherever it appears. Then make `python3 check.py` pass.
+verify: python3 check.py
+tags:
+- long
+- python
+- reading
+- analysis
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

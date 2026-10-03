@@ -1,0 +1,12 @@
+id: long-data-consistency-repair
+path: ../fixtures/long-data-consistency-repair
+prompt: The 30 JSON files in data/ (customers, products, orders) disagree with each other and with the rules in SPEC.md. Repair the data so that every rule holds, changing nothing else, then make `python3 check.py` pass.
+verify: python3 check.py
+tags:
+- long
+- python
+- data
+- multi-file
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

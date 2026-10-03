@@ -1,0 +1,756 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tasker",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "List users",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "summary": "Read a user",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a user",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "summary": "List projects",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/projects/{id}": {
+      "get": {
+        "summary": "Read a project",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a project",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/tickets": {
+      "get": {
+        "summary": "List tickets",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a ticket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ticket"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/tickets/{id}": {
+      "get": {
+        "summary": "Read a ticket",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a ticket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ticket"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a ticket",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/comments": {
+      "get": {
+        "summary": "List comments",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Comment"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a comment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/comments/{id}": {
+      "get": {
+        "summary": "Read a comment",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a comment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a comment",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/labels": {
+      "get": {
+        "summary": "List labels",
+        "parameters": [
+          {
+            "name": "color",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a label",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/labels/{id}": {
+      "get": {
+        "summary": "Read a label",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a label",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a label",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/sprints": {
+      "get": {
+        "summary": "List sprints",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Sprint"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a sprint",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sprint"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      }
+    },
+    "/sprints/{id}": {
+      "get": {
+        "summary": "Read a sprint",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a sprint",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sprint"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "422": {
+            "description": "invalid"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a sprint",
+        "responses": {
+          "200": {
+            "description": "ok"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member",
+              "guest"
+            ],
+            "default": "member"
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "required": [
+          "name",
+          "owner_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "default": "active"
+          }
+        }
+      },
+      "Ticket": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "doing",
+              "done"
+            ],
+            "default": "open"
+          },
+          "assignee_id": {
+            "type": "integer"
+          },
+          "severity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "default": 3
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "required": [
+          "ticket_id",
+          "author_id",
+          "body"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "ticket_id": {
+            "type": "integer"
+          },
+          "author_id": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "Label": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "gray",
+              "red",
+              "green",
+              "blue"
+            ],
+            "default": "gray"
+          }
+        }
+      },
+      "Sprint": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      }
+    }
+  }
+}

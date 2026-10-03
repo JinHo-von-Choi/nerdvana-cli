@@ -1,0 +1,12 @@
+id: long-bughunt-ledger
+path: ../fixtures/long-bughunt-ledger
+prompt: '`python3 -m unittest discover -s tests -t .` fails in tests/test_statement.py: statement balances are wrong for some postings (the USD-only test passes). Find the root causes inside the package and fix them in the code, not in the tests, so that the whole suite passes. The package has many look-alike modules; change only what is actually wrong.'
+verify: python3 -m unittest discover -s tests -t .
+tags:
+- long
+- python
+- bugfix
+- multi-file
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

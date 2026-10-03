@@ -1,0 +1,12 @@
+id: long-rename-snake-case
+path: ../fixtures/long-rename-snake-case
+prompt: The warehouse package has 40 modules. 25 of them define camelCase functions (for example computeOrderTotal) but the project convention is snake_case (compute_order_total). Rename every camelCase function to snake_case, update every import, call site and string that refers to it (the package resolves some functions by name from strings), and leave behaviour unchanged. Class names stay as they are. `python3 check.py` must pass.
+verify: python3 check.py
+tags:
+- long
+- python
+- refactor
+- multi-file
+max_turns: 80
+max_cost_usd: 1.0
+timeout: 1800

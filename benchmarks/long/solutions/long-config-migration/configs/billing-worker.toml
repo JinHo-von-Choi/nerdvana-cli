@@ -1,0 +1,574 @@
+[app]
+name = "billing-worker"
+port = 8620
+timeout_ms = 61000
+maintenance = true
+
+[logging]
+level = "warn"
+destinations = ["syslog"]
+file = "/var/log/billing-worker.log"
+rotate_size_bytes = 52428800
+
+[db]
+host = "db-1.internal"
+port = 5433
+name = "billing_worker"
+user = "svc_billing"
+password_path = "/etc/secrets/billing-worker.pw"
+tls = true
+connect_timeout_ms = 15000
+
+[db.pool]
+min = 4
+max = 56
+
+[security]
+scheme = "none"
+token_ttl_ms = 43200000
+allowed_origins = ["admin.example.com", "docs.example.com"]
+
+[limits]
+request_size_bytes = 524288
+burst = 28
+
+[limits.rate]
+count = 280
+per = "second"
+
+[environment]
+SENTRY_DSN = "blue-6"
+TIMEZONE = "green-4"
+OWNER_TEAM = "17"
+AUDIT_SINK = "56"
+RELEASE_TRAIN = "v7"
+CLUSTER = "v3"
+CHUNK_SIZE = "26"
+TRACE_RATE = "emea-5"
+DEPLOY_RING = "emea-7"
+ON_CALL = "v8"
+BUILD_ID = "v5"
+LOCALE = "v8"
+SHARD = "green-1"
+FEATURE_SET = "green-7"
+QUEUE_NAME = "61"
+BATCH_LIMIT = "47"
+TENANT_MODE = "green-4"
+
+[[route]]
+id = 1
+path = "/stock/export"
+upstream = "search-svc"
+methods = ["DELETE"]
+timeout_ms = 28000
+
+[[route]]
+id = 2
+path = "/health/cart"
+upstream = "auth-svc"
+methods = ["PUT", "GET", "DELETE"]
+timeout_ms = 840000
+
+[[route]]
+id = 3
+path = "/cart/geo"
+upstream = "geo-svc"
+methods = ["PUT", "PATCH"]
+timeout_ms = 29000
+
+[[route]]
+id = 4
+path = "/export/geo"
+upstream = "search-svc"
+methods = ["POST", "DELETE", "GET"]
+timeout_ms = 3180000
+
+[[route]]
+id = 5
+path = "/status/health"
+upstream = "search-svc"
+methods = ["GET"]
+timeout_ms = 28
+
+[[route]]
+id = 6
+path = "/images/notify"
+upstream = "stock-svc"
+methods = ["GET", "PATCH", "PUT"]
+timeout_ms = 19000
+
+[[route]]
+id = 7
+path = "/import/geo"
+upstream = "cart-svc"
+methods = ["PATCH", "POST", "DELETE"]
+timeout_ms = 1920000
+
+[[route]]
+id = 8
+path = "/status/images"
+upstream = "orders-svc"
+methods = ["DELETE", "POST", "GET"]
+timeout_ms = 29000
+
+[[route]]
+id = 9
+path = "/orders/search"
+upstream = "orders-svc"
+methods = ["PUT", "PATCH"]
+timeout_ms = 20
+
+[[route]]
+id = 10
+path = "/orders/export"
+upstream = "geo-svc"
+methods = ["DELETE"]
+timeout_ms = 780000
+
+[[route]]
+id = 11
+path = "/geo/search"
+upstream = "geo-svc"
+methods = ["PUT", "PATCH"]
+timeout_ms = 3240000
+
+[[route]]
+id = 12
+path = "/events/import"
+upstream = "billing-svc"
+methods = ["GET", "PATCH", "POST"]
+timeout_ms = 46
+
+[[route]]
+id = 13
+path = "/export/export"
+upstream = "billing-svc"
+methods = ["DELETE"]
+timeout_ms = 38
+
+[[route]]
+id = 14
+path = "/export/images"
+upstream = "stock-svc"
+methods = ["PATCH", "GET", "DELETE"]
+timeout_ms = 7200000
+
+[[route]]
+id = 15
+path = "/cart/orders"
+upstream = "cart-svc"
+methods = ["GET", "PATCH"]
+timeout_ms = 51
+
+[[route]]
+id = 16
+path = "/status/health"
+upstream = "notify-svc"
+methods = ["GET", "POST", "PUT"]
+timeout_ms = 3300000
+
+[[route]]
+id = 17
+path = "/events/stock"
+upstream = "notify-svc"
+methods = ["DELETE", "POST", "PATCH"]
+timeout_ms = 136800000
+
+[[route]]
+id = 18
+path = "/geo/export"
+upstream = "geo-svc"
+methods = ["GET"]
+timeout_ms = 97200000
+
+[[route]]
+id = 19
+path = "/invoices/events"
+upstream = "media-svc"
+methods = ["PATCH", "GET"]
+timeout_ms = 43200000
+
+[[route]]
+id = 20
+path = "/status/notify"
+upstream = "stock-svc"
+methods = ["GET", "DELETE", "PATCH"]
+timeout_ms = 59
+
+[[route]]
+id = 21
+path = "/health/status"
+upstream = "stock-svc"
+methods = ["DELETE"]
+timeout_ms = 64800000
+
+[[route]]
+id = 22
+path = "/invoices/search"
+upstream = "report-svc"
+methods = ["GET", "PATCH", "PUT"]
+timeout_ms = 38000
+
+[[route]]
+id = 23
+path = "/health/stock"
+upstream = "cart-svc"
+methods = ["PUT"]
+timeout_ms = 3060000
+
+[[route]]
+id = 24
+path = "/invoices/orders"
+upstream = "media-svc"
+methods = ["PATCH", "POST"]
+timeout_ms = 33000
+
+[[route]]
+id = 25
+path = "/geo/orders"
+upstream = "media-svc"
+methods = ["PUT"]
+timeout_ms = 60000
+
+[[route]]
+id = 26
+path = "/notify/notify"
+upstream = "notify-svc"
+methods = ["GET", "POST", "PUT"]
+timeout_ms = 11000
+
+[[route]]
+id = 27
+path = "/search/geo"
+upstream = "media-svc"
+methods = ["PATCH"]
+timeout_ms = 240000
+
+[[route]]
+id = 28
+path = "/stock/import"
+upstream = "geo-svc"
+methods = ["PATCH", "POST", "DELETE"]
+timeout_ms = 3300000
+
+[[route]]
+id = 29
+path = "/health/stock"
+upstream = "search-svc"
+methods = ["PUT", "PATCH", "GET"]
+timeout_ms = 34
+
+[[route]]
+id = 30
+path = "/reports/import"
+upstream = "billing-svc"
+methods = ["PUT"]
+timeout_ms = 13
+
+[[route]]
+id = 31
+path = "/stock/status"
+upstream = "orders-svc"
+methods = ["PATCH", "GET"]
+timeout_ms = 108000000
+
+[[route]]
+id = 32
+path = "/export/reports"
+upstream = "notify-svc"
+methods = ["GET", "DELETE", "POST"]
+timeout_ms = 21600000
+
+[[route]]
+id = 33
+path = "/notify/geo"
+upstream = "billing-svc"
+methods = ["DELETE", "POST"]
+timeout_ms = 1020000
+
+[[route]]
+id = 34
+path = "/search/cart"
+upstream = "notify-svc"
+methods = ["GET"]
+timeout_ms = 17000
+
+[[route]]
+id = 35
+path = "/export/stock"
+upstream = "geo-svc"
+methods = ["PATCH", "GET", "DELETE"]
+timeout_ms = 38000
+
+[[route]]
+id = 36
+path = "/images/orders"
+upstream = "orders-svc"
+methods = ["POST"]
+timeout_ms = 20000
+
+[[route]]
+id = 37
+path = "/stock/orders"
+upstream = "auth-svc"
+methods = ["DELETE"]
+timeout_ms = 3000
+
+[[route]]
+id = 38
+path = "/cart/events"
+upstream = "stock-svc"
+methods = ["PATCH", "GET"]
+timeout_ms = 97200000
+
+[[route]]
+id = 39
+path = "/export/health"
+upstream = "orders-svc"
+methods = ["DELETE", "PATCH", "GET"]
+timeout_ms = 1
+
+[[route]]
+id = 40
+path = "/reports/invoices"
+upstream = "cart-svc"
+methods = ["DELETE", "GET", "PUT"]
+timeout_ms = 32400000
+
+[[route]]
+id = 41
+path = "/import/status"
+upstream = "media-svc"
+methods = ["PATCH", "DELETE"]
+timeout_ms = 2520000
+
+[[route]]
+id = 42
+path = "/health/orders"
+upstream = "orders-svc"
+methods = ["DELETE"]
+timeout_ms = 79200000
+
+[[route]]
+id = 43
+path = "/cart/images"
+upstream = "stock-svc"
+methods = ["PUT", "POST", "PATCH"]
+timeout_ms = 32000
+
+[[route]]
+id = 44
+path = "/images/import"
+upstream = "geo-svc"
+methods = ["DELETE", "GET"]
+timeout_ms = 3120000
+
+[[route]]
+id = 45
+path = "/search/geo"
+upstream = "auth-svc"
+methods = ["PUT", "POST", "DELETE"]
+timeout_ms = 49
+
+[[route]]
+id = 46
+path = "/images/notify"
+upstream = "auth-svc"
+methods = ["GET", "POST", "DELETE"]
+timeout_ms = 56
+
+[[route]]
+id = 47
+path = "/health/events"
+upstream = "report-svc"
+methods = ["PATCH", "GET"]
+timeout_ms = 176400000
+
+[[route]]
+id = 48
+path = "/invoices/login"
+upstream = "billing-svc"
+methods = ["PUT", "POST"]
+timeout_ms = 30
+
+[[route]]
+id = 49
+path = "/events/login"
+upstream = "geo-svc"
+methods = ["PUT", "GET"]
+timeout_ms = 1080000
+
+[[route]]
+id = 50
+path = "/invoices/events"
+upstream = "geo-svc"
+methods = ["PATCH"]
+timeout_ms = 720000
+
+[[route]]
+id = 51
+path = "/invoices/health"
+upstream = "auth-svc"
+methods = ["POST"]
+timeout_ms = 27000
+
+[[route]]
+id = 52
+path = "/images/notify"
+upstream = "stock-svc"
+methods = ["GET", "PATCH", "DELETE"]
+timeout_ms = 360000
+
+[[route]]
+id = 53
+path = "/reports/search"
+upstream = "billing-svc"
+methods = ["PATCH", "POST"]
+timeout_ms = 37000
+
+[[route]]
+id = 54
+path = "/import/orders"
+upstream = "cart-svc"
+methods = ["POST", "DELETE", "GET"]
+timeout_ms = 2880000
+
+[[route]]
+id = 55
+path = "/status/invoices"
+upstream = "cart-svc"
+methods = ["DELETE", "POST"]
+timeout_ms = 147600000
+
+[[route]]
+id = 56
+path = "/orders/export"
+upstream = "notify-svc"
+methods = ["PUT"]
+timeout_ms = 30000
+
+[[route]]
+id = 57
+path = "/import/health"
+upstream = "auth-svc"
+methods = ["POST", "GET"]
+timeout_ms = 37
+
+[[route]]
+id = 58
+path = "/login/geo"
+upstream = "billing-svc"
+methods = ["POST"]
+timeout_ms = 5000
+
+[[route]]
+id = 59
+path = "/login/status"
+upstream = "notify-svc"
+methods = ["DELETE", "PUT"]
+timeout_ms = 27000
+
+[[route]]
+id = 60
+path = "/status/notify"
+upstream = "billing-svc"
+methods = ["POST", "DELETE", "GET"]
+timeout_ms = 10800000
+
+[[route]]
+id = 61
+path = "/cart/events"
+upstream = "auth-svc"
+methods = ["POST", "GET"]
+timeout_ms = 720000
+
+[[route]]
+id = 62
+path = "/status/export"
+upstream = "media-svc"
+methods = ["PUT", "DELETE", "POST"]
+timeout_ms = 2700000
+
+[[route]]
+id = 63
+path = "/orders/export"
+upstream = "media-svc"
+methods = ["PUT", "DELETE"]
+timeout_ms = 115200000
+
+[[route]]
+id = 64
+path = "/events/images"
+upstream = "cart-svc"
+methods = ["PATCH", "GET", "DELETE"]
+timeout_ms = 28
+
+[[route]]
+id = 65
+path = "/reports/orders"
+upstream = "billing-svc"
+methods = ["PATCH"]
+timeout_ms = 100800000
+
+[[route]]
+id = 66
+path = "/orders/notify"
+upstream = "auth-svc"
+methods = ["PUT", "PATCH", "POST"]
+timeout_ms = 2000
+
+[[route]]
+id = 67
+path = "/search/images"
+upstream = "orders-svc"
+methods = ["PUT"]
+timeout_ms = 2100000
+
+[[route]]
+id = 68
+path = "/reports/export"
+upstream = "cart-svc"
+methods = ["DELETE", "POST", "GET"]
+timeout_ms = 46
+
+[[route]]
+id = 69
+path = "/health/login"
+upstream = "search-svc"
+methods = ["GET"]
+timeout_ms = 115200000
+
+[[route]]
+id = 70
+path = "/geo/events"
+upstream = "media-svc"
+methods = ["PUT", "POST", "DELETE"]
+timeout_ms = 10
+
+[[route]]
+id = 71
+path = "/stock/health"
+upstream = "report-svc"
+methods = ["PUT", "PATCH"]
+timeout_ms = 10000
+
+[[route]]
+id = 72
+path = "/invoices/geo"
+upstream = "search-svc"
+methods = ["DELETE"]
+timeout_ms = 136800000
+
+[[route]]
+id = 73
+path = "/search/orders"
+upstream = "stock-svc"
+methods = ["PUT", "DELETE", "POST"]
+timeout_ms = 46000
+
+[[route]]
+id = 74
+path = "/health/reports"
+upstream = "media-svc"
+methods = ["POST", "DELETE", "PATCH"]
+timeout_ms = 180000000

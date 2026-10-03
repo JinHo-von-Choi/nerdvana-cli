@@ -1,0 +1,6 @@
+CREATE TABLE comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    body TEXT NOT NULL
+);

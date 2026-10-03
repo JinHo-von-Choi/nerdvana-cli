@@ -1,0 +1,437 @@
+[
+  {
+    "id": "O-00309",
+    "customer_id": "C-0109",
+    "region": "EU",
+    "currency": "EUR",
+    "placed": "12/03/2026",
+    "items": [
+      {
+        "sku": "SKU-0096",
+        "qty": 2,
+        "unit_cents": 705
+      },
+      {
+        "sku": "SKU-0073",
+        "qty": 2,
+        "unit_cents": 2676
+      }
+    ],
+    "total_cents": 6762
+  },
+  {
+    "id": "O-00310",
+    "customer_id": "C-0179",
+    "region": "NA",
+    "currency": "EUR",
+    "placed": "2026-02-17",
+    "items": [
+      {
+        "sku": "SKU-0034",
+        "qty": 1,
+        "unit_cents": 1113
+      },
+      {
+        "sku": "SKU-0116",
+        "qty": 4,
+        "unit_cents": 6775
+      }
+    ],
+    "total_cents": 28243
+  },
+  {
+    "id": "O-00311",
+    "customer_id": "c-0108",
+    "region": "NA",
+    "currency": "USD",
+    "placed": "2026-05-11",
+    "items": [
+      {
+        "sku": "SKU-0050",
+        "qty": 2,
+        "unit_cents": 7965
+      }
+    ],
+    "total_cents": 15930
+  },
+  {
+    "id": "O-00312",
+    "customer_id": "C-0071",
+    "region": "APAC",
+    "currency": "USD",
+    "placed": "02/01/2026",
+    "items": [
+      {
+        "sku": "SKU-0089",
+        "qty": 5,
+        "unit_cents": 2288
+      },
+      {
+        "sku": "SKU-0034",
+        "qty": 4,
+        "unit_cents": 1111
+      }
+    ],
+    "total_cents": 15884
+  },
+  {
+    "id": "O-00313",
+    "customer_id": "C-0054",
+    "region": "APAC",
+    "currency": "GBP",
+    "placed": "2026-04-05",
+    "items": [
+      {
+        "sku": "SKU-0045",
+        "qty": 1,
+        "unit_cents": 1847
+      }
+    ],
+    "total_cents": 1847
+  },
+  {
+    "id": "O-00314",
+    "customer_id": "C-0008",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-01-29",
+    "items": [
+      {
+        "sku": "SKU-0075",
+        "qty": 4,
+        "unit_cents": 6485
+      }
+    ],
+    "total_cents": 26010
+  },
+  {
+    "id": "O-00315",
+    "customer_id": "c42",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-04-18",
+    "items": [
+      {
+        "sku": "SKU-0035",
+        "qty": 5,
+        "unit_cents": 3788
+      }
+    ],
+    "total_cents": 18940
+  },
+  {
+    "id": "O-00316",
+    "customer_id": "C-0105",
+    "region": "NA",
+    "currency": "EUR",
+    "placed": "2026-05-20",
+    "items": [
+      {
+        "sku": "SKU-0022",
+        "qty": 4,
+        "unit_cents": 5413
+      },
+      {
+        "sku": "SKU-0033",
+        "qty": 4,
+        "unit_cents": 6957
+      },
+      {
+        "sku": "SKU-0099",
+        "qty": 2,
+        "unit_cents": 1330
+      }
+    ],
+    "total_cents": 52141
+  },
+  {
+    "id": "O-00317",
+    "customer_id": "C-0071",
+    "region": "APAC",
+    "currency": "USD",
+    "placed": "2026-05-12",
+    "items": [
+      {
+        "sku": "SKU-0071",
+        "qty": 5,
+        "unit_cents": 1455
+      }
+    ],
+    "total_cents": 7275
+  },
+  {
+    "id": "O-00318",
+    "customer_id": "C-0037",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-03-10",
+    "items": [
+      {
+        "sku": "SKU-0013",
+        "qty": 5,
+        "unit_cents": 3717
+      },
+      {
+        "sku": "SKU-0030",
+        "qty": 4,
+        "unit_cents": 6026
+      }
+    ],
+    "total_cents": 42689
+  },
+  {
+    "id": "O-00319",
+    "customer_id": "c143",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-06-21",
+    "items": [
+      {
+        "sku": "SKU-0082",
+        "qty": 1,
+        "unit_cents": 3451
+      },
+      {
+        "sku": "SKU-0024",
+        "qty": 2,
+        "unit_cents": 7115
+      },
+      {
+        "sku": "SKU-0087",
+        "qty": 1,
+        "unit_cents": 3857
+      }
+    ],
+    "total_cents": 21538
+  },
+  {
+    "id": "O-00320",
+    "customer_id": "C-0056",
+    "region": "NA",
+    "currency": "EUR",
+    "placed": "2026-03-14",
+    "items": [
+      {
+        "sku": "SKU-0067",
+        "qty": 3,
+        "unit_cents": 5244
+      },
+      {
+        "sku": "SKU-0093",
+        "qty": 4,
+        "unit_cents": 5008
+      },
+      {
+        "sku": "SKU-0027",
+        "qty": 1,
+        "unit_cents": 5335
+      }
+    ],
+    "total_cents": 41099
+  },
+  {
+    "id": "O-00321",
+    "customer_id": "C-0069",
+    "region": "EU",
+    "currency": "USD",
+    "placed": "2026-06-03",
+    "items": [
+      {
+        "sku": "SKU-0043",
+        "qty": 5,
+        "unit_cents": 6379
+      }
+    ],
+    "total_cents": 31895
+  },
+  {
+    "id": "O-00322",
+    "customer_id": "C-0002",
+    "region": "NA",
+    "currency": "GBP",
+    "placed": "2026-06-15",
+    "items": [
+      {
+        "sku": "SKU-0068",
+        "qty": 2,
+        "unit_cents": 2780
+      }
+    ],
+    "total_cents": 5560
+  },
+  {
+    "id": "O-00323",
+    "customer_id": "C-0103",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-04-12",
+    "items": [
+      {
+        "sku": "SKU-0039",
+        "qty": 3,
+        "unit_cents": 4797
+      },
+      {
+        "sku": "SKU-0062",
+        "qty": 4,
+        "unit_cents": 4878
+      },
+      {
+        "sku": "SKU-0012",
+        "qty": 2,
+        "unit_cents": 6977
+      }
+    ],
+    "total_cents": 47857
+  },
+  {
+    "id": "O-00324",
+    "customer_id": " C-0018 ",
+    "region": "NA",
+    "currency": "GBP",
+    "placed": "2026-05-28",
+    "items": [
+      {
+        "sku": "SKU-0016",
+        "qty": 5,
+        "unit_cents": 1202
+      },
+      {
+        "sku": "SKU-0069",
+        "qty": 3,
+        "unit_cents": 4927
+      },
+      {
+        "sku": "SKU-0071",
+        "qty": 4,
+        "unit_cents": 1335
+      }
+    ],
+    "total_cents": 26611
+  },
+  {
+    "id": "O-00325",
+    "customer_id": "C-0088",
+    "region": "NA",
+    "currency": "EUR",
+    "placed": "2026-03-22",
+    "items": [
+      {
+        "sku": "SKU-0024",
+        "qty": 4,
+        "unit_cents": 7288
+      },
+      {
+        "sku": "SKU-0089",
+        "qty": 4,
+        "unit_cents": 2353
+      },
+      {
+        "sku": "SKU-0072",
+        "qty": 2,
+        "unit_cents": 8029
+      }
+    ],
+    "total_cents": 54742
+  },
+  {
+    "id": "O-00326",
+    "customer_id": "C-5",
+    "region": "NA",
+    "currency": "GBP",
+    "placed": "2026-01-02",
+    "items": [
+      {
+        "sku": "sku-0015",
+        "qty": 4,
+        "unit_cents": 244
+      },
+      {
+        "sku": "SKU-0068",
+        "qty": 2,
+        "unit_cents": 2780
+      }
+    ],
+    "total_cents": 6536
+  },
+  {
+    "id": "O-00327",
+    "customer_id": "C-0158",
+    "region": "APAC",
+    "currency": "EUR",
+    "placed": "2026-03-11",
+    "items": [
+      {
+        "sku": "SKU-0101",
+        "qty": 1,
+        "unit_cents": 4728
+      }
+    ],
+    "total_cents": 4728
+  },
+  {
+    "id": "O-00328",
+    "customer_id": "C-0156",
+    "region": "APAC",
+    "currency": "USD",
+    "placed": "2026-01-09",
+    "items": [
+      {
+        "sku": "SKU-0082",
+        "qty": 5,
+        "unit_cents": 3944
+      },
+      {
+        "sku": "SKU-0058",
+        "qty": 2,
+        "unit_cents": 4891
+      },
+      {
+        "sku": "SKU-0096",
+        "qty": 2,
+        "unit_cents": 783
+      }
+    ],
+    "total_cents": 30870
+  },
+  {
+    "id": "O-00329",
+    "customer_id": "C-0006",
+    "region": "APAC",
+    "currency": "USD",
+    "placed": "2026-05-22",
+    "items": [
+      {
+        "sku": "SKU-0014",
+        "qty": 1,
+        "unit_cents": 2608
+      },
+      {
+        "sku": "SKU-0095",
+        "qty": 3,
+        "unit_cents": 3014
+      }
+    ],
+    "total_cents": 11650
+  },
+  {
+    "id": "O-00330",
+    "customer_id": "C-0016",
+    "region": "EU",
+    "currency": "GBP",
+    "placed": "2026-04-04",
+    "items": [
+      {
+        "sku": "SKU-0006",
+        "qty": 2,
+        "unit_cents": 163
+      },
+      {
+        "sku": "SKU-0033",
+        "qty": 4,
+        "unit_cents": 6764
+      }
+    ],
+    "total_cents": 27382
+  }
+]

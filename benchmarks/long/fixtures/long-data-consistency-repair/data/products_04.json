@@ -1,0 +1,218 @@
+[
+  {
+    "sku": "SKU-0073",
+    "title": "gasket 30mm",
+    "prices": {
+      "USD": 2973,
+      "EUR": 2676,
+      "GBP": 2602
+    }
+  },
+  {
+    "sku": "SKU-0074",
+    "title": "sensor 27mm",
+    "prices": {
+      "USD": 3280,
+      "EUR": 2952,
+      "GBP": 2870
+    }
+  },
+  {
+    "sku": "SKU-0075",
+    "title": "gasket 15mm",
+    "prices": {
+      "USD": 7411,
+      "EUR": 6670,
+      "GBP": 6485
+    }
+  },
+  {
+    "sku": "SKU-0076",
+    "title": "spring 15mm",
+    "prices": {
+      "USD": 2131,
+      "EUR": 1918,
+      "GBP": 1865
+    }
+  },
+  {
+    "sku": "SKU-0077",
+    "title": "washer 18mm",
+    "prices": {
+      "USD": 4098,
+      "EUR": 3689,
+      "GBP": 3586
+    }
+  },
+  {
+    "sku": "SKU-0078",
+    "title": "bearing 32mm",
+    "prices": {
+      "USD": 8848,
+      "EUR": 7964,
+      "GBP": 7742
+    }
+  },
+  {
+    "sku": "SKU-0079",
+    "title": "washer 22mm",
+    "prices": {
+      "USD": 8762,
+      "EUR": 7886,
+      "GBP": 7667
+    }
+  },
+  {
+    "sku": "SKU-0080",
+    "title": "bracket 16mm",
+    "prices": {
+      "USD": 1700,
+      "EUR": 1530,
+      "GBP": 1488
+    }
+  },
+  {
+    "sku": "SKU-0081",
+    "title": "sensor 28mm",
+    "prices": {
+      "USD": 5146,
+      "EUR": 4632,
+      "GBP": 4503
+    }
+  },
+  {
+    "sku": "SKU-0082",
+    "title": "bracket 5mm",
+    "prices": {
+      "USD": 3944,
+      "EUR": 3550,
+      "GBP": 3451
+    }
+  },
+  {
+    "sku": "SKU-0083",
+    "title": "hinge 35mm",
+    "prices": {
+      "USD": 4402,
+      "EUR": 3962,
+      "GBP": 3852
+    }
+  },
+  {
+    "sku": "SKU-0084",
+    "title": "bolt 19mm",
+    "prices": {
+      "USD": 5307,
+      "EUR": 4777,
+      "GBP": 4644
+    }
+  },
+  {
+    "sku": "SKU-0085",
+    "title": "bracket 13mm",
+    "prices": {
+      "USD": 5679,
+      "EUR": 5112,
+      "GBP": 4970
+    }
+  },
+  {
+    "sku": "SKU-0086",
+    "title": "coupler 37mm",
+    "prices": {
+      "USD": 4086,
+      "EUR": 3678,
+      "GBP": 3576
+    }
+  },
+  {
+    "sku": "SKU-0087",
+    "title": "bearing 17mm",
+    "prices": {
+      "USD": 4407,
+      "EUR": 3967,
+      "GBP": 3857
+    }
+  },
+  {
+    "sku": "SKU-0088",
+    "title": "spring 32mm",
+    "prices": {
+      "USD": 8857,
+      "EUR": 7972,
+      "GBP": 7750
+    }
+  },
+  {
+    "sku": "SKU-0089",
+    "title": "clamp 8mm",
+    "prices": {
+      "USD": 2614,
+      "EUR": 2353,
+      "GBP": 2288
+    }
+  },
+  {
+    "sku": "SKU-0090",
+    "title": "bolt 23mm",
+    "prices": {
+      "USD": 6169,
+      "EUR": 5553,
+      "GBP": 5398
+    }
+  },
+  {
+    "sku": "SKU-0091",
+    "title": "spring 38mm",
+    "prices": {
+      "USD": 5629,
+      "EUR": 5067,
+      "GBP": 4926
+    }
+  },
+  {
+    "sku": "SKU-0092",
+    "title": "hinge 5mm",
+    "prices": {
+      "USD": 3437,
+      "EUR": 3094,
+      "GBP": 3008
+    }
+  },
+  {
+    "sku": "SKU-0093",
+    "title": "hinge 18mm",
+    "prices": {
+      "USD": 5564,
+      "EUR": 5008,
+      "GBP": 4869
+    }
+  },
+  {
+    "sku": "SKU-0094",
+    "title": "spring 17mm",
+    "prices": {
+      "USD": 238,
+      "EUR": 215,
+      "GBP": 209
+    }
+  },
+  {
+    "sku": "SKU-0095",
+    "title": "coupler 11mm",
+    "prices": {
+      "USD": 3014,
+      "EUR": 2713,
+      "GBP": 2638
+    }
+  },
+  {
+    "sku": "SKU-0096",
+    "title": "spring 24mm",
+    "prices": {
+      "USD": 783,
+      "EUR": 705,
+      "GBP": 686
+    }
+  }
+]
