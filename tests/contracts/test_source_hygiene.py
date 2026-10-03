@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from functools import cache
 from pathlib import Path
 
@@ -30,15 +31,30 @@ CODE_DIRS = ("nerdvana_cli", "tests", "scripts")
 DOC_FILES = ("README.md", "README.ko.md", "NIRNA.md", "CONTRIBUTING.md", "pyproject.toml", "nerdvana.yml.example")
 
 
+@cache
+def _tracked() -> frozenset[Path] | None:
+    """Files git tracks, so notes and drafts a developer keeps untracked are not held to the rule; None without git."""
+    try:
+        listed = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return frozenset(REPO / name for name in listed.decode().split("\0") if name)
+
+
+def _only_tracked(paths: list[Path]) -> list[Path]:
+    tracked = _tracked()
+    return paths if tracked is None else [path for path in paths if path in tracked]
+
+
 def _code_files() -> list[Path]:
     this = Path(__file__).resolve()
-    return [path for top in CODE_DIRS for path in sorted((REPO / top).rglob("*.py")) if path.resolve() != this]
+    return _only_tracked([path for top in CODE_DIRS for path in sorted((REPO / top).rglob("*.py")) if path.resolve() != this])
 
 
 def _doc_files() -> list[Path]:
     docs = [path for path in sorted((REPO / "docs").rglob("*.md")) if "plans" not in path.relative_to(REPO / "docs").parts]
     workflows = sorted((REPO / ".github" / "workflows").glob("*.yml"))
-    return docs + workflows + [REPO / name for name in DOC_FILES if (REPO / name).is_file()]
+    return _only_tracked(docs + workflows + [REPO / name for name in DOC_FILES if (REPO / name).is_file()])
 
 
 @cache
