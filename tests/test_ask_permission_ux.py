@@ -17,9 +17,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.safety.tool_permission import ask_user_permission
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.core.tool_executor import ToolExecutor
 
 # ---------------------------------------------------------------------------
 # ask_user_permission unit tests

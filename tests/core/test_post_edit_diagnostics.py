@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import ToolResult
 
 
@@ -116,7 +116,7 @@ async def test_setting_turns_the_check_off(tmp_path: Path) -> None:
 
 
 async def test_slow_server_is_skipped(tmp_path: Path, monkeypatch: Any) -> None:
-    import nerdvana_cli.core.tool_executor as executor_module
+    import nerdvana_cli.core.execution.tool_executor as executor_module
 
     monkeypatch.setattr(executor_module, "_DIAGNOSTICS_TIMEOUT", 0.01)
     result = await _edit(tmp_path, _Client([[], [_err(1, "boom")]], delay=0.2))

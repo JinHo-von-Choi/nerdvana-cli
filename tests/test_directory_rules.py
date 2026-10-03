@@ -239,9 +239,9 @@ class TestDirectoryRuleInjector:
 
 class TestInjectionDelivery:
     def test_executor_queues_after_tool_injections_until_drained(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.execution.tool_executor import ToolExecutor
         from nerdvana_cli.core.hooks.hooks import HookEngine
         from nerdvana_cli.core.tool import ToolRegistry
-        from nerdvana_cli.core.tool_executor import ToolExecutor
         from nerdvana_cli.types import ToolResult
 
         (tmp_path / "pkg").mkdir()

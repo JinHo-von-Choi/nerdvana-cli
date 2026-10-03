@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.command_hooks import (
     DEFAULT_TIMEOUT,
     MAX_TIMEOUT,
@@ -25,7 +26,6 @@ from nerdvana_cli.core.hooks.command_hooks import (
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.hooks.user_hooks import trust_project_hook
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import ToolResult
 
 # ---------------------------------------------------------------------------

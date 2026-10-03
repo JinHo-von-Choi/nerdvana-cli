@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.config.settings_sections import ToolsConfig
 from nerdvana_cli.core.context.token_estimator import estimate_tokens
-from nerdvana_cli.core.progress_monitor import ProgressMonitor
+from nerdvana_cli.core.execution.progress_monitor import ProgressMonitor
 from nerdvana_cli.core.safety.classifier import ActionClassifier
 from nerdvana_cli.core.safety.edit_guard import (
     applies_edit,
@@ -32,11 +32,11 @@ from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.secrets import MARKER, SecretMasker
 from nerdvana_cli.core.safety.tool_permission import PermissionGate, refusal
 from nerdvana_cli.core.safety.untrusted import UntrustedTracker
-from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.state.concurrency import RepeatDetector
 from nerdvana_cli.core.state.signals import NO_PROGRESS, SECRET_MASKED, classify_result
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, TOOL_RESULT_CAP, ToolContext, ToolRegistry
 from nerdvana_cli.types import ToolResult
+from nerdvana_cli.utils.schema_check import validate_arguments
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.hooks.hooks import HookEngine
@@ -463,7 +463,7 @@ class ToolExecutor:
         """Record a completed tool call into the context reminder, if present."""
         if self._reminder is None:
             return
-        from nerdvana_cli.core.context_reminder import RecentToolResult
+        from nerdvana_cli.core.execution.context_reminder import RecentToolResult
 
         self._reminder.record_tool(
             RecentToolResult(

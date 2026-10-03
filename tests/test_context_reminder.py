@@ -1,7 +1,7 @@
 """Per-turn context reminder and tool result ring buffer."""
 from __future__ import annotations
 
-from nerdvana_cli.core.context_reminder import (
+from nerdvana_cli.core.execution.context_reminder import (
     ContextReminder,
     RecentToolResult,
 )

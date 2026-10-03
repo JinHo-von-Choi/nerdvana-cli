@@ -16,6 +16,7 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.safety.classifier import ClassifierFeed, Completion
@@ -30,7 +31,6 @@ from nerdvana_cli.core.state.signals import (
 )
 from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import ToolResult
 

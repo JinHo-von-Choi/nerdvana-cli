@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.changed_files import changed, report, snapshot
+from nerdvana_cli.core.execution.changed_files import changed, report, snapshot
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 
