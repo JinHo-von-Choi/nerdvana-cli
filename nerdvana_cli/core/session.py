@@ -102,6 +102,11 @@ class SessionStorage:
     def record(self, event_type: str, data: dict[str, Any]) -> None:
         if not self.persist:
             return
+        if not os.path.exists(self.file_path):
+            self._append("system", {"subtype": "session_start", "cwd": os.getcwd()})
+        self._append(event_type, data)
+
+    def _append(self, event_type: str, data: dict[str, Any]) -> None:
         entry = {
             "ts": datetime.now(UTC).isoformat(),
             "type": event_type,
