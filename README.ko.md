@@ -320,6 +320,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/route-knowledge` | 콘텐츠를 분류하여 WriteMemory 스코프 제안 |
 | `/dashboard` | 관찰 가능성 대시보드 토글 |
 | `/health` | 7일간 도구 호출 건강 요약 표시 |
+| `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
 | `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |
 | `/activity` | 활동 표시기 위젯 토글 (on/off, config.yml 에 저장) |

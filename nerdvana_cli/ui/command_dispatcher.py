@@ -29,6 +29,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
     (~µs) and keeps the dispatcher pure (no module-level mutable state).
     """
     from nerdvana_cli.commands import (
+        btw_command,
         goal_command,
         memory_commands,
         model_commands,
@@ -60,6 +61,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         "/context":         profile_commands.handle_context,
         "/health":          observability_commands.handle_health,
         "/dashboard":       observability_commands.handle_dashboard,
+        "/btw":             btw_command.handle_btw,
         "/goal":            goal_command.handle_goal,
         "/thinking":        system_commands.handle_thinking,
         "/activity":        system_commands.handle_activity,

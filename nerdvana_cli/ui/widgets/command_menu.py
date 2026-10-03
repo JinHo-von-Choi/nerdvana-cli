@@ -27,6 +27,7 @@ SLASH_COMMANDS = [
     ("/dashboard", "Toggle observability dashboard"),
     ("/health", "Show 7-day tool call health summary"),
     ("/goal", "Hold the agent to a verification command"),
+    ("/btw", "Ask a side question; the conversation is left as it is"),
     ("/thinking", "Toggle inline thinking display (on/off)"),
     ("/activity", "Toggle activity indicator (on/off)"),
     ("/quit", "Exit"),
