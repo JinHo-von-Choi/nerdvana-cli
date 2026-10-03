@@ -156,3 +156,44 @@ async def test_usage_summary_totals_every_request(monkeypatch: pytest.MonkeyPatc
     loop     = _loop(monkeypatch, tmp_path, provider, max_turns=2)
     await _drain(loop)
     assert loop.usage_summary() == {"input_tokens": 200, "output_tokens": 14, "cache_read_tokens": 120, "cache_write_tokens": 20}
+
+
+async def test_the_token_limit_stops_the_run_for_a_model_without_a_price(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = _Endless(usage={"input_tokens": 600, "output_tokens": 100})
+    loop     = _loop(monkeypatch, tmp_path, provider, model="unpriced", max_total_tokens=2_000)
+    output   = await _drain(loop)
+    assert loop.last_stop == "max_total_tokens"
+    assert provider.calls == 3
+    assert "Token limit reached (2,100 of 2,000)" in output
+
+
+async def test_no_token_limit_means_tokens_never_stop_a_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = _Endless(usage={"input_tokens": 1_000_000, "output_tokens": 1_000_000})
+    loop     = _loop(monkeypatch, tmp_path, provider, max_turns=3)
+    await _drain(loop)
+    assert loop.last_stop == "max_turns"
+
+
+async def test_require_price_refuses_before_the_first_request(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = _Endless(usage={"input_tokens": 10, "output_tokens": 1})
+    loop     = _loop(monkeypatch, tmp_path, provider, model="unpriced", max_cost_usd=1.0, require_price=True)
+    output   = await _drain(loop)
+    assert loop.last_stop == "unpriced"
+    assert provider.calls == 0
+    assert "Refusing to run" in output
+
+
+async def test_require_price_does_nothing_without_a_cost_limit_or_with_a_priced_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for model, limit in (("unpriced", 0.0), ("priced", 5.0)):
+        provider = _Once([ProviderEvent(type="done", stop_reason="end_turn")])
+        loop     = _loop(monkeypatch, tmp_path, provider, model=model, max_cost_usd=limit, require_price=True)
+        await _drain(loop)
+        assert loop.last_stop == "completed"
+
+
+def test_the_new_stop_reasons_map_to_exit_codes() -> None:
+    from nerdvana_cli.core.run_output import EXIT_BUDGET, EXIT_CONFIG, RunResult
+
+    assert RunResult(stop="max_total_tokens").exit_code == EXIT_BUDGET
+    assert RunResult(stop="unpriced").exit_code == EXIT_CONFIG
+    assert RunResult(stop="unpriced").to_dict()["subtype"] == "error_unpriced"

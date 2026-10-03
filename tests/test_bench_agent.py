@@ -77,10 +77,14 @@ def test_nothing_solved_leaves_cost_per_solved_task_undefined() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _sum_range() -> object:
+    return next(task for task in bench.load_tasks(TASKS) if task.id == "sum-range")
+
+
 def test_the_shipped_task_loads_with_a_resolved_fixture_path() -> None:
-    (task,) = bench.load_tasks(TASKS)
-    assert task.id == "sum-range"
-    assert (Path(task.path) / "calc.py").is_file()
+    task = _sum_range()
+    assert task.id == "sum-range"  # type: ignore[attr-defined]
+    assert (Path(task.path) / "calc.py").is_file()  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize("data", [
@@ -129,11 +133,11 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", model="", provider="")
+    return argparse.Namespace(approval_mode="yolo", sandbox="require", model="", provider="")
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, script: str) -> object:
-    (task,) = bench.load_tasks(TASKS)
+    task = _sum_range()
     monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", script])
     return bench.run_attempt(task, 1, _options(), tmp_path)
 
@@ -159,11 +163,12 @@ def test_output_without_a_result_object_is_recorded_as_an_error(monkeypatch: pyt
 
 def test_the_agent_command_carries_the_ceilings_and_the_chosen_model() -> None:
     task    = bench.Task("t", "do it", "v", path="x", max_turns=7, max_cost_usd=0.4)
-    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", model="m1", provider="anthropic"))
+    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", sandbox="require", model="m1", provider="anthropic"))
     assert command[command.index("--max-turns") + 1] == "7"
     assert command[command.index("--max-cost-usd") + 1] == "0.4"
     assert command[command.index("--model") + 1] == "m1"
     assert command[command.index("--approval-mode") + 1] == "plan"
+    assert command[command.index("--sandbox") + 1] == "require"
     assert json.dumps(command)  # plain strings only
 
 

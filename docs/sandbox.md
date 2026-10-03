@@ -19,6 +19,8 @@ sandbox:
 `nerdvana doctor` reports whether confinement is available and what the
 configuration asks for.
 
+`nerdvana run --sandbox off|auto|require` overrides the mode for a single run.
+
 ## What it does
 
 On Linux the command runs under [Landlock](https://docs.kernel.org/userspace-api/landlock.html),

@@ -352,6 +352,14 @@ class AgentLoop:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
 
+    def _over_token_limit(self) -> str:
+        """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
+        limit = self.settings.session.max_total_tokens
+        used  = self._usage_input_total + self._usage_output_total
+        if limit <= 0 or used < limit:
+            return ""
+        return f"\n[bold yellow]Token limit reached ({used:,} of {limit:,}). Stopping.[/bold yellow]"
+
     def _cost_limit_unenforceable(self) -> bool:
         """True once per loop when a cost limit is set but the model has no known price."""
         if self._cost_limit_warned or self.settings.session.max_cost_usd <= 0:
@@ -801,13 +809,21 @@ class AgentLoop:
             yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
             return
         self.turns_used = iteration
-        over_budget = self._over_cost_limit()
-        if over_budget:
-            self.last_stop = "max_cost"
-            flow.finished  = True
-            yield over_budget
-            return
+        for stop, notice in (("max_cost", self._over_cost_limit()), ("max_total_tokens", self._over_token_limit())):
+            if notice:
+                self.last_stop = stop
+                flow.finished  = True
+                yield notice
+                return
         if self._cost_limit_unenforceable():
+            if self.settings.session.require_price:
+                self.last_stop = "unpriced"
+                flow.finished  = True
+                yield (
+                    f"\n[bold red]Cost limit ${self.settings.session.max_cost_usd:.2f} cannot be enforced: no price is known for "
+                    f"{self.settings.model.provider}/{self.settings.model.model}. Refusing to run (session.require_price).[/bold red]"
+                )
+                return
             yield (
                 f"\n[yellow]Cost limit ${self.settings.session.max_cost_usd:.2f} is not enforced: "
                 f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"

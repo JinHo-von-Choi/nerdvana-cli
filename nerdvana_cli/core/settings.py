@@ -79,6 +79,11 @@ class SessionConfig(BaseModel):
     # Stop once the estimated cost of this session's provider requests reaches this
     # many USD; 0 means no limit. Needs a known price for the model.
     max_cost_usd: float = 0.0
+    # Total tokens (input + output, every request) after which the run stops; 0 = no limit.
+    # A limit that needs no price list, for models the price table does not know.
+    max_total_tokens: int = 0
+    # Refuse to run when max_cost_usd is set but the model has no known price.
+    require_price: bool = False
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures

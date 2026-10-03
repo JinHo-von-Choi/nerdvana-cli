@@ -386,6 +386,29 @@ def _check_mcp_config() -> CheckResult:
     return CheckResult("mcp_config", "ok", f"{total} server(s) parse; stdio commands found")
 
 
+def _check_pricing_coverage() -> CheckResult:
+    """The configured model and its fallbacks should have a known price, or a cost limit cannot apply."""
+    from nerdvana_cli.core.analytics import PricingTable
+    from nerdvana_cli.core.provider_recovery import parse_fallback
+    from nerdvana_cli.core.settings import NerdvanaSettings
+
+    try:
+        settings = NerdvanaSettings.load()
+    except Exception:  # noqa: BLE001 - config problems are reported by the config check
+        return CheckResult("pricing_coverage", "skip", "config could not be loaded")
+    table      = PricingTable()
+    provider   = settings.model.provider
+    candidates = [(provider, settings.model.model)]
+    for entry in settings.model.fallback_models:
+        other, model = parse_fallback(entry)
+        candidates.append((other or provider, model))
+    unpriced = [f"{p}/{m}" for p, m in candidates if not table.has_price(p, m)]
+    if not unpriced:
+        return CheckResult("pricing_coverage", "ok", f"{len(candidates)} model(s) have a known price")
+    limited = settings.session.max_cost_usd > 0 or settings.session.require_price
+    return CheckResult("pricing_coverage", "warn" if limited else "ok", f"no price for {', '.join(unpriced)}; a cost limit does not apply to them (session.max_total_tokens does)")
+
+
 def _check_sandbox() -> CheckResult:
     """Report whether shell commands can be confined, and what the configuration asks for."""
     from nerdvana_cli.core.sandbox import landlock_abi
@@ -476,6 +499,7 @@ _ALL_CHECKS = [
     _check_mcp_servers,
     _check_mcp_config,
     _check_sandbox,
+    _check_pricing_coverage,
     _check_pricing_freshness,
     _check_collect_baseline,
 ]

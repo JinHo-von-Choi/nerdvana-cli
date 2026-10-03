@@ -182,3 +182,24 @@ class TestStrictSemantics:
             dc.doctor_command(strict=True, json_output=True)
         assert lax.value.exit_code == 0
         assert strict.value.exit_code == 1
+
+
+class TestPricingCoverage:
+    def test_a_priced_default_is_ok(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+        assert dc._check_pricing_coverage().status == "ok"
+
+    def test_an_unpriced_model_under_a_cost_limit_warns(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+        (tmp_path / "nerdvana.yml").write_text("model:\n  provider: openai\n  model: not-in-the-price-table\nsession:\n  max_cost_usd: 1.0\n", encoding="utf-8")
+        result = dc._check_pricing_coverage()
+        assert result.status == "warn"
+        assert "not-in-the-price-table" in result.detail
+
+    def test_an_unpriced_model_without_a_limit_is_only_noted(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+        (tmp_path / "nerdvana.yml").write_text("model:\n  provider: openai\n  model: not-in-the-price-table\n", encoding="utf-8")
+        assert dc._check_pricing_coverage().status == "ok"

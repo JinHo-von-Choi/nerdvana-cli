@@ -148,9 +148,19 @@ def test_the_options_reach_the_settings(env: Path, monkeypatch: pytest.MonkeyPat
         seen["max_turns"]    = self.settings.session.max_turns
         seen["max_cost_usd"] = self.settings.session.max_cost_usd
         seen["mode"]         = self.policy.mode_name
+        seen["tokens"]       = self.settings.session.max_total_tokens
+        seen["price"]        = self.settings.session.require_price
+        seen["sandbox"]      = self.settings.sandbox.mode
 
     monkeypatch.setattr(AgentLoop, "__init__", _spy)
     _provider(monkeypatch, ANSWER)
-    result = runner.invoke(app, ["run", "go", "--max-turns", "7", "--max-cost-usd", "1.5", "--approval-mode", "yolo"])
+    result = runner.invoke(app, [
+        "run", "go", "--max-turns", "7", "--max-cost-usd", "1.5", "--approval-mode", "yolo",
+        "--max-total-tokens", "5000", "--require-price", "--sandbox", "auto",
+    ])
     assert result.exit_code == 0, result.output
-    assert seen == {"max_turns": 7, "max_cost_usd": 1.5, "mode": "one-shot"}
+    assert seen == {"max_turns": 7, "max_cost_usd": 1.5, "mode": "one-shot", "tokens": 5000, "price": True, "sandbox": "auto"}
+
+
+def test_a_bad_sandbox_mode_is_rejected(env: Path) -> None:
+    assert runner.invoke(app, ["run", "go", "--sandbox", "sometimes"]).exit_code == 2

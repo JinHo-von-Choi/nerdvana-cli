@@ -12,13 +12,14 @@ pass rate, pass@k, cost and time per task.
 
 This script calls real model APIs and bills for them. It is a manual tool and runs
 outside pytest and CI. Run it in a disposable environment: the agent executes shell
-commands with ``--approval-mode yolo`` by default and nothing confines them to the
-working directory.
+commands with ``--approval-mode yolo`` by default. ``--sandbox require`` (the default) limits
+what they can write to the working directory and the temporary directories on Linux. It does
+not stop reading, running programs or UDP, so a disposable environment is still advised.
 
 Usage::
 
     python scripts/bench_agent.py benchmarks/tasks --attempts 3 --yes \\
-        [--model M] [--provider P] [--approval-mode yolo] [--out results.jsonl]
+        [--model M] [--provider P] [--approval-mode yolo] [--sandbox require] [--out results.jsonl]
 
 Without ``--yes`` the script only prints the tasks and the worst-case spend.
 
@@ -245,6 +246,7 @@ def agent_command(task: Task, options: argparse.Namespace) -> list[str]:
         "--max-turns", str(task.max_turns),
         "--max-cost-usd", str(task.max_cost_usd),
         "--approval-mode", options.approval_mode,
+        "--sandbox", options.sandbox,
     ]
     if options.model:
         command += ["--model", options.model]
@@ -309,6 +311,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--model", default="")
     parser.add_argument("--provider", default="")
     parser.add_argument("--approval-mode", default="yolo", choices=["default", "auto_edit", "yolo", "plan"])
+    parser.add_argument("--sandbox", default="require", choices=["off", "auto", "require"],
+                        help="confine each attempt's shell commands to its working directory (default require; off on systems without Landlock)")
     parser.add_argument("--out", type=Path, default=Path("bench-results.jsonl"), help="JSONL file the attempts are appended to")
     parser.add_argument("--keep-workdirs", action="store_true", help="keep each attempt's working directory for inspection")
     parser.add_argument("--yes", action="store_true", help="spend money: run the agent (without it only the plan is printed)")
