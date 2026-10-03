@@ -2,7 +2,7 @@
 
 AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, Ollama 등 **21개 AI 플랫폼**을 지원합니다.
 
-판올림 1.6.0 · Python 3.11 이상 · MIT 라이선스 · [English README](README.md)
+판올림 1.7.0 · Python 3.11 이상 · MIT 라이선스 · [English README](README.md)
 
 ## 기능
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-03
+
 ### Added
 
 - `nerdvana run` reports results as `--output-format text|json|stream-json` and stops at `--max-turns` or `--max-cost-usd`. Exit codes: 0 completed, 1 provider error, 2 missing credentials or invalid usage, 3 limit reached.
