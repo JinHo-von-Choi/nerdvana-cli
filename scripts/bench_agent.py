@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import shutil
 import subprocess
 import sys
@@ -67,6 +68,7 @@ class Task:
     max_turns:    int   = DEFAULT_MAX_TURNS
     max_cost_usd: float = DEFAULT_MAX_COST
     timeout:      int   = DEFAULT_TIMEOUT
+    tags:         tuple[str, ...] = ()
 
 
 @dataclass
@@ -112,6 +114,7 @@ def parse_task(data: Any, base: Path) -> Task:
         max_turns    = int(data.get("max_turns", DEFAULT_MAX_TURNS)),
         max_cost_usd = float(data.get("max_cost_usd", DEFAULT_MAX_COST)),
         timeout      = int(data.get("timeout", DEFAULT_TIMEOUT)),
+        tags         = tuple(str(tag) for tag in data.get("tags") or ()),
     )
 
 
@@ -150,8 +153,21 @@ def pass_at_k(attempts: int, passed: int, k: int) -> float:
     return 1.0 - math.comb(attempts - passed, k) / math.comb(attempts, k)
 
 
-def summarize(attempts: list[Attempt], k: int) -> dict[str, Any]:
-    """Per-task and overall figures for the recorded attempts."""
+def bootstrap_ci(values: list[float], rounds: int = 2000, seed: int = 0, alpha: float = 0.05) -> tuple[float, float]:
+    """Percentile bootstrap interval of the mean of *values* (here: per-task pass rates).
+
+    Resampling tasks with replacement shows how much the mean could move had other tasks of the
+    same kind been drawn. The generator is seeded, so the same input gives the same interval.
+    """
+    if not values:
+        return 0.0, 0.0
+    rng   = random.Random(seed)
+    means = sorted(sum(rng.choices(values, k=len(values))) / len(values) for _ in range(rounds))
+    return means[int(rounds * alpha / 2)], means[min(int(rounds * (1 - alpha / 2)), rounds - 1)]
+
+
+def summarize(attempts: list[Attempt], k: int, tags: dict[str, tuple[str, ...]] | None = None) -> dict[str, Any]:
+    """Per-task, per-tag and overall figures for the recorded attempts."""
     by_task: dict[str, list[Attempt]] = {}
     for attempt in attempts:
         by_task.setdefault(attempt.task_id, []).append(attempt)
@@ -169,7 +185,14 @@ def summarize(attempts: list[Attempt], k: int) -> dict[str, Any]:
         })
     total_cost = sum(a.cost_usd for a in attempts)
     solved     = sum(1 for t in tasks if t["passed"])
+    by_tag: dict[str, list[float]] = {}
+    for task in tasks:
+        for tag in (tags or {}).get(task["task"], ()):
+            by_tag.setdefault(tag, []).append(task["pass_at_1"])
+    low, high = bootstrap_ci([t["pass_at_1"] for t in tasks])
     return {
+        "mean_pass_at_1_ci":   [low, high],
+        "by_tag":              {tag: {"tasks": len(rates), "mean_pass_at_1": sum(rates) / len(rates)} for tag, rates in sorted(by_tag.items())},
         "k":                   k,
         "tasks":               tasks,
         "attempts":            len(attempts),
@@ -191,10 +214,14 @@ def render(summary: dict[str, Any]) -> str:
             f"{t['task']:<28} {t['attempts']:>3} {t['passed']:>4} {t['pass_at_1']:>7.2f} "
             f"{t[f'pass_at_{k}']:>7.2f} {t['cost_usd']:>9.4f} {t['mean_seconds']:>7.1f}"
         )
+    if summary["by_tag"]:
+        lines += ["", "by tag"]
+        lines += [f"  {tag:<20} {data['tasks']:>3} task(s)  mean pass@1 {data['mean_pass_at_1']:.2f}" for tag, data in summary["by_tag"].items()]
     per_solved = summary["cost_per_solved_task"]
     lines.append("")
     lines.append(
-        f"tasks solved {summary['tasks_solved']}/{len(summary['tasks'])}, mean pass@1 {summary['mean_pass_at_1']:.2f}, "
+        f"tasks solved {summary['tasks_solved']}/{len(summary['tasks'])}, mean pass@1 {summary['mean_pass_at_1']:.2f} "
+        f"(95% bootstrap interval {summary['mean_pass_at_1_ci'][0]:.2f} to {summary['mean_pass_at_1_ci'][1]:.2f}), "
         f"total cost ${summary['total_cost_usd']:.4f}, "
         f"cost per solved task {'n/a' if per_solved is None else f'${per_solved:.4f}'}"
     )
@@ -306,6 +333,7 @@ def worst_case_cost(tasks: list[Task], attempts: int) -> float:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Measure the agent's success rate on fixed repository tasks.")
     parser.add_argument("tasks", type=Path, help="a task file or a directory of *.yml task files")
+    parser.add_argument("--tag", action="append", default=[], help="run only tasks carrying this tag (repeatable)")
     parser.add_argument("--attempts", type=int, default=1, help="attempts per task (default 1)")
     parser.add_argument("--k", type=int, default=0, help="k for pass@k (default: the number of attempts)")
     parser.add_argument("--model", default="")
@@ -330,6 +358,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
+    if options.tag:
+        tasks = [t for t in tasks if set(options.tag) & set(t.tags)]
+        if not tasks:
+            print(f"error: no task carries any of the tags {options.tag}", file=sys.stderr)
+            return 2
+
     print(f"{len(tasks)} task(s) x {options.attempts} attempt(s); worst-case spend ${worst_case_cost(tasks, options.attempts):.2f}")
     if not options.yes:
         print("dry run: pass --yes to run the agent against the real API")
@@ -352,7 +386,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             shutil.rmtree(root, ignore_errors=True)
     print()
-    print(render(summarize(attempts, k)))
+    print(render(summarize(attempts, k, {t.id: t.tags for t in tasks})))
     return 0
 
 

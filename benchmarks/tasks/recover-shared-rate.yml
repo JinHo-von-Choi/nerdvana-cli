@@ -1,0 +1,8 @@
+id: recover-shared-rate
+path: ../fixtures/recover-shared-rate
+prompt: "tax.tax(100) returns 7.0 but the sales tax rate is 8%, so it should return 8.0. Fix it without breaking the existing tests."
+verify: "python3 check.py"
+max_turns: 20
+max_cost_usd: 0.6
+timeout: 600
+tags: [recovery, python, shared-state]

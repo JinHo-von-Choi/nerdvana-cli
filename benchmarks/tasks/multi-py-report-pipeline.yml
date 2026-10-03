@@ -1,0 +1,8 @@
+id: multi-py-report-pipeline
+path: ../fixtures/multi-py-report-pipeline
+prompt: "app.run turns category,amount CSV text into a spending report, but the report is wrong for some inputs: categories are grouped incorrectly, the order of the lines is off and some amounts are printed wrongly. Find and fix every cause."
+verify: "python3 check.py"
+max_turns: 25
+max_cost_usd: 0.8
+timeout: 900
+tags: [multi-file, python]

@@ -1,0 +1,8 @@
+id: fix-c-ring-buffer
+path: ../fixtures/fix-c-ring-buffer
+prompt: "The ring buffer in ring.c misbehaves once it fills up. Fix the bug in ring.c."
+verify: "gcc -std=c11 -Wall -Wextra -o check_bin check.c ring.c && ./check_bin"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, c, boundary]

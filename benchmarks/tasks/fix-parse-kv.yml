@@ -1,0 +1,8 @@
+id: fix-parse-kv
+path: ../fixtures/fix-parse-kv
+prompt: "kvconfig.parse crashes on some valid config lines. Fix the bug in kvconfig.py."
+verify: "python3 check.py"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, python, parsing]

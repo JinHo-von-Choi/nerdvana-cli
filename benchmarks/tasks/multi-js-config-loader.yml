@@ -1,0 +1,8 @@
+id: multi-js-config-loader
+path: ../fixtures/multi-js-config-loader
+prompt: "loadConfig in index.js builds the configuration from defaults, a file config and APP_* environment lines, but it misbehaves: values from the environment are converted wrongly, calling it twice gives different results for the same defaults, and some valid ports are rejected. Find and fix every cause."
+verify: "node check.js"
+max_turns: 25
+max_cost_usd: 0.8
+timeout: 900
+tags: [multi-file, node]

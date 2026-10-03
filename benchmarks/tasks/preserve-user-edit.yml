@@ -1,0 +1,8 @@
+id: preserve-user-edit
+path: ../fixtures/preserve-user-edit
+prompt: "retry.delay_for returns the wrong delay for attempt 1 and raises IndexError for large attempt numbers. Fix it."
+verify: "python3 check.py"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [preservation, python, bugfix]

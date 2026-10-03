@@ -1,0 +1,8 @@
+id: fix-mutable-default
+path: ../fixtures/fix-mutable-default
+prompt: "tagger.add_tag returns different results for the same call when it is called repeatedly. Fix the bug in tagger.py."
+verify: "python3 check.py"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, python, state]

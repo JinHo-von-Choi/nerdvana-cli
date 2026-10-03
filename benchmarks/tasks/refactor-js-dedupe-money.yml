@@ -1,0 +1,8 @@
+id: refactor-js-dedupe-money
+path: ../fixtures/refactor-js-dedupe-money
+prompt: "invoice.js and receipt.js each contain their own copy of formatCents. Refactor so the function exists once and both files use it. Behaviour must not change and the existing tests must stay as they are and pass."
+verify: "node check.js"
+max_turns: 20
+max_cost_usd: 0.6
+timeout: 600
+tags: [refactor, node]
