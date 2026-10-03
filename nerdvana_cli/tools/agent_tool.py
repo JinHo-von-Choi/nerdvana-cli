@@ -15,6 +15,7 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
+from nerdvana_cli.core.worktree import Worktree, WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
 from nerdvana_cli.types import ToolResult
 
 
@@ -25,6 +26,7 @@ class AgentToolArgs:
     subagent_type:     str  = "general-purpose"
     model:             str  = ""
     category:          str  = ""
+    isolation:         str  = ""
     run_in_background: bool = False
 
 
@@ -41,6 +43,32 @@ def open_envelope(context: ToolContext, child_settings: NerdvanaSettings) -> Cal
     envelope = budget.reserve(fraction, own_spend())
     child_settings.session.max_cost_usd = envelope.amount
     return lambda actual: budget.settle(envelope, actual)
+
+
+def enter_worktree(args: AgentToolArgs, task_id: str, child_settings: NerdvanaSettings, context: ToolContext) -> Worktree | None:
+    """With ``isolation: worktree``, make the agent's checkout and point its settings at it; None otherwise."""
+    if args.isolation != "worktree":
+        return None
+    worktree = create_worktree(context.cwd, args.description or task_id)
+    child_settings.cwd = worktree.path
+    child_settings.sandbox.write_paths = [*child_settings.sandbox.write_paths, *git_dirs(worktree)]
+    return worktree
+
+
+def leave_worktree(worktree: Worktree | None) -> str:
+    """A note for the agent's result: where its changes are, or nothing (the unchanged worktree is removed)."""
+    if worktree is None:
+        return ""
+    try:
+        if has_changes(worktree):
+            return (
+                f"\n\n[This agent worked in its own git worktree. Its changes are on branch {worktree.branch} in {worktree.path}. "
+                f"Review them with: git -C {worktree.path} diff HEAD; to keep them, commit there and merge the branch.]"
+            )
+        remove_worktree(worktree)
+    except WorktreeError as exc:
+        return f"\n\n[Worktree {worktree.path} could not be checked or removed: {exc}]"
+    return "\n\n[The agent's worktree had no changes and was removed.]"
 
 
 def _agent_types() -> Any:
@@ -101,6 +129,14 @@ class AgentTool(BaseTool[AgentToolArgs]):
                     "in the configuration (empty = the agent type's category)."
                 ),
             },
+            "isolation": {
+                "type": "string",
+                "enum": ["", "worktree"],
+                "description": (
+                    "'worktree' runs the agent in its own git worktree on a new branch, so its edits do not touch "
+                    "the project directory; the result says where the changes are if there are any."
+                ),
+            },
             "run_in_background": {
                 "type": "boolean",
                 "description": "If true, returns task_id immediately without waiting.",
@@ -146,6 +182,11 @@ class AgentTool(BaseTool[AgentToolArgs]):
 
         child_settings = copy.deepcopy(self._settings)
         settle         = open_envelope(context, child_settings)
+        try:
+            worktree = enter_worktree(args, task_id, child_settings, context)
+        except WorktreeError as exc:
+            task.status, task.error = TaskStatus.FAILED, str(exc)
+            return ToolResult(tool_use_id="", content=str(exc), is_error=True)
 
         from nerdvana_cli.tools.registry import create_subagent_registry
 
@@ -185,7 +226,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         if args.run_in_background:
             task.background = True
             bg = asyncio.get_event_loop().create_task(
-                self._run_and_record(config, task, abort, registry, settle)
+                self._run_and_record(config, task, abort, registry, settle, worktree)
             )
             task.bg_task = bg
             return ToolResult(
@@ -193,7 +234,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 content     = f"Agent started in background. Task ID: {task_id}",
             )
 
-        output, total_tokens = await self._run_and_record(config, task, abort, registry, settle)
+        output, total_tokens = await self._run_and_record(config, task, abort, registry, settle, worktree)
         return ToolResult(tool_use_id="", content=output, tokens=total_tokens)
 
     async def _run_and_record(
@@ -203,9 +244,11 @@ class AgentTool(BaseTool[AgentToolArgs]):
         abort:    asyncio.Event,
         registry: TaskRegistry,
         settle:   Callable[[float], None] | None = None,
+        worktree: Worktree | None = None,
     ) -> tuple[str, int]:
         try:
             output, total_tokens = await run_subagent(config, abort)
+            output += leave_worktree(worktree)
             task.status = TaskStatus.COMPLETED
             task.output = output
             return output, total_tokens

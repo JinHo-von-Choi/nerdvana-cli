@@ -67,6 +67,16 @@ held to the scope. A session whose `sandbox.mode` is `require` keeps it. The edi
 are held to the scope by the tool executor, with relative paths resolved against the project and `..` and
 look-alike directory names refused. A refused edit is counted as `out_of_scope` in the run's signals.
 
+## Isolation in a git worktree
+
+`Agent` with `isolation: worktree` runs the sub-agent in its own `git worktree`: a checkout of the current commit on a
+new branch `nerdvana/<description>-<id>` in a temporary directory. Whatever the agent edits or runs stays there, and
+the project directory is not touched. When the agent finishes, the worktree is removed if it changed nothing; if it
+did, it is kept and the result names the branch and the path, with the command to review the changes. Nothing is merged
+for you. Uncommitted changes of the project are not in the copy, which starts from `HEAD`. With the sandbox on, the
+agent's commands may also write to the git directories that a commit in the worktree needs. It needs a git repository
+with at least one commit.
+
 ## Sharing the cost limit
 
 With `session.max_cost_usd` set, a sub-agent does not get the whole limit. Each `Agent` call is
