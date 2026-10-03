@@ -105,7 +105,7 @@ def create_tool_registry(
 
 # Never handed to a subagent: spawning, background-task control and questions
 # to the user all belong to the top-level session.
-_SUBAGENT_EXCLUDED: frozenset[str] = frozenset({"Agent", "Swarm", "TaskGet", "TaskStop", "AskUser"})
+_SUBAGENT_EXCLUDED: frozenset[str] = frozenset({"Agent", "Swarm", "TaskGet", "TaskStop", "AskUser", "ToolSearch"})
 
 # ``allowed_tools`` entry granting every tool that only reads.
 READ_ONLY_TOKEN = "@read"

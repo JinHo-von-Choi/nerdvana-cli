@@ -87,6 +87,10 @@ class SessionConfig(BaseModel):
     project_doc_max_tokens: int = 0
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
+    # MCP tools whose full declarations are sent only after the model loads them with ToolSearch:
+    # "auto" defers them once their declarations pass defer_tools_threshold tokens, "always", "never".
+    defer_tools: Literal["auto", "always", "never"] = "auto"
+    defer_tools_threshold: int = 3000
     # Share of the cost still unspent that one sub-agent (Agent call or Swarm) may use; it stops at its
     # share and its spend counts against max_cost_usd. 0 = no share, sub-agents run unbounded.
     subagent_budget_fraction: float = 0.5

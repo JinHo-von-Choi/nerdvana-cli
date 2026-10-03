@@ -46,6 +46,7 @@ from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, new_tool_use_id, repair_tool_ids
+from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.core.verify import run_verify
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
@@ -214,6 +215,7 @@ class AgentLoop:
     _goal:                    Goal | None
     _goal_loaded:             bool
     _budget:                  Budget | None
+    _tool_index:              ToolIndex | None
     last_stop:                str
     turns_used:               int
     _cost_limit_warned:       bool
@@ -456,6 +458,7 @@ class AgentLoop:
         self._goal                 = None
         self._goal_loaded          = False
         self._budget               = None
+        self._tool_index           = None
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -597,12 +600,37 @@ class AgentLoop:
         self._dir_rules.reset()
         self._context_budget.reset()
 
+    def _prepare_tools(self) -> list[Any]:
+        """The tools this run may use, with MCP tools deferred behind ToolSearch when their declarations are large.
+
+        What the model has loaded stays loaded across prompts of the session. Sub-agents never defer: they have
+        no ToolSearch.
+        """
+        from nerdvana_cli.tools.tool_search import ToolSearchTool
+
+        visible = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name) and t.name != "ToolSearch"]
+        session = self.settings.session
+        index   = ToolIndex.build(visible, session.defer_tools, session.defer_tools_threshold) if self.origin.agent_type == "main" else ToolIndex()
+        if self._tool_index is not None:
+            index.loaded = self._tool_index.loaded & set(index.deferred)
+        self._tool_index = index
+        if index.deferred:
+            search = ToolSearchTool(index)
+            self.registry.register(search)
+            visible.append(search)
+        return visible
+
+    def _declared(self, tools: list[Any]) -> list[Any]:
+        """The tools to declare in the next request."""
+        return self._tool_index.declared(tools) if self._tool_index else tools
+
     def build_system_prompt(self) -> str:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
         return _b(tools=[t for t in self.registry.all_tools() if self.policy.is_visible(t.name)], parism_active=self.registry.get("Parism") is not None,
                   model=self.settings.model.model, provider=self.settings.model.provider, cwd=self.settings.cwd,
                   active_tool_mode=bool(self.settings.model.extended_thinking),
-                  project_doc_max_tokens=self.settings.session.project_doc_max_tokens)
+                  project_doc_max_tokens=self.settings.session.project_doc_max_tokens,
+                  deferred_tools=self._tool_index.index_lines() if self._tool_index else None)
 
     def activate_skill(self, skill_body: str) -> None: self._active_skill = skill_body  # noqa: E704
     def deactivate_skill(self) -> None: self._active_skill = None  # noqa: E704
@@ -645,8 +673,8 @@ class AgentLoop:
             self.state.messages.append(Message(role=Role.USER, content=reminder))
         self.state.messages.append(Message(role=Role.USER, content=prompt))
         self.session.record_user_message(prompt)
+        tools         = self._prepare_tools()
         system_prompt = self.build_system_prompt()
-        tools = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name)]
         if not self._session_started:
             self._session_started = True
             self._session_ended   = False
@@ -852,6 +880,7 @@ class AgentLoop:
         )
         context.state["session_id"] = self.session.session_id
         context.state["budget"]     = (self.budget, self.session_cost_usd)
+        context.state["tool_index"] = self._tool_index
         sandbox = self.settings.sandbox
         context.state["sandbox"]    = SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths))
         return context
@@ -979,7 +1008,7 @@ class AgentLoop:
     ) -> AsyncGenerator[str, None]:
         """Consume one provider response, acting on each event until it reports ``done``."""
         async for ev in guarded_stream(
-            self.provider.stream(system_prompt, turn.messages, tools),
+            self.provider.stream(system_prompt, turn.messages, self._declared(tools)),
             idle  = self.settings.session.stream_idle_timeout,
             total = self.settings.session.stream_total_timeout,
         ):
@@ -1129,7 +1158,7 @@ class AgentLoop:
             self._fire_before_api_call(tools)
             repair_tool_ids(self.state.messages)
             try:
-                result = await self.provider.send(system_prompt, self._to_provider_messages(), tools)
+                result = await self.provider.send(system_prompt, self._to_provider_messages(), self._declared(tools))
             except Exception as e:
                 yield f"\n[bold red]Fallback error: {e}[/bold red]"
                 return
