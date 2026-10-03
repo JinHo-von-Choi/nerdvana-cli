@@ -35,6 +35,7 @@ class SwarmConfig:
     task_registry: TaskRegistry
     max_turns:     int = 50
     confirm:       ConfirmCallback | None = None
+    parent_session_id: str = ""
 
 
 async def run_swarm(
@@ -72,6 +73,8 @@ async def run_swarm(
             registry  = child_registry,
             max_turns = config.max_turns,
             confirm   = label_confirm(config.confirm, agent_id),
+            category  = task.category,
+            parent_session_id = config.parent_session_id,
         )
 
         try:

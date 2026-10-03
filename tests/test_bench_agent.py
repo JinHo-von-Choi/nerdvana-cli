@@ -213,3 +213,10 @@ def test_task_tags_are_read_and_the_tag_filter_selects_tasks(monkeypatch: pytest
     assert bench.main([str(TASKS), "--tag", "injection"]) == 0
     assert "1 task(s)" in capsys.readouterr().out
     assert bench.main([str(TASKS), "--tag", "no-such-tag"]) == 2
+
+
+def test_a_failed_run_keeps_the_error_text_the_agent_reported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    script  = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'error_provider', 'is_error': True, 'result': 'openai package not installed'}))\n"
+    attempt = _run(monkeypatch, tmp_path, script)
+    assert attempt.passed is False  # type: ignore[attr-defined]
+    assert "openai package not installed" in attempt.error  # type: ignore[attr-defined]

@@ -315,6 +315,8 @@ def run_attempt(task: Task, number: int, options: argparse.Namespace, root: Path
         result.cost_usd  = float(report.get("total_cost_usd", 0.0) or 0.0)
         if not report:
             result.error = f"no result object in the output (exit {agent.returncode}): {agent.stderr.strip()[-300:]}"
+        elif report.get("is_error"):
+            result.error = str(report.get("error") or report.get("result") or "")[-300:]
     except subprocess.TimeoutExpired:
         result.stop  = "timeout"
         result.error = f"agent exceeded {task.timeout}s"

@@ -190,7 +190,7 @@ The result object (`schema_version` 1; fields are only ever added):
 
 `subtype` is `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`; an error result also has an `error` string when one is known. `result` is the text the model wrote after its last tool call.
 
-`stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `compaction` and `context` (percent of the window used).
+`stream-json` events, one per line, before the result: `system` (subtype `init`, with the session id, provider and model), `text` (a piece of the answer), `notice` (a message from the agent itself, such as a retry or a fallback), `tool_start` (`name`, `summary`), `tool_done` (`name`, `is_error`), `request` (one provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, and `cost_usd`), `compaction` and `context` (percent of the window used).
 
 ## CLI Subcommands
 
@@ -205,7 +205,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana version` | Show version |
 | `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |
-| `nerdvana cost` | Aggregate token usage, cached tokens and USD cost over a time window, from the usage each request reported |
+| `nerdvana cost` | Aggregate token usage, cached tokens and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
 
 ### Session transcripts (`nerdvana session ...`)
 

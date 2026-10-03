@@ -13,14 +13,14 @@ import logging
 import math
 import re
 from collections.abc import AsyncGenerator, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.markup import escape
 
 from nerdvana_cli.core.activity_state import ActivityState
-from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
+from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
 from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
@@ -214,7 +214,11 @@ class AgentLoop:
         role_prompt:         str = "",
         on_ask_user:         AskUserCallback | None = None,
         on_confirm:          ConfirmCallback | None = None,
+        origin:              CallOrigin | None = None,
     ) -> None:
+        self.origin               = origin or CallOrigin()
+        self.usage_listener:      Callable[[dict[str, Any]], None] | None = None
+        self._last_tool           = ""
         self.settings             = settings
         self.registry             = registry
         self.session              = session or SessionStorage()
@@ -329,7 +333,13 @@ class AgentLoop:
         self._usage_output_total      += current.output_tokens
         self._usage_cache_read_total  += current.cache_read_tokens
         self._usage_cache_write_total += current.cache_creation_tokens
-        self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage)
+        origin = replace(self.origin, turn=self.turns_used, last_tool=self._last_tool)
+        cost   = self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage, origin)
+        if self.usage_listener is not None:
+            self.usage_listener({
+                **usage, "provider": self.settings.model.provider, "model": self.settings.model.model,
+                "agent_type": origin.agent_type, "turn": origin.turn, "last_tool": origin.last_tool, "cost_usd": cost,
+            })
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
 
@@ -711,6 +721,7 @@ class AgentLoop:
             yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
         names_by_id = {tu["id"]: tu["name"] for tu in tool_uses}
         results = await self.tool_executor.run_batch(tool_uses, tool_ctx)
+        self._last_tool = tool_uses[-1]["name"] if tool_uses else self._last_tool
         for tr in results:
             tname = names_by_id.get(tr.tool_use_id, "unknown")
             yield f"{TOOL_DONE_PREFIX}{tname} [{'error' if tr.is_error else 'done'}]"

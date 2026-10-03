@@ -22,6 +22,7 @@ import sqlite3
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -61,7 +62,13 @@ CREATE TABLE IF NOT EXISTS api_calls (
     output_tokens      INTEGER DEFAULT 0,
     cache_read_tokens  INTEGER DEFAULT 0,
     cache_write_tokens INTEGER DEFAULT 0,
-    cost_usd           REAL    DEFAULT 0.0
+    cost_usd           REAL    DEFAULT 0.0,
+    agent_id           TEXT,
+    agent_type         TEXT,
+    category           TEXT,
+    parent_session_id  TEXT,
+    turn               INTEGER DEFAULT 0,
+    last_tool          TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_api_calls_session ON api_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_api_calls_ts      ON api_calls(ts);
@@ -78,6 +85,24 @@ CREATE TABLE IF NOT EXISTS sessions (
     cache_write_tokens INTEGER DEFAULT 0
 );
 """
+
+
+_ATTRIBUTION_COLUMNS = (
+    ("agent_id", "TEXT"), ("agent_type", "TEXT"), ("category", "TEXT"),
+    ("parent_session_id", "TEXT"), ("turn", "INTEGER DEFAULT 0"), ("last_tool", "TEXT"),
+)
+
+
+@dataclass(frozen=True)
+class CallOrigin:
+    """Who made a provider request: the agent, its category and where in the run it stood."""
+
+    agent_id:          str = "main"
+    agent_type:        str = "main"
+    category:          str = ""
+    parent_session_id: str = ""
+    turn:              int = 0
+    last_tool:         str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +259,11 @@ class AnalyticsWriter:
                 for column in ("cache_read_tokens", "cache_write_tokens"):
                     if column not in existing:
                         conn.execute(f"ALTER TABLE sessions ADD COLUMN {column} INTEGER DEFAULT 0")
+                # Request rows written before cost attribution lack these.
+                existing = {row["name"] for row in conn.execute("PRAGMA table_info(api_calls)")}
+                for column, kind in _ATTRIBUTION_COLUMNS:
+                    if column not in existing:
+                        conn.execute(f"ALTER TABLE api_calls ADD COLUMN {column} {kind}")
         except Exception as exc:  # noqa: BLE001
             logger.warning("analytics: failed to initialise schema: %s", exc)
             self._enabled = False
@@ -287,25 +317,36 @@ class AnalyticsWriter:
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: end_session error: %s", exc)
 
-    def record_api_call(self, provider: str, model: str, usage: dict[str, int]) -> None:
-        """Persist the usage the provider reported for one request, cached tokens included."""
-        if not self._enabled:
-            return
+    def record_api_call(self, provider: str, model: str, usage: dict[str, int], origin: CallOrigin | None = None) -> float:
+        """Persist the usage the provider reported for one request, cached tokens included.
+
+        *origin* says which agent made it. ``last_tool`` is the tool that ran just before the request,
+        so the request that digests a tool's output is counted under that tool. It is an order in time,
+        not proof the tool caused the cost. Returns the estimated cost of the request in USD.
+        """
+        origin = origin or CallOrigin()
         read, write = usage.get("cache_read_tokens", 0), usage.get("cache_write_tokens", 0)
         inputs, outputs = usage.get("input_tokens", 0), usage.get("output_tokens", 0)
         cost = self._pricing.estimate_cost(provider, model, inputs, outputs, read, write)
+        if not self._enabled:
+            return cost
         with self._lock:
             try:
                 with _connect(self._db_path) as conn:
                     conn.execute(
                         """INSERT INTO api_calls
                            (session_id, ts, provider, model, input_tokens, output_tokens,
-                            cache_read_tokens, cache_write_tokens, cost_usd)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (self._session_id, datetime.now(UTC).isoformat(), provider, model, inputs, outputs, read, write, cost),
+                            cache_read_tokens, cache_write_tokens, cost_usd,
+                            agent_id, agent_type, category, parent_session_id, turn, last_tool)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            self._session_id, datetime.now(UTC).isoformat(), provider, model, inputs, outputs, read, write, cost,
+                            origin.agent_id, origin.agent_type, origin.category, origin.parent_session_id, origin.turn, origin.last_tool,
+                        ),
                     )
             except Exception as exc:  # noqa: BLE001
                 logger.debug("analytics: record_api_call error: %s", exc)
+        return cost
 
     # ------------------------------------------------------------------
     # Tool call recording
