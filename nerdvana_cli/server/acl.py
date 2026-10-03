@@ -37,6 +37,7 @@ import yaml  # type: ignore[import-untyped,unused-ignore]
 
 _DEFAULT_ROLE_TOOLS: dict[str, list[str]] = {
     "read-only": [
+        "FileRead",
         "symbol_overview",
         "find_symbol",
         "find_referencing_symbols",
@@ -45,6 +46,7 @@ _DEFAULT_ROLE_TOOLS: dict[str, list[str]] = {
         "GetCurrentConfig",
     ],
     "edit": [
+        "FileEdit",
         "replace_symbol_body",
         "insert_before_symbol",
         "insert_after_symbol",

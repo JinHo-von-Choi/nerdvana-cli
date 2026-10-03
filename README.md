@@ -39,6 +39,7 @@
 - **Tool System** — Bash, FileRead, FileWrite, FileEdit, Glob, Grep, Parism, Agent, Swarm, TaskGet, TaskStop, plus four LSP tools
 - **GitHub comments**: an example workflow runs `nerdvana run` when a collaborator comments `/nerdvana <task>`, with cost, turn and sandbox limits and a read-only token; see [docs/github-action.md](docs/github-action.md)
 - **MCP Integration** — connect external MCP servers for additional tools (`mcp__{server}__{tool}`); when their declarations get large they are listed by name and loaded on demand, see [`docs/mcp-deferred-tools.md`](docs/mcp-deferred-tools.md)
+- **Edit backend for other agents** — `nerdvana serve` also exposes `FileRead` (anchored lines) and `FileEdit` (refused unless this client read the file and it is unchanged), with a read ledger per client. See [`docs/mcp-edit-backend.md`](docs/mcp-edit-backend.md).
 - **MCP server per-tenant quota** — `nerdvana serve` supports rpm / rph / daily_tokens / max_concurrent limits per client, configured via `mcp_quota.yml`. See [`docs/mcp-quota.md`](docs/mcp-quota.md).
 - **Session Persistence**: JSONL transcripts; `nerdvana session resume <id>` restores the conversation
 - **Auto Provider Detection** — picks the right provider from model name

@@ -290,7 +290,7 @@ async def test_token_accounting_blocks_next_call_when_daily_limit_exceeded(
     # Patch _call_tool_raw to return a ToolResult with tokens=1500.
     # _dispatch calls _call_tool_raw (not _execute_tool) to preserve the
     # raw ToolResult so it can extract the tokens field before str conversion.
-    async def _fake_call_tool_raw(tool_name: str, args: dict) -> ToolResult:
+    async def _fake_call_tool_raw(tool_name: str, args: dict, client_identity: str | None = None) -> ToolResult:
         return ToolResult(tool_use_id="", content="ok", tokens=1500)
 
     server._call_tool_raw = _fake_call_tool_raw  # type: ignore[method-assign]
