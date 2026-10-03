@@ -110,6 +110,16 @@ def user_agents_dir() -> Path:
     return user_data_home() / "agents"
 
 
+def user_workflows_dir() -> Path:
+    """Directory for global workflow definitions."""
+    return user_data_home() / "workflows"
+
+
+def workflow_runs_dir() -> Path:
+    """Directory with one sub-directory of stored step results per workflow run."""
+    return user_workflows_dir() / "runs"
+
+
 def user_teams_dir() -> Path:
     """Directory for team state."""
     return user_data_home() / "teams"
