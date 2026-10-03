@@ -97,6 +97,21 @@ async def test_the_model_is_switched_once_when_a_signal_reaches_its_limit(monkey
     assert len(switched) == 1  # once per session
 
 
+async def test_the_escalated_model_stays_for_the_next_prompt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    loop, _ = _loop(monkeypatch, tmp_path, escalation_model="claude-opus-5-5")
+    loop._signals[signals.VERIFY_FAILED] += 1
+    await _drain(loop)
+    assert loop.settings.model.model == "claude-opus-5-5"
+    await _drain(loop)
+    assert loop.settings.model.model == "claude-opus-5-5"
+
+
+async def test_without_an_escalation_the_model_is_restored_after_the_prompt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    loop, _ = _loop(monkeypatch, tmp_path, escalation_model="claude-opus-5-5")
+    await _drain(loop)
+    assert loop.settings.model.model == "claude-haiku-4-5-20251001"
+
+
 async def test_below_the_limits_the_model_stays(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     loop, switched = _loop(monkeypatch, tmp_path, escalation_model="claude-opus-5-5")
     loop.tool_executor.signals[signals.CAS_REJECTED] += 2

@@ -220,3 +220,17 @@ def test_a_bad_set_is_refused_with_the_configuration_exit_code(env: Path, monkey
     _provider(monkeypatch, ANSWER)
     result = runner.invoke(app, ["run", "go", "--set", assignment])
     assert result.exit_code == 2, result.output
+
+
+def test_the_result_names_the_model_that_finished_the_run(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    original = AgentLoop.run
+
+    async def _switching(self: AgentLoop, prompt: str, images: Any = None) -> Any:
+        self.settings.model.model = "claude-opus-5-5"
+        async for chunk in original(self, prompt, images):
+            yield chunk
+
+    monkeypatch.setattr(AgentLoop, "run", _switching)
+    _provider(monkeypatch, ANSWER)
+    payload = json.loads(runner.invoke(app, ["run", "go", "--output-format", "json", "--model", "claude-sonnet-5-5"]).stdout)
+    assert payload["model"] == "claude-opus-5-5"

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- After an escalation (`session.escalation_model`) the next prompt of the same session went back to the first model, and the escalation could not happen again. The escalated model now stays for the session, and the `run` result names the model that finished the run.
 - `nerdvana serve --transport http` answered every MCP request with a 500 ("Task group is not initialized"), because the bearer-auth wrapper did not hand on the lifespan that starts the session manager. A test now completes the handshake through the real app.
 
 ### Added

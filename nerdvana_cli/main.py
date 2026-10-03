@@ -343,6 +343,8 @@ def _load_run_images(paths: list[str], cwd: str, reporter: Any, outcome: Any) ->
 
 def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     """Copy what the finished loop measured into the run result."""
+    outcome.provider     = loop.settings.model.provider
+    outcome.model        = loop.settings.model.model
     outcome.turns        = loop.turns_used
     outcome.cost_usd     = loop.session_cost_usd()
     outcome.usage        = loop.usage_summary()

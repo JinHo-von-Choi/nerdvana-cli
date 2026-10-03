@@ -219,6 +219,7 @@ class AgentLoop:
     _budget:                  Budget | None
     _tool_index:              ToolIndex | None
     _escalated:               bool
+    _escalated_to:            tuple[str, str, str, str] | None
     last_stop:                str
     turns_used:               int
     _cost_limit_warned:       bool
@@ -512,6 +513,7 @@ class AgentLoop:
             return ""
         self._signals[signals.ESCALATED] += 1
         self._switch_model(provider, model)
+        self._escalated_to = self._model_state()
         for message in self.state.messages:
             message.provider_blocks = []
         return f"\n[bold yellow][Escalating to {self.settings.model.provider}:{model}: {reason}][/bold yellow]\n"
@@ -529,6 +531,7 @@ class AgentLoop:
         self._budget               = None
         self._tool_index           = None
         self._escalated            = False
+        self._escalated_to         = None
         self._turn_marks: list[tuple[int, int]] = []   # per prompt: (messages before it, checkpoints before it)
 
     def _over_token_limit(self) -> str:
@@ -962,12 +965,7 @@ class AgentLoop:
         """Request, execute tools and repeat until the model is done or a limit stops it."""
         tool_ctx = self._new_tool_context()
         state    = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
-        saved    = (
-            self.settings.model.provider,
-            self.settings.model.model,
-            self.settings.model.api_key,
-            self.settings.model.base_url,
-        )
+        saved    = self._model_state()
         self._context_budget.set_overhead(system_prompt, tools)
         recovery = RecoveryPlanner(
             fallbacks   = list(self.settings.model.fallback_models),
@@ -1004,13 +1002,7 @@ class AgentLoop:
                 if flow.finished:
                     return
         finally:
-            (
-                self.settings.model.provider,
-                self.settings.model.model,
-                self.settings.model.api_key,
-                self.settings.model.base_url,
-            ) = saved
-            self.provider = self.create_provider_from_settings()
+            self._restore_model(saved)
 
     async def _check_run_limits(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
         """Stop the run when the turn or cost limit is reached, and warn about an unenforceable one."""
@@ -1215,6 +1207,21 @@ class AgentLoop:
             return
         yield f"\n[bold red]Error: {exc}[/bold red]"
         self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {exc}"))
+
+    def _restore_model(self, saved: tuple[str, str, str, str]) -> None:
+        """After a prompt, go back to the model it started on; an escalation lasts for the session, a fallback only for the prompt it served."""
+        (
+            self.settings.model.provider,
+            self.settings.model.model,
+            self.settings.model.api_key,
+            self.settings.model.base_url,
+        ) = self._escalated_to or saved
+        self._escalated_to = None
+        self.provider      = self.create_provider_from_settings()
+
+    def _model_state(self) -> tuple[str, str, str, str]:
+        """The settings that name the model in use: provider, model, API key and base URL."""
+        return (self.settings.model.provider, self.settings.model.model, self.settings.model.api_key, self.settings.model.base_url)
 
     def _switch_model(self, provider: str | None, model: str) -> None:
         """Point the loop at *model*, on *provider* when one is given."""
