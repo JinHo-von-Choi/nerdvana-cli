@@ -13,7 +13,7 @@ sub-agents included, then calls :func:`observe_loop` while it is built (from
 usage listener. No other part of the agent knows about tracing.
 
 Spans follow the OpenTelemetry GenAI conventions, with every attribute name kept in
-``core.otel_semconv``:
+``core.telemetry.otel_semconv``:
 
 * ``invoke_agent {agent}`` (INTERNAL): one per run of a prompt. A sub-agent's span is a child of
   the open ``Agent`` or ``Swarm`` tool call of the session that started it.
@@ -39,10 +39,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli import __version__
-from nerdvana_cli.core import otel_semconv as sc
 from nerdvana_cli.core.hooks import HookContext, HookEvent, HookResult
-from nerdvana_cli.core.otel_semconv import Attr, Operation
 from nerdvana_cli.core.secrets import SecretMasker
+from nerdvana_cli.core.telemetry import otel_semconv as sc
+from nerdvana_cli.core.telemetry.otel_semconv import Attr, Operation
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop

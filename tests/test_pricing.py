@@ -27,14 +27,14 @@ CLAUDE_5_MODELS = ("claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claud
 @pytest.fixture
 def table():
     """PricingTable backed by the shipped providers/pricing.yml."""
-    from nerdvana_cli.core.analytics import PricingTable
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
     return PricingTable()
 
 
 @pytest.fixture
 def synthetic_table(tmp_path: Path):
     """PricingTable backed by fixed rates that no pricing refresh will move."""
-    from nerdvana_cli.core.analytics import PricingTable
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
     pricing_path = tmp_path / "pricing.yml"
     pricing_path.write_text(SYNTHETIC_PRICING, encoding="utf-8")
     return PricingTable(pricing_path=pricing_path)
@@ -58,7 +58,7 @@ class TestPricingTableLoad:
         assert not missing, f"unmapped Claude 5 models: {missing}"
 
     def test_nonexistent_yaml(self, tmp_path: Path) -> None:
-        from nerdvana_cli.core.analytics import PricingTable
+        from nerdvana_cli.core.telemetry.analytics import PricingTable
         t = PricingTable(pricing_path=tmp_path / "missing.yml")
         # Should not raise; all costs default to 0
         cost = t.estimate_cost("openai", "gpt-4o", 1000, 500)

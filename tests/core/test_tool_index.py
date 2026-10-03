@@ -219,7 +219,7 @@ async def test_never_keeps_everything_declared(monkeypatch: pytest.MonkeyPatch, 
 
 
 async def test_sub_agents_never_defer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from nerdvana_cli.core.analytics import CallOrigin
+    from nerdvana_cli.core.telemetry.analytics import CallOrigin
 
     provider = _Script([])
     loop     = _loop(monkeypatch, tmp_path, provider, _big())

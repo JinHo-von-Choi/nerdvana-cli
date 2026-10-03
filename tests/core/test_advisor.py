@@ -16,9 +16,9 @@ import pytest
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.advisor import MAX_REPLY_TOKENS, Advisor, Reply, provider_completion, render_context
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import PROVIDER_KEY_ENVVARS, ProviderEvent, ProviderName
 from nerdvana_cli.tools.advisor_tool import AdvisorTool

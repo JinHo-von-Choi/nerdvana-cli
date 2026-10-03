@@ -7,7 +7,7 @@ Date:   2026-10-03
 from __future__ import annotations
 
 from nerdvana_cli.core import signals
-from nerdvana_cli.core.cache_watch import CacheWatch
+from nerdvana_cli.core.telemetry.cache_watch import CacheWatch
 from nerdvana_cli.ui.widgets.status_bar import StatusBar
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from nerdvana_cli.core.analytics import AnalyticsReader
+from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp

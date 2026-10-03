@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.analytics.db import connect, default_db_path
+from nerdvana_cli.core.telemetry.analytics.db import connect, default_db_path
 
 logger = logging.getLogger(__name__)
 

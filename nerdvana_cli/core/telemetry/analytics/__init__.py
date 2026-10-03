@@ -11,8 +11,8 @@ Classes:
 
 from __future__ import annotations
 
-from nerdvana_cli.core.analytics.pricing import PricingTable
-from nerdvana_cli.core.analytics.reader import AnalyticsReader
-from nerdvana_cli.core.analytics.writer import AnalyticsWriter, CallOrigin
+from nerdvana_cli.core.telemetry.analytics.pricing import PricingTable
+from nerdvana_cli.core.telemetry.analytics.reader import AnalyticsReader
+from nerdvana_cli.core.telemetry.analytics.writer import AnalyticsWriter, CallOrigin
 
 __all__ = ["AnalyticsReader", "AnalyticsWriter", "CallOrigin", "PricingTable"]

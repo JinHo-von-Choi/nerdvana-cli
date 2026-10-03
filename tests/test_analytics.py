@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.core.analytics — SQLite schema, writes, and queries."""
+"""Tests for nerdvana_cli.core.telemetry.analytics — SQLite schema, writes, and queries."""
 from __future__ import annotations
 
 import sqlite3
@@ -24,7 +24,7 @@ def tmp_db(tmp_path: Path) -> Path:
 @pytest.fixture
 def synthetic_pricing(tmp_path: Path):
     """PricingTable backed by rates no pricing refresh will move."""
-    from nerdvana_cli.core.analytics import PricingTable
+    from nerdvana_cli.core.telemetry.analytics import PricingTable
     pricing_path = tmp_path / "pricing.yml"
     pricing_path.write_text(SYNTHETIC_PRICING, encoding="utf-8")
     return PricingTable(pricing_path=pricing_path)
@@ -32,13 +32,13 @@ def synthetic_pricing(tmp_path: Path):
 
 @pytest.fixture
 def writer(tmp_db: Path, synthetic_pricing):
-    from nerdvana_cli.core.analytics import AnalyticsWriter
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
     return AnalyticsWriter(db_path=tmp_db, pricing_table=synthetic_pricing, enabled=True)
 
 
 @pytest.fixture
 def reader(tmp_db: Path, writer):  # writer ensures schema exists
-    from nerdvana_cli.core.analytics import AnalyticsReader
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
     return AnalyticsReader(db_path=tmp_db)
 
 
@@ -166,7 +166,7 @@ class TestAnalyticsWriter:
         assert abs(row[0] - 4.0) < 0.001
 
     def test_disabled_writer_no_writes(self, tmp_db: Path) -> None:
-        from nerdvana_cli.core.analytics import AnalyticsWriter
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
         writer = AnalyticsWriter(db_path=tmp_db, enabled=False)
         writer.start_session("sess-disabled")
         # File should not exist since disabled before schema creation
@@ -179,7 +179,7 @@ class TestAnalyticsWriter:
 
 class TestAnalyticsReader:
     def test_summary_no_db(self, tmp_path: Path) -> None:
-        from nerdvana_cli.core.analytics import AnalyticsReader
+        from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
         reader = AnalyticsReader(db_path=tmp_path / "nonexistent.sqlite")
         s = reader.summary()
         assert s["total_calls"] == 0

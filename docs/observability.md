@@ -42,7 +42,7 @@ whole prompt, cached part included.
 
 The names of the `gen_ai.*` attributes follow the OpenTelemetry GenAI semantic
 conventions, which are all at the Development stability level and may still be renamed.
-They are kept in one table, `nerdvana_cli/core/otel_semconv.py`, so a rename touches
+They are kept in one table, `nerdvana_cli/core/telemetry/otel_semconv.py`, so a rename touches
 one file.
 
 A tool call that was refused before it ran (a permission denial, a hook veto, a failed
@@ -74,7 +74,7 @@ an MCP tool is recorded like any other.
 
 ## Wiring
 
-`setup(settings)` in `nerdvana_cli/core/telemetry_otel.py` starts tracing. It is called
+`setup(settings)` in `nerdvana_cli/core/telemetry/telemetry_otel.py` starts tracing. It is called
 once from `resolve_run_provider` in `cli/runtime.py`, the step the interactive start,
 `nerdvana run` and `nerdvana review` all take before building an agent.
 `register_activity_hooks` calls `observe_loop` for every agent loop, so sub-agents are

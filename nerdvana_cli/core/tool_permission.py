@@ -23,8 +23,8 @@ from nerdvana_cli.core.untrusted import UntrustedTracker
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.analytics import AnalyticsWriter
     from nerdvana_cli.core.hooks import HookEngine
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 
 logger = logging.getLogger(__name__)
 

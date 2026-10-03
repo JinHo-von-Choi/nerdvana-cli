@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.commands.cost_command import build_cost_report
-from nerdvana_cli.core.analytics import AnalyticsWriter
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 
 
 def _writer(tmp_path: Path, session: str) -> tuple[AnalyticsWriter, Path]:
@@ -58,7 +58,7 @@ def test_an_unpriced_model_is_recorded_at_zero_cost(tmp_path: Path) -> None:
 
 
 def test_the_session_cost_prefers_request_rows_and_falls_back_to_tool_calls(tmp_path: Path) -> None:
-    from nerdvana_cli.core.analytics import AnalyticsReader
+    from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
 
     writer, db = _writer(tmp_path, "s3")
     writer.record_api_call("anthropic", "claude-sonnet-5-5", {"input_tokens": 1_000_000, "output_tokens": 0})
@@ -79,7 +79,7 @@ def test_the_session_cost_prefers_request_rows_and_falls_back_to_tool_calls(tmp_
 
 
 def _attributed(tmp_path: Path) -> Path:
-    from nerdvana_cli.core.analytics import CallOrigin
+    from nerdvana_cli.core.telemetry.analytics import CallOrigin
 
     writer, db = _writer(tmp_path, "attr")
     usage = {"input_tokens": 1_000_000, "output_tokens": 0}

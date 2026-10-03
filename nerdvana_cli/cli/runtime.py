@@ -19,7 +19,7 @@ from rich.prompt import Prompt
 
 from nerdvana_cli.core.config.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
-from nerdvana_cli.core.telemetry_otel import setup as setup_tracing
+from nerdvana_cli.core.telemetry.telemetry_otel import setup as setup_tracing
 
 console        = Console()
 console_stderr = Console(stderr=True)

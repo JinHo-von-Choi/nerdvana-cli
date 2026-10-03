@@ -17,9 +17,9 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 

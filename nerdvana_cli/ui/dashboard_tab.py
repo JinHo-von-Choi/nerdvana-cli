@@ -305,7 +305,7 @@ class DashboardTab(Widget):
         if "active" not in self.classes:
             return
         try:
-            from nerdvana_cli.core.analytics import AnalyticsReader
+            from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
             if self._reader is None:
                 self._reader = AnalyticsReader()
 
