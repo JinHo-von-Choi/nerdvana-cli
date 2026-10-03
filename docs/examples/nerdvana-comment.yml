@@ -1,0 +1,61 @@
+# Run nerdvana on an issue or pull request when a collaborator comments "/nerdvana <task>".
+# Copy to .github/workflows/nerdvana-comment.yml. See docs/github-action.md before enabling it.
+name: nerdvana-comment
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read          # the job cannot push; it reports what it did in a comment
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: nerdvana-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    # Only collaborators, only comments that start with the trigger, never from a fork's pull request code.
+    if: >
+      startsWith(github.event.comment.body, '/nerdvana ') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TASK: ${{ github.event.comment.body }}
+      # The provider key is a repository secret that belongs to a metered or subscription account you accept
+      # being charged. It is read only by the run step below.
+      ANTHROPIC_API_KEY: ${{ secrets.NERDVANA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Run nerdvana
+        run: |
+          set -euo pipefail
+          TASK="${TASK#/nerdvana }"
+          uv tool install nerdvana-cli
+          nerdvana run "$TASK" \
+            --approval-mode auto_edit \
+            --sandbox require \
+            --max-turns 40 \
+            --max-cost-usd 3 \
+            --output-format json > result.json || true
+          python3 - <<'EOF' > comment.md
+          import json
+          lines = open("result.json").read().strip().splitlines()
+          r = json.loads(lines[-1]) if lines else {}
+          print(r.get("result") or "nerdvana produced no result.")
+          print()
+          print(f"`{r.get('subtype', 'no result')}` after {r.get('num_turns', 0)} turns, ${r.get('total_cost_usd', 0)}")
+          files = (r.get("receipt") or {}).get("files_changed")
+          if files:
+              print("Files changed: " + ", ".join(files))
+          EOF
+      - name: Reply
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body-file comment.md
