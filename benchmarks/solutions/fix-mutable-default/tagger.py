@@ -1,0 +1,6 @@
+"""Tag list helpers."""
+
+
+def add_tag(tag: str, tags: list[str] | None = None) -> list[str]:
+    """Return a new list holding the given tags followed by tag. The tags argument is left unchanged."""
+    return [*(tags or []), tag]

@@ -1,0 +1,8 @@
+id: fix-js-median
+path: ../fixtures/fix-js-median
+prompt: "stats.median([10, 9, 1]) should return 9 but returns something else. Fix the bug in stats.js."
+verify: "node check.js"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, node, sorting]

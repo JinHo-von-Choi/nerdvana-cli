@@ -1,0 +1,8 @@
+id: write-tests-py-merge-intervals
+path: ../fixtures/write-tests-py-merge-intervals
+prompt: "intervals.merge_intervals has no tests. Write unit tests for it in test_intervals.py using unittest. They must pass on the current code and be thorough enough to catch mistakes in other implementations of the same documented behaviour."
+verify: "python3 check.py"
+max_turns: 20
+max_cost_usd: 0.6
+timeout: 600
+tags: [test-writing, python]

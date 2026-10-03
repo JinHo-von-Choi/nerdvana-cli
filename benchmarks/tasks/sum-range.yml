@@ -5,3 +5,4 @@ verify: python check.py
 max_turns: 15
 max_cost_usd: 0.5
 timeout: 600
+tags: [python, bugfix]

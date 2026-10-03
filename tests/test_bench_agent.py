@@ -178,3 +178,38 @@ def test_without_yes_nothing_runs(monkeypatch: pytest.MonkeyPatch, capsys: pytes
     assert bench.main([str(TASKS), "--attempts", "2"]) == 0
     assert called == []
     assert "dry run" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Tags and the bootstrap interval
+# ---------------------------------------------------------------------------
+
+
+def test_the_interval_is_deterministic_contains_the_mean_and_narrows_with_more_tasks() -> None:
+    few  = [1.0, 0.0, 1.0, 1.0]
+    many = few * 10
+    low, high = bench.bootstrap_ci(few)
+    assert (low, high) == bench.bootstrap_ci(few)
+    assert low <= sum(few) / len(few) <= high
+    wide, narrow = high - low, bench.bootstrap_ci(many)[1] - bench.bootstrap_ci(many)[0]
+    assert narrow < wide
+    assert bench.bootstrap_ci([]) == (0.0, 0.0)
+    assert bench.bootstrap_ci([1.0, 1.0, 1.0]) == (1.0, 1.0)
+
+
+def test_the_summary_groups_pass_rates_by_tag_and_reports_the_interval() -> None:
+    attempts = [bench.Attempt("a", 1, True), bench.Attempt("b", 1, False), bench.Attempt("c", 1, True)]
+    summary  = bench.summarize(attempts, 1, {"a": ("python", "bugfix"), "b": ("python",), "c": ("node",)})
+    assert summary["by_tag"]["python"] == {"tasks": 2, "mean_pass_at_1": pytest.approx(0.5)}
+    assert summary["by_tag"]["node"]["mean_pass_at_1"] == pytest.approx(1.0)
+    low, high = summary["mean_pass_at_1_ci"]
+    assert 0.0 <= low <= summary["mean_pass_at_1"] <= high <= 1.0
+    assert "bootstrap interval" in bench.render(summary)
+
+
+def test_task_tags_are_read_and_the_tag_filter_selects_tasks(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    tasks = bench.load_tasks(TASKS)
+    assert all(t.tags for t in tasks)
+    assert bench.main([str(TASKS), "--tag", "injection"]) == 0
+    assert "1 task(s)" in capsys.readouterr().out
+    assert bench.main([str(TASKS), "--tag", "no-such-tag"]) == 2

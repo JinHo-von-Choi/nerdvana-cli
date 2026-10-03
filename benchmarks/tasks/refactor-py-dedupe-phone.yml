@@ -1,0 +1,8 @@
+id: refactor-py-dedupe-phone
+path: ../fixtures/refactor-py-dedupe-phone
+prompt: "customers.py and suppliers.py carry the same copy of normalize_phone. Refactor so that the logic lives in one place and both modules use it. Behaviour must not change and the existing tests must stay as they are and pass."
+verify: "python3 check.py"
+max_turns: 20
+max_cost_usd: 0.6
+timeout: 600
+tags: [refactor, python]

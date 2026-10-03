@@ -24,6 +24,7 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | Option | Meaning |
 |-|-|
 | `--attempts N` | attempts per task (default 1) |
+| `--tag TAG` | run only tasks carrying this tag (repeatable); tags in `benchmarks/tasks` include `python`, `node`, `c`, `bugfix`, `feature`, `refactor`, `multi-file`, `tests`, `recovery`, `permission`, `injection`, `preserve` |
 | `--k K` | k for pass@k (default: the number of attempts) |
 | `--model`, `--provider` | passed to `nerdvana run` |
 | `--approval-mode` | `default`, `auto_edit`, `yolo` (default) or `plan` |
@@ -37,7 +38,7 @@ directories on Linux; it does not stop reading, running programs or UDP.
 One YAML file per task in `benchmarks/tasks/`:
 
 ```yaml
-id: sum-range                  # unique
+id: sum-range                  # unique, equal to the file name
 path: ../fixtures/sum-range    # a local directory, relative to this file; or use repo + ref
 # repo: https://example.com/project.git
 # ref: 3f2a9c1
@@ -47,6 +48,7 @@ verify: python check.py        # exit status 0 means solved
 max_turns: 15                  # default 30
 max_cost_usd: 0.5              # default 1.0; the run stops at this estimated cost
 timeout: 600                   # seconds for the agent, default 1200
+tags: [python, bugfix]         # used by --tag and for the per-tag summary
 ```
 
 Every attempt starts from a fresh copy of the repository, so attempts never see each
@@ -54,10 +56,12 @@ other's changes and the source repository is never modified.
 
 ## Reading the result
 
+Each task is checked by `tests/test_bench_fixtures.py` without a model: its verify command must fail on the starting repository and pass once the reference solution in `benchmarks/solutions/<id>/` is laid over it.
+
 For each task: attempts, passes, `pass@1` (share of attempts that passed), `pass@k`
 (chance that at least one of k attempts passes, the unbiased estimator
 `1 - C(n - c, k) / C(n, k)`), total cost and mean time. Overall: tasks solved, mean
-`pass@1`, total cost and cost per solved task. Costs are the loop's own estimate from
+`pass@1` with a 95% bootstrap interval over tasks, pass rates by tag, total cost and cost per solved task. Costs are the loop's own estimate from
 the usage each request reported and `providers/pricing.yml`; a model without a price
 reports 0 and the cost ceiling does not apply to it.
 

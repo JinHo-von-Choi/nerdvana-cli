@@ -1,0 +1,8 @@
+id: fix-pagination-boundary
+path: ../fixtures/fix-pagination-boundary
+prompt: "paginate.page_count(6, 5) should return 2 but returns 1. Fix the bug in paginate.py."
+verify: "python3 check.py"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, python, boundary]

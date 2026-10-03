@@ -1,0 +1,8 @@
+id: add-py-slug-max-length
+path: ../fixtures/add-py-slug-max-length
+prompt: "Add an optional max_length parameter to slug.slugify. When given, the result is at most max_length characters, never ends with a hyphen, and is cut at a word boundary when possible (a first word that is itself too long is cut hard). Without it behaviour is unchanged and existing tests keep passing."
+verify: "python3 check.py"
+max_turns: 20
+max_cost_usd: 0.6
+timeout: 600
+tags: [feature, python, strings]

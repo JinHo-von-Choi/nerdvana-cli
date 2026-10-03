@@ -1,0 +1,8 @@
+id: fix-stable-sort
+path: ../fixtures/fix-stable-sort
+prompt: "ranking.rank lists players with equal scores in the wrong order. Fix the bug in ranking.py."
+verify: "python3 check.py"
+max_turns: 15
+max_cost_usd: 0.5
+timeout: 600
+tags: [bugfix, python, sorting]
