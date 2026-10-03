@@ -185,6 +185,18 @@ tools:
   max_result_chars: {}
   #  Grep: 8000
   #  "mcp__github__*": 4000
+advisor:
+  # The Advisor tool: the model puts a short question, with an excerpt of the recent conversation
+  # (tool output cut, secrets masked), to a stronger model at a decision point. See docs/advisor.md.
+  enabled: false
+  # "model" on the current provider or "provider:model"
+  model: ""
+  # Consultations per run, the tool's and the signal-triggered one together
+  max_calls: 3
+  # Recent messages sent with the question
+  max_context_messages: 12
+  # Ask the advisor once when an escalation signal reaches its threshold, before switching to session.escalation_model
+  on_signals: false
 
 goal:
   # A goal (nerdvana run --verify, /goal) is done when its command exits with status 0. See docs/goals.md.

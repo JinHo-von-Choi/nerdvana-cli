@@ -13,6 +13,7 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX, AgentLoop
 from nerdvana_cli.core.settings import (
+    AdvisorConfig,
     GoalConfig,
     ModelConfig,
     NerdvanaSettings,
@@ -45,6 +46,7 @@ def _make_settings(**overrides) -> NerdvanaSettings:
     settings.sandbox = SandboxConfig()
     settings.secrets = SecretsConfig()
     settings.goal = GoalConfig()
+    settings.advisor = AdvisorConfig()
     settings.cwd = "/tmp"
     settings.verbose = False
     return settings

@@ -259,6 +259,20 @@ class SecretsConfig(BaseModel):
         return checked
 
 
+class AdvisorConfig(BaseModel):
+    # A stronger model the agent consults at decision points through the Advisor tool (core/advisor.py).
+    enabled:              bool = False
+    # "model" (on the current provider) or "provider:model", the same form as session.escalation_model.
+    model:                str  = ""
+    # Consultations per run, the tool's and the signal-triggered one together.
+    max_calls:            int  = Field(default=3, ge=0)
+    # Recent messages sent with the question (tool output cut, secrets masked); never the whole history.
+    max_context_messages: int  = Field(default=12, ge=1)
+    # When an escalation signal reaches its threshold, ask the advisor once and pass its guidance to the
+    # model before switching to session.escalation_model.
+    on_signals:           bool = False
+
+
 class CheckpointConfig(BaseModel):
     enabled: bool = True
     per_session_max: int = 50
@@ -268,7 +282,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory", "workflow", "tools",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry", "memory", "workflow", "tools", "advisor",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -391,6 +405,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("memory",     MemoryConfig,     _MEMORY_STRICT_FIELDS),
     ("workflow",   WorkflowConfig,   _WORKFLOW_STRICT_FIELDS),
     ("tools",      ToolsConfig,      frozenset()),
+    ("advisor",    AdvisorConfig,    frozenset()),
 )
 
 
@@ -412,6 +427,7 @@ class NerdvanaSettings(BaseSettings):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    advisor: AdvisorConfig = Field(default_factory=AdvisorConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.

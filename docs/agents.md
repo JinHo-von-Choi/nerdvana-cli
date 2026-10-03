@@ -188,7 +188,8 @@ in `nerdvana_cli/core/`:
 | Module | Class or functions | Concern |
 |-|-|-|
 | `run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
-| `model_failover.py` | `ModelFailover` | escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `model_failover.py` | `ModelFailover` | advice and escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `advisor.py` | `Advisor` | the consultations of the `Advisor` tool and of the signal-triggered advice: what is sent, the call cap, the cost (see [advisor.md](advisor.md)) |
 | `phase_effort.py` | `PhaseEffort`, `phase_level` | reasoning effort per phase: planning, implementation, verification |
 | `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/compact.py` as the fallback |
 | `compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |

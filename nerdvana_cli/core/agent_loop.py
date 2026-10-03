@@ -23,6 +23,7 @@ from rich.markup import escape
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_hooks import register_activity_hooks
 from nerdvana_cli.core.activity_state import ActivityState
+from nerdvana_cli.core.advisor import Advisor
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.builtin_hooks import (
@@ -165,6 +166,7 @@ class AgentLoop:
         self.last_stop            = "completed"
         self.turns_used           = 0
         self.goal_gate            = GoalGate(self)
+        self.advisor              = Advisor(self)
         self.phase_effort         = PhaseEffort(self)
         self.server_compaction    = ServerCompaction(self)
         self.failover             = ModelFailover(self)
@@ -601,6 +603,7 @@ class AgentLoop:
         context.state["edit_scope"] = self.settings.sandbox.edit_scope
         context.state["goal_scope"] = self.goal_gate.scope()
         context.state["classifier_feed"] = classifier_feed(self)
+        context.state["advisor"]    = self.advisor
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
@@ -664,7 +667,7 @@ class AgentLoop:
             flow.finished  = True
             yield notice
             return
-        escalated = self.failover.maybe_escalate()
+        escalated = await self.failover.maybe_escalate()
         if escalated:
             yield escalated
         stop, notice = self.limits.unpriced()

@@ -1,4 +1,4 @@
-"""Which model serves the agent loop: escalation, recovery from a failed request, and the way back.
+"""Which model serves the agent loop: advice and escalation, recovery from a failed request, and the way back.
 
 Author: 최진호
 Date:   2026-10-03
@@ -47,13 +47,16 @@ _MAX_RESEND_ROUNDS = 10
 class ModelFailover:
     """Switches the model of *loop*: once to ``session.escalation_model``, and per prompt after a failure.
 
-    An escalation lasts for the session; a fallback only for the prompt it served.
+    An escalation lasts for the session; a fallback only for the prompt it served. With
+    ``advisor.on_signals`` the advisor is asked once before an escalation, and the escalation only follows
+    when the signal that called for help keeps coming.
     """
 
     def __init__(self, loop: AgentLoop) -> None:
         self._loop        = loop
         self._escalated   = False
         self._escalated_to: ModelState | None = None
+        self._advised: dict[str, int] | None  = None   # the signal counts when the advisor was asked
 
     def model_state(self) -> ModelState:
         """The settings that name the model in use: provider, model, API key and base URL."""
@@ -61,7 +64,8 @@ class ModelFailover:
         return (model.provider, model.model, model.api_key, model.base_url)
 
     def begin_run(self) -> ModelState:
-        """Start a run at the implementation effort. Returns the model state to restore."""
+        """Start a run: the advisor's consultations and the implementation effort. Returns the model state to restore."""
+        self._loop.advisor.start_run()
         self._loop.phase_effort.enter(IMPLEMENTATION)
         return self.model_state()
 
@@ -112,18 +116,28 @@ class ModelFailover:
         if changed:
             self._emit(HookEvent.POST_MODEL_SWITCH, current, (target[0], target[1]), "restore")
 
-    def maybe_escalate(self) -> str:
-        """Switch to ``session.escalation_model`` once, when the run's signals reach their thresholds.
+    async def maybe_escalate(self) -> str:
+        """When the run's signals reach their thresholds, ask the advisor or switch to ``session.escalation_model``.
 
-        Returns the notice to show, or an empty string when nothing changed. The thinking blocks kept on
-        earlier assistant messages belong to the model that wrote them, so they are dropped on a switch.
+        With ``advisor.on_signals`` the first time asks the advisor and puts its guidance in front of the model.
+        Otherwise, and when the advisor cannot answer or a signal has kept coming after its advice, the model
+        is switched, once per session. Returns the notice to show, or an empty string when nothing changed. The
+        thinking blocks kept on earlier assistant messages belong to the model that wrote them, so they are
+        dropped on a switch.
         """
         loop    = self._loop
         session = loop.settings.session
-        if self._escalated or not session.escalation_model:
+        asks    = loop.settings.advisor.on_signals and self._advised is None
+        if self._escalated or not (session.escalation_model or asks):
             return ""
-        reason = signals.escalation_reason(loop.signal_summary(), session.escalation_signals)
+        reason = self._trigger()
         if not reason:
+            return ""
+        if asks:
+            notice = await self._advise(reason)
+            if notice:
+                return notice
+        if not session.escalation_model:
             return ""
         self._escalated = True
         provider, model = parse_fallback(session.escalation_model)
@@ -137,6 +151,26 @@ class ModelFailover:
         for message in loop.state.messages:
             message.provider_blocks = []
         return f"\n[bold yellow][Escalating to {loop.settings.model.provider}:{model}: {reason}][/bold yellow]\n"
+
+    def _trigger(self) -> str:
+        """The signal that calls for help, as text: the first at its threshold; after advice, one that has grown since."""
+        loop       = self._loop
+        counts     = loop.signal_summary()
+        thresholds = loop.settings.session.escalation_signals
+        if self._advised is not None:
+            thresholds = {name: limit for name, limit in thresholds.items() if counts.get(name, 0) > self._advised.get(name, 0)}
+        return signals.escalation_reason(counts, thresholds)
+
+    async def _advise(self, reason: str) -> str:
+        """Ask the advisor about *reason* and give its guidance to the model; the notice to show, or empty when it could not."""
+        loop   = self._loop
+        advice = await loop.advisor.advise(f"The run shows trouble ({reason}). What should be done differently?", reason)
+        if not advice.ok:
+            logger.info("the advisor was not consulted about %s: %s", reason, advice.text)
+            return ""
+        self._advised = loop.signal_summary()
+        loop.state.messages.append(Message(role=Role.USER, content=f"[Advisor guidance, asked because of {reason}]\n{advice.text}"))
+        return f"\n[bold yellow][Asked the advisor ({loop.settings.advisor.model}): {reason}][/bold yellow]\n"
 
     async def recover(
         self,
