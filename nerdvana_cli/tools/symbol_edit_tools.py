@@ -335,7 +335,7 @@ class ReplaceSymbolBodyTool(SymbolEditTool[ReplaceSymbolBodyArgs]):
         "Step 1: supply name_path + relative_path + body -> get preview_id + diff. "
         "Step 2: supply preview_id + apply=True -> commit the change. "
         "Returns STALE if the target file changed between steps. "
-        "body replaces the whole symbol, signature line included. "
+        "body replaces the whole symbol, decorators and signature line included. "
         "Example: step 1 name_path: \"Greeter/greet\", relative_path: \"src/greeter.py\", "
         "body: \"    def greet(self) -> str:\\n        return 'hi'\"; step 2 preview_id: \"<id from step 1>\", apply: true."
     )
