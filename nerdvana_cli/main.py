@@ -319,6 +319,15 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
         raise typer.Exit(EXIT_CONFIG) from exc
 
 
+def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The receipt of a run, or None when it changed nothing and checked nothing."""
+    from nerdvana_cli.core.analytics import AnalyticsReader
+    from nerdvana_cli.core.receipt import build_receipt
+
+    receipt = build_receipt(loop, verification, AnalyticsReader().cost_breakdown(loop.session.session_id))
+    return receipt if receipt["files_changed"] or verification else None
+
+
 def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     """Copy what the finished loop measured into the run result."""
     outcome.turns        = loop.turns_used
@@ -326,6 +335,7 @@ def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     outcome.usage        = loop.usage_summary()
     outcome.signals      = loop.signal_summary()
     outcome.verification = loop.verification_summary()
+    outcome.receipt      = _receipt_of(loop, outcome.verification)
     outcome.duration_ms  = duration_ms
 
 

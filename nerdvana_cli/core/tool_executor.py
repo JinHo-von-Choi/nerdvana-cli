@@ -87,6 +87,7 @@ class ToolExecutor:
         self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
         self.signals: Counter[str] = Counter()
+        self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []
 
@@ -371,7 +372,9 @@ class ToolExecutor:
             result.content     = self._masked(tool.name, tool, tool.truncate_result(result.content))
             if result.is_error:
                 success = False
-            elif edited and baseline is not None:
+            else:
+                self._note_edit(tool_use["name"], parsed_args)
+            if not result.is_error and edited and baseline is not None:
                 result.content += await self._new_errors_note(edited, baseline)
             if repeats >= _REPEAT_WARN:
                 result.content += (
@@ -597,6 +600,12 @@ class ToolExecutor:
         more  = len(fresh) - len(lines)
         tail  = f"\n- ... and {more} more" if more > 0 else ""
         return "\n\nNew errors reported by the language server after this edit:\n" + "\n".join(lines) + tail
+
+    def _note_edit(self, tool_name: str, parsed_args: Any) -> None:
+        """Count an applied edit per file (a symbol edit that is only a preview is not one)."""
+        if tool_name in self._EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
+            with contextlib.suppress(Exception):  # a counter must never fail the edit it describes
+                self.edited.update(self._edit_targets(parsed_args))
 
     def _edit_targets(self, parsed_args: Any) -> list[str]:
         """Return the file paths carried by a parsed edit-tool argument object."""
