@@ -310,6 +310,22 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any]) 
             setattr(getattr(settings, section), field, value)
 
 
+def _resolve_run_provider(settings: NerdvanaSettings) -> tuple[str, bool]:
+    """Fill in the provider and its API key from the model name and the environment.
+
+    Returns the provider name and whether a key is still missing (local providers need none).
+    """
+    from nerdvana_cli.providers import ProviderName, detect_provider
+    from nerdvana_cli.providers.factory import resolve_api_key
+
+    if not settings.model.provider:
+        settings.model.provider = detect_provider(settings.model.model).value
+    prov = ProviderName(settings.model.provider)
+    if not settings.model.api_key:
+        settings.model.api_key = resolve_api_key(prov)
+    return prov.value, not settings.model.api_key and prov not in (ProviderName.OLLAMA, ProviderName.VLLM)
+
+
 @app.command()
 def run(
     prompt: str = typer.Argument(..., help="Prompt to run"),
@@ -341,16 +357,15 @@ def run(
     from nerdvana_cli.core.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
 
-    if output_format not in FORMATS:
-        console_stderr.print(f"[red]Error: --output-format must be one of {', '.join(FORMATS)}.[/red]")
-        raise typer.Exit(EXIT_CONFIG)
-    if sandbox and sandbox not in SANDBOX_MODES:
-        console_stderr.print(f"[red]Error: --sandbox must be one of {', '.join(SANDBOX_MODES)}.[/red]")
-        raise typer.Exit(EXIT_CONFIG)
     resolved_approval = approval_mode.strip().lower()
-    if resolved_approval and resolved_approval not in _APPROVAL_MODE_MAP:
-        console_stderr.print(f"[red]Error: --approval-mode must be one of {', '.join(_APPROVAL_MODE_MAP)}.[/red]")
-        raise typer.Exit(EXIT_CONFIG)
+    for flag, value, allowed in (
+        ("--output-format", output_format,     FORMATS),
+        ("--sandbox",       sandbox,           SANDBOX_MODES),
+        ("--approval-mode", resolved_approval, tuple(_APPROVAL_MODE_MAP)),
+    ):
+        if value and value not in allowed:
+            console_stderr.print(f"[red]Error: {flag} must be one of {', '.join(allowed)}.[/red]")
+            raise typer.Exit(EXIT_CONFIG)
 
     def _write(text: str) -> None:
         sys.stdout.write(text)
@@ -377,24 +392,12 @@ def run(
         "session.default_mode":     _APPROVAL_MODE_MAP[resolved_approval][0] if resolved_approval else "",
     })
 
-    from nerdvana_cli.providers import ProviderName, detect_provider
-    from nerdvana_cli.providers.factory import resolve_api_key
-
-    if not settings.model.provider:
-        prov = detect_provider(settings.model.model)
-        settings.model.provider = prov.value
-    else:
-        prov = ProviderName(settings.model.provider)
-
-    if not settings.model.api_key:
-        settings.model.api_key = resolve_api_key(prov)
-
+    prov, key_missing = _resolve_run_provider(settings)
     outcome.provider = settings.model.provider
     outcome.model    = settings.model.model
-
-    if not settings.model.api_key and prov not in (ProviderName.OLLAMA, ProviderName.VLLM):
+    if key_missing:
         outcome.stop = "config"
-        reporter.failure(outcome, f"No API key found for {prov.value}.")
+        reporter.failure(outcome, f"No API key found for {prov}.")
         raise typer.Exit(EXIT_CONFIG)
 
     from nerdvana_cli.core.task_state import TaskRegistry

@@ -10,9 +10,10 @@ Discovery order (ascending priority):
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.token_estimator import approx_tokens
 
 MAX_INSTRUCTION_BYTES = 50_000
 COMPAT_RULE_FILENAMES = ("AGENTS.md", "CLAUDE.md")
@@ -82,6 +83,31 @@ def load_nirna_files(
             ))
 
     return files
+
+
+def fit_to_budget(files: list[NirnaFile], max_tokens: int) -> list[NirnaFile]:
+    """Cut each document longer than *max_tokens* at a paragraph boundary and say what was left out.
+
+    The notice names the file so the model can read the rest when it matters. A budget of 0
+    or less keeps every document whole.
+    """
+    if max_tokens <= 0:
+        return files
+    return [_truncated(f, max_tokens) if approx_tokens(f.content) > max_tokens else f for f in files]
+
+
+def _truncated(file: NirnaFile, max_tokens: int) -> NirnaFile:
+    kept: list[str] = []
+    used = 0
+    for paragraph in file.content.split("\n\n"):
+        cost = approx_tokens(paragraph)
+        if kept and used + cost > max_tokens:
+            break
+        kept.append(paragraph)
+        used += cost
+    omitted = approx_tokens(file.content) - used
+    notice  = f"[About {omitted:,} tokens of this document are not shown. Read {file.path} for the rest.]"
+    return replace(file, content="\n\n".join(kept) + "\n\n" + notice)
 
 
 def format_nirna_for_prompt(files: list[NirnaFile]) -> str | None:

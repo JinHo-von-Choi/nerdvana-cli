@@ -386,6 +386,30 @@ def _check_mcp_config() -> CheckResult:
     return CheckResult("mcp_config", "ok", f"{total} server(s) parse; stdio commands found")
 
 
+PROJECT_DOC_WARN_TOKENS = 3_000
+
+
+def _check_project_docs() -> CheckResult:
+    """Project documents ride along on every request; say how much they add."""
+    from nerdvana_cli.core.nirnamd import fit_to_budget, load_nirna_files
+    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.token_estimator import approx_tokens
+
+    try:
+        settings = NerdvanaSettings.load()
+    except Exception:  # noqa: BLE001 - config problems are reported by the config check
+        return CheckResult("project_docs", "skip", "config could not be loaded")
+    budget = settings.session.project_doc_max_tokens
+    files  = fit_to_budget(load_nirna_files(cwd=os.getcwd()), budget)
+    total  = sum(approx_tokens(f.content) for f in files)
+    if not files:
+        return CheckResult("project_docs", "ok", "no project documents")
+    detail = f"{len(files)} document(s), about {total:,} tokens on every request"
+    if budget <= 0 and total > PROJECT_DOC_WARN_TOKENS:
+        return CheckResult("project_docs", "warn", f"{detail}; trim them or set session.project_doc_max_tokens")
+    return CheckResult("project_docs", "ok", detail)
+
+
 def _check_pricing_coverage() -> CheckResult:
     """The configured model and its fallbacks should have a known price, or a cost limit cannot apply."""
     from nerdvana_cli.core.analytics import PricingTable
@@ -500,6 +524,7 @@ _ALL_CHECKS = [
     _check_mcp_config,
     _check_sandbox,
     _check_pricing_coverage,
+    _check_project_docs,
     _check_pricing_freshness,
     _check_collect_baseline,
 ]

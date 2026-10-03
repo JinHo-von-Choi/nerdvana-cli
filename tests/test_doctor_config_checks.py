@@ -203,3 +203,18 @@ class TestPricingCoverage:
         monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
         (tmp_path / "nerdvana.yml").write_text("model:\n  provider: openai\n  model: not-in-the-price-table\n", encoding="utf-8")
         assert dc._check_pricing_coverage().status == "ok"
+
+
+class TestProjectDocs:
+    def test_no_documents_is_ok(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+        assert dc._check_project_docs().status == "ok"
+
+    def test_a_large_document_warns_unless_a_budget_is_set(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+        (tmp_path / "NIRNA.md").write_text("\n\n".join("rule " * 60 for _ in range(60)), encoding="utf-8")
+        assert dc._check_project_docs().status == "warn"
+        (tmp_path / "nerdvana.yml").write_text("session:\n  project_doc_max_tokens: 1000\n", encoding="utf-8")
+        assert dc._check_project_docs().status == "ok"

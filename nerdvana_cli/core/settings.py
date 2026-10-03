@@ -82,6 +82,9 @@ class SessionConfig(BaseModel):
     # Total tokens (input + output, every request) after which the run stops; 0 = no limit.
     # A limit that needs no price list, for models the price table does not know.
     max_total_tokens: int = 0
+    # Longest a project document (NIRNA.md, AGENTS.md, CLAUDE.md) may be in the system prompt, in
+    # tokens; a longer one is cut at a paragraph boundary. 0 = every document whole.
+    project_doc_max_tokens: int = 0
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
     max_context_tokens: int = 180_000

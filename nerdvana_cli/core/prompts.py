@@ -14,7 +14,7 @@ import threading
 import time
 from typing import Any
 
-from nerdvana_cli.core.nirnamd import format_nirna_for_prompt, load_nirna_files
+from nerdvana_cli.core.nirnamd import fit_to_budget, format_nirna_for_prompt, load_nirna_files
 
 
 def build_system_prompt(
@@ -24,13 +24,14 @@ def build_system_prompt(
     provider: str = "",
     cwd: str = ".",
     active_tool_mode: bool = False,
+    project_doc_max_tokens: int = 0,
 ) -> str:
     """Build the complete system prompt from ordered sections.
 
     active_tool_mode: when true, inject the stronger active-tool augment
     section. Triggered by ultrawork keyword or extended_thinking flag.
     """
-    nirna_files   = load_nirna_files(cwd=cwd)
+    nirna_files   = fit_to_budget(load_nirna_files(cwd=cwd), project_doc_max_tokens)
     nirna_section = format_nirna_for_prompt(nirna_files)
 
     sections = [
@@ -39,7 +40,7 @@ def build_system_prompt(
         _doing_tasks_section(),
         _tool_judgment_section(),
         _active_tool_augment_section() if active_tool_mode else None,
-        _using_tools_section(tools or []),
+        _using_tools_section(tools),
         _parism_section() if parism_active else None,
         _tone_and_style_section(),
         _output_efficiency_section(),
@@ -150,28 +151,35 @@ def _active_tool_augment_section() -> str:
     )
 
 
-def _using_tools_section(tools: list[Any]) -> str:
-    parts = [
+# Which tool each habit applies to. The tools' own descriptions and parameter schemas reach the model
+# through the provider's tool declarations, so they are not repeated in the system prompt.
+_TOOL_HABITS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("FileRead",),         "- Read files: FileRead (not cat/head/tail)"),
+    (("FileEdit",),         "- Edit files: FileEdit (not sed/awk)"),
+    (("FileWrite",),        "- Create files: FileWrite (not echo/cat heredoc)"),
+    (("Glob",),             "- Search files: Glob (not find/ls)"),
+    (("Grep",),             "- Search content: Grep (not grep/rg)"),
+    (("Bash", "Parism"),    "- Shell commands: Bash or Parism"),
+)
+
+
+def _using_tools_section(tools: list[Any] | None) -> str:
+    """How to choose among the tools in use; every line is for a tool that is actually available.
+
+    With ``tools=None`` the section lists every habit, for callers that do not know the tool set.
+    """
+    names = None if tools is None else {getattr(tool, "name", "") for tool in tools}
+    lines = [line for needed, line in _TOOL_HABITS if names is None or names.intersection(needed)]
+    if not lines:
+        return ""
+    return "\n".join([
         "# Available Tools",
         "",
         "Use the appropriate tool for each task:",
-        "- Read files: FileRead (not cat/head/tail)",
-        "- Edit files: FileEdit (not sed/awk)",
-        "- Create files: FileWrite (not echo/cat heredoc)",
-        "- Search files: Glob (not find/ls)",
-        "- Search content: Grep (not grep/rg)",
-        "- Shell commands: Bash or Parism",
+        *lines,
         "",
         "Call multiple independent tools in parallel. Sequential if dependent.",
-    ]
-
-    if tools:
-        parts.append("")
-        parts.append("## Tool Descriptions")
-        for tool in tools:
-            parts.append(tool.prompt())
-
-    return "\n".join(parts)
+    ])
 
 
 def _parism_section() -> str:

@@ -496,7 +496,8 @@ class AgentLoop:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
         return _b(tools=[t for t in self.registry.all_tools() if self.policy.is_visible(t.name)], parism_active=self.registry.get("Parism") is not None,
                   model=self.settings.model.model, provider=self.settings.model.provider, cwd=self.settings.cwd,
-                  active_tool_mode=bool(self.settings.model.extended_thinking))
+                  active_tool_mode=bool(self.settings.model.extended_thinking),
+                  project_doc_max_tokens=self.settings.session.project_doc_max_tokens)
 
     def activate_skill(self, skill_body: str) -> None: self._active_skill = skill_body  # noqa: E704
     def deactivate_skill(self) -> None: self._active_skill = None  # noqa: E704

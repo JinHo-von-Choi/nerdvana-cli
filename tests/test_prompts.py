@@ -30,12 +30,29 @@ class TestSystemPromptBuilder:
         prompt = build_system_prompt(tools=[], parism_active=False)
         assert "Preferred Shell" not in prompt
 
-    def test_tool_descriptions_included(self):
+    def test_tool_descriptions_are_left_to_the_tool_declarations(self):
         class MockTool:
+            name = "FileRead"
+            description_text = "UNIQUE-DESCRIPTION-MARKER"
+            input_schema = {"type": "object"}
+
             def prompt(self):
-                return "## TestTool\nA test tool."
+                return "## FileRead\nUNIQUE-DESCRIPTION-MARKER"
         prompt = build_system_prompt(tools=[MockTool()], parism_active=False)
-        assert "TestTool" in prompt
+        assert "UNIQUE-DESCRIPTION-MARKER" not in prompt
+        assert "Read files: FileRead" in prompt
+
+    def test_habit_lines_follow_the_tools_in_use(self):
+        class Tool:
+            def __init__(self, name):
+                self.name = name
+        read_only = build_system_prompt(tools=[Tool("FileRead"), Tool("Grep")], parism_active=False)
+        assert "Read files: FileRead" in read_only
+        assert "Edit files: FileEdit" not in read_only
+        assert "Shell commands" not in read_only
+        everything = build_system_prompt(tools=None, parism_active=False)
+        assert "Edit files: FileEdit" in everything
+        assert "# Available Tools" not in build_system_prompt(tools=[], parism_active=False)
 
     def test_direct_answer_guidance(self):
         prompt = build_system_prompt(tools=[], parism_active=False)
