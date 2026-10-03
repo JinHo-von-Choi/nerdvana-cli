@@ -71,6 +71,9 @@ class ModelConfig(BaseModel):
     # Which OpenAI API OpenAI-compatible providers use: "auto" speaks Responses to OpenAI's own endpoint and
     # Chat Completions to every other server (Groq, Ollama, OpenRouter, ...); "chat" and "responses" force one.
     openai_api: Literal["auto", "chat", "responses"] = "auto"
+    # Which Gemini API the gemini provider uses: "generate_content" (the default until the Interactions path is
+    # verified against the live API), "interactions" (stateless, ``store: false``), or "auto" (picks Interactions).
+    gemini_api: Literal["auto", "generate_content", "interactions"] = "generate_content"
 
 
 class PermissionConfig(BaseModel):

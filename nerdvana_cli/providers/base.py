@@ -102,6 +102,9 @@ class ProviderConfig:
     # Which OpenAI API the OpenAI-compatible adapter speaks: ``auto`` (Responses on OpenAI's own
     # endpoint, Chat Completions elsewhere), ``chat`` or ``responses``.
     openai_api: str = "auto"
+    # Which Gemini API the Gemini adapter speaks: ``generate_content``, ``interactions`` or ``auto``
+    # (which picks Interactions).
+    gemini_api: str = "generate_content"
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
