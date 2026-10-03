@@ -216,7 +216,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana import claude\|codex` | Bring over slash commands (`.claude/commands`, `~/.codex/prompts`) into `.nerdvana/commands`, never overwriting, and print the permission rules of a Claude Code `settings.json` converted to this syntax; shows a plan until `--write` |
 | `nerdvana review` | Review the working tree against a git ref with a read-only agent that starts from the changed functions and the lines that use them (`--base`, `--context-only`, `--fail-on`); see [docs/review.md](docs/review.md) |
 | `nerdvana context [id]` | Show where the context window goes in a stored session (the latest by default): system prompt parts, tool declarations per tool, messages by role, tool results by tool, against the window and the compaction threshold (`--top`, `--json`); see [docs/context-history.md](docs/context-history.md) |
-| `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written |
+| `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written. With `permissions.classifier: shadow` it also sets the classifier's verdicts against your answers |
 | `nerdvana cost` | Aggregate token usage, cached tokens, the cache hit ratio (cache reads over input, `Hit %` and `cache_hit_ratio`) and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
 
 ### Scheduled runs (`nerdvana schedule ...`)

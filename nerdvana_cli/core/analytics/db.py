@@ -6,6 +6,7 @@ Schema:
     tool_calls: one row per tool invocation with timing, token, and cost data.
     api_calls:  one row per provider request with usage, cost and the agent that made it.
     approvals:  one row per answer to a permission question.
+    classifier_verdicts: one row per call the action classifier judged, with what really happened to it.
     sessions:   one row per CLI session with aggregated totals.
 
 Both tables use WAL mode for concurrent read safety.
@@ -71,6 +72,19 @@ CREATE TABLE IF NOT EXISTS approvals (
     decision    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_approvals_call ON approvals(tool_name, arg_key);
+
+CREATE TABLE IF NOT EXISTS classifier_verdicts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  TEXT,
+    ts          TEXT NOT NULL,
+    tool_name   TEXT NOT NULL,
+    arg_key     TEXT,
+    mode        TEXT NOT NULL,
+    verdict     TEXT NOT NULL,
+    reason      TEXT,
+    outcome     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_classifier_verdicts_ts ON classifier_verdicts(ts);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id          TEXT    PRIMARY KEY,

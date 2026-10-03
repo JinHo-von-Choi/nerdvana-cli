@@ -46,6 +46,9 @@ NO_PROGRESS         = "no_progress"
 UNTRUSTED_SOURCE    = "untrusted_source"
 CACHE_MISS          = "cache_miss"
 EGRESS_DENIED       = "egress_denied"
+CLASSIFIER_ASK      = "classifier_ask"
+CLASSIFIER_DENY     = "classifier_deny"
+CLASSIFIER_ERROR    = "classifier_error"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (

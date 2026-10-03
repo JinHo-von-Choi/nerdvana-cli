@@ -107,6 +107,11 @@ permissions:
     - "Grep"
   always_deny: []
   gate_untrusted_sources: true
+  # A second model judges each call the policy would run unasked: "off", "shadow" (records
+  # verdicts, changes nothing; compare with `nerdvana approvals`) or "enforce" (allow can
+  # become ask or deny). Fails to ask. See docs/configuration.md.
+  classifier: "off"
+  classifier_model: ""   # "model" or "provider:model"; empty = agents.categories classifier, quick, then the session model
 
 session:
   persist: true
