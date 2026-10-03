@@ -4,7 +4,7 @@ Author: 최진호
 Date:   2026-10-03
 
 ``start_run`` writes the run record (core/run_store.py), makes a git worktree for it when asked, and starts a
-monitor process (``python -m nerdvana_cli.core.supervisor <id>``) in a session of its own, so it outlives the
+monitor process (``python -m nerdvana_cli.cli.supervisor <id>``) in a session of its own, so it outlives the
 terminal that started it. The monitor starts the run, ``nerdvana run --output-format stream-json``, in its own
 process group with the output going to the run's log, and until the run ends it renews the record's lease,
 reads the log for the session id, the cost so far and the last event, and obeys SIGTERM by ending the run's
@@ -222,7 +222,7 @@ def spawn_monitor(store: RunStore, run_id: str) -> int:
     directory = store.run_dir(run_id)
     with (directory / MONITOR_LOG).open("ab") as log:
         process = subprocess.Popen(
-            [sys.executable, "-m", "nerdvana_cli.core.supervisor", run_id],
+            [sys.executable, "-m", "nerdvana_cli.cli.supervisor", run_id],
             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, close_fds=True,
         )
     return process.pid
@@ -386,9 +386,9 @@ def clean_runs(days: float, store: RunStore | None = None, now: float | None = N
 
 
 def main() -> None:
-    """Entry point of the monitor process: ``python -m nerdvana_cli.core.supervisor <run id>``."""
+    """Entry point of the monitor process: ``python -m nerdvana_cli.cli.supervisor <run id>``."""
     if len(sys.argv) != 2:
-        sys.exit("usage: python -m nerdvana_cli.core.supervisor <run id>")
+        sys.exit("usage: python -m nerdvana_cli.cli.supervisor <run id>")
     sys.exit(asyncio.run(monitor(sys.argv[1])))
 
 

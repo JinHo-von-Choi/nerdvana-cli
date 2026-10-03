@@ -13,7 +13,7 @@ import re
 import sys
 from typing import Any
 
-from nerdvana_cli.core.review_context import MAX_DIFF_CHARS, ReviewError, build_context, render_prompt
+from nerdvana_cli.cli.review_context import MAX_DIFF_CHARS, ReviewError, build_context, render_prompt
 
 SEVERITIES = ("low", "medium", "high")
 FAIL_ON    = ("never", *SEVERITIES)

@@ -74,12 +74,12 @@ def _maybe_show_update_notice(target: Console | None = None) -> None:
     try:
         import asyncio as _asyncio
 
-        from nerdvana_cli.core.settings import NerdvanaSettings
-        from nerdvana_cli.core.updater import (
+        from nerdvana_cli.cli.updater import (
             cached_or_check,
             format_update_notice,
             is_update_check_enabled,
         )
+        from nerdvana_cli.core.settings import NerdvanaSettings
 
         try:
             _flag = bool(NerdvanaSettings().session.update_check)
@@ -188,7 +188,7 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
     Unset means empty, zero or False, the options' defaults. *assignments* are the ``--set`` strings;
     one that cannot be applied ends the command with the configuration exit code.
     """
-    from nerdvana_cli.core.run_output import EXIT_CONFIG
+    from nerdvana_cli.cli.run_output import EXIT_CONFIG
     from nerdvana_cli.core.settings import apply_settings_overrides
 
     for dotted, value in overrides.items():
@@ -205,8 +205,8 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
 
 def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any] | None:
     """The receipt of a run, or None when it changed nothing and checked nothing."""
+    from nerdvana_cli.cli.receipt import build_receipt
     from nerdvana_cli.core.analytics import AnalyticsReader
-    from nerdvana_cli.core.receipt import build_receipt
 
     receipt = build_receipt(loop, verification, AnalyticsReader().cost_breakdown(loop.session.session_id))
     return receipt if receipt["files_changed"] or verification else None
@@ -214,8 +214,8 @@ def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any
 
 def _load_run_images(paths: list[str], cwd: str, reporter: Any, outcome: Any) -> list[dict[str, Any]]:
     """The image blocks named by ``--image``; a file that cannot be sent ends the command with the configuration exit code."""
+    from nerdvana_cli.cli.run_output import EXIT_CONFIG
     from nerdvana_cli.core.images import ImageError, load_images
-    from nerdvana_cli.core.run_output import EXIT_CONFIG
 
     try:
         return load_images(paths, cwd)
@@ -240,7 +240,7 @@ def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
 
 def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outcome: Any) -> tuple[SessionStorage, AgentLoop]:
     """The session and agent loop of a run: a new session, or with ``--resume`` the recorded one with its conversation restored."""
-    from nerdvana_cli.core.run_output import EXIT_CONFIG
+    from nerdvana_cli.cli.run_output import EXIT_CONFIG
     from nerdvana_cli.core.task_state import TaskRegistry
 
     resumed = resume_session_id(resume) if resume else None
@@ -289,8 +289,8 @@ def run(
     """
     import time
 
+    from nerdvana_cli.cli.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.goal import Goal
-    from nerdvana_cli.core.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
 
     resolved_approval = approval_mode.strip().lower()
@@ -372,7 +372,7 @@ def setup(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
 ) -> None:
     """Interactive setup — choose provider, enter API key, select model."""
-    from nerdvana_cli.core.setup import run_setup
+    from nerdvana_cli.cli.setup import run_setup
 
     run_setup(force=force)
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from nerdvana_cli.core.lsp_workspace import notice_of
+from nerdvana_cli.codeintel.lsp_workspace import notice_of
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.codeintel.lsp_client import LspClient
 
 
 # ── Arg classes ─────────────────────────────────────────────────────────

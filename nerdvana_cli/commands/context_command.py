@@ -3,7 +3,7 @@
 Author: 최진호
 Date:   2026-10-03
 
-Both front ends print the same breakdown (``core/context_report.py``). The slash command reads the live
+Both front ends print the same breakdown (``cli/context_report.py``). The slash command reads the live
 conversation of the running agent loop. The CLI command rebuilds a loop for a stored session: the
 conversation comes from the transcript, the system prompt and the tool declarations from the current
 settings and tools.
@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape
 
-from nerdvana_cli.core.context_report import ContextReport, advice, build_report, render
+from nerdvana_cli.cli.context_report import ContextReport, advice, build_report, render
 from nerdvana_cli.core.tool_index import ToolIndex
 
 if TYPE_CHECKING:

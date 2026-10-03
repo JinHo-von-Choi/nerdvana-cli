@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.lsp_protocol import write_file as _write_file
-from nerdvana_cli.core.symbol import (
+from nerdvana_cli.codeintel.lsp_protocol import write_file as _write_file
+from nerdvana_cli.codeintel.symbol import (
     LanguageServerSymbolRetriever,
     SymbolPathBoundaryError,
 )

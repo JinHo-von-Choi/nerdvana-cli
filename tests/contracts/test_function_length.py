@@ -20,7 +20,7 @@ ROOT  = Path(nerdvana_cli.__file__).resolve().parent
 LIMIT = 60
 
 KNOWN_LONG: dict[str, int] = {
-    "core/setup.py:run_setup": 161,
+    "cli/setup.py:run_setup": 161,
     "ui/response_runner.py:run_response_stream": 151,
     "providers/openai_provider.py:OpenAIProvider.stream": 141,
     "main.py:run": 111,
@@ -28,7 +28,7 @@ KNOWN_LONG: dict[str, int] = {
     "core/activity_state.py:summarize_tool_call": 108,
     "commands/model_commands.py:switch_provider": 95,
     "core/settings.py:NerdvanaSettings.load": 92,
-    "core/updater.py:run_self_update": 91,
+    "cli/updater.py:run_self_update": 91,
     "tools/registry.py:create_tool_registry": 86,
     "providers/base.py:detect_provider": 82,
     "providers/gemini_provider.py:GeminiProvider.stream": 81,
@@ -40,7 +40,7 @@ KNOWN_LONG: dict[str, int] = {
     "core/migrate.py:run_if_needed": 70,
     "utils/path.py:safe_open_fd": 70,
     "tools/external_project_tools.py:RegisterExternalProjectTool._safe_resolve": 68,
-    "core/code_editor.py:CodeEditor.prepare_insert_after": 67,
+    "codeintel/code_editor.py:CodeEditor.prepare_insert_after": 67,
     "main.py:main": 67,
     "tools/file_tools.py:FileReadTool.call": 64,
     "tools/search_tools.py:GrepTool.call": 62,

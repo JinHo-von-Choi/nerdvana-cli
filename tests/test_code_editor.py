@@ -1,4 +1,4 @@
-"""Unit tests for nerdvana_cli.core.code_editor.
+"""Unit tests for nerdvana_cli.codeintel.code_editor.
 
 Tests PreviewEntry, CodeEditor preview creation, apply, STALE detection,
 and LRU eviction. No actual LSP process required — workspace edits are
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.code_editor import (
+from nerdvana_cli.codeintel.code_editor import (
     CodeEditor,
     PreviewEntry,
     StalePreviewError,

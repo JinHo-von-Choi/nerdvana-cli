@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.core.setup import load_config, save_config
+from nerdvana_cli.cli.setup import load_config, save_config
 from nerdvana_cli.providers.base import ModelInfo
 
 # ---------------------------------------------------------------------------

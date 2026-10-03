@@ -9,7 +9,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from nerdvana_cli.core.context_report import (
+from nerdvana_cli.cli.context_report import (
     LARGE_SHARE,
     ContextReport,
     advice,

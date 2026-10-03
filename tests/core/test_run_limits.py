@@ -192,7 +192,7 @@ async def test_require_price_does_nothing_without_a_cost_limit_or_with_a_priced_
 
 
 def test_the_new_stop_reasons_map_to_exit_codes() -> None:
-    from nerdvana_cli.core.run_output import EXIT_BUDGET, EXIT_CONFIG, RunResult
+    from nerdvana_cli.cli.run_output import EXIT_BUDGET, EXIT_CONFIG, RunResult
 
     assert RunResult(stop="max_total_tokens").exit_code == EXIT_BUDGET
     assert RunResult(stop="unpriced").exit_code == EXIT_CONFIG

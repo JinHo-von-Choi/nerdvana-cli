@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from nerdvana_cli.core.importer import ImportPlan, apply_commands, plan_import
+from nerdvana_cli.cli.importer import ImportPlan, apply_commands, plan_import
 
 SOURCES = ("claude", "codex")
 

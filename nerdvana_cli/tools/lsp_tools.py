@@ -8,7 +8,7 @@ from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSide
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.codeintel.lsp_client import LspClient
 
 
 class RestartLanguageServerArgs:

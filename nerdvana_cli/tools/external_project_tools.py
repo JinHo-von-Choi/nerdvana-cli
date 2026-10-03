@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.external_projects import ExternalProject, ExternalProjectRegistry
-from nerdvana_cli.core.external_worker import ExternalWorker
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
+from nerdvana_cli.external.external_projects import ExternalProject, ExternalProjectRegistry
+from nerdvana_cli.external.external_worker import ExternalWorker
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 from nerdvana_cli.utils.path import safe_open_fd, validate_path
 

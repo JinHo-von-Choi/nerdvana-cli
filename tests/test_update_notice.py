@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from nerdvana_cli.core import updater
-from nerdvana_cli.core.updater import (
+from nerdvana_cli.cli import updater
+from nerdvana_cli.cli.updater import (
     cached_or_check,
     format_update_notice,
     is_update_check_enabled,

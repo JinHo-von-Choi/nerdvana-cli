@@ -4,7 +4,7 @@ Author: 최진호
 Workflow: `scripts/bench_lsp.py`
 
 This document records the first numerical baseline for LSP-driven operations
-exposed by `core/lsp_client.py`. Future runs should be appended as new files
+exposed by `codeintel/lsp_client.py`. Future runs should be appended as new files
 under `docs/benchmarks/lsp-<date>.md` and the regression check should compare
 against the most recent prior entry.
 
@@ -68,8 +68,8 @@ Once at least two baselines exist:
 ## Caching strategy notes (forward-looking)
 
 Per the parent roadmap (D-9 in the analysis report), the harness exists to
-inform a future caching decision in `core/lsp_client.py` /
-`core/symbol_graph.py`. Candidates evaluated:
+inform a future caching decision in `codeintel/lsp_client.py` /
+`codeintel/symbol_graph.py`. Candidates evaluated:
 
 1. **LRU on in-memory request results** — quickest to add; loses state on
    process exit; good fit if cold cost is acceptable.

@@ -129,7 +129,7 @@ async def repl_loop(
     _apply_launch_options(settings, model, provider, max_tokens, approval_mode)
 
     # Auto-run setup if no config and no API key
-    from nerdvana_cli.core.setup import has_config_file, has_valid_api_key, run_setup
+    from nerdvana_cli.cli.setup import has_config_file, has_valid_api_key, run_setup
 
     if not config_path and not has_config_file() and not has_valid_api_key():
         config = run_setup()

@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.code_editor import CodeEditor
-from nerdvana_cli.core.lsp_client import LspClient
-from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+from nerdvana_cli.codeintel.code_editor import CodeEditor
+from nerdvana_cli.codeintel.lsp_client import LspClient
+from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.symbol_edit_tools import ReplaceSymbolBodyArgs, ReplaceSymbolBodyTool
 

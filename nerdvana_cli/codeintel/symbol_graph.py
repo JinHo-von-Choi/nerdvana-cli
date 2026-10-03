@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.symbol import LanguageServerSymbol, Location
+    from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location
 
 # Approximate chars-per-token ratio (conservative: 4 chars ≈ 1 token).
 _CHARS_PER_TOKEN = 4

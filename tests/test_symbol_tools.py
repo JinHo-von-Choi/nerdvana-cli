@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nerdvana_cli.core.symbol import LanguageServerSymbol, Location, LspSymbolError
+from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location, LspSymbolError
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.symbol_tools import (
     FindReferencingSymbolsArgs,
@@ -229,7 +229,7 @@ class TestReplaceSymbolBodyTool:
         retriever.find_references = AsyncMock(return_value=refs or [])
         retriever._resolve     = lambda p: str(tmp_path / p)
 
-        from nerdvana_cli.core.code_editor import CodeEditor
+        from nerdvana_cli.codeintel.code_editor import CodeEditor
         editor = CodeEditor(project_root=str(tmp_path))
 
         return ReplaceSymbolBodyTool(retriever=retriever, editor=editor)
@@ -331,7 +331,7 @@ def _make_insert_tool(
     retriever.find_references = AsyncMock(return_value=refs or [])
     retriever._resolve        = lambda p: str(tmp_path / p)
 
-    from nerdvana_cli.core.code_editor import CodeEditor
+    from nerdvana_cli.codeintel.code_editor import CodeEditor
     editor = CodeEditor(project_root=str(tmp_path))
     return cls(retriever=retriever, editor=editor)
 

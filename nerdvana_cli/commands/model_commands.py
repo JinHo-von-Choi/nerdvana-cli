@@ -30,7 +30,7 @@ async def handle_model(app: NerdvanaApp, args: str) -> None:
 
         # Persist so the selection survives restart.
         try:
-            from nerdvana_cli.core.setup import load_config, save_config
+            from nerdvana_cli.cli.setup import load_config, save_config
             existing = load_config()
             existing.setdefault("model", {})
             existing["model"]["model"] = args
@@ -195,7 +195,7 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
 
 def _save_provider_config(app: NerdvanaApp, provider_name: str, api_key: str) -> None:
     """Write the active model and the provider's API key to the config file."""
-    from nerdvana_cli.core.setup import load_config, save_config
+    from nerdvana_cli.cli.setup import load_config, save_config
     existing = load_config()
     existing["model"] = {
         "provider": app.settings.model.provider,
@@ -224,7 +224,7 @@ async def handle_provider_selection(app: NerdvanaApp, provider_name: str) -> Non
     from textual.widgets import Input
 
     # Check for saved API key
-    from nerdvana_cli.core.setup import load_config
+    from nerdvana_cli.cli.setup import load_config
     existing = load_config()
     saved_keys = existing.get("api_keys", {})
     saved_key = saved_keys.get(provider_name, "")

@@ -13,7 +13,7 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from nerdvana_cli import __version__
-from nerdvana_cli.core.updater import (
+from nerdvana_cli.cli.updater import (
     cached_or_check,
     format_update_notice,
     is_update_check_enabled,

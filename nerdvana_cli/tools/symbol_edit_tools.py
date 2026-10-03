@@ -22,13 +22,13 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
-from nerdvana_cli.core.symbol_lines import outside_symbol, trim_trailing_gap, with_trailing_blank_lines
+from nerdvana_cli.codeintel.symbol_lines import outside_symbol, trim_trailing_gap, with_trailing_blank_lines
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.code_editor import CodeEditor
-    from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+    from nerdvana_cli.codeintel.code_editor import CodeEditor
+    from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ async def _locate_symbol_lines(
 
 async def _do_apply(editor: CodeEditor, preview_id: str) -> ToolResult:
     """Apply a previously created preview (shared by all edit tools)."""
-    from nerdvana_cli.core.code_editor import (  # noqa: PLC0415
+    from nerdvana_cli.codeintel.code_editor import (  # noqa: PLC0415
         StalePreviewError,
         UnknownPreviewError,
     )

@@ -13,9 +13,9 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock
 
-from nerdvana_cli.core.code_editor import CodeEditor
-from nerdvana_cli.core.symbol import LanguageServerSymbol, Location
-from nerdvana_cli.core.symbol_lines import outside_symbol, with_trailing_blank_lines
+from nerdvana_cli.codeintel.code_editor import CodeEditor
+from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location
+from nerdvana_cli.codeintel.symbol_lines import outside_symbol, with_trailing_blank_lines
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools import symbol_edit_tools as se
 

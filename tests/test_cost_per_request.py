@@ -136,7 +136,7 @@ def test_an_unknown_grouping_is_refused() -> None:
 def test_stream_json_carries_one_request_event_per_provider_request() -> None:
     import json
 
-    from nerdvana_cli.core.run_output import RunReporter
+    from nerdvana_cli.cli.run_output import RunReporter
 
     lines: list[str] = []
     RunReporter("stream-json", lines.append).request(

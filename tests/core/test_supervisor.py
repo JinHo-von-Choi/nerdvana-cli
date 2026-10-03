@@ -20,10 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import cancellation, run_store, supervisor
-from nerdvana_cli.core.run_store import FAILED, ORPHANED, RUNNING, STOPPED, SUCCEEDED, RunRecord, RunStore, pid_alive
-from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.supervisor import (
+from nerdvana_cli.cli import supervisor
+from nerdvana_cli.cli.supervisor import (
     COMMAND_ENV,
     RESUME_PROMPT,
     LogScan,
@@ -35,6 +33,9 @@ from nerdvana_cli.core.supervisor import (
     start_run,
     stop_run,
 )
+from nerdvana_cli.core import cancellation, run_store
+from nerdvana_cli.core.run_store import FAILED, ORPHANED, RUNNING, STOPPED, SUCCEEDED, RunRecord, RunStore, pid_alive
+from nerdvana_cli.core.session import SessionStorage
 
 FAKE = textwrap.dedent('''
     import json, os, signal, sys, time

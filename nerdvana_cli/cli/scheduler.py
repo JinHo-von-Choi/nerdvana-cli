@@ -3,7 +3,7 @@
 Author: 최진호
 Date:   2026-10-03
 
-A job is a prompt, a schedule (see ``core.cron``), a working directory and limits. The daemon fires a
+A job is a prompt, a schedule (see ``cli.cron``), a working directory and limits. The daemon fires a
 due job by starting ``nerdvana run`` in a new process with the job's cost ceiling and approval mode and
 saves what the run reported under ``<data root>/schedule/runs/<job>/``: ``<stamp>.json`` holds the run
 result and ``<stamp>.log`` what the process wrote to standard error.
@@ -34,8 +34,8 @@ from typing import IO, Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
+from nerdvana_cli.cli.cron import Schedule, ScheduleError, parse_schedule
 from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core.cron import Schedule, ScheduleError, parse_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ _LOCK_FRESH_SECONDS = 10
 _STDOUT_KEEP_CHARS  = 20_000
 _NAME               = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 
-# nerdvana run exit codes (core.run_output) -> the status recorded for the run
+# nerdvana run exit codes (cli.run_output) -> the status recorded for the run
 _STATUS_BY_EXIT = {0: "success", 1: "failed", 2: "config_error", 3: "limit_reached"}
 
 

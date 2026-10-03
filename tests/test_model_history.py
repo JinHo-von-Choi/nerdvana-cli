@@ -85,8 +85,8 @@ async def test_switch_provider_uses_history(tmp_path):
     app = _make_app_mock(model_history={"dashscope": "qwen-plus"}, current_provider="anthropic")
 
     with (
-        patch("nerdvana_cli.core.setup.load_config", return_value={}),
-        patch("nerdvana_cli.core.setup.save_config"),
+        patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+        patch("nerdvana_cli.cli.setup.save_config"),
         patch("nerdvana_cli.providers.factory.create_provider") as mock_cp,
     ):
         mock_provider = AsyncMock()
@@ -108,8 +108,8 @@ async def test_switch_provider_falls_back_to_default(tmp_path):
     app = _make_app_mock(model_history={}, current_provider="anthropic")
 
     with (
-        patch("nerdvana_cli.core.setup.load_config", return_value={}),
-        patch("nerdvana_cli.core.setup.save_config"),
+        patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+        patch("nerdvana_cli.cli.setup.save_config"),
         patch("nerdvana_cli.providers.factory.create_provider") as mock_cp,
     ):
         mock_provider = AsyncMock()
@@ -141,8 +141,8 @@ async def test_handle_model_records_history():
         saved_config.update(cfg)
 
     with (
-        patch("nerdvana_cli.core.setup.load_config", return_value={}),
-        patch("nerdvana_cli.core.setup.save_config", side_effect=fake_save),
+        patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+        patch("nerdvana_cli.cli.setup.save_config", side_effect=fake_save),
     ):
         await handle_model(app, "claude-opus-4")
 
@@ -162,8 +162,8 @@ async def test_switch_provider_saves_history_in_config():
         saved_config.update(cfg)
 
     with (
-        patch("nerdvana_cli.core.setup.load_config", return_value={}),
-        patch("nerdvana_cli.core.setup.save_config", side_effect=fake_save),
+        patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+        patch("nerdvana_cli.cli.setup.save_config", side_effect=fake_save),
         patch("nerdvana_cli.providers.factory.create_provider") as mock_cp,
     ):
         mock_provider = AsyncMock()

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from nerdvana_cli.core.cron import CronSchedule, IntervalSchedule, ScheduleError, parse_schedule
+from nerdvana_cli.cli.cron import CronSchedule, IntervalSchedule, ScheduleError, parse_schedule
 
 
 def _cron(expression: str) -> CronSchedule:

@@ -1,4 +1,4 @@
-"""Unit tests for nerdvana_cli.core.symbol_graph.
+"""Unit tests for nerdvana_cli.codeintel.symbol_graph.
 
 Tests SymbolGraph construction, edge management, and compact JSON export.
 No LSP process required.
@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import json
 
-from nerdvana_cli.core.symbol import (
+from nerdvana_cli.codeintel.symbol import (
     LanguageServerSymbol,
     Location,
 )
-from nerdvana_cli.core.symbol_graph import SymbolGraph
+from nerdvana_cli.codeintel.symbol_graph import SymbolGraph
 
 # ---------------------------------------------------------------------------
 # Helpers

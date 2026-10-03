@@ -17,8 +17,8 @@ import signal
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.lsp_protocol import language_id_for, park_response, simplify_diagnostic, write_file
-from nerdvana_cli.core.lsp_workspace import MAX_REFERENCE_FILES, NoticedList, mentioning_files
+from nerdvana_cli.codeintel.lsp_protocol import language_id_for, park_response, simplify_diagnostic, write_file
+from nerdvana_cli.codeintel.lsp_workspace import MAX_REFERENCE_FILES, NoticedList, mentioning_files
 
 logger = logging.getLogger(__name__)
 

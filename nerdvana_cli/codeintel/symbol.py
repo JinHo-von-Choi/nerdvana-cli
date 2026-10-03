@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from nerdvana_cli.core.lsp_workspace import NoticedList, notice_of
+from nerdvana_cli.codeintel.lsp_workspace import NoticedList, notice_of
 from nerdvana_cli.utils.path import validate_path
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.codeintel.lsp_client import LspClient
 
 # ---------------------------------------------------------------------------
 # SymbolKind mapping (LSP spec §3.16.0)
@@ -352,7 +352,7 @@ def _flatten(symbols: list[LanguageServerSymbol]) -> list[LanguageServerSymbol]:
 class LanguageServerSymbolRetriever:
     """High-level LSP symbol query API.
 
-    Depends on :class:`~nerdvana_cli.core.lsp_client.LspClient` for I/O.
+    Depends on :class:`~nerdvana_cli.codeintel.lsp_client.LspClient` for I/O.
 
     Parameters
     ----------

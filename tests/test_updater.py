@@ -1,4 +1,4 @@
-from nerdvana_cli.core.updater import compare_versions, parse_version
+from nerdvana_cli.cli.updater import compare_versions, parse_version
 
 
 def test_parse_version_basic():
