@@ -360,6 +360,7 @@ class AgentLoop:
         self._usage_cache_write_total += current.cache_creation_tokens
         origin = replace(self.origin, turn=self.turns_used, last_tool=self._last_tool)
         cost   = self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage, origin)
+        self._cost_total += cost
         if self.usage_listener is not None:
             self.usage_listener({
                 **usage, "provider": self.settings.model.provider, "model": self.settings.model.model,
@@ -452,7 +453,7 @@ class AgentLoop:
         limit = self.settings.session.max_cost_usd
         if limit <= 0:
             return ""
-        spent = self.session_cost_usd() + self.budget.spent
+        spent = self.total_cost_usd()
         if spent < limit:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
@@ -555,15 +556,12 @@ class AgentLoop:
         return True
 
     def session_cost_usd(self) -> float:
-        """Estimated USD cost of every provider request made so far in this session."""
-        return self._pricing_table.estimate_cost(
-            self.settings.model.provider or "",
-            self.settings.model.model or "",
-            self._usage_input_total,
-            self._usage_output_total,
-            cache_read_tokens  = self._usage_cache_read_total,
-            cache_write_tokens = self._usage_cache_write_total,
-        )
+        """Estimated USD cost of every provider request this session made itself, each priced for the model that served it."""
+        return self._cost_total
+
+    def total_cost_usd(self) -> float:
+        """What the session spent: its own requests plus what its finished sub-agents spent."""
+        return self._cost_total + self.budget.spent
 
     def _record_session_totals(self) -> None:
         """Refresh the analytics session row with cumulative tokens and cost.
@@ -621,6 +619,7 @@ class AgentLoop:
         self._usage_output_total      = 0
         self._usage_cache_read_total  = 0
         self._usage_cache_write_total = 0
+        self._cost_total              = 0.0
 
     def queue_input(self, text: str) -> None:
         """Hold text the user typed while the agent was working.
