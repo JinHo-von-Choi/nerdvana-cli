@@ -7,8 +7,8 @@ from nerdvana_cli.core.context.compact import (
     CompactionState,
     ai_compact,
     compact_messages,
-    estimate_tokens,
 )
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.types import Message, Role
 
 
@@ -17,7 +17,7 @@ def make_msgs(n):
 
 
 def test_estimate_tokens_basic():
-    assert estimate_tokens("hello world") == 3
+    assert approx_tokens("hello world") == 3
 
 
 def test_compact_preserves_recent():

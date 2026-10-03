@@ -205,3 +205,17 @@ async def test_the_estimate_counts_the_tool_declarations_too(monkeypatch: pytest
     events = [e async for e in provider.stream("sys", [{"role": "user", "content": "go"}], [_Tool()])]
     (usage,) = [e.usage for e in events if e.type == "usage"]
     assert usage["input_tokens"] >= 1000
+
+
+async def test_the_estimate_counts_with_the_counter_the_session_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    config   = ProviderConfig(provider="openai", model="m", api_key="k", max_tokens=100, count_tokens=lambda text: text.count("가"))
+    provider = OpenAIProvider(config)
+
+    async def _stream() -> AsyncIterator[Any]:
+        yield _chunk(content="가나" * 20)
+        yield _chunk(finish="stop")
+
+    create = AsyncMock(return_value=_stream())
+    monkeypatch.setattr(provider, "_get_client", lambda: SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    events = [e async for e in provider.stream("sys", [{"role": "user", "content": "가가가"}], [])]
+    assert [e.usage for e in events if e.type == "usage"] == [{"input_tokens": 3, "output_tokens": 20}]

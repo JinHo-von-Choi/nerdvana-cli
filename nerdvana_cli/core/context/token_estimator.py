@@ -1,23 +1,32 @@
-"""Token estimation abstractions for NerdVana CLI.
+"""Token estimation: one strategy interface, a local approximation and optional provider tokenizers.
 
-Provider-aware token counting. Falls back gracefully when optional
-dependencies (tiktoken, anthropic) are not installed.
+Author: 최진호
+Date:   2026-10-04
 
-Hierarchy:
-    TokenEstimator (ABC)
-    ├── TiktokenEstimator   — OpenAI tokenizer (requires `tiktoken`)
-    ├── AnthropicExactEstimator — Anthropic count_tokens API (requires `anthropic`)
-    └── CharEstimator       — Char-based fallback (always available)
+``TokenEstimator`` is the interface. ``CharEstimator`` is the default approximation every count
+falls back to: about four ASCII characters per token, one token per other character, and one and a
+half per Hangul character. ``TiktokenEstimator`` counts exactly for OpenAI-compatible models when
+``tiktoken`` is installed. ``estimator_for`` picks the estimator a session counts with and never
+makes a network call; ``AnthropicExactEstimator`` asks the Anthropic API and is for explicit use only.
 
-TokenEstimatorRegistry.get_for(provider) selects the right estimator.
+The approximation is measured against tiktoken on English, Korean and mixed text (see
+tests/core/test_token_estimator.py). On Korean prose ``cl100k_base`` spends 1.3 to 1.5 tokens per
+Hangul syllable and ``o200k_base`` about 0.9, so the Hangul weight keeps the estimate from running
+under either; on English it stays within 25 percent above both.
 """
 
 from __future__ import annotations
 
 import logging
+import math
+import re
 from abc import ABC, abstractmethod
+from functools import cache
 
 logger = logging.getLogger(__name__)
+
+# Hangul syllables, jamo and compatibility jamo.
+_HANGUL = re.compile("[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]")
 
 
 # ---------------------------------------------------------------------------
@@ -38,18 +47,20 @@ class TokenEstimator(ABC):
 # ---------------------------------------------------------------------------
 
 class CharEstimator(TokenEstimator):
-    """Simple character-division estimator.
+    """The default approximation, always available: no tokenizer, O(n).
 
-    Default: 4 chars ≈ 1 token (GPT-3/4 rough rule).
-    Always available — no extra dependencies.
+    ASCII text averages ``avg_chars_per_token`` characters per token (4 by default). Every other
+    character counts as one token, except Hangul, which counts as one and a half.
     """
 
     def __init__(self, avg_chars_per_token: int = 4) -> None:
         self._avg = max(1, avg_chars_per_token)
 
     def estimate(self, text: str) -> int:
-        import math
-        return math.ceil(len(text) / self._avg)
+        ascii_chars  = len(text.encode("ascii", "ignore"))
+        hangul_chars = len(_HANGUL.findall(text))
+        other_chars  = len(text) - ascii_chars - hangul_chars
+        return math.ceil(ascii_chars / self._avg) + other_chars + math.ceil(hangul_chars * 3 / 2)
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +70,8 @@ class CharEstimator(TokenEstimator):
 class TiktokenEstimator(TokenEstimator):
     """Tiktoken-based exact estimator for OpenAI-compatible models.
 
-    Falls back to CharEstimator silently when `tiktoken` is not installed.
+    Falls back to CharEstimator when `tiktoken` is not installed or its encoding cannot be loaded
+    (tiktoken fetches an encoding over the network the first time it is used).
     """
 
     def __init__(self, model: str = "gpt-4o") -> None:
@@ -76,6 +88,8 @@ class TiktokenEstimator(TokenEstimator):
                 self._enc = tiktoken.get_encoding("cl100k_base")
         except ImportError:
             logger.debug("tiktoken not installed; TiktokenEstimator using CharEstimator fallback")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("tiktoken encoding for %s unavailable (%s); TiktokenEstimator using CharEstimator fallback", model, exc)
 
     def estimate(self, text: str) -> int:
         if self._enc is not None:
@@ -169,22 +183,28 @@ class TokenEstimatorRegistry:
 
 
 # ---------------------------------------------------------------------------
-# Module-level convenience (drop-in replacement for agent_loop.estimate_tokens)
+# Module-level convenience
 # ---------------------------------------------------------------------------
 
-def approx_tokens(text: str) -> int:
-    """Fast token estimate that does not undercount non-Latin scripts.
+_DEFAULT = CharEstimator()
 
-    ASCII text averages about four characters per token; CJK and most other
-    scripts take about one token per character or more. O(n), no tokenizer.
+
+@cache
+def estimator_for(provider: str | None, model: str = "") -> TokenEstimator:
+    """The estimator a session on *provider* counts with: a local tokenizer when one applies, else the default.
+
+    Never a network call, so it is safe for the per-turn context accounting.
     """
-    ascii_chars = len(text.encode("ascii", "ignore"))
-    return -(-ascii_chars // 4) + (len(text) - ascii_chars)
+    if provider and provider.lower().strip() in TokenEstimatorRegistry._TIKTOKEN_PROVIDERS:
+        return TiktokenEstimator(model=model or "gpt-4o")
+    return _DEFAULT
+
+
+def approx_tokens(text: str) -> int:
+    """Token estimate of *text* with the default approximation."""
+    return _DEFAULT.estimate(text)
 
 
 def estimate_tokens(text: str, provider: str | None = None) -> int:
-    """Estimate token count. Compatible with the original agent_loop signature.
-
-    provider=None → CharEstimator (identical behaviour to the original len/4).
-    """
+    """Token estimate of *text* with the estimator ``TokenEstimatorRegistry`` picks for *provider*."""
     return TokenEstimatorRegistry.get_for(provider).estimate(text)

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
 from nerdvana_cli.core.context.context_snapshot import collect_snapshot, format_snapshot
 from nerdvana_cli.core.context.nirnamd import load_nirna_files
+from nerdvana_cli.core.context.token_estimator import estimator_for
 from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.state.todos import describe, load_todos, open_items
@@ -45,6 +46,7 @@ def new_provider(model: ModelConfig) -> AnthropicProvider | OpenAIProvider | Gem
         extended_thinking=model.extended_thinking, thinking_budget=model.thinking_budget, show_thinking=model.show_thinking,
         reasoning_effort=model.reasoning_effort, openai_api=model.openai_api, gemini_api=model.gemini_api,
         anthropic_tool_search=model.anthropic_tool_search, anthropic_compaction=model.anthropic_compaction,
+        count_tokens=estimator_for(model.provider or None, model.model).estimate,
     )
 
 

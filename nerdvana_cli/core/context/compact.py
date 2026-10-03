@@ -6,14 +6,13 @@ Falls back to FALLBACK_PROMPT when the skill file is not found.
 """
 from __future__ import annotations
 
-import json
 import logging
-import math
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from nerdvana_cli.core.context.context_budget import message_tokens
+from nerdvana_cli.core.context.token_estimator import TokenEstimator
 from nerdvana_cli.types import Message, Role
 
 logger = logging.getLogger(__name__)
@@ -224,25 +223,18 @@ def compact_with_blocks(
     return compacted
 
 
-def estimate_tokens(text: str) -> int:
-    return math.ceil(len(text) / 4)
-
-
-def estimate_messages_tokens(msgs: list[Any]) -> int:
-    return message_tokens(msgs)
-
-
-def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
-    if not msgs or estimate_messages_tokens(msgs) <= max_tokens:
+def compact_messages(msgs: list[Any], max_tokens: int, estimator: TokenEstimator | None = None) -> list[Any]:
+    """Keep the last ten messages and as many early ones as fit *max_tokens*, counted with *estimator*."""
+    if not msgs or message_tokens(msgs, estimator) <= max_tokens:
         return msgs
     keep = min(10, len(msgs))
     recent = msgs[-keep:]
-    budget = max_tokens - estimate_messages_tokens(recent)
+    budget = max_tokens - message_tokens(recent, estimator)
     if budget <= 0:
         return msgs[-4:]
     early: list[Any] = []
     for m in msgs[:-keep]:
-        cost = estimate_tokens(m.content if isinstance(m.content, str) else json.dumps(m.content))
+        cost = message_tokens([m], estimator)
         if budget - cost < 0:
             break
         early.append(m)

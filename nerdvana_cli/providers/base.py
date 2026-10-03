@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
@@ -108,6 +108,9 @@ class ProviderConfig:
     # Anthropic only: ``off``, ``bm25`` or ``regex`` server-side tool search, and ``off`` or ``on`` server-side compaction.
     anthropic_tool_search: str = "off"
     anthropic_compaction: str = "off"
+    # Counts the tokens of a text for the usage estimate of a response the server reported nothing about;
+    # None estimates four characters per token.
+    count_tokens: Callable[[str], int] | None = field(default=None, compare=False)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
