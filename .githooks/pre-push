@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Refuse a push to main that CI would reject. Enable once per clone: git config core.hooksPath .githooks
+# Skip deliberately (a docs-only branch, a hotfix you will check another way): git push --no-verify
+while read -r local_ref _ remote_ref _; do
+    case "$remote_ref" in
+        refs/heads/main) exec "$(git rev-parse --show-toplevel)/scripts/preflight.sh" quick ;;
+    esac
+done
+exit 0

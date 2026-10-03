@@ -66,6 +66,27 @@ without any test failing. Besides the quality gate:
 
 ---
 
+## Before you push or release
+
+CI runs on a clean checkout with the locked dependencies, and a second workflow installs freshly
+resolved dependencies. A tree that passes on your machine can still fail there (an optional extra that
+CI does not install, a newer typer, a checkout under `/tmp`). So never push on the strength of a local
+run alone:
+
+```bash
+git config core.hooksPath .githooks      # once per clone: a push to main runs the quick preflight
+scripts/preflight.sh quick               # ruff, mypy, docs, collection baseline, import graph, pricing (about 1 minute)
+scripts/preflight.sh full                # plus the whole suite on Python 3.11, locked, as Quality Gate does
+scripts/preflight.sh release             # plus Python 3.12, freshly resolved dependencies, LSP tests, wheel install
+```
+
+The preflight checks out `HEAD` into a temporary worktree under `$HOME`, so uncommitted changes are not
+tested: commit first. To release, run `scripts/release.sh X.Y.Z` and nothing else: it runs the release
+preflight, bumps the version, pushes `main` without the tag, waits until GitHub's checks on that commit are
+green, and only then creates and pushes the tag. A tag is never pushed ahead of green checks.
+
+---
+
 ## Optional gates
 
 **LSP integration tests** — requires `pyright` and `typescript-language-server` on PATH:
