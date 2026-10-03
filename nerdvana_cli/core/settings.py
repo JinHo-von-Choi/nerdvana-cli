@@ -187,7 +187,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "goal",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "goal", "telemetry",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -279,6 +279,21 @@ class GoalConfig(BaseModel):
     auto_verify:       bool = False  # without a goal, check a run that changed files with the project's detected test command
 
 
+class OtelConfig(BaseModel):
+    # OpenTelemetry traces of the agent, the model requests and the tool calls. Needs the `otel`
+    # extra (pip install 'nerdvana-cli[otel]'). See docs/observability.md.
+    enabled:         bool = False
+    # OTLP/HTTP collector base URL; empty = the OTEL_EXPORTER_OTLP_ENDPOINT environment variable.
+    endpoint:        str  = ""
+    service_name:    str  = "nerdvana-cli"
+    # Also record the conversation, tool arguments and tool results on the spans (secrets masked).
+    capture_content: bool = False
+
+
+class TelemetryConfig(BaseModel):
+    otel: OtelConfig = Field(default_factory=OtelConfig)
+
+
 class AgentsConfig(BaseModel):
     # Category name -> model for sub-agents, written "model" or "provider:model".
     # An agent type or an Agent call that names a category runs on the mapped model.
@@ -319,6 +334,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("sandbox",    SandboxConfig,    _SANDBOX_STRICT_FIELDS),
     ("agents",     AgentsConfig,     frozenset()),
     ("goal",       GoalConfig,       frozenset()),
+    ("telemetry",  TelemetryConfig,  frozenset()),
 )
 
 
@@ -335,6 +351,7 @@ class NerdvanaSettings(BaseSettings):
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     goal: GoalConfig = Field(default_factory=GoalConfig)
+    telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     model_history: dict[str, str] = Field(default_factory=dict)
     # External project tools hand a registered directory to a read-capable
     # subprocess, so the whole family stays off until the user opts in.

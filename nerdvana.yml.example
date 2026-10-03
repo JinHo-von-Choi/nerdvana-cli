@@ -131,6 +131,16 @@ checkpoint:
   enabled: true
   per_session_max: 50
 
+telemetry:
+  otel:
+    # OpenTelemetry traces (needs: pip install 'nerdvana-cli[otel]'). See docs/observability.md.
+    enabled: false
+    # OTLP/HTTP collector base URL; empty = the OTEL_EXPORTER_OTLP_ENDPOINT environment variable
+    endpoint: ""
+    service_name: nerdvana-cli
+    # Also record the conversation, tool arguments and tool results on the spans (secrets masked)
+    capture_content: false
+
 hooks:
   # Run <cwd>/.nerdvana/hooks/*.py and load project skills (<cwd>/.agents/skills,
   # <cwd>/.nerdvana/skills). Opting in is not sufficient on its own: each file must

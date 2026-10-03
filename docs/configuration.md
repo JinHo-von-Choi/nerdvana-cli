@@ -226,6 +226,21 @@ See [goals.md](goals.md).
 | `enabled` | bool | `true` | Automatically save session checkpoints |
 | `per_session_max` | int | `50` | Maximum number of checkpoints retained per session |
 
+### `telemetry` (TelemetryConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `otel` | map | see below | OpenTelemetry traces; the fields are listed under `telemetry.otel`. |
+
+### `telemetry.otel` (OtelConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Export OpenTelemetry traces of agent runs, model requests and tool calls. Needs the `otel` extra (`pip install 'nerdvana-cli[otel]'`); without the SDK a notice is printed and tracing stays off. See [observability.md](observability.md). |
+| `endpoint` | string | `""` | Base URL of an OTLP/HTTP collector, for example `http://localhost:4318`; `/v1/traces` is appended. Empty uses the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable (and the other `OTEL_EXPORTER_OTLP_*` variables, such as `OTEL_EXPORTER_OTLP_HEADERS`). |
+| `service_name` | string | `nerdvana-cli` | The `service.name` resource attribute. |
+| `capture_content` | bool | `false` | Also record the conversation sent with each request, the arguments of each tool call and its result on the spans. Secret values are masked first and each attribute is cut at 32768 characters. Prompts and file contents are still sensitive: send them only to a collector you control. |
+
 ### Pricing maintenance
 
 `nerdvana_cli/providers/pricing.yml` stores rates as USD per 1,000,000 tokens under the keys `input_per_1m` and `output_per_1m`, which is the unit vendors publish, so a value can be copied from a source table without conversion. An entry may also carry `cache_write_per_1m` and `cache_read_per_1m` for prompt caching; without them cached tokens are billed at `input_per_1m`. Each provider block carries a snapshot comment that records when the values were last verified. Recommended cadence: once per quarter.
