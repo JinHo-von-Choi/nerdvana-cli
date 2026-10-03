@@ -119,7 +119,7 @@ class WriteMemoryTool(BaseTool[WriteMemoryArgs]):
         "  project_rule      — appended to NIRNA.md as a rule section\n"
         "  project_knowledge — saved to <cwd>/.nerdvana/memories/\n"
         "  user_global       — saved to ~/.nerdvana/memories/global/\n"
-        "  agent_experience  — delegates to AnchorMind (returns instructions)\n\n"
+        "  agent_experience  — not stored here (returns instructions)\n\n"
         "Use slash namespaces in name (e.g. 'auth/login/rules')."
         + _REVIEW_NOTE
     )

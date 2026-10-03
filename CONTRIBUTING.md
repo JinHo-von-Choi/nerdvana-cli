@@ -108,7 +108,6 @@ uv run pytest -m live
 
 ## New provider checklist
 
-Follow the procedure template in `docs/plans/2026-04-29-add-providers-kimi-qwen.md`.
 Files that require changes:
 
 - `nerdvana_cli/providers/base.py`: add enum value, update provider dict, update `detect_provider`

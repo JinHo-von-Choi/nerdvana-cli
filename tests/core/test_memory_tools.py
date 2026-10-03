@@ -102,7 +102,7 @@ async def test_write_memory_agent_experience_stub(tmp_path: Path) -> None:
     ctx    = _ctx(tmp_path)
     result = await _call(tool, {"name": "err1", "content": "some error", "scope": "agent_experience"}, ctx)
     assert result.is_error
-    assert "AnchorMind" in result.content
+    assert "not stored by this tool" in result.content
 
 
 # ===========================================================================

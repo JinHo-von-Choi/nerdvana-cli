@@ -96,7 +96,7 @@ def test_write_user_global(mgr: MemoriesManager, tmp_path: Path, monkeypatch: py
 # ---------------------------------------------------------------------------
 
 def test_agent_experience_raises(mgr: MemoriesManager) -> None:
-    with pytest.raises(NotImplementedError, match="AnchorMind"):
+    with pytest.raises(NotImplementedError, match="not stored by this tool"):
         mgr.write("exp", "some error", MemoryScope.AGENT_EXPERIENCE)
 
 

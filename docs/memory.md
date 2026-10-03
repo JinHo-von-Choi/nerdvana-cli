@@ -8,7 +8,7 @@ NerdVana keeps notes that outlive a session in three places.
 | `project_knowledge` | `<project>/.nerdvana/memories/<name>.md` | Plain text. Names may be slash namespaces (`auth/login/rules`). |
 | `user_global` | `~/.nerdvana/memories/global/<name>.md` | Plain text, shared by every project. |
 
-`agent_experience` is not stored here; AnchorMind owns it, and `WriteMemory` refuses that scope.
+`agent_experience` is not stored here, and `WriteMemory` refuses that scope.
 
 The prompt carries only a count of the file-backed memories. The agent reads a memory body only when it calls `ReadMemory`.
 

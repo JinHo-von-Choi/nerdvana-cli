@@ -41,6 +41,8 @@ step "documentation matches the code"
 uv run python scripts/check_docs_consistency.py
 step "test collection baseline"
 uv run python scripts/check_test_collection.py
+step "contract tests (layers, hygiene, public-repository rules)"
+uv run pytest tests/contracts -q -o addopts=""
 step "import graph"
 uv run python scripts/check_import_graph.py --root nerdvana_cli
 step "pricing freshness"

@@ -67,8 +67,7 @@ Once at least two baselines exist:
 
 ## Caching strategy notes (forward-looking)
 
-Per the parent roadmap (D-9 in the analysis report), the harness exists to
-inform a future caching decision in `codeintel/lsp_client.py` /
+The harness exists to inform a future caching decision in `codeintel/lsp_client.py` /
 `codeintel/symbol_graph.py`. Candidates evaluated:
 
 1. **LRU on in-memory request results** — quickest to add; loses state on
@@ -77,5 +76,3 @@ inform a future caching decision in `codeintel/lsp_client.py` /
 3. **Persistent SQLite index** — adds a dependency but enables sub-millisecond
    lookups for repeated `find_references` on hot symbols.
 
-A separate ADR (`docs/adr/lsp-cache-strategy.md`) should pick one once two
-real measurements (small + medium) are on file.

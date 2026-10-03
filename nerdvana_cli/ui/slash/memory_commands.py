@@ -151,9 +151,8 @@ _EXPERIENCE_PATTERNS = re.compile(
 )
 
 
-# MemoryScope.AGENT_EXPERIENCE. WriteMemory rejects it: those memories live in
-# AnchorMind, so the suggestion has to point there instead of at a call that
-# always fails.
+# MemoryScope.AGENT_EXPERIENCE. WriteMemory rejects it, so the suggestion has to
+# point elsewhere instead of at a call that always fails.
 _AGENT_EXPERIENCE = "agent_experience"
 
 
@@ -193,8 +192,8 @@ async def handle_route_knowledge(app: NerdvanaApp, args: str) -> None:
             "  project_rule      — rules for the codebase (must/shall/forbidden)\n"
             "  project_knowledge — build/structure/architecture facts\n"
             "  user_global       — personal preferences and style\n"
-            "  agent_experience  — errors and solutions, recorded through\n"
-            "                      AnchorMind rather than WriteMemory"
+            "  agent_experience  — errors and solutions, not stored by\n"
+            "                      WriteMemory"
         )
         return
 
@@ -209,9 +208,8 @@ async def handle_route_knowledge(app: NerdvanaApp, args: str) -> None:
 
     if suggested == _AGENT_EXPERIENCE:
         action = (
-            "This content belongs to AnchorMind, which owns experience memories.\n"
-            "WriteMemory does not store this scope. Record it with:\n"
-            "  mcp__anchormind__remember(type='error', content='...')"
+            "This content is an experience memory.\n"
+            "WriteMemory does not store this scope; record it with your experience memory service."
         )
     else:
         action = (

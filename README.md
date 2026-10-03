@@ -694,7 +694,6 @@ mypy nerdvana_cli/
 | [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
 | [docs/testing-live.md](docs/testing-live.md) | Live provider test matrix and secrets setup |
-| [docs/adr/0004-lsp-cache-strategy.md](docs/adr/0004-lsp-cache-strategy.md) | ADR: LSP result cache strategy |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
 ## Changelog

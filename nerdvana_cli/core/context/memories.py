@@ -5,7 +5,7 @@ Scopes
 PROJECT_RULE       → appended to <cwd>/NIRNA.md  (append-mode document)
 PROJECT_KNOWLEDGE  → <cwd>/.nerdvana/memories/
 USER_GLOBAL        → ~/.nerdvana/memories/global/
-AGENT_EXPERIENCE   → stub; delegates to AnchorMind CLI (not managed here)
+AGENT_EXPERIENCE   → not stored here (raises NotImplementedError)
 
 Slash namespaces (e.g. "auth/login/rules") are stored as sub-directories.
 Files are plain-text with a .md extension.
@@ -240,8 +240,8 @@ class MemoriesManager:
         """
         if scope == MemoryScope.AGENT_EXPERIENCE:
             raise NotImplementedError(
-                "AGENT_EXPERIENCE memories are managed by AnchorMind. "
-                "Run: mcp__anchormind__remember  (or use the AnchorMind CLI)."
+                "AGENT_EXPERIENCE memories are not stored by this tool; "
+                "record them with your experience memory service."
             )
         _check_content(content)
         if scope == MemoryScope.PROJECT_RULE:

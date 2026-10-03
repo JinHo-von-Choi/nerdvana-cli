@@ -251,7 +251,7 @@ class TestRouteKnowledge:
         experience_line = next(
             line for line in app.last.splitlines() if "agent_experience" in line
         )
-        assert "AnchorMind" in app.last
+        assert "not stored by" in app.last
         assert "WriteMemory" not in experience_line
 
     async def test_suggests_writememory_for_file_backed_scope(self) -> None:
@@ -269,10 +269,9 @@ class TestRouteKnowledge:
             assert scope in app.last
         assert "score=" in app.last
 
-    async def test_experience_content_routes_to_anchormind_not_writememory(self) -> None:
+    async def test_experience_content_is_not_routed_to_writememory(self) -> None:
         app = _App()
         await mc.handle_route_knowledge(app, "traceback exception bug fix resolved")
         assert "agent_experience" in app.last
-        assert "AnchorMind" in app.last
-        assert "mcp__anchormind__remember" in app.last
+        assert "experience memory service" in app.last
         assert "WriteMemory(name=" not in app.last

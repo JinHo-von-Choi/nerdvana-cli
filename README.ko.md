@@ -577,7 +577,7 @@ session:
   max_context_tokens: 180000
   compact_threshold: 0.8           # 컨텍스트 사용률이 임계값 도달 시 자동 압축
   compact_max_failures: 3          # 압축 연속 실패 허용 횟수 (회로 차단기)
-  planning_gate: false             # Phase C — 복잡도 기반 Plan 에이전트 선행 실행
+  planning_gate: false             # 복잡도 기반 Plan 에이전트 선행 실행
   default_context: standalone      # 기본 런타임 컨텍스트 프로파일 이름
   default_mode: interactive        # 기본 런타임 모드 이름 (interactive, planning 등)
   show_activity: true              # ActivityIndicator 위젯 표시 (/activity 로 토글)
