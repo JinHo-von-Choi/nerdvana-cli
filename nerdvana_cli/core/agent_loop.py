@@ -917,6 +917,7 @@ class AgentLoop:
         context.state["tool_index"] = self._tool_index
         context.state["sandbox"]    = self._sandbox_policy()
         context.state["edit_scope"] = self.settings.sandbox.edit_scope
+        context.state["goal_scope"] = self.goal.scope if self.goal is not None and self.goal.enforced and self.goal.scope else None
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:

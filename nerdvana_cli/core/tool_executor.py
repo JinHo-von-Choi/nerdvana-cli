@@ -22,7 +22,7 @@ from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
-from nerdvana_cli.core.signals import SECRET_MASKED, classify_result
+from nerdvana_cli.core.signals import OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -191,7 +191,7 @@ class ToolExecutor:
             return refusal
         refusal = self._check_hooks_and_validation(tool_use, tool, parsed_args, context)
         if refusal is None:
-            refusal = self._check_edit_scope(tool_use, parsed_args, context)
+            refusal = self._check_edit_scope(tool_use, parsed_args, context) or await self._check_goal_scope(tool_use, parsed_args, context)
         if refusal is not None:
             return refusal
 
@@ -341,6 +341,25 @@ class ToolExecutor:
             return content
         self.signals[SECRET_MASKED] += masked.count
         return f"{masked.text}\n\n[{masked.count} secret-like value(s) in this output were replaced with {MARKER}]"
+
+    async def _check_goal_scope(self, tool_use: dict[str, Any], parsed_args: Any, context: ToolContext) -> ToolResult | None:
+        """Ask before an edit outside the goal's scope; refuse it when nobody can be asked. None means go ahead.
+
+        A goal's scope says what the work is about. Leaving it is allowed, but a person decides.
+        """
+        scope = context.state.get("goal_scope")
+        if not scope or tool_use["name"] not in self._EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
+            return None
+        root    = Path(context.cwd).resolve()
+        allowed = [(root / entry).resolve() for entry in scope]
+        outside = [t for t in self._edit_targets(parsed_args) if not any((root / t).resolve() == b or b in (root / t).resolve().parents for b in allowed)]
+        if not outside:
+            return None
+        self.signals[OUT_OF_GOAL_SCOPE] += 1
+        message = f"This edit is outside the goal's scope ({', '.join(scope)}): {', '.join(outside)}"
+        if await self._ask_user_permission(context=context, tool_name=tool_use["name"], message=message):
+            return None
+        return self._refusal(tool_use["id"], f"Permission denied by user: {message}")
 
     async def _execute(
         self,

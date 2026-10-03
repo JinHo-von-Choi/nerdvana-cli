@@ -48,6 +48,7 @@ class Goal:
     created_at:   float               = field(default_factory=time.time)
     last_exit:    int | None          = None
     last_tail:    str                 = ""
+    scope:        list[str]           = field(default_factory=list)   # paths the work is about; edits elsewhere ask first
 
     def __post_init__(self) -> None:
         if not self.verify.strip():

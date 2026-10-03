@@ -148,3 +148,82 @@ async def test_the_todo_guard_comes_before_the_verification(monkeypatch: pytest.
     assert loop.goal.attempts == 0  # type: ignore[union-attr]
     told = [str(m.get("content", "")) for m in provider.payloads[1] if m["role"] == "user"]
     assert any("write tests" in text for text in told)
+
+
+# ---------------------------------------------------------------------------
+# Scope: edits outside what the goal is about ask first
+# ---------------------------------------------------------------------------
+
+
+class _Writer(BaseTool[Any]):
+    name             = "FileWrite"
+    description_text = "write"
+    input_schema: dict[str, Any] = {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+
+    def __init__(self) -> None:
+        self.written: list[str] = []
+
+    def parse_args(self, tool_input: dict[str, Any]) -> Any:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(path=tool_input["path"])
+
+    async def call(self, args: Any, context: Any, can_use_tool: Any = None, on_progress: Any = None) -> ToolResult:
+        self.written.append(args.path)
+        return ToolResult(tool_use_id="", content="written")
+
+
+async def _write(path: str, scope: list[str] | None, answer: bool | None, tmp_path: Path) -> tuple[ToolResult, _Writer, Any]:
+    from nerdvana_cli.core.hooks import HookEngine
+    from nerdvana_cli.core.policy import PermissionPolicy
+    from nerdvana_cli.core.tool_executor import ToolExecutor
+
+    tool     = _Writer()
+    registry = ToolRegistry()
+    registry.register(tool)
+    asked: list[str] = []
+
+    async def confirm(name: str, message: str) -> bool:
+        asked.append(message)
+        return bool(answer)
+
+    executor = ToolExecutor(registry=registry, hooks=HookEngine(), settings=NerdvanaSettings(), policy=PermissionPolicy(trust_level="yolo"))
+    context  = ToolContext(cwd=str(tmp_path), confirm=confirm if answer is not None else None)
+    context.state["goal_scope"] = scope
+    (result,) = await executor.run_batch([{"id": "1", "name": "FileWrite", "input": {"path": path}}], context)
+    return result, tool, (executor, asked)
+
+
+async def test_an_edit_inside_the_goals_scope_runs_without_a_question(tmp_path: Path) -> None:
+    result, tool, (_, asked) = await _write("tests/test_a.py", ["tests"], True, tmp_path)
+    assert not result.is_error and tool.written == ["tests/test_a.py"] and asked == []
+
+
+async def test_an_edit_outside_the_scope_asks_and_follows_the_answer(tmp_path: Path) -> None:
+    allowed, tool, (executor, asked) = await _write("src/a.py", ["tests"], True, tmp_path)
+    assert not allowed.is_error and tool.written == ["src/a.py"]
+    assert "outside the goal's scope (tests): src/a.py" in asked[0]
+    refused, tool, (executor, _) = await _write("src/a.py", ["tests"], False, tmp_path)
+    assert refused.is_error and tool.written == [] and "Permission denied by user" in refused.content
+    assert executor.signals["out_of_goal_scope"] == 1
+
+
+async def test_with_nobody_to_ask_an_edit_outside_the_scope_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False, raising=False)
+    result, tool, _ = await _write("src/a.py", ["tests"], None, tmp_path)
+    assert result.is_error and tool.written == []
+
+
+async def test_a_goal_without_a_scope_asks_nothing(tmp_path: Path) -> None:
+    result, tool, (_, asked) = await _write("src/a.py", None, True, tmp_path)
+    assert not result.is_error and asked == []
+
+
+async def test_only_an_enforced_goal_hands_its_scope_to_the_tools(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    loop = _loop(monkeypatch, tmp_path, _Script([]))
+    loop.set_goal(Goal(objective="x", verify="true", scope=["tests"]))
+    assert loop._new_tool_context().state["goal_scope"] == ["tests"]
+    loop.set_goal(Goal(objective="x", verify="true", scope=["tests"], status=PAUSED))
+    assert loop._new_tool_context().state["goal_scope"] is None
+    loop.set_goal(None)
+    assert loop._new_tool_context().state["goal_scope"] is None
