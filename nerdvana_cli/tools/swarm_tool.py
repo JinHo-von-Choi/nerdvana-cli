@@ -10,7 +10,7 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
-from nerdvana_cli.tools.registry import create_subagent_registry
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 
 
@@ -105,6 +105,7 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
             parent_session_id = str(context.state.get("session_id", "")),
             budget        = context.state.get("budget"),
             absorb        = context.state.get("absorb"),
+            factories     = context.state.get("loop_factories"),
         )
         parent_tools = self._parent_registry.all_tools() if self._parent_registry else None
         results      = await run_swarm(config, partial(create_subagent_registry, parent_tools=parent_tools))

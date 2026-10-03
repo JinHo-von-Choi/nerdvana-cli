@@ -55,12 +55,14 @@ def render_findings(findings: list[dict[str, Any]]) -> str:
 async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     """Run the read-only code-reviewer agent on *prompt* and return its answer."""
     from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
+    from nerdvana_cli.cli.bootstrap import loop_factories
     from nerdvana_cli.cli.runtime import resolve_run_provider
     from nerdvana_cli.core.managed_policy import ManagedPolicyError
     from nerdvana_cli.core.model_routing import apply_model_spec, select_model
     from nerdvana_cli.core.settings import NerdvanaSettings
-    from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
-    from nerdvana_cli.tools.registry import create_subagent_registry
+    from nerdvana_cli.core.subagent import run_subagent
+    from nerdvana_cli.core.subagent_config import SubagentConfig
+    from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 
     settings     = NerdvanaSettings.load()
     settings.cwd = os.getcwd()
@@ -81,7 +83,7 @@ async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     registry   = create_subagent_registry(settings=settings, allowed_tools=definition.allowed_tools)
     config     = SubagentConfig(
         agent_id="review", name="code-reviewer", prompt=prompt, settings=settings, registry=registry,
-        max_turns=definition.max_turns, system_prompt=definition.system_prompt, category="review",
+        max_turns=definition.max_turns, system_prompt=definition.system_prompt, category="review", factories=loop_factories(),
     )
     output, _ = await run_subagent(config, asyncio.Event())
     return output

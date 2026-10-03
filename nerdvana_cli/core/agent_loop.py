@@ -53,6 +53,7 @@ from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
+from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
 from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
@@ -152,8 +153,10 @@ class AgentLoop:
         on_ask_user:         AskUserCallback | None = None,
         on_confirm:          ConfirmCallback | None = None,
         origin:              CallOrigin | None = None,
+        factories:           LoopFactories | None = None,
     ) -> None:
         self._init_telemetry(origin)
+        self._factories           = factories or LoopFactories()
         self.settings             = settings
         self.registry             = registry
         self.session              = session or SessionStorage()
@@ -621,18 +624,18 @@ class AgentLoop:
         """The tools this run may use, with MCP tools deferred behind ToolSearch when their declarations are large.
 
         What the model has loaded stays loaded across prompts of the session. Sub-agents never defer: they have
-        no ToolSearch.
+        no ToolSearch. A loop built without a ToolSearch factory never defers either.
         """
-        from nerdvana_cli.tools.tool_search import ToolSearchTool
-
-        visible = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name) and t.name != "ToolSearch"]
-        session = self.settings.session
-        index   = ToolIndex.build(visible, session.defer_tools, session.defer_tools_threshold) if self.origin.agent_type == "main" else ToolIndex()
+        visible     = [t for t in self.registry.all_tools() if self.policy.is_visible(t.name) and t.name != "ToolSearch"]
+        session     = self.settings.session
+        search_tool = self._factories.tool_search
+        deferring   = self.origin.agent_type == "main" and search_tool is not None
+        index       = ToolIndex.build(visible, session.defer_tools, session.defer_tools_threshold) if deferring else ToolIndex()
         if self._tool_index is not None:
             index.loaded = self._tool_index.loaded & set(index.deferred)
         self._tool_index = index
-        if index.deferred:
-            search = ToolSearchTool(index)
+        if index.deferred and search_tool is not None:
+            search = search_tool(index)
             self.registry.register(search)
             visible.append(search)
         return visible
@@ -729,14 +732,16 @@ class AgentLoop:
             self._record_session_totals()
 
     async def _run_plan_agent(self, prompt: str) -> str:
-        from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
-        from nerdvana_cli.tools.registry import create_subagent_registry
+        """The plan a read-only sub-agent drafts for *prompt*; empty when the loop cannot start sub-agents."""
+        run_subagent, registry_for = self._factories.run_subagent, self._factories.subagent_registry
+        if run_subagent is None or registry_for is None:
+            return ""
         child = self.settings.model_copy(deep=True)
         child.session.planning_gate = False
-        reg = create_subagent_registry(settings=child, allowed_tools=["Glob", "Grep", "FileRead", "Bash"])
+        reg = registry_for(settings=child, allowed_tools=["Glob", "Grep", "FileRead", "Bash"])
         cfg = SubagentConfig(agent_id="plan_agent", name="Plan", max_turns=20,
                              prompt=f"Create an implementation plan for the following task:\n\n{prompt}",
-                             settings=child, registry=reg)
+                             settings=child, registry=reg, factories=self._factories)
         try:
             output, _ = await run_subagent(cfg, asyncio.Event())
             return output
@@ -900,6 +905,7 @@ class AgentLoop:
         context.state["session_id"] = self.session.session_id
         context.state["budget"]     = (self.budget, self.session_cost_usd)
         context.state["absorb"]     = self.absorb_subagent
+        context.state["loop_factories"]      = self._factories
         context.state["report_bash_changes"] = self.settings.session.report_bash_changes
         context.state["tool_index"] = self._tool_index
         context.state["sandbox"]    = self._sandbox_policy()
@@ -1183,11 +1189,9 @@ class AgentLoop:
     @staticmethod
     def _skill_loader_for(registry: ToolRegistry, settings: NerdvanaSettings) -> SkillLoader:
         """The loader the ActivateSkill tool uses, so ``/clear`` resets its activations; a fresh one without the tool."""
-        from nerdvana_cli.tools.skill_tool import ActivateSkillTool
-
-        shared = registry.get(ActivateSkillTool.name)
-        if isinstance(shared, ActivateSkillTool):
-            return shared.loader
+        shared = getattr(registry.get("ActivateSkill"), "loader", None)
+        if isinstance(shared, SkillLoader):
+            return shared
         loader = SkillLoader.from_settings(settings)
         loader.load_all()
         return loader

@@ -23,8 +23,9 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import Skill, SkillLoader, name_problems, project_skill_trust
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.core.user_hooks import load_trust_record, trust_project_hook
-from nerdvana_cli.tools.registry import create_subagent_registry, create_tool_registry
+from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.skill_tool import ActivateSkillArgs, ActivateSkillTool, format_activation
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 
 LOGGER = "nerdvana_cli.core.skills"
 

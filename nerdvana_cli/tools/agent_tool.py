@@ -12,10 +12,12 @@ from typing import Any, ClassVar
 from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
+from nerdvana_cli.core.subagent import label_confirm, run_subagent
+from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.core.worktree import Worktree, WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 
 
@@ -188,8 +190,6 @@ class AgentTool(BaseTool[AgentToolArgs]):
             task.status, task.error = TaskStatus.FAILED, str(exc)
             return ToolResult(tool_use_id="", content=str(exc), is_error=True)
 
-        from nerdvana_cli.tools.registry import create_subagent_registry
-
         _agent_type_reg = _agent_types()
         agent_defn = _agent_type_reg.get(args.subagent_type)
         if agent_defn is None:
@@ -222,6 +222,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
             category      = args.category or agent_defn.category,
             parent_session_id = str(context.state.get("session_id", "")),
             absorb        = context.state.get("absorb"),
+            factories     = context.state.get("loop_factories"),
         )
 
         if args.run_in_background:

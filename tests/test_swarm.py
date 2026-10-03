@@ -9,7 +9,7 @@ import pytest
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
 from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
-from nerdvana_cli.tools.registry import create_subagent_registry
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 
 
 @pytest.mark.asyncio
