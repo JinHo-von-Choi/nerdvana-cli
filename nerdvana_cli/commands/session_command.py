@@ -19,6 +19,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from nerdvana_cli.core import paths as core_paths
 
@@ -48,27 +49,33 @@ def _list_session_files(sessions_dir: Path) -> list[Path]:
     return files
 
 
+def _user_text(entry: dict[str, Any]) -> str:
+    """The text of a user entry, or an empty string for any other entry.
+
+    The transcript writer marks the kind of an entry with ``type`` (``user``,
+    ``assistant``, ``tool_result``, ``system``); older transcripts used
+    ``role``. The content is a string, or a list of content blocks.
+    """
+    if (entry.get("role") or entry.get("type")) != "user":
+        return ""
+    content = entry.get("content", "")
+    if isinstance(content, list):
+        content = " ".join(str(b.get("text", "")) for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return " ".join(str(content).split())
+
+
 def _first_message(path: Path) -> str:
     """Return the first human message text from a JSONL transcript."""
     try:
         with open(path, encoding="utf-8") as fp:
             for line in fp:
-                line = line.strip()
-                if not line:
-                    continue
                 try:
-                    obj = json.loads(line)
+                    entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                role    = obj.get("role", "")
-                content = obj.get("content", "")
-                if role == "user":
-                    if isinstance(content, str):
-                        return content[:80]
-                    if isinstance(content, list):
-                        for block in content:
-                            if isinstance(block, dict) and block.get("type") == "text":
-                                return str(block.get("text", ""))[:80]
+                text = _user_text(entry) if isinstance(entry, dict) else ""
+                if text:
+                    return text[:80]
     except OSError:
         pass
     return "(no preview)"
@@ -141,7 +148,7 @@ def session_list(
         dt   = datetime.fromtimestamp(rec["mtime"]).strftime("%Y-%m-%d %H:%M")
         msgs = rec["messages"]
         sid  = rec["id"]
-        prev = rec["preview"]
+        prev = escape(rec["preview"])
         console.print(f"  [cyan]{sid}[/cyan]  {dt}  [{msgs} lines]  {prev}")
 
 
