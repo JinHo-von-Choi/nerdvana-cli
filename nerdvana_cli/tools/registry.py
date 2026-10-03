@@ -16,7 +16,7 @@ from nerdvana_cli.tools.web_tools import WebFetchTool, WebSearchTool
 
 def _register_skill_and_agent_tools(registry: ToolRegistry, settings: Any, task_registry: Any) -> None:
     """Register ActivateSkill (when some skill can be activated by the model), the Agent tool and, when enabled, the Workflow, memory and Advisor tools."""
-    from nerdvana_cli.core.skills import SkillLoader
+    from nerdvana_cli.core.context.skills import SkillLoader
     from nerdvana_cli.mcp.skills import McpSkillFileTool
     from nerdvana_cli.tools.advisor_tool import AdvisorTool
     from nerdvana_cli.tools.agent_tool import AgentTool

@@ -13,7 +13,7 @@ prompt marks that ``/rewind`` uses stay valid.
 
 The request is only made between turns, from the loop's context step, where the history holds every tool
 result its calls asked for; a context-limit failure in the middle of a request still goes to the client-side
-compaction in ``core/compact.py``. Any failure of the request, or a reply without a summary, falls back to
+compaction in ``core/context/compact.py``. Any failure of the request, or a reply without a summary, falls back to
 that compaction for the same trigger. After ``session.compact_max_failures`` failures in a row the provider is
 no longer asked in this session.
 """
@@ -25,7 +25,7 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import signals
-from nerdvana_cli.core.loop_context import COMPACT_STATUS_PREFIX, open_todos_note
+from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX, open_todos_note
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:

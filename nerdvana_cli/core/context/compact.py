@@ -1,4 +1,4 @@
-# nerdvana_cli/core/compact.py
+# nerdvana_cli/core/context/compact.py
 """AI-powered context compression.
 
 Uses the body of compress-context.skill as the prompt to summarize conversations.
@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.context_budget import message_tokens
+from nerdvana_cli.core.context.context_budget import message_tokens
 from nerdvana_cli.types import Message, Role
 
 logger = logging.getLogger(__name__)

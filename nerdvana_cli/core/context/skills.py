@@ -326,7 +326,7 @@ class SkillLoader:
         """Skill directories in ascending precedence (later tiers override earlier ones)."""
         claude  = self._include_claude_skills
         project = self._project_dir
-        tiers   = [_Tier(Path(__file__).parent.parent / "skills", flat=True)]
+        tiers   = [_Tier(Path(__file__).parents[2] / "skills", flat=True)]
         if claude:
             tiers.append(_Tier(self._claude_global_dir, flat=True))
         tiers.append(_Tier(self._agents_global_dir))

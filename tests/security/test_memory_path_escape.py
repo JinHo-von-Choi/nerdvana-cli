@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
 
 pytestmark = pytest.mark.security
 

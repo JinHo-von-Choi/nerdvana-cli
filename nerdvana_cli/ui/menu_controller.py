@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from nerdvana_cli.core.skills import Skill
+from nerdvana_cli.core.context.skills import Skill
 from nerdvana_cli.ui.widgets import SLASH_COMMANDS, CommandMenu, ModelSelector, ProviderSelector
 
 if TYPE_CHECKING:

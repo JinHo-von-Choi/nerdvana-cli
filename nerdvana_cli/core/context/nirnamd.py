@@ -13,7 +13,7 @@ import os
 from dataclasses import dataclass, replace
 
 from nerdvana_cli.core.config import paths
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 
 MAX_INSTRUCTION_BYTES = 50_000
 COMPAT_RULE_FILENAMES = ("AGENTS.md", "CLAUDE.md")

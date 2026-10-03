@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location, _flatten
-from nerdvana_cli.core import prompts
+from nerdvana_cli.core.context import prompts
 from nerdvana_cli.core.safety.profiles import ProfileManager
 from nerdvana_cli.ui.response_runner import run_response_stream
 

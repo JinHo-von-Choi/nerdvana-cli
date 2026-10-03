@@ -15,8 +15,8 @@ import pytest
 
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.context.loop_context import background_reports, provider_messages
 from nerdvana_cli.core.input_queue import InputQueue
-from nerdvana_cli.core.loop_context import background_reports, provider_messages
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.safety.edit_guard import applies_edit, check_edit_scope, edit_targets
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable

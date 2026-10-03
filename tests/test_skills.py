@@ -1,4 +1,4 @@
-from nerdvana_cli.core.skills import Skill, SkillLoader
+from nerdvana_cli.core.context.skills import Skill, SkillLoader
 
 
 def test_parse_skill_file(tmp_path):

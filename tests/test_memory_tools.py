@@ -36,7 +36,7 @@ def _isolate_global_memories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     fake_global = tmp_path / "_global_memories"
     fake_global.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(
-        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        "nerdvana_cli.core.context.memories.core_paths.global_memories_dir",
         lambda: fake_global,
     )
 
@@ -248,7 +248,7 @@ async def test_check_onboarding_not_done(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_check_onboarding_done(tmp_path: Path) -> None:
-    from nerdvana_cli.core.memories import MemoriesManager
+    from nerdvana_cli.core.context.memories import MemoriesManager
     tool = CheckOnboardingPerformedTool()
     ctx  = _ctx(tmp_path)
     MemoriesManager(ctx.cwd).mark_onboarding_done()

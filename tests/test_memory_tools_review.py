@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_review import MemoryInbox
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_review import MemoryInbox
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools import memory_tools
 from nerdvana_cli.tools.memory_tools import (

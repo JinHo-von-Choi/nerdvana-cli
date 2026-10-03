@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.user_commands import MAX_COMMAND_BYTES, UserCommand, UserCommandLoader
+from nerdvana_cli.core.context.user_commands import MAX_COMMAND_BYTES, UserCommand, UserCommandLoader
 from nerdvana_cli.ui.app import NerdvanaApp
 from nerdvana_cli.ui.command_dispatcher import dispatch_command
 

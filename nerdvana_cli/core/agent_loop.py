@@ -35,24 +35,16 @@ from nerdvana_cli.core.builtin_hooks import (
 )
 from nerdvana_cli.core.cancellation import race_abort, until_interrupted
 from nerdvana_cli.core.checkpoint import CheckpointManager
-from nerdvana_cli.core.compact import (
+from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.context.compact import (
     FALLBACK_PROMPT,
     CompactionState,
     ai_compact,
     compact_messages,
     drop_orphan_tool_results,
 )
-from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.context_budget import ContextBudget
-from nerdvana_cli.core.context_reminder import ContextReminder
-from nerdvana_cli.core.goal import Goal
-from nerdvana_cli.core.goal_gate import GoalGate
-from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
-from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
-from nerdvana_cli.core.hooks.user_hooks import load_user_hooks
-from nerdvana_cli.core.images import prompt_content, transcript_text
-from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
-from nerdvana_cli.core.loop_context import (
+from nerdvana_cli.core.context.context_budget import ContextBudget
+from nerdvana_cli.core.context.loop_context import (
     COMPACT_STATUS_PREFIX,
     background_reports,
     new_provider,
@@ -61,11 +53,22 @@ from nerdvana_cli.core.loop_context import (
     provider_messages,
     session_start_context,
 )
+from nerdvana_cli.core.context.observation_mask import mask_observations
+from nerdvana_cli.core.context.server_compaction import ServerCompaction
+from nerdvana_cli.core.context.skills import SkillLoader
+from nerdvana_cli.core.context.tool_index import ToolIndex
+from nerdvana_cli.core.context_reminder import ContextReminder
+from nerdvana_cli.core.goal import Goal
+from nerdvana_cli.core.goal_gate import GoalGate
+from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
+from nerdvana_cli.core.hooks.user_hooks import load_user_hooks
+from nerdvana_cli.core.images import prompt_content, transcript_text
+from nerdvana_cli.core.input_queue import InputQueue, interrupted_results
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
 from nerdvana_cli.core.loop_support import classifier_feed, with_compaction_hooks
 from nerdvana_cli.core.model_failover import ModelFailover
-from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.phase_effort import PhaseEffort
 from nerdvana_cli.core.plan_gate import plan_for
 from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
@@ -73,9 +76,7 @@ from nerdvana_cli.core.rewind import Rewinder
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
-from nerdvana_cli.core.server_compaction import ServerCompaction
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
@@ -83,7 +84,6 @@ from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
-from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.types import Message, Role, SessionState
 
@@ -413,8 +413,8 @@ class AgentLoop:
         return self._tool_index.declared(tools) if self._tool_index else tools
 
     def build_system_prompt(self) -> str:
-        from nerdvana_cli.core.prompts import build_system_prompt as _b
-        from nerdvana_cli.core.prompts import git_snapshot
+        from nerdvana_cli.core.context.prompts import build_system_prompt as _b
+        from nerdvana_cli.core.context.prompts import git_snapshot
         if self._git_snapshot is None:
             self._git_snapshot = git_snapshot(self.settings.cwd)
         return _b(tools=[t for t in self.registry.all_tools() if self.policy.is_visible(t.name)], parism_active=self.registry.get("Parism") is not None,

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.skills import MAX_BUNDLED_FILES, Skill, SkillLoader, SkillLoadError
+from nerdvana_cli.core.context.skills import MAX_BUNDLED_FILES, Skill, SkillLoader, SkillLoadError
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

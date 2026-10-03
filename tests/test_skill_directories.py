@@ -9,7 +9,7 @@ import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.config.settings_sections import SkillsConfig
-from nerdvana_cli.core.skills import MAX_SKILL_BYTES, SkillLoader
+from nerdvana_cli.core.context.skills import MAX_SKILL_BYTES, SkillLoader
 
 
 def _write_skill(path: Path, name: str, body: str = "Body") -> None:
@@ -58,7 +58,7 @@ def test_same_tier_collision_directory_wins_with_warning(
     base = _project_skills(tmp_path)
     _write_skill(base / "dup.md", "dup", "file body")
     _write_skill(base / "dup" / "SKILL.md", "dup", "dir body")
-    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.skills"):
+    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.context.skills"):
         skills = _loader(tmp_path).load_all()
     dup = [s for s in skills if s.name == "dup"]
     assert len(dup) == 1

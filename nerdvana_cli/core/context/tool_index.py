@@ -17,7 +17,7 @@ import json
 import re
 from typing import Any
 
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 
 MODES = ("auto", "always", "never")
 DEFAULT_THRESHOLD = 3000

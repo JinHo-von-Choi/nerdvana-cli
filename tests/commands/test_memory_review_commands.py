@@ -18,9 +18,9 @@ from typer.testing import CliRunner
 
 from nerdvana_cli.commands import memory_commands as mc
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_index import INDEX_NAME, MemoryIndex
-from nerdvana_cli.core.memory_review import MemoryInbox
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_index import INDEX_NAME, MemoryIndex
+from nerdvana_cli.core.context.memory_review import MemoryInbox
 from nerdvana_cli.main import app
 
 PK = MemoryScope.PROJECT_KNOWLEDGE

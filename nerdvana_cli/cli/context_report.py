@@ -6,7 +6,7 @@ Date:   2026-10-03
 Every request carries the system prompt, the tool declarations and the conversation. This module
 splits the three into the parts a user can act on (the skills catalog, the project documents, one
 tool's declaration, the results of one tool) and puts the totals next to the context window and the
-compaction threshold. The figures are the loop's own estimate (``core/token_estimator.py``), not a
+compaction threshold. The figures are the loop's own estimate (``core/context/token_estimator.py``), not a
 provider's count.
 
 Everything here is a pure function of a system prompt, tool objects, messages and ``SessionConfig``.
@@ -20,10 +20,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from nerdvana_cli.core.config.settings import SessionConfig
-from nerdvana_cli.core.context_budget import message_tokens
-from nerdvana_cli.core.observation_mask import mask_observations
-from nerdvana_cli.core.token_estimator import approx_tokens
-from nerdvana_cli.core.tool_index import declaration_tokens
+from nerdvana_cli.core.context.context_budget import message_tokens
+from nerdvana_cli.core.context.observation_mask import mask_observations
+from nerdvana_cli.core.context.token_estimator import approx_tokens
+from nerdvana_cli.core.context.tool_index import declaration_tokens
 from nerdvana_cli.types import Role
 
 # Where the sections of the system prompt that carry a heading of their own begin.

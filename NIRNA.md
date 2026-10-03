@@ -18,7 +18,7 @@
 - TUI: Textual App (ui/app.py) with ChatMessage widgets (click-to-copy), AgentLoop is backend
 - MCP: config -> client -> tools -> manager, stdio + HTTP transport, failure isolation per server
 - Parism: structured shell output via MCP, falls back silently to Bash on failure
-- Custom commands: core/user_commands.py (markdown templates under commands/ directories, `$ARGUMENTS` and `$1`..`$9`); command hooks: core/hooks/command_hooks.py (hooks.yml shell commands, exit code 2 blocks, project files need the project-hook opt-in and approved digest)
+- Custom commands: core/context/user_commands.py (markdown templates under commands/ directories, `$ARGUMENTS` and `$1`..`$9`); command hooks: core/hooks/command_hooks.py (hooks.yml shell commands, exit code 2 blocks, project files need the project-hook opt-in and approved digest)
 - Hooks: HookEngine with SESSION_START/SESSION_END/BEFORE_TOOL/AFTER_TOOL/BEFORE_API_CALL/AFTER_API_CALL events, builtin context injection, directory rule injection (AGENTS.md/CLAUDE.md/NIRNA.md in subdirectories on first touch)
 - Skills: markdown-based prompt plugins (.nerdvana/skills/*.md), /trigger activation
 - Agents: 6 builtin types (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) dispatched via AgentTool with their own system prompt and max_turns; allowed_tools filters the parent session's tools per agent ("@read" admits READ/SYMBOLIC tools); sub-agents run under a per-provider concurrency bound
@@ -32,11 +32,11 @@
 
 ## Key Components
 - core/agent_loop.py: streaming agent loop, tool execution, context compaction, recovery (planning_gate, provider recovery, todo guard, background task reports, ultrawork), session resume (restore_history) and close_session (SESSION_END)
-- core/compact.py: compaction strategy module shared by agent_loop and SessionState
+- core/context/compact.py: compaction strategy module shared by agent_loop and SessionState
 - codeintel/lsp_client.py: stdio JSON-RPC 2.0 LspClient, request/response correlation, capability negotiation
 - core/hooks/hooks.py: HookEngine event system, HookContext (with stop_reason field, default None)
 - core/builtin_hooks.py: session start context injection (tools/settings/NIRNA.md)
-- core/skills.py: SkillLoader with 3-tier discovery (builtin < global < project)
+- core/context/skills.py: SkillLoader with 3-tier discovery (builtin < global < project)
 - cli/updater.py: GitHub release check, self-update via git pull
 - agents/builtin.py: 6 builtin agent definitions (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) with system prompts and allowed_tools
 - agents/registry.py: agent registry, .nerdvana/agents/*.yml custom loader, allowed_tools filtering
@@ -76,7 +76,7 @@
 - Auto-resolved per model via MODEL_CONTEXT_WINDOWS in providers/base.py
 - Fallback to PROVIDER_CAPABILITIES max_context per provider
 - User can override in YAML: session.max_context_tokens
-- Window use (core/context_budget.py): the provider's input_tokens for the last request plus an estimate of messages added since; before the first report, an estimate including the system prompt and tool schemas
+- Window use (core/context/context_budget.py): the provider's input_tokens for the last request plus an estimate of messages added since; before the first report, an estimate including the system prompt and tool schemas
 - Compaction at compact_threshold (default 0.8): AI summary or naive truncation keeping recent 10; open todo items are restated afterwards
 
 ## Skills

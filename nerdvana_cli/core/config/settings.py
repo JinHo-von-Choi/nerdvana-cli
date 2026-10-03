@@ -101,7 +101,7 @@ class ModelConfig(BaseModel):
     # declaration as it is.
     anthropic_tool_search: Literal["off", "bm25", "regex"] = "off"
     # Anthropic only. Server-side compaction (beta): the provider can ask the API to summarize the conversation
-    # and sends the signed summary back in place of the messages it replaced. core/compact.py stays the
+    # and sends the signed summary back in place of the messages it replaced. core/context/compact.py stays the
     # fallback for every other provider and for a model that does not support it.
     anthropic_compaction: Literal["off", "on"] = "off"
     # Anthropic only. Declares Anthropic's client-side memory tool; the files live in a per-project directory of
@@ -174,7 +174,7 @@ class SessionConfig(BaseModel):
     max_context_tokens: int = 180_000
     compact_threshold: float = 0.8
     compact_max_failures: int = 3  # circuit breaker max consecutive failures
-    # Replace old read-type tool output with a placeholder before compaction (core/observation_mask.py):
+    # Replace old read-type tool output with a placeholder before compaction (core/context/observation_mask.py):
     # the last mask_keep_last tool results stay, and nothing is cleared until the clearable
     # results add up to mask_trigger_tokens, so the request prefix changes once per batch.
     observation_masking: bool = False

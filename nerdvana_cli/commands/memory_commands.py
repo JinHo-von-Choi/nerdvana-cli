@@ -87,7 +87,7 @@ async def handle_memories(app: NerdvanaApp, args: str) -> None:
     """Handle /memories [--stale [--days N]] — list project memories."""
     import datetime
 
-    from nerdvana_cli.core.memories import MemoriesManager
+    from nerdvana_cli.core.context.memories import MemoriesManager
 
     stale   = "--stale" in args
     days    = 30

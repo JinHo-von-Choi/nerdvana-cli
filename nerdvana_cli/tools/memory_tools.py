@@ -15,9 +15,9 @@ import re
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
-from nerdvana_cli.core.memory_index import MemorySource
-from nerdvana_cli.core.memory_review import MemoryInbox
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.context.memory_index import MemorySource
+from nerdvana_cli.core.context.memory_review import MemoryInbox
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

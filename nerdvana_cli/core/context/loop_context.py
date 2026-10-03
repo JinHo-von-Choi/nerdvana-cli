@@ -10,11 +10,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
-from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
+from nerdvana_cli.core.context.context_snapshot import collect_snapshot, format_snapshot
+from nerdvana_cli.core.context.nirnamd import load_nirna_files
+from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
-from nerdvana_cli.core.nirnamd import load_nirna_files
 from nerdvana_cli.core.todos import describe, load_todos, open_items
-from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.providers.anthropic_features import uses_server_search
 from nerdvana_cli.providers.base import ProviderName, detect_provider
 from nerdvana_cli.providers.factory import create_provider

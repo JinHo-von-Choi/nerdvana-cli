@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.memories import MemoriesManager, MemoryEntry, MemoryScope
+from nerdvana_cli.core.context.memories import MemoriesManager, MemoryEntry, MemoryScope
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -35,7 +35,7 @@ def mgr(project_dir: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Me
     fake_global = tmp_path / "global"
     fake_global.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(
-        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        "nerdvana_cli.core.context.memories.core_paths.global_memories_dir",
         lambda: fake_global,
     )
     return MemoriesManager(project_dir)
@@ -81,7 +81,7 @@ def test_write_overwrite(mgr: MemoriesManager) -> None:
 def test_write_user_global(mgr: MemoriesManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     global_dir = tmp_path / "global_mem"
     monkeypatch.setattr(
-        "nerdvana_cli.core.memories.core_paths.global_memories_dir",
+        "nerdvana_cli.core.context.memories.core_paths.global_memories_dir",
         lambda: global_dir,
     )
     mgr2 = MemoriesManager(str(tmp_path / "project"))

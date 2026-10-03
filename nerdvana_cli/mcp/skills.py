@@ -36,7 +36,13 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core.skills import DESCRIPTION_MAX_CHARS, MAX_BUNDLED_FILES, MAX_SKILL_BYTES, Skill, SkillLoadError
+from nerdvana_cli.core.context.skills import (
+    DESCRIPTION_MAX_CHARS,
+    MAX_BUNDLED_FILES,
+    MAX_SKILL_BYTES,
+    Skill,
+    SkillLoadError,
+)
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

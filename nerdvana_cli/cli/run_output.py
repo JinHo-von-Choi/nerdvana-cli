@@ -24,7 +24,7 @@ from typing import Any
 from rich.text import Text
 
 from nerdvana_cli.core.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
-from nerdvana_cli.core.loop_context import COMPACT_STATUS_PREFIX
+from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX
 
 SCHEMA_VERSION = 1
 FORMATS        = ("text", "json", "stream-json")

@@ -2,7 +2,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact, compact_messages, estimate_tokens
+from nerdvana_cli.core.context.compact import (
+    FALLBACK_PROMPT,
+    CompactionState,
+    ai_compact,
+    compact_messages,
+    estimate_tokens,
+)
 from nerdvana_cli.types import Message, Role
 
 

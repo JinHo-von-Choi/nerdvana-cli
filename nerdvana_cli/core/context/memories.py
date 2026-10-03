@@ -12,7 +12,7 @@ Files are plain-text with a .md extension.
 
 Concurrency: each read/write acquires an exclusive fcntl.flock on the file.
 
-Each file-backed scope also keeps a sidecar index (core/memory_index.py) with the
+Each file-backed scope also keeps a sidecar index (core/context/memory_index.py) with the
 created and last-modified times, the source and the last load of every entry.
 
 Author: 최진호
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import IO
 
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.memory_index import MemoryIndex, MemorySource, effective_modified
+from nerdvana_cli.core.context.memory_index import MemoryIndex, MemorySource, effective_modified
 from nerdvana_cli.utils.path import validate_path
 
 logger = logging.getLogger(__name__)

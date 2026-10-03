@@ -6,7 +6,7 @@ Date:   2026-10-03
 Every request to the model starts with the system prompt and the tool declarations. This
 script builds both for the default tool set and prints their estimated size, the largest
 system prompt sections and the largest tool declarations. The estimate is the same one the
-agent loop uses (``core/token_estimator.py``), not a provider's own count.
+agent loop uses (``core/context/token_estimator.py``), not a provider's own count.
 
 The figures depend on the tool set and on the project documents found in ``--cwd``
 (NIRNA.md, AGENTS.md and the like), so quote them together with the directory they were
@@ -28,7 +28,7 @@ from typing import Any
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.token_estimator import approx_tokens
+from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.tools.registry import create_tool_registry
 
 _SECTION = re.compile(r"\n(?=#{1,3} )")

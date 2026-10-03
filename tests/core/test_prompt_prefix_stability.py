@@ -20,9 +20,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core import prompts
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.context import prompts
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider, with_cache_breakpoints
 from nerdvana_cli.providers.base import ProviderConfig, ProviderName
