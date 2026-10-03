@@ -1,34 +1,21 @@
-"""HTTP-level smoke test — QuotaExceeded over Streamable-HTTP transport.
+"""A tenant over its quota gets a readable refusal over the HTTP transport.
 
-Boots NerdvanaMcpServer in transport="http" mode on an ephemeral port,
-configures rpm=1 for a known tenant, issues two requests, and asserts the
-second response carries a 429 with Retry-After.
-
-Known limitation (mcp==1.27.0): the MCP lowlevel server catches all tool
-exceptions (``server.py`` line ~583: ``except Exception as e: return
-self._make_error_result(str(e))``) and converts them to an MCP error
-result with HTTP 200.  ``QuotaExceeded`` is therefore serialised as
-``{"isError":true}`` in the response body before it can reach the ASGI
-middleware layer.  The second request receives HTTP 200 with ``isError:true``
-instead of HTTP 429.
-
-The test is marked ``xfail`` for this reason.  When a future ``mcp`` release
-surfaces ``raise_exceptions=True`` in the Streamable-HTTP path this marker
-should be removed and the assertion updated.
-
-See ``docs/mcp-quota.md`` — "Known limitation" section.
+mcp reports a tool exception as a tool result with ``isError:true`` inside an HTTP 200 response,
+so the quota refusal reaches the client as that result, with the reason, and not as an HTTP 429.
+See ``docs/mcp-quota.md``.
 
 작성자: 최진호
 작성일: 2026-05-13
+수정일: 2026-10-03
 """
 
 from __future__ import annotations
 
-import asyncio
-import threading
+import json
 from pathlib import Path
+from typing import Any
 
-import pytest
+from starlette.testclient import TestClient
 
 from nerdvana_cli.server.acl import ACLManager
 from nerdvana_cli.server.audit import AuditLogger
@@ -36,18 +23,8 @@ from nerdvana_cli.server.auth import AuthManager
 from nerdvana_cli.server.mcp_server import NerdvanaMcpServer
 from nerdvana_cli.server.quota import QuotaPolicy, QuotaPolicyResolver, QuotaStore
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _find_free_port() -> int:
-    """Bind to port 0 and return the OS-assigned port number."""
-    import socket
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+TOKEN = "test-secret-12345"
+BASE  = {"Authorization": f"Bearer {TOKEN}", "Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
 
 def _make_permissive_acl(tmp_path: Path) -> ACLManager:
@@ -85,127 +62,43 @@ def _make_auth_manager(tmp_path: Path, bearer_token: str) -> AuthManager:
     return mgr
 
 
-# ---------------------------------------------------------------------------
-# Fixture: server on ephemeral port
-# ---------------------------------------------------------------------------
+def _rpc(method: str, request_id: int | None = None, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    body: dict[str, Any] = {"jsonrpc": "2.0", "method": method, "params": params or {}}
+    if request_id is not None:
+        body["id"] = request_id
+    return body
 
 
-@pytest.fixture
-def http_server_ctx(tmp_path):
-    """Start NerdvanaMcpServer(transport='http') in a background thread.
+def _message(text: str) -> dict[str, Any]:
+    data = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
+    return json.loads(data[0] if data else text)
 
-    Yields (base_url, bearer_token) after the server loop is running.
-    Stops the server after the test completes.
-    """
-    pytest.importorskip("httpx")
-    pytest.importorskip("uvicorn")
 
-    port         = _find_free_port()
-    bearer_token = "test-secret-12345"
-    acl          = _make_permissive_acl(tmp_path)
-    auth         = _make_auth_manager(tmp_path, bearer_token)
-    audit        = AuditLogger(db_path=tmp_path / "audit.sqlite")
+def test_second_request_over_the_rate_limit_is_refused_with_its_reason(tmp_path: Path) -> None:
+    audit = AuditLogger(db_path=tmp_path / "audit.sqlite")
     audit.open()
-    resolver = QuotaPolicyResolver(
-        per_tenant={"test-tenant": QuotaPolicy(rpm=1)},
-    )
-    store  = QuotaStore()
     server = NerdvanaMcpServer(
         transport      = "http",
-        host           = "127.0.0.1",
-        port           = port,
-        auth_manager   = auth,
-        acl_manager    = acl,
+        auth_manager   = _make_auth_manager(tmp_path, TOKEN),
+        acl_manager    = _make_permissive_acl(tmp_path),
         audit_logger   = audit,
-        quota_resolver = resolver,
-        quota_store    = store,
+        quota_resolver = QuotaPolicyResolver(per_tenant={"test-tenant": QuotaPolicy(rpm=1)}),
+        quota_store    = QuotaStore(),
         project_path   = tmp_path,
     )
+    call = _rpc("tools/call", 2, {"name": "ListMemories", "arguments": {"topic": ""}})
+    try:
+        with TestClient(server._http_app(), base_url="http://127.0.0.1:10830") as client:
+            opened  = client.post("/mcp", headers=BASE, json=_rpc("initialize", 1, {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}))
+            session = {**BASE, "Mcp-Session-Id": opened.headers["mcp-session-id"], "MCP-Protocol-Version": "2025-03-26"}
+            client.post("/mcp", headers=session, json=_rpc("notifications/initialized"))
+            first  = client.post("/mcp", headers=session, json=call)
+            second = client.post("/mcp", headers=session, json={**call, "id": 3})
+    finally:
+        audit.close()
 
-    loop_holder: list[asyncio.AbstractEventLoop] = []
-    started      = threading.Event()
-    stopped      = threading.Event()
-
-    def _run() -> None:
-        loop = asyncio.new_event_loop()
-        loop_holder.append(loop)
-
-        async def _serve() -> None:
-            # Signal ready after the first iteration so httpx can connect.
-            loop.call_soon(started.set)
-            await server.run()
-
-        try:
-            loop.run_until_complete(_serve())
-        except Exception:
-            pass
-        finally:
-            loop.close()
-            stopped.set()
-
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    started.wait(timeout=5)
-
-    # Give uvicorn a moment to bind the port.
-    import time
-    time.sleep(0.3)
-
-    yield f"http://127.0.0.1:{port}", bearer_token
-
-    # Teardown: cancel all tasks in the loop so uvicorn shuts down.
-    if loop_holder:
-        loop = loop_holder[0]
-        for task in asyncio.all_tasks(loop):
-            loop.call_soon_threadsafe(task.cancel)
-    thread.join(timeout=3)
-    audit.close()
-
-
-# ---------------------------------------------------------------------------
-# Smoke test
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.xfail(
-    reason=(
-        "mcp==1.27.0 converts QuotaExceeded to isError:true/HTTP-200 inside "
-        "the lowlevel call_tool handler (server.py ~line 583: "
-        "'except Exception as e: return self._make_error_result(str(e))'). "
-        "The second request receives 200 instead of 429. "
-        "Remove this marker when mcp exposes raise_exceptions=True in the "
-        "Streamable-HTTP path. See docs/mcp-quota.md#known-limitation."
-    ),
-    strict=False,
-)
-def test_http_quota_rpm1_second_request_is_429(http_server_ctx) -> None:
-    """Second request from same tenant must yield 429 with Retry-After when rpm=1.
-
-    If mcp swallows QuotaExceeded (current behaviour with 1.27.0) the second
-    request returns HTTP 200 with ``isError:true`` in the body — the xfail
-    marker documents this and allows CI to pass while tracking the issue.
-    """
-    import httpx
-
-    base_url, token = http_server_ctx
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type":  "application/json",
-    }
-    payload = {
-        "jsonrpc": "2.0",
-        "id":      1,
-        "method":  "tools/call",
-        "params":  {"name": "ListMemories", "arguments": {"topic": ""}},
-    }
-
-    with httpx.Client(timeout=5) as client:
-        r1 = client.post(f"{base_url}/mcp", json=payload, headers=headers)
-        assert r1.status_code == 200, f"First request failed: {r1.status_code} {r1.text}"
-
-        r2 = client.post(f"{base_url}/mcp", json=payload, headers=headers)
-        assert r2.status_code == 429, (
-            f"Expected 429 for rate-limited request but got {r2.status_code}: {r2.text}"
-        )
-        assert "Retry-After" in r2.headers, "Retry-After header missing from 429 response"
-        assert int(r2.headers["Retry-After"]) >= 1
+    assert _message(first.text)["result"].get("isError") is not True
+    refused = _message(second.text)["result"]
+    assert second.status_code == 200
+    assert refused["isError"] is True
+    assert "rpm" in refused["content"][0]["text"].lower()
