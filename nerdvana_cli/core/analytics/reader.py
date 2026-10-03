@@ -134,6 +134,23 @@ class AnalyticsReader:
             logger.debug("analytics: approvals error: %s", exc)
             return []
 
+    def classifier_outcomes(self, days: int = 30) -> list[dict[str, Any]]:
+        """What the action classifier said against what happened, counted per mode, verdict and outcome, last *days* days."""
+        if not self._exists():
+            return []
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        try:
+            with connect(self._db_path) as conn:
+                rows = conn.execute(
+                    """SELECT mode, verdict, outcome, COUNT(*) AS n
+                       FROM classifier_verdicts WHERE ts >= ? GROUP BY mode, verdict, outcome""",
+                    (cutoff,),
+                ).fetchall()
+            return [{"mode": r["mode"], "verdict": r["verdict"], "outcome": r["outcome"], "count": int(r["n"])} for r in rows]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("analytics: classifier_outcomes error: %s", exc)
+            return []
+
     def session_cost(self, session_id: str) -> float:
         """Return cumulative cost USD for a session."""
         if not self._exists():

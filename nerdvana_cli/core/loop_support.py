@@ -1,4 +1,4 @@
-"""What the agent loop adds around compaction.
+"""What the agent loop adds around the permission classifier and compaction.
 
 Author: 최진호
 Date:   2026-10-03
@@ -9,8 +9,10 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import AsyncGenerator, Callable
+from dataclasses import replace
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from nerdvana_cli.core.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.hooks import HookEvent
 
 if TYPE_CHECKING:
@@ -19,6 +21,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _CompactT = TypeVar("_CompactT", bound=Callable[..., AsyncGenerator[str, None]])
+
+
+def classifier_feed(loop: AgentLoop) -> ClassifierFeed:
+    """What the action classifier may use of *loop*: the user's own words, and a way to book its requests."""
+
+    def charge(answer: Completion) -> float:
+        origin = replace(loop.origin, agent_type="classifier", turn=loop.turns_used, last_tool=loop._last_tool)
+        return loop.limits.record_auxiliary(answer.usage, origin, answer.provider, answer.model)
+
+    return ClassifierFeed(lambda: loop.session.user_prompts, charge, lambda: bool(loop.limits.over_cost_limit()))
 
 
 def with_compaction_hooks(compact: _CompactT) -> _CompactT:

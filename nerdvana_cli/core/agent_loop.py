@@ -52,7 +52,7 @@ from nerdvana_cli.core.input_queue import InputQueue
 from nerdvana_cli.core.loop_context import background_reports, open_todos_note, provider_messages, session_start_context
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
-from nerdvana_cli.core.loop_support import with_compaction_hooks
+from nerdvana_cli.core.loop_support import classifier_feed, with_compaction_hooks
 from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.plan_gate import plan_for
@@ -616,6 +616,7 @@ class AgentLoop:
         context.state["sandbox"]    = self._sandbox_policy()
         context.state["edit_scope"] = self.settings.sandbox.edit_scope
         context.state["goal_scope"] = self.goal_gate.scope()
+        context.state["classifier_feed"] = classifier_feed(self)
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:

@@ -113,6 +113,19 @@ class PermissionConfig(BaseModel):
     always_deny: list[str] = Field(default_factory=list)
     # Ask before a Bash command or a state-changing MCP call that repeats text returned by the web or an MCP server.
     gate_untrusted_sources: bool = True
+    # A second model call that judges each call the policy would run without asking (core/classifier.py).
+    # "shadow" records what it would have done next to the real decision and changes nothing; "enforce"
+    # turns an allow into an ask or a refusal. It never relaxes an ask or a refusal.
+    classifier: Literal["off", "shadow", "enforce"] = "off"
+    # Model for the classifier, "model" or "provider:model"; empty = the agents.categories entry "classifier",
+    # then "quick", then the session model.
+    classifier_model: str = ""
+
+    @field_validator("classifier", mode="before")
+    @classmethod
+    def _unquoted_yaml_off(cls, value: Any) -> Any:
+        """YAML reads an unquoted ``off`` as False; take it as the word it was written as."""
+        return "off" if value is False else value
 
 
 class SessionConfig(BaseModel):

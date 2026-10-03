@@ -94,6 +94,8 @@ class SessionStorage:
     def __init__(self, session_id: str | None = None, storage_dir: str = "", persist: bool = True):
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.persist    = persist
+        # What the user typed in this session, in order: the one record that holds no model or tool text.
+        self.user_prompts: list[str] = []
         base_dir = storage_dir or str(paths.user_sessions_dir())
         if persist:
             os.makedirs(base_dir, exist_ok=True)
@@ -116,6 +118,7 @@ class SessionStorage:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def record_user_message(self, content: str) -> None:
+        self.user_prompts.append(content)
         self.record("user", {"content": content})
 
     def record_assistant_message(
@@ -156,6 +159,8 @@ class SessionStorage:
         )
 
     def record_system(self, subtype: str, data: dict[str, Any]) -> None:
+        if subtype == "rewind":
+            del self.user_prompts[-max(int(data.get("prompts", 1) or 1), 1):]
         self.record("system", {"subtype": subtype, **data})
 
     def replay(self) -> list[dict[str, Any]]:
@@ -171,7 +176,9 @@ class SessionStorage:
 
     def load_messages(self) -> list[Message]:
         """Conversation messages recorded in this session's transcript."""
-        return messages_from_transcript(self.replay())
+        entries = self.replay()
+        self.user_prompts = [str(e.get("content", "")) for e in _after_rewinds(entries) if e.get("type") == "user"]
+        return messages_from_transcript(entries)
 
     @classmethod
     def get_last_session(cls, storage_dir: str = "") -> str | None:

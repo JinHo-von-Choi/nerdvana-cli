@@ -170,6 +170,25 @@ class AnalyticsWriter:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("analytics: record_approval error: %s", exc)
 
+    def record_classifier_verdict(self, tool_name: str, arg_key: str, mode: str, verdict: str, reason: str, outcome: str) -> None:
+        """Persist what the action classifier said about one call and what really happened to it.
+
+        *outcome* is ``allow_auto`` (ran without a question), ``allow_user`` or ``deny_user`` (the user answered)
+        or ``deny_classifier`` (the classifier refused it in enforce mode).
+        """
+        if not self._enabled:
+            return
+        with self._lock:
+            try:
+                with connect(self._db_path) as conn:
+                    conn.execute(
+                        """INSERT INTO classifier_verdicts (session_id, ts, tool_name, arg_key, mode, verdict, reason, outcome)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (self._session_id, datetime.now(UTC).isoformat(), tool_name, arg_key, mode, verdict, reason[:500], outcome),
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("analytics: record_classifier_verdict error: %s", exc)
+
     # ------------------------------------------------------------------
     # Tool call recording
     # ------------------------------------------------------------------

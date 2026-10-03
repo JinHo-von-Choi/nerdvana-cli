@@ -17,6 +17,9 @@ sub-agents and background tasks all reach the same decision for the same call:
                   ``requires_confirmation``              -> at least ASK
        yolo     : ASK                                    -> ALLOW
   6. otherwise the tool's own verdict
+
+``permissions.classifier`` adds a last, optional judgment of a call this order lets through; it is made by
+the permission gate (core/tool_permission.py) and can only make a verdict stricter.
 """
 
 from __future__ import annotations
@@ -139,6 +142,10 @@ class PermissionPolicy:
         if self.included_tools and tool_name not in self.included_tools:
             return False
         return tool_name not in self.excluded_tools
+
+    def allowed_by_rule(self, tool_name: str, tool_input: dict[str, Any] | None = None) -> bool:
+        """True when an ``always_allow`` rule names this call: the user approved it ahead of time."""
+        return _matches(tool_name, self.always_allow, primary_argument(tool_name, tool_input), allow=True)
 
     def decide(self, tool: BaseTool[Any], verdict: PermissionResult, tool_input: dict[str, Any] | None = None) -> PermissionResult:
         """Combine the tool's own *verdict* with the user's rules; *tool_input* lets a rule name arguments."""

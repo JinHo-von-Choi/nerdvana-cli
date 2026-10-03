@@ -16,6 +16,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.classifier import ActionClassifier
 from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.edit_guard import (
     applies_edit,
@@ -83,7 +84,10 @@ class ToolExecutor:
         self._progress            = ProgressMonitor.from_settings(settings)
         self.signals: Counter[str] = Counter()
         self._untrusted           = UntrustedTracker.from_settings(settings, self.signals)
-        self._permission          = PermissionGate(policy or PermissionPolicy(), self._untrusted, analytics_writer)
+        self._permission          = PermissionGate(
+            policy or PermissionPolicy(), self._untrusted, analytics_writer,
+            hooks=hooks, settings=settings, signals=self.signals, classifier=ActionClassifier.from_settings(settings),
+        )
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []

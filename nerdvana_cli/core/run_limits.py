@@ -70,6 +70,18 @@ class RunLimits:
             self._counts[signals.CACHE_MISS] += 1
         return cost
 
+    def record_auxiliary(self, usage: dict[str, int], origin: CallOrigin, provider: str, model: str) -> float:
+        """Add a request that is not the agent's own (the action classifier's) on *provider* and *model* to the totals.
+
+        It is priced for the model it ran on, counts toward the cost and token limits, and leaves the
+        prompt-cache watch alone: that watch follows the session model's own requests. Returns the cost in USD.
+        """
+        self.input_tokens  += usage.get("input_tokens", 0)
+        self.output_tokens += usage.get("output_tokens", 0)
+        cost = self.analytics_writer.record_api_call(provider, model, usage, origin)
+        self.cost_usd += cost
+        return cost
+
     def usage_summary(self) -> dict[str, int]:
         """Token totals for every provider request made so far in this session."""
         return {
