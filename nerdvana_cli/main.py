@@ -610,5 +610,26 @@ def approvals(
     approvals_command(since=since, min_approvals=min_count, json_output=json_output)
 
 
+@app.command()
+def review(
+    base:          str  = typer.Option("HEAD", "--base", help="Review the working tree against this git ref"),
+    path:          list[str] | None = typer.Option(None, "--path", help="Limit the review to this path (repeatable)"),  # noqa: B008
+    context_only:  bool = typer.Option(False, "--context-only", help="Print what the reviewer would be given and stop; calls no model"),
+    output_format: str  = typer.Option("text", "--output-format", help="text or json"),
+    fail_on:       str  = typer.Option("never", "--fail-on", help="Exit 1 when a finding has at least this severity: low | medium | high | never"),
+    model:         str  = typer.Option("", "--model", "-m", help="Model name"),
+    provider:      str  = typer.Option("", "--provider", "-p", help="AI provider"),
+) -> None:
+    """Review a change with a read-only agent that starts from the changed code and the places that use it."""
+    from nerdvana_cli.commands.review_command import FAIL_ON, review_command
+
+    if fail_on not in FAIL_ON or output_format not in ("text", "json"):
+        console_stderr.print(f"[red]Error: --fail-on must be one of {', '.join(FAIL_ON)} and --output-format text or json.[/red]")
+        raise typer.Exit(2)
+    code = review_command(base, path or [], context_only, output_format, fail_on, model, provider)
+    if code:
+        raise typer.Exit(code)
+
+
 if __name__ == "__main__":
     app()

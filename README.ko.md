@@ -192,6 +192,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana version` | 버전 표시 |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
+| `nerdvana review` | 작업 트리를 git ref 와 비교해, 바뀐 함수와 그것을 쓰는 줄에서 출발하는 읽기 전용 에이전트로 리뷰합니다(`--base`, `--context-only`, `--fail-on`). [docs/review.md](docs/review.md) |
 | `nerdvana approvals` | 계속 승인하는 권한 질문에 대해 `always_allow` 규칙(`Bash(git status)`)을 제안합니다. 설정은 바뀌지 않습니다 |
 | `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
 
