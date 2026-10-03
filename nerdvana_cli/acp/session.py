@@ -44,9 +44,9 @@ from nerdvana_cli.acp.tool_mapping import (
 from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.cli.run_output import classify_chunk
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookContext, HookEvent
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.user_commands import UserCommandLoader
 from nerdvana_cli.mcp.config import McpServerConfig

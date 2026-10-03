@@ -54,7 +54,7 @@ from typing import Any
 import yaml
 
 from nerdvana_cli import __version__
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.sandbox import landlock_abi
 
 DEFAULT_MAX_TURNS    = 30

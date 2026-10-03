@@ -19,7 +19,8 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Point the data home at tmp_path and hand back the reloaded modules."""
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
 
-    from nerdvana_cli.core import paths, user_hooks
+    from nerdvana_cli.core import user_hooks
+    from nerdvana_cli.core.config import paths
 
     importlib.reload(paths)
     importlib.reload(user_hooks)

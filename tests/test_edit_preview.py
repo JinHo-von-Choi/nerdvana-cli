@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
 from nerdvana_cli.core.policy import PermissionPolicy
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.tools.file_tools import (

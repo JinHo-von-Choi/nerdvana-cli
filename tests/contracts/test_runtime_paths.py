@@ -1,4 +1,4 @@
-"""Data root resolution lives in core/paths.py and core/settings.py only.
+"""Data root resolution lives in core/config/paths.py and core/config/settings.py only.
 
 Two constructions are tracked outside those two modules: building the user data
 root as ``Path.home() / ".nerdvana"`` and naming one of the NERDVANA_DATA_HOME,
@@ -20,7 +20,7 @@ import ast
 
 from tests.contracts.import_graph import parsed_sources
 
-OWNERS = frozenset({"core/paths.py", "core/settings.py"})
+OWNERS = frozenset({"core/config/paths.py", "core/config/settings.py"})
 
 HOME_ROOT = "home-data-root"
 ENV_READ  = "env-read"

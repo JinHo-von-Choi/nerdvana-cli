@@ -15,8 +15,8 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core import run_store
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.run_store import FAILED, RUNNING, STOPPED, SUCCEEDED, RunStore
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext

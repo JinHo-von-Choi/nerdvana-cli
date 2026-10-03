@@ -22,7 +22,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 
 console = Console()
 

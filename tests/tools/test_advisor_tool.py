@@ -11,10 +11,10 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core import paths as core_paths
 from nerdvana_cli.core.advisor import Advice
-from nerdvana_cli.core.managed_policy import load_managed_policy
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.config.managed_policy import load_managed_policy
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolCategory, ToolContext
 from nerdvana_cli.tools.advisor_tool import AdvisorArgs, AdvisorTool
 from nerdvana_cli.tools.registry import create_tool_registry

@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.core import sandbox
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.sandbox import SETUP_FAILED, SandboxPolicy, plan_launch, wrap_command, writable_paths
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 
@@ -211,7 +211,7 @@ async def test_the_bash_tool_without_a_policy_runs_the_plain_shell(tmp_path: Pat
 
 
 def test_the_sandbox_section_loads_and_a_bad_mode_stops_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core.settings import SettingsLoadError
+    from nerdvana_cli.core.config.settings import SettingsLoadError
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))

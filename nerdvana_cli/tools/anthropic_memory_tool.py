@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import unquote
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.tools.memory_tools import _scan_secrets
 from nerdvana_cli.types import ToolResult

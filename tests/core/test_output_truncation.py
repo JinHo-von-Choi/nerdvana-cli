@@ -11,8 +11,8 @@ from typing import Any
 
 import pytest
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.token_estimator import approx_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

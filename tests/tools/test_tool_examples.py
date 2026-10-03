@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.tools.registry import create_tool_registry
 
 WITH_EXAMPLES = ("FileEdit", "replace_symbol_body", "Grep", "Bash", "Agent", "Swarm", "ActivateSkill", "WebFetch")

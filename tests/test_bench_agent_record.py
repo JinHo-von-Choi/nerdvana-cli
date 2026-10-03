@@ -199,7 +199,7 @@ def test_the_no_network_config_cuts_the_network_and_keeps_what_the_user_configur
 
 
 def test_the_generated_config_is_accepted_by_the_settings_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     _user_config(tmp_path, monkeypatch, "")
     settings = NerdvanaSettings.load(str(bench.network_off_config(tmp_path)))

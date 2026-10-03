@@ -21,8 +21,8 @@ from nerdvana_cli.core.command_hooks import (
     make_handler,
     parse_hooks,
 )
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.user_hooks import trust_project_hook

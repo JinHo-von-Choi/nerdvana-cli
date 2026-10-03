@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.paths import user_cache_dir
+from nerdvana_cli.core.config.paths import user_cache_dir
 
 logger = logging.getLogger(__name__)
 

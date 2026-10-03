@@ -23,8 +23,8 @@ from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, St
 from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import Skill
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState
 from nerdvana_cli.core.user_commands import UserCommand, UserCommandLoader

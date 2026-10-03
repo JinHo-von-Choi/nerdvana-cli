@@ -11,9 +11,9 @@ from typing import Any, ClassVar
 
 import pytest
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import ToolResult

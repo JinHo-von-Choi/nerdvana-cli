@@ -35,7 +35,7 @@ from typing import IO, Any
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from nerdvana_cli.cli.cron import Schedule, ScheduleError, parse_schedule
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 
 logger = logging.getLogger(__name__)
 

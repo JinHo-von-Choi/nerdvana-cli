@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
-from nerdvana_cli.core.managed_policy import load_managed_policy
+from nerdvana_cli.core.config import paths
+from nerdvana_cli.core.config.managed_policy import load_managed_policy
 
 
 @dataclass

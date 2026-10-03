@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 Decision = Literal["allowed", "denied", "error"]
 

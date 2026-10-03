@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.token_estimator import approx_tokens
 from nerdvana_cli.tools.registry import create_tool_registry
 

@@ -26,7 +26,7 @@
 - LSP: LspClient (codeintel/lsp_client.py) speaks JSON-RPC 2.0 over stdio to language servers; 4 tools (lsp_diagnostics, lsp_goto_definition, lsp_find_references, lsp_rename) registered with graceful degradation when no server is available
 - Recovery: provider failures are classified (providers/errors.py) and core/provider_recovery.py decides retry with backoff, fallback, compaction, non-streaming resend or give-up; nothing is retried after output streamed. Provider streams are bounded by idle and total timeouts (core/stream_guard.py). End-of-turn hooks (context_limit_recovery, ralph_loop_check) may continue a turn at most 3 times per prompt; the todo guard (core/todos.py) keeps the loop on open todo items until three nudges make no progress
 - Planning gate: opt-in two-phase mode (planning_gate=true in YAML) that forces a Plan agent pass before code execution; child agents always run with planning_gate=False to prevent recursion
-- Model fallback: core/settings.py ModelConfig.fallback_models (`model` or `provider:model`) and max_retries; the original provider, model and key are restored after the run
+- Model fallback: core/config/settings.py ModelConfig.fallback_models (`model` or `provider:model`) and max_retries; the original provider, model and key are restored after the run
 - Custom agents: .nerdvana/agents/*.yml loaded by agents/registry.py at startup, merged on top of builtin definitions
 - Ultrawork: the `ultrawork`/`ulw` keyword adds autonomous tool-use guidance to the system prompt for that prompt; for Anthropic models the same switch turns on provider-side thinking, and thinking blocks are kept across tool turns
 

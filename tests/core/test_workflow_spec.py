@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.core.workflow import (
     ORIGIN_BUNDLED,
     ORIGIN_PROJECT,

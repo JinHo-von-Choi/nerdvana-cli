@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
 from nerdvana_cli.core.progress_monitor import EDIT, OTHER, READ, ProgressMonitor
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.signals import NO_PROGRESS
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

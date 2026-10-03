@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.ui.app import NerdvanaApp
 from nerdvana_cli.ui.editor_pane import EditorPane
 

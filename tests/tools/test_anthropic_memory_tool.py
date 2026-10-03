@@ -15,8 +15,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings
+from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.providers.anthropic_features import declare_tools
 from nerdvana_cli.tools import anthropic_memory_tool as memory

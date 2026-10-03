@@ -22,12 +22,12 @@ from opentelemetry.trace import StatusCode  # noqa: E402
 from nerdvana_cli.core import telemetry_otel  # noqa: E402
 from nerdvana_cli.core.agent_loop import AgentLoop  # noqa: E402
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin  # noqa: E402
+from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings_sections import OtelConfig  # noqa: E402
 from nerdvana_cli.core.hooks import HookContext, HookEvent  # noqa: E402
 from nerdvana_cli.core.otel_semconv import Attr  # noqa: E402
 from nerdvana_cli.core.secrets import MARKER  # noqa: E402
 from nerdvana_cli.core.session import SessionStorage  # noqa: E402
-from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.settings_sections import OtelConfig  # noqa: E402
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry  # noqa: E402
 from nerdvana_cli.providers.base import ProviderEvent  # noqa: E402
 from nerdvana_cli.tools.bash_tool import _build_env  # noqa: E402

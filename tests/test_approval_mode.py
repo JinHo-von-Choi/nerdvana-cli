@@ -43,7 +43,7 @@ class TestPlanningGateCompat:
 
         import yaml
 
-        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.core.config.settings import NerdvanaSettings
 
         cfg = {"session": {"planning_gate": True}}
         with tempfile.NamedTemporaryFile(

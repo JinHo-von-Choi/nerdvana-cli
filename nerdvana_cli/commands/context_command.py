@@ -92,8 +92,8 @@ async def handle_context(app: NerdvanaApp, args: str) -> None:
 def _stored_loop(session_id: str) -> AgentLoop:
     """An agent loop holding the conversation of the stored session *session_id*."""
     from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.core.session import SessionStorage
-    from nerdvana_cli.core.settings import NerdvanaSettings
 
     settings     = NerdvanaSettings.load()
     settings.cwd = os.getcwd()

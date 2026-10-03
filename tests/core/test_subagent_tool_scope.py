@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext
 from nerdvana_cli.tools.agent_tool import AgentToolArgs

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 
 
 @pytest.fixture(autouse=True)

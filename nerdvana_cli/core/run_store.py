@@ -34,7 +34,7 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 
 logger = logging.getLogger(__name__)
 

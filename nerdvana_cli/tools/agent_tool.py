@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.agent_scope import apply_write_scope
-from nerdvana_cli.core.model_routing import apply_model_spec, select_model
+from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus

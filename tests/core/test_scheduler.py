@@ -38,7 +38,7 @@ from nerdvana_cli.cli.scheduler import (
     systemd_unit,
     validate_job,
 )
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 
 FAKE = textwrap.dedent('''
     import json, os, sys, time

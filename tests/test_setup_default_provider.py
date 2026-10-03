@@ -82,7 +82,7 @@ def test_wizard_default_no_saved_config(tmp_path, monkeypatch):
 
     cfg_path = tmp_path / "nerdvana.yml"
     monkeypatch.setattr(
-        "nerdvana_cli.core.paths.user_config_path",
+        "nerdvana_cli.core.config.paths.user_config_path",
         lambda: cfg_path,
     )
 
@@ -100,7 +100,7 @@ def test_wizard_default_with_saved_provider_in_config(tmp_path, monkeypatch):
     cfg_path.write_text(yaml.dump({"model": {"provider": "groq", "model": "llama-3.3-70b-versatile"}}))
 
     monkeypatch.setattr(
-        "nerdvana_cli.core.paths.user_config_path",
+        "nerdvana_cli.core.config.paths.user_config_path",
         lambda: cfg_path,
     )
 

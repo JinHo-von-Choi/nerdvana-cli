@@ -27,11 +27,11 @@ from typing import TYPE_CHECKING, Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
+from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.mcp.config import McpServerConfig
 
 logger = logging.getLogger(__name__)
@@ -230,7 +230,7 @@ class ManagedPolicy:
 
     def _restrict_models(self, settings: NerdvanaSettings) -> dict[str, list[str]]:
         """Drop the fallback, escalation, advisor and category models the policy refuses; returns what was dropped."""
-        from nerdvana_cli.core.provider_recovery import parse_fallback
+        from nerdvana_cli.core.config.model_routing import parse_fallback
 
         provider = settings.model.provider
 

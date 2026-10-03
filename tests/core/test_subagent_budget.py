@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nerdvana_cli.core.budget import MIN_ENVELOPE, Budget
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext

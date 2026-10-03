@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, replace
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.token_estimator import approx_tokens
 
 MAX_INSTRUCTION_BYTES = 50_000

@@ -36,8 +36,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-MODES = ("off", "auto", "require")
-
 # Exit status of the launcher when the restriction could not be set up. The command
 # never runs in that case.
 SETUP_FAILED = 125

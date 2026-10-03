@@ -16,9 +16,9 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
 from nerdvana_cli.core.policy import PermissionPolicy
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import label_confirm
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry

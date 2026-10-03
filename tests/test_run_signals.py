@@ -13,8 +13,8 @@ import pytest
 
 from nerdvana_cli.cli.run_output import RunResult
 from nerdvana_cli.core import signals
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.signals import classify_result
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

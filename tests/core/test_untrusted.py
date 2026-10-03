@@ -9,8 +9,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.signals import UNTRUSTED_SOURCE
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
@@ -87,7 +87,7 @@ def test_only_untrusted_sources_are_remembered_and_old_output_ages_out() -> None
 
 
 def test_settings_switch_defaults_on() -> None:
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     assert NerdvanaSettings().permissions.gate_untrusted_sources is True
     off = NerdvanaSettings()

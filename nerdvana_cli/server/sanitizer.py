@@ -38,7 +38,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 # ---------------------------------------------------------------------------
 # Constants

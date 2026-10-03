@@ -15,6 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context_budget import IMAGE_TOKENS, message_tokens
 from nerdvana_cli.core.images import (
     MAX_IMAGE_BYTES,
@@ -25,7 +26,6 @@ from nerdvana_cli.core.images import (
     transcript_text,
 )
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.main import app
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider

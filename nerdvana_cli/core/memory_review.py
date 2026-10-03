@@ -26,7 +26,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
 from nerdvana_cli.core.memory_index import MemorySource
 

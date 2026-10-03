@@ -89,7 +89,7 @@ def memory_list(
 
     # PROJECT_RULE is NIRNA.md — direct file listing not meaningful via list_memories
     if resolved == MemoryScope.PROJECT_RULE:
-        from nerdvana_cli.core import paths as core_paths
+        from nerdvana_cli.core.config import paths as core_paths
 
         nirnamd = core_paths.project_nirnamd_path(_cwd())
         if nirnamd.exists():
@@ -153,7 +153,7 @@ def memory_purge(
     scope: str = typer.Option("project", "--scope", help="Scope to purge: project | global."),
 ) -> None:
     """Delete all memories in the given scope."""
-    from nerdvana_cli.core import paths as core_paths
+    from nerdvana_cli.core.config import paths as core_paths
 
     resolved = _resolve_scope(scope)
 

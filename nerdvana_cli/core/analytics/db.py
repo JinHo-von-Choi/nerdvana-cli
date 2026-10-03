@@ -22,7 +22,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 DDL = """
 CREATE TABLE IF NOT EXISTS tool_calls (

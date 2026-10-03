@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field, field_validator
 # The smallest result cap tools.max_result_chars accepts, in characters.
 MIN_RESULT_CHARS = 1000
 
+# The values of sandbox.mode, from the least to the most strict.
+SANDBOX_MODES = ("off", "auto", "require")
+
 
 class SkillsConfig(BaseModel):
     # Also scan ~/.claude/skills and <cwd>/.claude/skills, one tier below the

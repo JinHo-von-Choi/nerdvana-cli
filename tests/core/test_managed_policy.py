@@ -12,14 +12,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core.managed_policy import (
+from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.config.managed_policy import (
     ManagedPolicy,
     ManagedPolicyError,
     load_managed_policy,
     scan_managed_policy,
 )
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 
 
 @pytest.fixture
@@ -364,7 +364,7 @@ class TestMcpAllowList:
 
 class TestEntryPoints:
     def test_apply_model_spec_refuses_a_model_outside_the_policy(self, managed: Path, tmp_path: Path) -> None:
-        from nerdvana_cli.core.model_routing import apply_model_spec
+        from nerdvana_cli.core.config.model_routing import apply_model_spec
 
         _write(managed, "10-a.yml", "model:\n  allowed_models: ['claude-*']\n")
         settings = _settings_with(tmp_path)

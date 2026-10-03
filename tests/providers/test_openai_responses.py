@@ -142,7 +142,7 @@ def test_the_setting_defaults_to_auto_and_reaches_the_provider() -> None:
     from pydantic import ValidationError
 
     from nerdvana_cli.core.agent_loop import AgentLoop
-    from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings
+    from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
 
     assert ModelConfig().openai_api == "auto"
     with pytest.raises(ValidationError):

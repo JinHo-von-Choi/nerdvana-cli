@@ -72,7 +72,7 @@ def code_env_vars() -> set[str]:
     Nested model fields are excluded on purpose: their env override expects a
     JSON document, so documenting them as plain strings would be a lie.
     """
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     literal = re.compile(r"NERDVANA_[A-Z0-9_]+")
     names: set[str] = set()
@@ -103,7 +103,7 @@ def code_tool_names() -> set[str]:
     describes them either way.
     """
     from nerdvana_cli.codeintel.lsp_client import LspClient
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.tools.lsp import create_lsp_tools
     from nerdvana_cli.tools.parism_tool import ParismTool
     from nerdvana_cli.tools.registry import create_tool_registry
@@ -154,7 +154,7 @@ def code_settings_sections() -> dict[str, set[str]]:
     """Field names of every nested settings section, keyed by its YAML name."""
     from pydantic import BaseModel
 
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     sections: dict[str, set[str]] = {}
     for name, info in NerdvanaSettings.model_fields.items():
@@ -166,7 +166,7 @@ def code_settings_sections() -> dict[str, set[str]]:
 
 def code_paths() -> dict[str, str]:
     """Canonical user-data paths, written the way documentation writes them."""
-    from nerdvana_cli.core import paths as core_paths
+    from nerdvana_cli.core.config import paths as core_paths
 
     home = str(Path.home())
 
@@ -356,7 +356,7 @@ def check_paths(docs: dict[str, str], report: Report) -> None:
     for name, text in docs.items():
         for number, line in enumerate(text.splitlines(), start=1):
             if LEGACY_CONFIG_DIR in line and not LEGACY_CONTEXT.search(line):
-                report.add(name, f"line {number} points at {LEGACY_CONFIG_DIR}, not the path core.paths returns")
+                report.add(name, f"line {number} points at {LEGACY_CONFIG_DIR}, not the path core.config.paths returns")
 
     joined = "\n".join(docs.values())
     for key, path in expected.items():

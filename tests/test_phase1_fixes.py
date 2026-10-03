@@ -19,7 +19,7 @@ from nerdvana_cli.core.agent_loop import (
     TOOL_STATUS_PREFIX,
     AgentLoop,
 )
-from nerdvana_cli.core.settings import (
+from nerdvana_cli.core.config.settings import (
     AdvisorConfig,
     ModelConfig,
     NerdvanaSettings,

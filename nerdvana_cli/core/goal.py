@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 logger = logging.getLogger(__name__)
 

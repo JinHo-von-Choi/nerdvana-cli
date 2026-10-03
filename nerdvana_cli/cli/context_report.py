@@ -19,9 +19,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from nerdvana_cli.core.config.settings import SessionConfig
 from nerdvana_cli.core.context_budget import message_tokens
 from nerdvana_cli.core.observation_mask import mask_observations
-from nerdvana_cli.core.settings import SessionConfig
 from nerdvana_cli.core.token_estimator import approx_tokens
 from nerdvana_cli.core.tool_index import declaration_tokens
 from nerdvana_cli.types import Role

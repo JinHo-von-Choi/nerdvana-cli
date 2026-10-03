@@ -23,8 +23,8 @@ from typing import Any
 from unittest.mock import patch
 
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import ToolResult

@@ -16,7 +16,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from nerdvana_cli.providers.base import ProviderName
+from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.providers.errors import AUTH, CONTEXT_LIMIT, DECODE, RETRYABLE, ProviderFailure
 
 RETRY    = "retry"
@@ -25,28 +25,12 @@ COMPACT  = "compact"
 RESEND   = "resend"
 GIVE_UP  = "give_up"
 
-_PROVIDER_NAMES: frozenset[str] = frozenset(p.value for p in ProviderName)
-
-
 class ProviderCallError(Exception):
     """A provider reported failure through an error event rather than raising."""
 
     def __init__(self, message: str, failure: ProviderFailure) -> None:
         super().__init__(message)
         self.failure = failure
-
-
-def parse_fallback(entry: str) -> tuple[str | None, str]:
-    """Split a fallback entry into (provider, model).
-
-    ``provider:model`` names another provider; anything else is a model on the
-    current provider. Model names may contain colons (``llama3:8b``), so the
-    prefix only counts when it is a known provider name.
-    """
-    head, sep, tail = entry.partition(":")
-    if sep and head in _PROVIDER_NAMES and tail:
-        return head, tail
-    return None, entry
 
 
 @dataclass(frozen=True)

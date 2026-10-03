@@ -32,9 +32,9 @@ from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentTypeRegistry
 from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.budget import MIN_ENVELOPE, Budget
-from nerdvana_cli.core.model_routing import apply_model_spec, select_model
+from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.sandbox import SandboxPolicy
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig, SubagentRegistryFactory
 from nerdvana_cli.core.tool import BaseTool, ConfirmCallback

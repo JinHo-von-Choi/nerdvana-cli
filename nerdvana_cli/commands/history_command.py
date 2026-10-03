@@ -16,7 +16,7 @@ from rich.markup import escape
 
 from nerdvana_cli.cli.history_search import INDEX_FILENAME, Hit, search_history
 from nerdvana_cli.commands.cost_command import parse_since
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp

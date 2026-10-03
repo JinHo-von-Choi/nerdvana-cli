@@ -28,7 +28,7 @@ from nerdvana_cli.core.classifier import (
     parse_verdict,
     provider_completion,
 )
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 
 
 class _Fake:
@@ -231,7 +231,7 @@ def test_the_classifier_exists_only_when_the_setting_turns_it_on() -> None:
 
 
 def test_a_bare_off_in_yaml_means_off_and_a_typo_stops_the_start(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core.settings import SettingsLoadError
+    from nerdvana_cli.core.config.settings import SettingsLoadError
 
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     config = tmp_path / "c.yml"

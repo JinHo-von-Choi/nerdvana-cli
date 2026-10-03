@@ -17,19 +17,18 @@ import pytest
 
 from nerdvana_cli.core import egress_proxy
 from nerdvana_cli.core.agent_scope import apply_write_scope
+from nerdvana_cli.core.config.egress_rules import ProxyCredential, normalize_pattern
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.core.egress_proxy import (
     EgressProxy,
     PreparedLaunch,
     host_allowed,
     host_matches,
     is_public_address,
-    normalize_pattern,
     parse_request,
     split_host_port,
 )
 from nerdvana_cli.core.sandbox import Launch, SandboxPolicy, plan_launch, proxy_environment
-from nerdvana_cli.core.secrets import ProxyCredential
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.core.signals import EGRESS_DENIED, classify_result
 
 
@@ -453,7 +452,7 @@ def test_bad_egress_settings_stop_startup(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 def test_the_secrets_section_cannot_be_overridden_from_the_command_line() -> None:
-    from nerdvana_cli.core.settings import apply_settings_overrides
+    from nerdvana_cli.core.config.settings import apply_settings_overrides
 
     with pytest.raises(ValueError, match="cannot change"):
         apply_settings_overrides(NerdvanaSettings(), ["secrets.proxy_credentials={a.example: TOKEN}"])

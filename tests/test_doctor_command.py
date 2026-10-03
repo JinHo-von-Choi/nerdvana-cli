@@ -86,8 +86,8 @@ class TestCheckInstallPaths:
         install_dir.mkdir()
 
         with (
-            patch("nerdvana_cli.core.paths.user_data_home", return_value=data_dir),
-            patch("nerdvana_cli.core.paths.install_root",   return_value=install_dir),
+            patch("nerdvana_cli.core.config.paths.user_data_home", return_value=data_dir),
+            patch("nerdvana_cli.core.config.paths.install_root",   return_value=install_dir),
         ):
             r = _check_install_paths()
 
@@ -99,8 +99,8 @@ class TestCheckInstallPaths:
         missing = tmp_path / "nonexistent"
 
         with (
-            patch("nerdvana_cli.core.paths.user_data_home", return_value=missing),
-            patch("nerdvana_cli.core.paths.install_root",   return_value=missing),
+            patch("nerdvana_cli.core.config.paths.user_data_home", return_value=missing),
+            patch("nerdvana_cli.core.config.paths.install_root",   return_value=missing),
         ):
             r = _check_install_paths()
 
@@ -116,8 +116,8 @@ class TestCheckInstallPaths:
 
         try:
             with (
-                patch("nerdvana_cli.core.paths.user_data_home", return_value=ro_dir),
-                patch("nerdvana_cli.core.paths.install_root",   return_value=ro_dir),
+                patch("nerdvana_cli.core.config.paths.user_data_home", return_value=ro_dir),
+                patch("nerdvana_cli.core.config.paths.install_root",   return_value=ro_dir),
             ):
                 r = _check_install_paths()
             assert r.status == "warn"

@@ -262,7 +262,7 @@ async def test_check_onboarding_done(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_onboarding_creates_stamp(tmp_path: Path) -> None:
-    from nerdvana_cli.core import paths as core_paths
+    from nerdvana_cli.core.config import paths as core_paths
     tool   = OnboardingTool()
     ctx    = _ctx(tmp_path)
     result = await tool.call(None, ctx, can_use_tool=None)

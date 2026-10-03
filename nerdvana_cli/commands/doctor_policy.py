@@ -11,7 +11,7 @@ from nerdvana_cli.commands.doctor_result import CheckResult
 
 def check_managed_policy() -> CheckResult:
     """Report the managed settings files that applied and every one that could not be read."""
-    from nerdvana_cli.core.managed_policy import scan_managed_policy
+    from nerdvana_cli.core.config.managed_policy import scan_managed_policy
 
     policy, problems = scan_managed_policy()
     if problems:

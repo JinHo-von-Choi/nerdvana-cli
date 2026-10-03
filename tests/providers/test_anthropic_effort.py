@@ -378,8 +378,8 @@ async def test_send_reports_thinking_tokens_read_by_the_real_sdk() -> None:
 
 def test_the_loop_accepts_usage_with_extra_keys(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.core.session import SessionStorage
-    from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.core.tool import ToolRegistry
 
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))

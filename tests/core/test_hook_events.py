@@ -16,10 +16,10 @@ import pytest
 from nerdvana_cli.core import model_failover, signals
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.command_hooks import CommandHook, make_handler, parse_hooks
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.loop_context import session_start_context
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.providers.errors import RETRYABLE

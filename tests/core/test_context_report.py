@@ -19,8 +19,8 @@ from nerdvana_cli.cli.context_report import (
     role_items,
     system_prompt_items,
 )
+from nerdvana_cli.core.config.settings import SessionConfig
 from nerdvana_cli.core.observation_mask import placeholder_for
-from nerdvana_cli.core.settings import SessionConfig
 from nerdvana_cli.core.token_estimator import approx_tokens
 from nerdvana_cli.types import Message, Role
 

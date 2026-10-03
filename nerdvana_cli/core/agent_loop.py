@@ -44,6 +44,7 @@ from nerdvana_cli.core.compact import (
     compact_messages,
     drop_orphan_tool_results,
 )
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context_budget import ContextBudget
 from nerdvana_cli.core.context_reminder import ContextReminder
 from nerdvana_cli.core.goal import Goal
@@ -74,7 +75,6 @@ from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.core.server_compaction import ServerCompaction
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.subagent_config import LoopFactories

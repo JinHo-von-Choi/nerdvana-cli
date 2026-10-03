@@ -14,9 +14,9 @@ import pytest
 from nerdvana_cli.commands.approvals_command import build_report, render
 from nerdvana_cli.core.analytics import AnalyticsReader, AnalyticsWriter
 from nerdvana_cli.core.approvals import Suggestion, normalise, suggest_rules
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks import HookEngine
 from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult

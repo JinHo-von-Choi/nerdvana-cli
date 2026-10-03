@@ -25,10 +25,10 @@ from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.analytics import AnalyticsWriter
 from nerdvana_cli.core.checkpoint import CheckpointManager
 from nerdvana_cli.core.compact import compact_messages
+from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SessionConfig
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import Message, Role, ToolResult

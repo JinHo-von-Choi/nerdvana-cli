@@ -106,7 +106,7 @@ def test_the_factory_builds_the_variant_only_for_gemini() -> None:
 
 def test_the_setting_defaults_to_generate_content_and_reaches_the_provider() -> None:
     from nerdvana_cli.core.agent_loop import AgentLoop
-    from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings
+    from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
 
     assert ModelConfig().gemini_api == "generate_content"
     with pytest.raises(ValidationError):

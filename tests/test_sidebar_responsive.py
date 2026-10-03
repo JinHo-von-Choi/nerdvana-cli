@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.ui.app import NerdvanaApp
 
 

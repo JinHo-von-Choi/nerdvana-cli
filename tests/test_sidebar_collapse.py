@@ -49,7 +49,7 @@ async def test_tools_section_height_grows_when_toggled_in_tui() -> None:
     flipped but the body stayed hidden. With refresh(layout=True) Textual
     re-measures and the section height follows render() output.
     """
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.ui.app import NerdvanaApp
 
     app = NerdvanaApp(settings=NerdvanaSettings())

@@ -17,8 +17,8 @@ from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Prompt
 
-from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+from nerdvana_cli.core.config.migrate import run_if_needed as _migrate_run
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.core.telemetry_otel import setup as setup_tracing
 
 console        = Console()
@@ -44,7 +44,7 @@ def load_settings(config_path: str | None = None) -> NerdvanaSettings:
 
 def enforce_managed_policy(settings: NerdvanaSettings) -> None:
     """Apply the managed policy once every command line option is in; a model it refuses ends the command."""
-    from nerdvana_cli.core.managed_policy import ManagedPolicyError
+    from nerdvana_cli.core.config.managed_policy import ManagedPolicyError
 
     try:
         settings.managed_policy.enforce(settings)
