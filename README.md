@@ -690,6 +690,7 @@ mypy nerdvana_cli/
 | [docs/scheduling.md](docs/scheduling.md) | Scheduled runs: cron and interval jobs, the daemon, cost ceilings |
 | [docs/workflows.md](docs/workflows.md) | Declared multi-agent workflows: steps, fan-out, cross-checking, resume, cost ceiling |
 | [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
+| [docs/architecture.md](docs/architecture.md) | Packages, the core subpackages and the allowed dependency direction |
 | [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
 | [docs/testing-live.md](docs/testing-live.md) | Live provider test matrix and secrets setup |

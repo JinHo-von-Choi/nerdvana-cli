@@ -183,25 +183,25 @@ cannot import from `core`: the sub-agent runner, the sub-agent registry and the
 ToolSearch tool (`LoopFactories` in `nerdvana_cli/core/loop/subagent_config.py`).
 
 The loop keeps the request cycle and hands its other concerns to collaborators
-in `nerdvana_cli/core/`:
+in the subpackages of `nerdvana_cli/core/` (see [architecture.md](architecture.md)):
 
 | Module | Class or functions | Concern |
 |-|-|-|
-| `run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
-| `model_failover.py` | `ModelFailover` | advice and escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
-| `advisor.py` | `Advisor` | the consultations of the `Advisor` tool and of the signal-triggered advice: what is sent, the call cap, the cost (see [advisor.md](advisor.md)) |
-| `phase_effort.py` | `PhaseEffort`, `phase_level` | reasoning effort per phase: planning, implementation, verification |
-| `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/context/compact.py` as the fallback |
-| `compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |
-| `goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |
-| `input_queue.py` | `InputQueue` | text typed while the agent works |
-| `rewind.py` | `Rewinder` | prompt marks and `/rewind` |
-| `plan_gate.py` | `plan_for`, `draft_plan` | the planning gate's plan sub-agent |
-| `loop_context.py` | `provider_messages`, `background_reports`, `open_todos_note`, `session_start_context`, `prepare_tools`, `new_provider` | messages and prompt text the loop adds around the history, the tool list of a run and the provider adapter built from the settings |
+| `loop/run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
+| `loop/model_failover.py` | `ModelFailover` | advice and escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `loop/advisor.py` | `Advisor` | the consultations of the `Advisor` tool and of the signal-triggered advice: what is sent, the call cap, the cost (see [advisor.md](advisor.md)) |
+| `loop/phase_effort.py` | `PhaseEffort`, `phase_level` | reasoning effort per phase: planning, implementation, verification |
+| `context/server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/context/compact.py` as the fallback |
+| `state/compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |
+| `loop/goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |
+| `loop/input_queue.py` | `InputQueue` | text typed while the agent works |
+| `state/rewind.py` | `Rewinder` | prompt marks and `/rewind` |
+| `loop/plan_gate.py` | `plan_for`, `draft_plan` | the planning gate's plan sub-agent |
+| `context/loop_context.py` | `provider_messages`, `background_reports`, `open_todos_note`, `session_start_context`, `prepare_tools`, `new_provider` | messages and prompt text the loop adds around the history, the tool list of a run and the provider adapter built from the settings |
 
-`ToolExecutor` (`tool_executor.py`) likewise leaves the permission check to
-`PermissionGate` and `ask_user_permission` (`tool_permission.py`) and the edit
-scope, goal scope and pre-edit checkpoint to `edit_guard.py`.
+`ToolExecutor` (`execution/tool_executor.py`) likewise leaves the permission check to
+`PermissionGate` and `ask_user_permission` (`safety/tool_permission.py`) and the edit
+scope, goal scope and pre-edit checkpoint to `safety/edit_guard.py`.
 
 `AgentLoop._loop` (in `nerdvana_cli/core/loop/agent_loop.py`) delegates to four focused helpers:
 
