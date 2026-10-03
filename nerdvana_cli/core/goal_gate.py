@@ -16,6 +16,7 @@ from nerdvana_cli.core import signals
 from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
 from nerdvana_cli.core.loop_state import LoopFlow
+from nerdvana_cli.core.phase_effort import VERIFICATION
 from nerdvana_cli.core.verify import run_verify
 from nerdvana_cli.types import Message, Role
 
@@ -98,7 +99,7 @@ class GoalGate:
         """Run the verification command of *goal* now that the model says it is done.
 
         A pass ends the run; running out of attempts ends it as unmet; otherwise the failure is put in
-        front of the model and the run goes on (``flow.finished`` stays False).
+        front of the model and the run goes on (``flow.finished`` stays False) at the verification effort.
         """
         loop   = self._loop
         config = loop.settings.goal
@@ -123,6 +124,7 @@ class GoalGate:
             yield f"[bold yellow]Goal not met after {goal.attempts} verification attempts ({result.summary()}). Stopping.[/bold yellow]\n"
             return
         yield f"[yellow]Verification failed ({result.summary()}); the agent continues.[/yellow]\n"
+        loop.phase_effort.enter(VERIFICATION)
         loop.state.messages.append(Message(role=Role.USER, content=_VERIFY_FAILED.format(
             command=goal.verify, summary=result.summary(), attempt=goal.attempts, limit=goal.max_attempts, tail=result.tail.strip(),
         )))

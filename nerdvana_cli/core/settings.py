@@ -85,6 +85,12 @@ class ModelConfig(BaseModel):
     # How hard models reason, in the provider's own words (Anthropic ``output_config.effort``,
     # OpenAI ``reasoning_effort``, Gemini ``thinking_level``). Empty keeps the provider default.
     reasoning_effort: str = ""
+    # Reasoning effort per phase of a run, in the same words as reasoning_effort: the plan agent drafts at
+    # effort_planning, the main run works at effort_implementation, and the turns after a failed goal
+    # verification run at effort_verification. Empty = reasoning_effort for that phase.
+    effort_planning:       str = ""
+    effort_implementation: str = ""
+    effort_verification:   str = ""
     # Which OpenAI API OpenAI-compatible providers use: "auto" speaks Responses to OpenAI's own endpoint and
     # Chat Completions to every other server (Groq, Ollama, OpenRouter, ...); "chat" and "responses" force one.
     openai_api: Literal["auto", "chat", "responses"] = "auto"

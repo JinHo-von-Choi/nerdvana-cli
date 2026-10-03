@@ -69,7 +69,7 @@ goal of the session, and an explicit goal, even a paused one, replaces it. Sub-a
 `goal.max_attempts` bounds it too: a check that keeps failing ends the run the way an unmet goal does
 (`error_goal_unmet`, exit code 3). `verify_failed` is also what starts the model escalation
 (`session.escalation_model`, `session.escalation_signals`), so a model that cannot get the tests to pass can
-hand over to the stronger one before the attempts run out.
+hand over to the stronger one before the attempts run out. The turns after a failed check run at `model.effort_verification` when it is set.
 
 ## Runs that go nowhere
 

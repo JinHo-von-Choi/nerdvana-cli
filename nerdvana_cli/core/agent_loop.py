@@ -64,6 +64,7 @@ from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
 from nerdvana_cli.core.loop_support import classifier_feed, with_compaction_hooks
 from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.observation_mask import mask_observations
+from nerdvana_cli.core.phase_effort import PhaseEffort
 from nerdvana_cli.core.plan_gate import plan_for
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
@@ -164,6 +165,7 @@ class AgentLoop:
         self.last_stop            = "completed"
         self.turns_used           = 0
         self.goal_gate            = GoalGate(self)
+        self.phase_effort         = PhaseEffort(self)
         self.server_compaction    = ServerCompaction(self)
         self.failover             = ModelFailover(self)
         self.rewinder             = Rewinder(self)
@@ -606,7 +608,7 @@ class AgentLoop:
         tool_ctx = self._new_tool_context()
         self.goal_gate.start_run()
         state    = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
-        saved    = self.failover.model_state()
+        saved    = self.failover.begin_run()
         self._context_budget.set_overhead(system_prompt, tools)
         recovery = RecoveryPlanner(
             fallbacks   = list(self.settings.model.fallback_models),
