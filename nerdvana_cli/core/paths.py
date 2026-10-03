@@ -12,6 +12,7 @@ Legacy locations (for migration and backwards-compat detection only):
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -217,6 +218,13 @@ def project_memories_dir(cwd: str) -> Path:
 def project_onboarding_dir(cwd: str) -> Path:
     """Project-local onboarding stamp directory."""
     return Path(cwd) / ".nerdvana" / "memories" / "onboarding"
+
+
+def project_memory_tool_dir(cwd: str) -> Path:
+    """Directory behind Anthropic's memory tool for the project at *cwd* (data root, one directory per project)."""
+    root   = Path(cwd).expanduser().resolve()
+    digest = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:12]
+    return user_data_home() / "memory-tool" / f"{root.name or 'root'}-{digest}"
 
 
 def global_memories_dir() -> Path:

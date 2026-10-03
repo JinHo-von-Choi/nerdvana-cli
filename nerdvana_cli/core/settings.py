@@ -88,6 +88,9 @@ class ModelConfig(BaseModel):
     # and sends the signed summary back in place of the messages it replaced. core/compact.py stays the
     # fallback for every other provider and for a model that does not support it.
     anthropic_compaction: Literal["off", "on"] = "off"
+    # Anthropic only. Declares Anthropic's client-side memory tool; the files live in a per-project directory of
+    # the data root.
+    anthropic_memory_tool: bool = False
 
     @field_validator("anthropic_tool_search", "anthropic_compaction", mode="before")
     @classmethod

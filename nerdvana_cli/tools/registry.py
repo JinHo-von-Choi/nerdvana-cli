@@ -15,9 +15,10 @@ from nerdvana_cli.tools.web_tools import WebFetchTool, WebSearchTool
 
 
 def _register_skill_and_agent_tools(registry: ToolRegistry, settings: Any, task_registry: Any) -> None:
-    """Register ActivateSkill (when some skill can be activated by the model) and the Agent tool."""
+    """Register ActivateSkill (when some skill can be activated by the model), the Agent tool and, when enabled, the memory tool."""
     from nerdvana_cli.core.skills import SkillLoader
     from nerdvana_cli.tools.agent_tool import AgentTool
+    from nerdvana_cli.tools.anthropic_memory_tool import create_memory_tool
     from nerdvana_cli.tools.skill_tool import ActivateSkillTool
 
     loader = SkillLoader.from_settings(settings)
@@ -25,6 +26,8 @@ def _register_skill_and_agent_tools(registry: ToolRegistry, settings: Any, task_
     if loader.model_skills():
         registry.register(ActivateSkillTool(loader))
     registry.register(AgentTool(settings=settings, task_registry=task_registry, parent_registry=registry))
+    if (memory := create_memory_tool(settings)) is not None:
+        registry.register(memory)
 
 
 def create_tool_registry(
