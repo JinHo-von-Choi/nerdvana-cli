@@ -8,6 +8,7 @@ from typing import Any, Literal, TypeVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nerdvana_cli.core import paths as core_paths
@@ -70,8 +71,8 @@ class ModelConfig(BaseModel):
     extended_thinking: bool = False
     thinking_budget: int = 8192
     show_thinking: bool = True
-    # How hard OpenAI-compatible and Gemini models reason, in the provider's own words
-    # (OpenAI ``reasoning_effort``, Gemini ``thinking_level``). Empty keeps the provider default.
+    # How hard models reason, in the provider's own words (Anthropic ``output_config.effort``,
+    # OpenAI ``reasoning_effort``, Gemini ``thinking_level``). Empty keeps the provider default.
     reasoning_effort: str = ""
     # Which OpenAI API OpenAI-compatible providers use: "auto" speaks Responses to OpenAI's own endpoint and
     # Chat Completions to every other server (Groq, Ollama, OpenRouter, ...); "chat" and "responses" force one.
@@ -79,6 +80,22 @@ class ModelConfig(BaseModel):
     # Which Gemini API the gemini provider uses: "generate_content" (the default until the Interactions path is
     # verified against the live API), "interactions" (stateless, ``store: false``), or "auto" (picks Interactions).
     gemini_api: Literal["auto", "generate_content", "interactions"] = "generate_content"
+    # Anthropic only. Server-side tool search: MCP tools are declared with defer_loading plus Anthropic's BM25 or
+    # regex search tool, so the model discovers them without the local ToolSearch tool. "off" keeps every
+    # declaration as it is.
+    anthropic_tool_search: Literal["off", "bm25", "regex"] = "off"
+    # Anthropic only. Server-side compaction (beta): the provider can ask the API to summarize the conversation
+    # and sends the signed summary back in place of the messages it replaced. core/compact.py stays the
+    # fallback for every other provider and for a model that does not support it.
+    anthropic_compaction: Literal["off", "on"] = "off"
+
+    @field_validator("anthropic_tool_search", "anthropic_compaction", mode="before")
+    @classmethod
+    def _unquoted_yaml_switches(cls, value: Any, info: ValidationInfo) -> Any:
+        """YAML reads an unquoted ``off`` as False and ``on`` as True; take them as the words they were written as."""
+        if value is False:
+            return "off"
+        return "on" if value is True and info.field_name == "anthropic_compaction" else value
 
 
 class PermissionConfig(BaseModel):

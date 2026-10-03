@@ -399,10 +399,10 @@ async def test_the_effort_is_the_thinking_level_in_the_interactions_generation_c
     assert "reasoning_effort" not in create.await_args.kwargs
 
 
-async def test_anthropic_requests_do_not_carry_the_effort() -> None:
+async def test_the_effort_is_output_config_effort_in_the_anthropic_request() -> None:
     adapter = next(a for a in ADAPTERS if a.name == "anthropic")
     _, create = await _stream(adapter, [], effort="high")
-    assert "high" not in json.dumps(create.await_args.kwargs, default=str)
+    assert create.await_args.kwargs["extra_body"] == {"output_config": {"effort": "high"}}
     assert "reasoning_effort" not in create.await_args.kwargs
 
 

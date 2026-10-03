@@ -25,7 +25,6 @@ KNOWN_LONG: dict[str, int] = {
     "providers/openai_provider.py:OpenAIProvider.stream": 141,
     "main.py:run": 121,
     "tools/file_tools.py:FileEditTool.call": 116,
-    "providers/anthropic_provider.py:AnthropicProvider.stream": 110,
     "core/activity_state.py:summarize_tool_call": 108,
     "core/agent_loop.py:AgentLoop.__init__": 102,
     "commands/model_commands.py:switch_provider": 95,

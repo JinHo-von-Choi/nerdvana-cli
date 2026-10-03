@@ -105,6 +105,9 @@ class ProviderConfig:
     # Which Gemini API the Gemini adapter speaks: ``generate_content``, ``interactions`` or ``auto``
     # (which picks Interactions).
     gemini_api: str = "generate_content"
+    # Anthropic only: ``off``, ``bm25`` or ``regex`` server-side tool search, and ``off`` or ``on`` server-side compaction.
+    anthropic_tool_search: str = "off"
+    anthropic_compaction: str = "off"
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
