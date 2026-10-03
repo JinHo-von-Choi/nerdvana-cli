@@ -1,4 +1,4 @@
-"""Diff-preview CodeEditor for Phase D: ReplaceSymbolBody 2-step workflow.
+"""Diff-preview CodeEditor: the ReplaceSymbolBody 2-step workflow.
 
 Manages a session-scoped preview store (max 20, LRU eviction).
 Each preview captures a WorkspaceEdit + per-file SHA256 fingerprints.
@@ -212,7 +212,7 @@ class CodeEditor:
 
         return {"status": "applied", "changed_files": result.get("changed_files", [])}
 
-    # -- new Phase D.1 prepare methods --
+    # -- insert and delete prepare methods --
 
     def prepare_insert_before(
         self,

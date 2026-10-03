@@ -91,13 +91,6 @@ class Usage:
 
 
 @dataclass
-class ToolProgress:
-    tool_name: str
-    status: str
-    detail: str = ""
-
-
-@dataclass
 class SessionState:
     """Mutable state for the agent loop — replaced atomically each turn."""
 

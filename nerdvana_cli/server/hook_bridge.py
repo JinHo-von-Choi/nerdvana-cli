@@ -5,13 +5,9 @@ applies sanitisation, records to audit DB, and writes a JSON response to
 stdout.
 
 Supported hook types (Claude Code / Codex / VSCode):
-  - pre-tool-use      → permission decision + optional context injection
-  - post-tool-use     → additional context injection
-  - prompt-submit     → additional context injection (AnchorMind placeholder)
-
-AnchorMind injection is opt-in via ``nerdvana.yml`` key
-``hooks.anchormind_inject`` (default ``false``).  When disabled a placeholder
-comment is returned instead of a real recall result.
+  - pre-tool-use      → permission decision
+  - post-tool-use     → additional context from the tool output
+  - prompt-submit     → the prompt, sanitised; a rejected prompt is denied
 
 작성자: 최진호
 작성일: 2026-04-18
@@ -30,7 +26,6 @@ from nerdvana_cli.core.config import paths
 from nerdvana_cli.server.hook_schemas import (
     HOOK_NAMES,
     HookResponse,
-    PermissionDecision,
     make_response,
 )
 from nerdvana_cli.server.sanitizer import SanitizerAudit, SanitizeResult, sanitize
@@ -70,19 +65,11 @@ class HookBridge:
     ----------
     db_path:
         Path to ``audit.sqlite``.  Defaults to ``audit.sqlite`` in the user data root.
-    anchormind_inject:
-        When ``True``, the ``prompt-submit`` handler will attempt to inject
-        AnchorMind recall context.  Currently always a placeholder.
     """
 
-    def __init__(
-        self,
-        db_path:           Path | None = None,
-        anchormind_inject: bool        = False,
-    ) -> None:
-        self._db_path          : Path           = db_path or paths.server_store_path("audit.sqlite")
-        self._anchormind_inject: bool           = anchormind_inject
-        self._audit            : SanitizerAudit | None = None
+    def __init__(self, db_path: Path | None = None) -> None:
+        self._db_path: Path                  = db_path or paths.server_store_path("audit.sqlite")
+        self._audit  : SanitizerAudit | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -120,21 +107,9 @@ class HookBridge:
     # ------------------------------------------------------------------
 
     def _handle_pre_tool_use(self, payload: dict[str, Any]) -> HookResponse:
-        """Handle ``pre-tool-use``: approve by default, inject context."""
-        tool_name = payload.get("tool_name", "")
-        decision  : PermissionDecision = "approve"
-
-        # AnchorMind injection (placeholder — opt-in, disabled by default)
-        context = self._maybe_anchormind_context(f"pre-tool-use:{tool_name}")
-
-        if context:
-            result  = sanitize(context)
-            context = "" if result.rejected else result.text
-        else:
-            result = SanitizeResult(text="")
-
-        self._record_sanitize(result, hook_name="pre-tool-use", original_len=len(context))
-        return make_response(permission_decision=decision, additional_context=context)
+        """Handle ``pre-tool-use``: approve, with no context added."""
+        self._record_sanitize(SanitizeResult(text=""), hook_name="pre-tool-use", original_len=0)
+        return make_response(permission_decision="approve", additional_context="")
 
     def _handle_post_tool_use(self, payload: dict[str, Any]) -> HookResponse:
         """Handle ``post-tool-use``: inject context based on tool output."""
@@ -154,8 +129,7 @@ class HookBridge:
     def _handle_prompt_submit(self, payload: dict[str, Any]) -> HookResponse:
         """Handle ``prompt-submit`` (UserPromptSubmit): sanitise user prompt.
 
-        Sanitises the incoming prompt text and injects AnchorMind context
-        (placeholder) when ``anchormind_inject`` is enabled.
+        Sanitises the incoming prompt text; no context is added.
 
         A gate-2 rejection denies the submission.  Stripping the payload and
         letting the prompt through cannot prove the removal was complete, so
@@ -173,29 +147,7 @@ class HookBridge:
                 additional_context=_PROMPT_REJECTED_REASON,
             )
 
-        # AnchorMind recall injection (placeholder)
-        injected = self._maybe_anchormind_context("prompt-submit")
-        if injected:
-            inj_result   = sanitize(injected)
-            original_len = len(injected)
-            injected     = "" if inj_result.rejected else inj_result.text
-            self._record_sanitize(inj_result, hook_name="prompt-submit", original_len=original_len)
-
-        return make_response(additional_context=injected)
-
-    # ------------------------------------------------------------------
-    # AnchorMind placeholder
-    # ------------------------------------------------------------------
-
-    def _maybe_anchormind_context(self, topic: str) -> str:
-        """Return AnchorMind recall context, or empty string.
-
-        This is always a placeholder when ``anchormind_inject`` is True.
-        """
-        if not self._anchormind_inject:
-            return ""
-        # Placeholder — real implementation calls AnchorMind MCP
-        return f"[AnchorMind placeholder — topic={topic}]"
+        return make_response(additional_context="")
 
     # ------------------------------------------------------------------
     # Audit helpers

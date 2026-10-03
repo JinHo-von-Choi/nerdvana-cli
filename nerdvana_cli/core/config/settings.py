@@ -183,7 +183,7 @@ class SessionConfig(BaseModel):
     # Name the files a Bash command changed in a git working tree at the end of its output.
     report_bash_changes: bool = False
     planning_gate: bool = False  # enable complexity-triggered Plan agent before execution
-    # Phase F: runtime profiles — default context and mode names
+    # Runtime profiles: default context and mode names
     default_context: str = "standalone"
     default_mode:    str = "interactive"
     show_activity:   bool = True
@@ -496,7 +496,7 @@ class NerdvanaSettings(BaseSettings):
                     )
                 if "session" in data:
                     session_data = data["session"]
-                    # Phase F: planning_gate=true → default_mode=planning (deprecated in 0.8.0)
+                    # planning_gate=true means default_mode=planning (deprecated in 0.8.0)
                     if (
                         isinstance(session_data, dict)
                         and session_data.get("planning_gate")

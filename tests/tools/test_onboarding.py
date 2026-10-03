@@ -1,4 +1,4 @@
-"""Tests for onboarding tools — Phase E.
+"""Tests for onboarding tools.
 
 Author: 최진호
 Date:   2026-04-18

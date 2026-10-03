@@ -1,5 +1,5 @@
 {
-  "description": "known circular imports allowed by Phase 0A baseline",
+  "description": "known circular imports allowed by the baseline",
   "count": 0,
   "cycles": []
 }

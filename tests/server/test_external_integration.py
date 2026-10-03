@@ -1,4 +1,4 @@
-"""External project integration tests — Phase H.
+"""External project integration tests.
 
 Marked with @pytest.mark.lsp_integration: these tests spawn a real Python
 subprocess (a tiny echo server) to verify the full stdio MCP round-trip.

@@ -1,4 +1,4 @@
-"""Tests for hook audit logging — Phase G2.
+"""Tests for hook audit logging.
 
 Verifies that HookBridge writes rows to the hooks table in audit.sqlite.
 

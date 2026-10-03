@@ -1,7 +1,6 @@
-"""Fault-injection tests for T-0A-07.
+"""Fault-injection tests.
 
-Three scenarios that exercise error-handling paths added/preserved in
-Phase 0A:
+Three scenarios that exercise error-handling paths of the agent loop:
 
 1. Provider HTTP-500 retry — provider raises a retryable exception 3
    times; AgentLoop falls back to a secondary model on the 4th attempt.

@@ -1,4 +1,4 @@
-"""Phase 2 security/stability fixes — regression tests for M1–M5.
+"""Security and stability fixes: regression tests for M1 to M5.
 
 M1: the MCP stdio transport frames each message as one JSON line
 M2: ai_compact truncates oversized history

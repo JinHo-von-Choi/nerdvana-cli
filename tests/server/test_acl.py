@@ -1,7 +1,7 @@
-"""Tests for ACLManager — Phase G1.
+"""Tests for ACLManager.
 
 7 test cases:
-  - unknown client → read-only default (v3.1 §3.1)
+  - unknown client → read-only default
   - role tool mapping: read-only, edit, write-memory, admin
   - explicit client role assignment
   - revoke by prefix
@@ -67,7 +67,7 @@ def full_acl(tmp_path) -> ACLManager:
 
 
 def test_unknown_client_gets_read_only(full_acl):
-    """Unknown client identity must be assigned read-only by default (v3.1 §3.1)."""
+    """Unknown client identity must be assigned read-only by default."""
     decision = full_acl.check("nobody", "symbol_overview")
     assert decision.allowed
 

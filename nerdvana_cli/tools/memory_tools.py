@@ -1,4 +1,4 @@
-"""Memory CRUD tools and Onboarding tools — Phase E.
+"""Memory CRUD tools and Onboarding tools.
 
 9 tools:
   Memory CRUD:  WriteMemory, ReadMemory, ListMemories, DeleteMemory,

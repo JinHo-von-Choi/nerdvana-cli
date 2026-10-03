@@ -1,4 +1,4 @@
-"""External project query tools — Phase H.
+"""External project query tools.
 
 Provides three MCP-visible tools that allow the agent to:
   1. List all registered queryable external projects.

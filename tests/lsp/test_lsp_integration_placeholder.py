@@ -1,7 +1,7 @@
 """
 LSP integration placeholder tests.
 
-These tests verify that language server binaries required by Phase D1
+These tests verify that language server binaries required by the
 symbol-tool E2E scenarios are available on PATH. They are gated by the
 `lsp_integration` pytest marker and, like
 `test_symbol_tools_integration.py`, skip when the binary is absent so a

@@ -38,21 +38,6 @@ class ProviderName(StrEnum):
 
 
 @dataclass
-class ProviderResponse:
-    """Normalized response from any provider."""
-
-    content: str = ""
-    tool_use_id: str = ""
-    tool_name: str = ""
-    tool_input: dict[str, Any] | None = None
-    input_tokens: int = 0
-    output_tokens: int = 0
-    stop_reason: str = ""  # end_turn, tool_use, max_tokens
-    thinking: str = ""
-    is_error: bool = False
-
-
-@dataclass
 class ProviderEvent:
     """Streaming event from provider."""
 

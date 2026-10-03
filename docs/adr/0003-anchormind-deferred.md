@@ -2,7 +2,7 @@
 
 작성자: 최진호
 작성일: 2026-04-18
-상태: Accepted
+상태: Superseded. `HookBridge` 는 문맥을 주입하지 않으며 `anchormind_inject` 인자와 자리표시자는 없다.
 
 ## Context
 

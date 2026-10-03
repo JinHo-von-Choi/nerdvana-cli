@@ -120,7 +120,7 @@ def test_filter_tags_all_lsp_symbol_returns_symbol_tools() -> None:
 
     lsp_rename gained the ``symbol`` tag in the T-debt-lsp-rename-symbol-tag
     cleanup: it is a symbol-level refactoring tool and should surface in the
-    same filter as its read-only siblings. Phase F profiles still distinguish
+    same filter as its read-only siblings. Runtime profiles still distinguish
     read vs write via ``category``/``requires_confirmation``, so this does not
     weaken any safety gate.
     """

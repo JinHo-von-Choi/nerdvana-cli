@@ -15,7 +15,7 @@ Schema:
   CREATE INDEX idx_audit_ts ON audit(ts);
 
 WAL mode, file permissions 0600.
-Rows are pruned to keep the file under 1 MB after every 1 000 writes (v3.1 §1.4).
+Rows are pruned to keep the file under 1 MB after every 1 000 writes.
 
 작성자: 최진호
 작성일: 2026-04-18

@@ -16,8 +16,6 @@ from typing import Any
 
 from nerdvana_cli.types import ToolResult
 
-STEER_MODES = ("queue", "interrupt")
-
 # A tool already running when an interruption arrives gets this long to finish by itself before it is cancelled.
 TOOL_PATIENCE_SECONDS = 1.0
 

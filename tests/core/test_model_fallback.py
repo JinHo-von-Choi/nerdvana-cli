@@ -18,7 +18,7 @@ def test_model_config_fallback_from_dict() -> None:
 
 
 def test_is_retryable_http_error() -> None:
-    # _is_retryable_error was moved to LoopHookEngine (T-0A-05)
+    # _is_retryable_error was moved to LoopHookEngine
     engine = LoopHookEngine(hooks=None, settings=None, registry=None)
     assert engine._is_retryable_error(Exception("HTTP 429 Too Many Requests")) is True
     assert engine._is_retryable_error(Exception("status 529")) is True

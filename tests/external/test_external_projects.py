@@ -1,4 +1,4 @@
-"""ExternalProjectRegistry CRUD + YAML round-trip tests — Phase H.
+"""ExternalProjectRegistry CRUD + YAML round-trip tests.
 
 작성자: 최진호
 작성일: 2026-04-18

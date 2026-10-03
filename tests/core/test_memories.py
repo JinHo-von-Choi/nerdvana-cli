@@ -1,4 +1,4 @@
-"""Tests for MemoriesManager — Phase E.
+"""Tests for MemoriesManager.
 
 Covers: CRUD, scope routing, fcntl locking (smoke), stale listing,
         onboarding helpers, session_start_hint.

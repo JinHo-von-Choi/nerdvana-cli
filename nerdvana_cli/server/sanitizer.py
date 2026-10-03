@@ -1,4 +1,4 @@
-"""Dual-gate sanitizer for hook-injected context (v3.1 §3.3).
+"""Dual-gate sanitizer for hook-injected context.
 
 Gate 1 — Blacklist tag: known prompt-injection patterns are wrapped with
     ``<!-- SANITIZED:<pattern_id> -->…<!-- /SANITIZED -->`` (warn, not block).
@@ -19,7 +19,7 @@ Length cap: 4 096 characters; excess is truncated and ``[TRUNCATED]`` appended.
 All events (gate1 warnings, gate2 rejections, redactions, truncations) are
 recorded in the ``sanitizer_events`` table in ``audit.sqlite``.
 
-30-day false-positive rate target: < 5 % (v3.1 §3.3).
+30-day false-positive rate target: < 5 %.
 Actual measurement requires production data — this module provides the
 framework; events are stored in ``sanitizer_events`` for offline analysis.
 

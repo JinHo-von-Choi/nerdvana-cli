@@ -1,4 +1,4 @@
-"""Contract tests for T-0A-05: LoopHookEngine recovery hooks.
+"""LoopHookEngine recovery hooks.
 
 Verifies:
 - on_api_call: context_limit_recovery fires on max_tokens stop.

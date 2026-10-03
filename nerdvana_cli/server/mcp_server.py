@@ -1,4 +1,4 @@
-"""NerdVana MCP server, Phase G1.
+"""NerdVana MCP server.
 
 Exposes nerdvana tools over MCP 1.0 (stdio + HTTP JSON-RPC).
 
@@ -94,7 +94,7 @@ class NerdvanaMcpServer:
         audit_logger:     AuditLogger | None       = None,
         quota_resolver:   QuotaPolicyResolver | None = None,
         quota_store:      QuotaStore | None        = None,
-        # Phase H extensions, external project subprocess support
+        # External project subprocess support
         project_path:     Path | None              = None,
         mode:             str  | None              = None,
     ) -> None:
@@ -105,7 +105,7 @@ class NerdvanaMcpServer:
         self.tls_cert      = tls_cert
         self.tls_key       = tls_key
         self.tls_ca        = tls_ca
-        # Phase H: working directory override and mode name.
+        # Working directory override and mode name.
         self.project_path  = project_path
         self.mode          = mode
 

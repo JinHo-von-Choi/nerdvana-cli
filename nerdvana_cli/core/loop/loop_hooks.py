@@ -1,7 +1,7 @@
 """Recovery hook engine for the agent loop.
 
 Wraps the general HookEngine to provide typed on_api_call / on_turn_end entry
-points. Extracted from AgentLoop as part of Phase 0A (T-0A-05).
+points.
 
 AFTER_TOOL is not dispatched here. It is fired by ToolExecutor, on the path
 that actually runs tools, so the handlers see every real tool result.

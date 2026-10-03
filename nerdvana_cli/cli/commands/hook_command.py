@@ -1,4 +1,4 @@
-"""`nerdvana hook ...` — Claude Code / Codex / VSCode hook bridge (Phase G2).
+"""`nerdvana hook ...` — Claude Code / Codex / VSCode hook bridge.
 
 Reads hook JSON from stdin and writes the response to stdout. Each subcommand
 maps one-to-one onto a hook type defined in ``server.hook_schemas``.

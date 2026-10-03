@@ -1,4 +1,4 @@
-"""Tests for LSP client hardening (Phase 0B).
+"""Tests for LSP client hardening.
 
 Covers: rootUri, capabilities, didOpen, documentChanges, shutdown sequence,
 per-server init timeouts.  All tests use mocks — no real language server is

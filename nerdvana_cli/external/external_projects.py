@@ -1,4 +1,4 @@
-"""External project registry — Phase H.
+"""External project registry.
 
 Manages a persistent list of external project paths that can be queried
 via subprocess-isolated MCP channels.
