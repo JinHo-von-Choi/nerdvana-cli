@@ -110,6 +110,8 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `defer_tools_threshold` | int | `3000` | Size, in estimated tokens, above which `defer_tools: auto` defers the MCP tools. |
 | `escalation_model` | string | `` | Model to switch to, once per session, when the run shows trouble: `model` for the current provider or `provider:model` (the provider's API key must be in the environment). Empty = never. Start on a cheap model (`model.model` or an agent category) and let this one take over only if it is needed. The thinking blocks of the earlier model are dropped on the switch, and providers that cache the start of a request reread it once. |
 | `escalation_signals` | map | `verify_failed: 1`, `repeat_refused: 1`, `cas_rejected: 3`, `new_diagnostics: 4` | Signal name to the number of occurrences that triggers the escalation; the signals are the ones counted in the `signals` of a run result. |
+| `mask_secrets` | bool | `true` | Replace secret-looking values in the output of commands and external tools with `[REDACTED]` before the model sees it. See [secret-masking.md](secret-masking.md). |
+| `mask_extra_patterns` | list | `[]` | Regular expressions whose matches are replaced as well. |
 | `require_price` | bool | `false` | Refuse to run when `max_cost_usd` is set but the model has no known price, instead of continuing without a cost limit. Also `nerdvana run --require-price`. |
 | `max_context_tokens` | int | `180000` | Auto-resolved per model (1M-token models resolve to 1,000,000, so compaction starts near 800,000 tokens); set a smaller value to compact earlier |
 | `compact_threshold` | float | `0.8` | Fraction of max_context_tokens that triggers compaction |

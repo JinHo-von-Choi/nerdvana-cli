@@ -20,7 +20,8 @@ from nerdvana_cli.core import paths
 from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.schema_check import validate_arguments
-from nerdvana_cli.core.signals import classify_result
+from nerdvana_cli.core.secrets import MARKER, SecretMasker
+from nerdvana_cli.core.signals import SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -85,6 +86,7 @@ class ToolExecutor:
         self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
         self.signals: Counter[str] = Counter()
+        self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []
 
     def drain_injections(self) -> list[dict[str, Any]]:
@@ -300,6 +302,36 @@ class ToolExecutor:
                 return self._refusal(tool_use["id"], f"Outside this agent's edit scope ({where}): {target}")
         return None
 
+    # Tools whose output is not the user's own files: commands and external services. File tools are not
+    # masked, so the model reads and edits files exactly as they are.
+    _MASKED_TOOLS: frozenset[str] = frozenset({"Bash", "Parism", "WebFetch", "WebSearch"})
+
+    @staticmethod
+    def _build_masker(settings: Any) -> SecretMasker | None:
+        session = getattr(settings, "session", None)
+        if not getattr(session, "mask_secrets", True):
+            return None
+        key = getattr(getattr(settings, "model", None), "api_key", "") or ""
+        return SecretMasker.from_environment({"API_KEY": key} if key else None, getattr(session, "mask_extra_patterns", ()))
+
+    def mask_text(self, text: str) -> str:
+        """*text* with secret values replaced, counted in the signals (unchanged when masking is off)."""
+        if self._masker is None:
+            return text
+        masked = self._masker.mask(text)
+        self.signals[SECRET_MASKED] += masked.count
+        return masked.text
+
+    def _masked(self, name: str, tool: Any, content: str) -> str:
+        """The result text of a command or external tool with secret values replaced, and a note saying so."""
+        if self._masker is None or not (name in self._MASKED_TOOLS or "mcp" in getattr(tool, "tags", ())):
+            return content
+        masked = self._masker.mask(content)
+        if not masked.count:
+            return content
+        self.signals[SECRET_MASKED] += masked.count
+        return f"{masked.text}\n\n[{masked.count} secret-like value(s) in this output were replaced with {MARKER}]"
+
     async def _execute(
         self,
         tool_use:    dict[str, Any],
@@ -327,7 +359,7 @@ class ToolExecutor:
         try:
             result: ToolResult = await tool.call(parsed_args, context, can_use_tool=None)
             result.tool_use_id = tool_id
-            result.content     = tool.truncate_result(result.content)
+            result.content     = self._masked(tool.name, tool, tool.truncate_result(result.content))
             if result.is_error:
                 success = False
             elif edited and baseline is not None:

@@ -414,6 +414,7 @@ class AgentLoop:
             goal.verify, self.settings.cwd or ".", timeout=config.verify_timeout, tail=config.output_tail_chars,
             policy=self._sandbox_policy(),
         )
+        result = replace(result, tail=self.tool_executor.mask_text(result.tail))
         goal.record_attempt(result.passed, result.exit_code, result.tail)
         save_goal(self.session.session_id, goal)
         if goal.status == MET:

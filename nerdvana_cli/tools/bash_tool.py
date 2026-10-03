@@ -9,45 +9,14 @@ import re
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.sandbox import Launch, plan_launch
+from nerdvana_cli.core.secrets import SENSITIVE_ENV
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 logger  = logging.getLogger(__name__)
 _warned: set[str] = set()
 
-# Name patterns for environment variables withheld from the subprocess.
-#
-# This is a mitigation, not a boundary. A command can still print a secret it
-# reads from a file, from a credential helper, or from a variable whose name
-# matches nothing here. What makes name matching worth doing at all is that
-# os.environ is finite and enumerable, unlike shell syntax (see the note on
-# _DANGEROUS_PATTERNS below): the cost of widening the pattern is bounded and
-# the residual gap is a naming gap, not an infinite grammar.
-#
-# The list is deliberately name-based rather than an allowlist. An allowlist of
-# permitted variables was tried on 2026-07-05 and withdrawn: it broke build
-# tools and every workflow that passes custom variables through, which is most
-# of them. Segment anchors ((^|[_-]) ... ([_-]|$)) keep ordinary variables such
-# as PATH and TOKENIZERS_PARALLELISM out of the match.
-_SENSITIVE_ENV = re.compile(
-    r"""(?ix)
-    (?: api[_-]?key
-      | (?:^|[_-]) key (?:[_-]|$)
-      | private[_-]?key
-      | access[_-]?key
-      | secret
-      | passw
-      | passphrase
-      | credential
-      | (?:^|[_-]) token (?:[_-]|$)
-      | (?:^|[_-]) pat (?:[_-]|$)
-      | (?:^|[_-]) (?:pem|dsn|bearer|authorization) (?:[_-]|$)
-      | (?:^|[_-]) (?:database|db|redis|mongo|mongodb|postgres|postgresql|mysql|amqp|rabbitmq)
-        [_-]? (?:url|uri|dsn|conn|connection(?:[_-]?string)?)
-      )
-    """
-)
-
+_SENSITIVE_ENV = SENSITIVE_ENV
 
 async def _spawn(launch: Launch, command: str, cwd: str, env: dict[str, str]) -> asyncio.subprocess.Process:
     """Start *command* through the sandbox launcher when the plan has one, else through the shell."""
