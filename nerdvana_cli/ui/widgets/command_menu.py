@@ -20,6 +20,7 @@ SLASH_COMMANDS = [
     ("/tools", "List tools"),
     ("/update", "Check and install updates"),
     ("/memories", "List project memories"),
+    ("/memory", "Review memory proposals, forget memories, list stale ones"),
     ("/undo", "Restore pre-edit git checkpoint"),
     ("/redo", "Re-apply last undone checkpoint"),
     ("/rewind", "Go back before the last prompt(s): messages and file edits"),

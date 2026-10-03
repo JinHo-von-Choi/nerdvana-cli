@@ -234,6 +234,13 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana memory add <내용>` | 새 메모리 기록 |
 | `nerdvana memory remove <id>` | 메모리 한 건 삭제 |
 | `nerdvana memory purge` | 선택한 범위의 메모리 전체 삭제 |
+| `nerdvana memory inbox` | 에이전트가 제안한 메모리(`memory.review: true` 일 때)를 현재 항목과의 차이와 함께 표시 |
+| `nerdvana memory approve <id>` | 제안 한 건 적용. `--all` 은 대기 중인 전부 적용 |
+| `nerdvana memory reject <id>` | 제안 폐기 |
+| `nerdvana memory forget <이름>` | 확인 후 메모리 삭제(`--yes` 로 확인 생략), 감사 로그에 기록 |
+| `nerdvana memory stale` | `--days N`(기본 30)일 동안 수정되지 않았고 읽힌 적 없는 메모리 표시. `--remove` 는 확인 후 삭제 |
+
+[docs/memory.md](docs/memory.md) 참조.
 
 ### 훅 브리지 (`nerdvana hook ...`)
 
@@ -318,6 +325,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/tools` | 활성화된 모든 내장 도구 및 MCP 도구 목록 표시 |
 | `/update` | 최신 버전 확인 및 업데이트 설치 (`/update parism` 입력 시 내장 Parism MCP 패키지를 최신 버전으로 강제 갱신) |
 | `/memories` | 프로젝트 메모리 목록 표시 |
+| `/memory` | `/memory inbox`, `approve <id>` 또는 `approve --all`, `reject <id>`, `forget <이름> --yes`, `stale [--days N]`: 에이전트의 메모리 제안 검토와 메모리 정리 ([docs/memory.md](docs/memory.md) 참조) |
 | `/undo` | 편집 전 git 체크포인트로 복원 |
 | `/rewind` | `/rewind [N]` 은 마지막 N개 프롬프트 이전으로 되돌립니다. 그 메시지는 버려지고 편집 도구가 한 편집은 취소됩니다(셸 명령이 바꾼 것은 제외) |
 | `/redo` | 마지막으로 되돌린 체크포인트 재적용 |

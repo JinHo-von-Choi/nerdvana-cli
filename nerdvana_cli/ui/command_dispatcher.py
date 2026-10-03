@@ -58,6 +58,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         "/rewind":          memory_commands.handle_rewind,
         "/checkpoints":     memory_commands.handle_checkpoints,
         "/memories":        memory_commands.handle_memories,
+        "/memory":          memory_commands.handle_memory,
         "/route-knowledge": memory_commands.handle_route_knowledge,
         "/mode":            profile_commands.handle_mode,
         "/context":         profile_commands.handle_context,
