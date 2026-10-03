@@ -204,6 +204,11 @@ def schedule_lock_path(job_name: str) -> Path:
     return schedule_dir() / "locks" / f"{job_name}.lock"
 
 
+def runs_dir() -> Path:
+    """Root of the run store: one directory per background run (record, log, result, and the key claims)."""
+    return user_data_home() / "runs"
+
+
 def ensure_user_dirs() -> None:
     """Create all user subdirectories if they do not exist. Idempotent."""
     root = user_data_home()

@@ -49,7 +49,8 @@ async def test_agent_tool_foreground_returns_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_tool_background_returns_task_id() -> None:
+async def test_agent_tool_background_returns_task_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     settings      = NerdvanaSettings()
     task_registry = TaskRegistry()
     tool          = AgentTool(settings=settings, task_registry=task_registry)

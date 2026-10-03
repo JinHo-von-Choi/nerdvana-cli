@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 
 from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.model_routing import apply_model_spec, select_model
+from nerdvana_cli.core.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
@@ -19,6 +20,9 @@ from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegi
 from nerdvana_cli.core.worktree import Worktree, WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
+
+# How a task's final state is written to its run record; a task cancelled with its process counts as stopped.
+_RECORD_STATUS = {TaskStatus.COMPLETED: SUCCEEDED, TaskStatus.FAILED: FAILED, TaskStatus.KILLED: STOPPED}
 
 
 @dataclass
@@ -229,18 +233,46 @@ class AgentTool(BaseTool[AgentToolArgs]):
         )
 
         if args.run_in_background:
-            task.background = True
-            bg = asyncio.get_event_loop().create_task(
-                self._run_and_record(config, task, abort, registry, settle, worktree)
-            )
-            task.bg_task = bg
-            return ToolResult(
-                tool_use_id = "",
-                content     = f"Agent started in background. Task ID: {task_id}",
-            )
+            return self._start_background(args, context, config, task, registry, settle, worktree)
 
         output, total_tokens = await self._run_and_record(config, task, abort, registry, settle, worktree)
         return ToolResult(tool_use_id="", content=output, tokens=total_tokens)
+
+    def _start_background(
+        self,
+        args:     AgentToolArgs,
+        context:  ToolContext,
+        config:   SubagentConfig,
+        task:     TaskState,
+        registry: TaskRegistry,
+        settle:   Callable[[float], None] | None,
+        worktree: Worktree | None,
+    ) -> ToolResult:
+        """Run the agent as a task of its own, with a durable record (core/run_store.py) that outlives this process."""
+        task.background = True
+        recorder        = TaskRecorder.start(task.id, args.prompt, context.cwd, worktree)
+        task.bg_task    = asyncio.get_event_loop().create_task(
+            self._run_in_background(recorder, config, task, registry, settle, worktree)
+        )
+        return ToolResult(tool_use_id="", content=f"Agent started in background. Task ID: {task.id}")
+
+    async def _run_in_background(
+        self,
+        recorder: TaskRecorder | None,
+        config:   SubagentConfig,
+        task:     TaskState,
+        registry: TaskRegistry,
+        settle:   Callable[[float], None] | None,
+        worktree: Worktree | None,
+    ) -> tuple[str, int]:
+        """Run the agent and keep its record: the lease renewed while it runs, the outcome written when it ends."""
+        lease = asyncio.get_event_loop().create_task(recorder.keep_lease()) if recorder else None
+        try:
+            return await self._run_and_record(config, task, task.abort, registry, settle, worktree)
+        finally:
+            if lease is not None and recorder is not None:
+                lease.cancel()
+                recorder.finish(_RECORD_STATUS.get(task.status, STOPPED), task.output, task.error or "", config.cost_usd)
 
     async def _run_and_record(
         self,

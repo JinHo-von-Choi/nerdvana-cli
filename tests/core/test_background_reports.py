@@ -62,7 +62,8 @@ async def test_task_get_marks_a_finished_task_as_seen() -> None:
     assert registry.drain_unreported() == []
 
 
-async def test_background_agent_finishing_notifies_the_registry() -> None:
+async def test_background_agent_finishing_notifies_the_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     registry = TaskRegistry()
     heard: list[str] = []
     registry.add_listener(lambda task: heard.append(task.status))
