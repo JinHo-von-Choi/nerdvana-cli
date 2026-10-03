@@ -14,8 +14,9 @@ clearable results add up to ``trigger_tokens``; then all of them are cleared at 
 history stays byte-stable until the next batch.
 
 Never cleared: results of write, edit and todo tools, error results, results of the last
-``keep_last`` tool calls, the newest result that shows ``N#hhhhhh`` line anchors for a file (a
-pending edit may rely on it), and any message holding ``<skill_content``.
+``keep_last`` tool calls, and any message holding ``<skill_content``. A file read whose lines carry
+``N#hhhhhh`` anchors is cleared like any other read: the model reads the file again when it needs to
+edit it, and that read is among the newest results, which stay.
 """
 
 from __future__ import annotations
@@ -36,9 +37,7 @@ MASKABLE_TOOLS = frozenset({
 })
 MCP_TOOL_PREFIX = "mcp__"
 
-_ANCHOR_LINE  = re.compile(r"^\d+#[0-9a-f]{6} ", re.MULTILINE)
 _PLACEHOLDER  = re.compile(r"^\[output of .+ cleared \(\d+ chars\); call it again if needed\]$")
-_PATH_KEYS    = ("path", "within_relative_path", "relative_path")
 
 
 @dataclass(frozen=True)
@@ -68,26 +67,6 @@ def _calls_by_id(messages: Sequence[Any]) -> dict[str, tuple[str, dict[str, Any]
     return calls
 
 
-def _anchor_key(name: str, arguments: dict[str, Any]) -> str:
-    """The file (or, failing that, the tool) an anchor-bearing result belongs to."""
-    for key in _PATH_KEYS:
-        if arguments.get(key):
-            return f"{name}:{arguments[key]}"
-    return name
-
-
-def _newest_anchor_results(messages: Sequence[Any], calls: dict[str, tuple[str, dict[str, Any]]]) -> set[int]:
-    """Indexes of the newest result per file that shows line anchors."""
-    newest: dict[str, int] = {}
-    for index in range(len(messages) - 1, -1, -1):
-        message = messages[index]
-        if message.role != Role.TOOL or not isinstance(message.content, str) or not _ANCHOR_LINE.search(message.content):
-            continue
-        name, arguments = calls.get(str(message.tool_use_id or ""), ("", {}))
-        newest.setdefault(_anchor_key(name, arguments), index)
-    return set(newest.values())
-
-
 def _clearable(message: Any, name: str) -> bool:
     """Whether the result in *message*, a tool message answering a call to *name*, may be replaced."""
     content = message.content
@@ -108,7 +87,6 @@ def _clearable_indexes(messages: Sequence[Any], calls: dict[str, tuple[str, dict
     """Indexes of the old tool results that may be cleared."""
     tool_at   = [i for i, m in enumerate(messages) if m.role == Role.TOOL]
     protected = set(tool_at[-keep_last:]) if keep_last > 0 else set()
-    protected |= _newest_anchor_results(messages, calls)
     return [i for i in tool_at if i not in protected and _clearable(messages[i], _tool_name(calls, messages[i]))]
 
 

@@ -87,28 +87,17 @@ def test_the_last_results_are_kept() -> None:
     assert [m.content == BIG for m in messages if m.role == Role.TOOL] == [False, False, True, True, True]
 
 
-def test_the_newest_read_of_each_file_is_kept() -> None:
+def test_an_old_anchored_read_is_cleared_and_the_newest_results_stay() -> None:
     anchored = "1#a1b2c3    import os\n2#d4e5f6    import sys"
     messages = _history(
         ("a", "FileRead", {"path": "x.py"}, anchored + BIG), ("b", "FileRead", {"path": "y.py"}, anchored + BIG),
         ("c", "FileRead", {"path": "x.py"}, anchored + BIG), ("d", "Grep", {}, BIG),
     )
-    assert _mask(messages, keep_last=1).masked == 1
+    assert _mask(messages, keep_last=2).masked == 2
     assert messages[2].content == placeholder_for("FileRead", len(anchored + BIG))
-    assert messages[4].content == anchored + BIG   # the newest read of y.py
-    assert messages[6].content == anchored + BIG   # the newest read of x.py
-
-
-def test_anchored_symbol_output_is_kept_per_file() -> None:
-    anchored = "5#a1b2c3    def f():"
-    messages = _history(
-        ("a", "find_symbol", {"within_relative_path": "m.py"}, anchored + BIG),
-        ("b", "find_symbol", {"within_relative_path": "m.py"}, anchored + BIG),
-        ("c", "Grep", {}, BIG),
-    )
-    assert _mask(messages, keep_last=1).masked == 1
-    assert messages[2].content != anchored + BIG
-    assert messages[4].content == anchored + BIG
+    assert messages[4].content == placeholder_for("FileRead", len(anchored + BIG))
+    assert messages[6].content == anchored + BIG   # one of the last two calls
+    assert messages[8].content == BIG
 
 
 def test_error_results_and_activated_skills_are_kept() -> None:
