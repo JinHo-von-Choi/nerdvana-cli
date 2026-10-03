@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `model.openai_api` (`auto`, `chat`, `responses`): provider `openai` on OpenAI's own endpoint uses the Responses API (stateless, `store: false`, encrypted reasoning items kept in the session); every other OpenAI-compatible endpoint keeps Chat Completions. A warning is logged when tools and a `reasoning_effort` other than `none` go to the Chat Completions endpoint. `docs/providers-compat.md` and adapter contract tests describe and check what each adapter supports.
+- Skills follow the Agent Skills standard: `~/.agents/skills` and `<project>/.agents/skills` are scanned, parsing is lenient, the system prompt carries a skill catalog, and the `ActivateSkill` tool loads a skill as `<skill_content name="...">` plus a listing of its bundled files. `nerdvana skill trust <path>` approves a project skill. See `docs/skills.md`.
+- Opt-in `session.observation_masking` (`mask_keep_last`, `mask_trigger_tokens`) clears old read-type tool output in batches before compaction, counted as the `observations_masked` signal.
+- A note, counted as `no_progress`, after 3 failed edits in a row to one file or 12 read-only turns in a row (`session.no_progress_failed_edits`, `session.no_progress_read_turns`). `goal.auto_verify` runs the detected test command (pytest, npm test, cargo test, go test) before a run that changed files and has no goal is accepted.
+- `nerdvana cost` shows the cache hit ratio per row and in total (`Hit %`, `cache_hit_ratio` in `--json`).
+- `scripts/bench_agent.py` reports pass^k, records the run environment, and has `--isolate` (one-commit repository per attempt), `--no-network` and an audit of solution-lookup behaviour; `scripts/bench_compare.py` compares two result files with a seeded bootstrap interval.
+
+### Changed
+
+- Project skills (`<project>/.agents/skills`, `.nerdvana/skills`, `.claude/skills`) load only when `hooks.allow_project_hooks` is true and the `SKILL.md` digest is approved. Existing project skills stop loading until then.
+- MCP tools run next to other calls only when the server marks them `readOnlyHint`, and a tool marked `destructiveHint` asks before it runs; a tool with no annotations is serialized.
+- `nerdvana session resume` passes the session id to the TUI as an argument instead of setting `NERDVANA_RESUME`.
+
+### Fixed
+
+- The MCP server key, ACL and audit files follow `NERDVANA_DATA_HOME`; files that exist only under `~/.nerdvana` are still read from there with one warning. Nothing is copied or deleted.
+- A streamed Gemini response that called tools now ends as `tool_use`; it ended as `end_turn` before and the run stopped without executing the calls.
+- The git status in the system prompt is taken once per session, so editing files no longer invalidates the provider prompt cache on the next prompt.
+
 ### Changed
 
 - `nerdvana serve` runs on `mcp` 2.x (`pyproject.toml` now asks for `mcp>=2.0.0,<3.0`): the server is an `MCPServer`, the tool list and calls were checked with the mcp 2.x client over stdio and over HTTP with a bearer token. A refused call (access denied, over the quota, malformed) still reaches the client with its reason.
