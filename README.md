@@ -252,6 +252,13 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana memory add <text>` | Record a new memory |
 | `nerdvana memory remove <id>` | Delete one memory |
 | `nerdvana memory purge` | Delete every memory in the selected scope |
+| `nerdvana memory inbox` | List the memories the agent proposed (with `memory.review: true`), each with a diff against the current entry |
+| `nerdvana memory approve <id>` | Apply one proposal; `--all` applies every pending one |
+| `nerdvana memory reject <id>` | Drop a proposal |
+| `nerdvana memory forget <name>` | Delete a memory after confirmation (`--yes` skips it) and record it in the audit log |
+| `nerdvana memory stale` | List memories not modified for `--days N` (default 30) and never read; `--remove` deletes them after confirmation |
+
+See [docs/memory.md](docs/memory.md).
 
 ### Hook bridge (`nerdvana hook ...`)
 
@@ -340,6 +347,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/tools` | List tools |
 | `/update` | Check and install updates (`/update parism` refreshes the bundled Parism MCP package to its latest version) |
 | `/memories` | List project memories |
+| `/memory` | `/memory inbox`, `approve <id>` or `approve --all`, `reject <id>`, `forget <name> --yes`, `stale [--days N]`: review the agent's memory proposals and clean up memories (see [docs/memory.md](docs/memory.md)) |
 | `/undo` | Restore pre-edit git checkpoint |
 | `/rewind` | `/rewind [N]` goes back before the last N prompts: their messages are dropped and the edits the edit tools made in them are undone (edits made by shell commands are not) |
 | `/redo` | Re-apply last undone checkpoint |

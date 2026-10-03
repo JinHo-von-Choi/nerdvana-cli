@@ -5,6 +5,7 @@ Commands:
   /redo           — Re-apply last undone checkpoint
   /checkpoints    — List session checkpoints
   /memories       — List project memories (with optional --stale flag)
+  /memory         : Review the agent's memory proposals, forget memories, report stale ones
   /route-knowledge — Classify content and suggest WriteMemory scope
 
 Author: 최진호
@@ -15,6 +16,8 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
+
+from rich.markup import escape
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
@@ -108,8 +111,22 @@ async def handle_memories(app: NerdvanaApp, args: str) -> None:
     lines = [header]
     for e in entries:
         dt  = datetime.datetime.fromtimestamp(e.mtime).strftime("%Y-%m-%d")
-        lines.append(f"  {e.name:<40}  {e.scope:<20}  {e.size:>6}B  {dt}")
+        lines.append(f"  {e.name:<40}  {e.scope:<20}  {e.size:>6}B  {dt}  {e.source}")
     app._add_chat_message("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
+# /memory
+# ---------------------------------------------------------------------------
+
+async def handle_memory(app: NerdvanaApp, args: str) -> None:
+    """Handle /memory inbox | approve | reject | forget | stale, see memory_review_text.USAGE."""
+    from nerdvana_cli.commands.memory_review_text import ReviewError, run_slash
+
+    try:
+        app._add_chat_message(run_slash(app.settings.cwd, args))
+    except ReviewError as exc:
+        app._add_chat_message(f"[red]{escape(str(exc))}[/red]")
 
 
 # ---------------------------------------------------------------------------

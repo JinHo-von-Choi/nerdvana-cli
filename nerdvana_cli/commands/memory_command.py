@@ -5,6 +5,11 @@ Commands:
   memory add     — write a new memory
   memory remove  — delete a memory by name
   memory purge   — delete all memories in a scope
+  memory inbox   : list the agent's proposed memories with a diff (memory.review)
+  memory approve : apply one proposal, or every pending one with --all
+  memory reject  : drop a proposal
+  memory forget  : delete a memory after confirmation
+  memory stale   : list memories not modified for N days and never read
 
 Storage: core/memories.py MemoriesManager — same helper that /memories
 slash command (memory_commands.py:handle_memories) uses.
@@ -17,11 +22,15 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Callable
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
+from nerdvana_cli.commands import memory_review_text as review
 from nerdvana_cli.core.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.memory_index import MemorySource
 
 console = Console()
 
@@ -53,6 +62,15 @@ def _resolve_scope(scope: str) -> MemoryScope:
 
 def _cwd() -> str:
     return os.getcwd()
+
+
+def _show(produce: Callable[[], str]) -> None:
+    """Print the text *produce* returns; a ReviewError becomes a red message and exit status 1."""
+    try:
+        console.print(produce())
+    except review.ReviewError as exc:
+        console.print(f"[red]{escape(str(exc))}[/red]")
+        raise typer.Exit(1) from None
 
 
 # ---------------------------------------------------------------------------
@@ -90,8 +108,9 @@ def memory_list(
 
     console.print(f"[bold]{resolved} memories ({len(entries)})[/bold]")
     for e in entries:
-        dt = datetime.datetime.fromtimestamp(e.mtime).strftime("%Y-%m-%d")
-        console.print(f"  [cyan]{e.name}[/cyan]  {e.size:>6}B  {dt}")
+        created  = datetime.datetime.fromtimestamp(e.created).strftime("%Y-%m-%d")
+        modified = datetime.datetime.fromtimestamp(e.mtime).strftime("%Y-%m-%d")
+        console.print(f"  [cyan]{e.name}[/cyan]  {e.size:>6}B  created {created}  modified {modified}  {e.source}")
 
 
 @memory_app.command("add")
@@ -99,16 +118,19 @@ def memory_add(
     text:  str = typer.Argument(..., help="Memory content."),
     name:  str = typer.Option("",        "--name",  help="Memory name/key."),
     scope: str = typer.Option("project", "--scope", help="Scope: project | global | rule."),
+    source: str = typer.Option("user", "--source", help="Recorded origin of the entry: user | import."),
 ) -> None:
     """Write a memory entry."""
     resolved = _resolve_scope(scope)
+    if source not in (MemorySource.USER, MemorySource.IMPORT):
+        raise typer.BadParameter(f"Unknown source '{source}'. Valid: user, import.")
 
     if not name:
         import time
         name = f"memory-{int(time.time())}"
 
     mgr    = MemoriesManager(_cwd())
-    result = mgr.write(name, text, resolved)
+    result = mgr.write(name, text, resolved, source=MemorySource(source))
     console.print(result)
 
 
@@ -152,3 +174,57 @@ def memory_purge(
     shutil.rmtree(target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"Purged {count} memor{'y' if count == 1 else 'ies'} from scope '{scope}'.")
+
+
+@memory_app.command("inbox")
+def memory_inbox() -> None:
+    """List the memories the agent proposed, each with a diff against the current entry."""
+    _show(lambda: review.inbox_text(_cwd()))
+
+
+@memory_app.command("approve")
+def memory_approve(
+    proposal_id: str | None = typer.Argument(None, help="Proposal id from 'memory inbox'."),
+    everything:  bool       = typer.Option(False, "--all", help="Approve every pending proposal."),
+) -> None:
+    """Apply one proposal, or all of them with --all."""
+    _show(lambda: review.approve_text(_cwd(), proposal_id, everything))
+
+
+@memory_app.command("reject")
+def memory_reject(
+    proposal_id: str = typer.Argument(..., help="Proposal id from 'memory inbox'."),
+) -> None:
+    """Drop a proposal without applying it."""
+    _show(lambda: review.reject_text(_cwd(), proposal_id))
+
+
+@memory_app.command("forget")
+def memory_forget(
+    name: str  = typer.Argument(..., help="Memory name to delete."),
+    yes:  bool = typer.Option(False, "--yes", "-y", help="Delete without asking."),
+) -> None:
+    """Delete a memory after confirmation and record it in the audit log."""
+    entry = review.find_entry(_cwd(), name)
+    if entry is None:
+        console.print(f"[red]Memory '{escape(name)}' not found.[/red]")
+        raise typer.Exit(1)
+    if not yes:
+        typer.confirm(f"Delete {review.describe_entry(entry)}?", abort=True)
+    _show(lambda: review.forget_text(_cwd(), name))
+
+
+@memory_app.command("stale")
+def memory_stale(
+    days:   int  = typer.Option(review.DEFAULT_STALE_DAYS, "--days", min=0, help="Not modified for this many days."),
+    remove: bool = typer.Option(False, "--remove", help="Delete the listed memories after confirmation."),
+    yes:    bool = typer.Option(False, "--yes", "-y", help="With --remove: delete without asking."),
+) -> None:
+    """List memories not modified for N days and never read; --remove deletes them after confirmation."""
+    entries = review.stale_entries(_cwd(), days)
+    console.print(review.stale_text(entries, days))
+    if not remove or not entries:
+        return
+    if not yes:
+        typer.confirm(f"Delete these {len(entries)} memories?", abort=True)
+    _show(lambda: review.forget_stale_text(_cwd(), entries))
