@@ -6,7 +6,7 @@ import base64
 import binascii
 import re
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
@@ -42,6 +42,21 @@ def _read_call(part: Any) -> tuple[str, dict[str, Any], str]:
     """Name, arguments and thought signature of a part holding a function call."""
     call = part.function_call
     return call.name or "", dict(call.args) if call.args else {}, _encode_signature(part)
+
+
+def _part_events(part: Any) -> Iterator[ProviderEvent]:
+    """The events a streamed part yields: its text, or its function call under a freshly minted id."""
+    if part.text:
+        yield ProviderEvent(type="content_delta", content=part.text)
+    elif part.function_call:
+        fn_name, args, signature = _read_call(part)
+        yield ProviderEvent(
+            type="tool_use_complete",
+            tool_use_id=make_tool_use_id(fn_name),
+            tool_name=fn_name,
+            tool_input_complete=args,
+            tool_signature=signature,
+        )
 
 
 def _decode_signature(text: Any) -> bytes | None:
@@ -178,6 +193,7 @@ class GeminiProvider:
             )
 
             usage_metadata: Any = None
+            called          = False
             async for chunk in stream:
                 # Counts are cumulative; the last chunk that carries them is the total.
                 usage_metadata = getattr(chunk, "usage_metadata", None) or usage_metadata
@@ -185,21 +201,13 @@ class GeminiProvider:
                     for candidate in chunk.candidates:
                         if candidate.content and candidate.content.parts:
                             for part in candidate.content.parts:
-                                if part.text:
-                                    yield ProviderEvent(type="content_delta", content=part.text)
-                                elif part.function_call:
-                                    fn_name, args, signature = _read_call(part)
-                                    yield ProviderEvent(
-                                        type="tool_use_complete",
-                                        tool_use_id=make_tool_use_id(fn_name),
-                                        tool_name=fn_name,
-                                        tool_input_complete=args,
-                                        tool_signature=signature,
-                                    )
+                                for event in _part_events(part):
+                                    called = called or event.type == "tool_use_complete"
+                                    yield event
 
             if usage_metadata is not None:
                 yield ProviderEvent(type="usage", usage=_usage_dict(usage_metadata))
-            yield ProviderEvent(type="done", stop_reason="end_turn")
+            yield ProviderEvent(type="done", stop_reason="tool_use" if called else "end_turn")
 
         except Exception as e:
             yield ProviderEvent(type="error", error=str(e), **error_fields(e))
