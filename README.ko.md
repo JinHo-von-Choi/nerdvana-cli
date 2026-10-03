@@ -315,6 +315,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/update` | 최신 버전 확인 및 업데이트 설치 (`/update parism` 입력 시 내장 Parism MCP 패키지를 최신 버전으로 강제 갱신) |
 | `/memories` | 프로젝트 메모리 목록 표시 |
 | `/undo` | 편집 전 git 체크포인트로 복원 |
+| `/rewind` | `/rewind [N]` 은 마지막 N개 프롬프트 이전으로 되돌립니다. 그 메시지는 버려지고 편집 도구가 한 편집은 취소됩니다(셸 명령이 바꾼 것은 제외) |
 | `/redo` | 마지막으로 되돌린 체크포인트 재적용 |
 | `/checkpoints` | 세션 체크포인트 목록 표시 |
 | `/route-knowledge` | 콘텐츠를 분류하여 WriteMemory 스코프 제안 |

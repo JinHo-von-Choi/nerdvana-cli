@@ -22,6 +22,7 @@ SLASH_COMMANDS = [
     ("/memories", "List project memories"),
     ("/undo", "Restore pre-edit git checkpoint"),
     ("/redo", "Re-apply last undone checkpoint"),
+    ("/rewind", "Go back before the last prompt(s): messages and file edits"),
     ("/checkpoints", "List session checkpoints"),
     ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
     ("/dashboard", "Toggle observability dashboard"),

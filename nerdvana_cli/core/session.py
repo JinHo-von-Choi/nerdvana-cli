@@ -29,6 +29,20 @@ def resume_session_id() -> str | None:
     return raw
 
 
+def _after_rewinds(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The transcript entries without the prompts a rewind went back before, each with what followed them."""
+    kept: list[dict[str, Any]] = []
+    for entry in entries:
+        if entry.get("type") == "system" and entry.get("subtype") == "rewind":
+            starts = [i for i, e in enumerate(kept) if e.get("type") == "user"]
+            count  = int(entry.get("prompts", 1) or 1)
+            if starts:
+                del kept[starts[-min(count, len(starts))]:]
+        else:
+            kept.append(entry)
+    return kept
+
+
 def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
     """Rebuild conversation messages from transcript *entries*.
 
@@ -38,6 +52,7 @@ def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
     Providers reject either half on its own.
     """
     answered = {str(e.get("tool_use_id", "")) for e in entries if e.get("type") == "tool_result"}
+    entries  = _after_rewinds(entries)
     known:    set[str]      = set()
     messages: list[Message] = []
     for entry in entries:
