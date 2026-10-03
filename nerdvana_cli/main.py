@@ -30,6 +30,7 @@ from nerdvana_cli.commands.memory_command import memory_app
 from nerdvana_cli.commands.schedule_command import schedule_app
 from nerdvana_cli.commands.session_command import session_app
 from nerdvana_cli.commands.skill_command import skill_app
+from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
@@ -49,6 +50,7 @@ app.add_typer(hook_app)
 app.add_typer(admin_app)
 app.command(name="acp")(acp_command)
 app.add_typer(schedule_app)
+app.add_typer(workflow_app)
 
 
 def _maybe_show_update_notice(target: Console | None = None) -> None:
