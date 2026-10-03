@@ -70,6 +70,7 @@ class RunResult:
     duration_ms: int                 = 0
     cost_usd:    float               = 0.0
     usage:       dict[str, int]      = field(default_factory=dict)
+    signals:     dict[str, int]      = field(default_factory=dict)
     error:       str                 = ""
 
     @property
@@ -99,6 +100,7 @@ class RunResult:
                 "cache_write_tokens": self.usage.get("cache_write_tokens", 0),
             },
         }
+        payload["signals"] = dict(self.signals)
         if self.error:
             payload["error"] = self.error
         return payload

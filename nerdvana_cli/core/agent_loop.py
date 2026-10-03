@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import re
+from collections import Counter
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.markup import escape
 
+from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
@@ -189,6 +191,12 @@ class _Turn:
         self.tool_uses.append(call)
 
 
+_WRAP_UP = (
+    "[Turn budget] {used} of {limit} turns are used. Stop exploring now and answer with what you have found; "
+    "say plainly what you could not find."
+)
+
+
 class AgentLoop:
     """Orchestrates provider calls, tool execution, and session recording."""
 
@@ -216,9 +224,7 @@ class AgentLoop:
         on_confirm:          ConfirmCallback | None = None,
         origin:              CallOrigin | None = None,
     ) -> None:
-        self.origin               = origin or CallOrigin()
-        self.usage_listener:      Callable[[dict[str, Any]], None] | None = None
-        self._last_tool           = ""
+        self._init_telemetry(origin)
         self.settings             = settings
         self.registry             = registry
         self.session              = session or SessionStorage()
@@ -343,6 +349,10 @@ class AgentLoop:
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
 
+    def signal_summary(self) -> dict[str, int]:
+        """How often each kind of trouble came up in this session (see ``core/signals.py``)."""
+        return signals.merge(self._signals, self.tool_executor.signals)
+
     def usage_summary(self) -> dict[str, int]:
         """Token totals for every provider request made so far in this session."""
         return {
@@ -361,6 +371,15 @@ class AgentLoop:
         if spent < limit:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
+
+    def _init_telemetry(self, origin: CallOrigin | None) -> None:
+        """State for attributing requests and counting trouble: who this loop is and what it has seen."""
+        self.origin                = origin or CallOrigin()
+        self.usage_listener:       Callable[[dict[str, Any]], None] | None = None
+        self._last_tool            = ""
+        self._signals: Counter[str] = Counter()
+        # Turn at which the model is told to stop exploring and answer; 0 = never. Sub-agents set it.
+        self.wrap_up_at            = 0
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -610,6 +629,7 @@ class AgentLoop:
         AI compaction returns None or the circuit breaker is open.
         """
         before = len(self.state.messages)
+        self._signals[signals.COMPACTION] += 1
         if not self._compaction_state.is_circuit_open:
             yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."
             summary = await ai_compact(
@@ -821,6 +841,9 @@ class AgentLoop:
             yield f"\n[bold yellow]Max turns ({self.settings.session.max_turns}) reached.[/bold yellow]"
             return
         self.turns_used = iteration
+        if self.wrap_up_at and iteration == self.wrap_up_at:
+            self._signals[signals.WRAP_UP] += 1
+            self.state.messages.append(Message(role=Role.USER, content=_WRAP_UP.format(used=iteration - 1, limit=self.settings.session.max_turns)))
         for stop, notice in (("max_cost", self._over_cost_limit()), ("max_total_tokens", self._over_token_limit())):
             if notice:
                 self.last_stop = stop
@@ -940,6 +963,7 @@ class AgentLoop:
                 return
             decision = self._todo_guard.check(self.session.session_id)
             if decision.kind == CONTINUE:
+                self._signals[signals.TODO_NUDGE] += 1
                 self.state.messages.append(Message(role=Role.USER, content=decision.message))
                 return
             if decision.kind == STALLED:
@@ -983,6 +1007,7 @@ class AgentLoop:
                 yield c
             return
         if action.kind == RETRY:
+            self._signals[signals.PROVIDER_RETRY] += 1
             yield f"\n[dim yellow][Retrying in {action.delay:.1f}s: {failure.kind}][/dim yellow]\n"
             await asyncio.sleep(action.delay)
             return
@@ -992,6 +1017,7 @@ class AgentLoop:
                 yield status
             return
         if action.kind == FALLBACK:
+            self._signals[signals.PROVIDER_FALLBACK] += 1
             self._switch_model(action.provider, action.model)
             yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
             return

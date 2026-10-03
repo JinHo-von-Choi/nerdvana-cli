@@ -169,10 +169,11 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 {"type": "result", "schema_version": 1, "subtype": "success", "is_error": false,
  "result": "최종 답변", "session_id": "ab12cd34", "provider": "anthropic",
  "model": "claude-sonnet-5-5", "num_turns": 4, "duration_ms": 18234, "total_cost_usd": 0.0421,
- "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000}}
+ "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000},
+ "signals": {"cas_rejected": 1, "new_diagnostics": 2}}
 ```
 
-`subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
+`signals`는 실행 중 무엇이 잘못됐는지를 종류별로 센 값입니다(`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` 등). 일어나지 않은 종류는 없습니다. `subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
 
 `stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `request`(요청 하나의 `provider`, `model`, `agent_type`, `turn`, `last_tool`, 캐시 토큰을 포함한 토큰 수, `cost_usd`), `compaction`, `context`(창 사용률)입니다.
 
@@ -365,9 +366,9 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | 에이전트 타입 | 최대 턴 | 허용 도구 | 용도 |
 |-|-|-|-|
 | `general-purpose` | 50 | `*` | 범용 에이전트 |
-| `Explore` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | 코드베이스 탐색 전용, 파일 수정 불가 |
-| `Plan` | 20 | `Glob`, `Grep`, `FileRead`, `@read` | 구현 계획 수립 전용, `planning_gate`와 함께 동작 |
-| `code-reviewer` | 15 | `FileRead`, `Grep`, `Glob`, `@read` | 코드 품질과 정확성 검토, 읽기 전용 |
+| `Explore` | 12 | `Glob`, `Grep`, `FileRead`, `@read` | 코드베이스 탐색 전용, 파일 수정 불가 |
+| `Plan` | 15 | `Glob`, `Grep`, `FileRead`, `@read` | 구현 계획 수립 전용, `planning_gate`와 함께 동작 |
+| `code-reviewer` | 12 | `FileRead`, `Grep`, `Glob`, `@read` | 코드 품질과 정확성 검토, 읽기 전용 |
 | `git-management` | 20 | `Bash`, `FileRead` | git 작업 전담 |
 | `test-writer` | 30 | `*` | 테스트 작성과 실행 |
 

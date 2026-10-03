@@ -60,7 +60,7 @@ Each task is checked by `tests/test_bench_fixtures.py` without a model: its veri
 
 For each task: attempts, passes, `pass@1` (share of attempts that passed), `pass@k`
 (chance that at least one of k attempts passes, the unbiased estimator
-`1 - C(n - c, k) / C(n, k)`), total cost and mean time. Overall: tasks solved, mean
+`1 - C(n - c, k) / C(n, k)`), total cost and mean time. The summary also shows how the failed attempts ended and how often each kind of trouble (`cas_rejected`, `new_diagnostics`, `repeat_refused`, `sandbox_denied` and the like, counted by the run itself) occurred in failed against passed attempts, which tells what to fix first. Overall: tasks solved, mean
 `pass@1` with a 95% bootstrap interval over tasks, pass rates by tag, total cost and cost per solved task. Costs are the loop's own estimate from
 the usage each request reported and `providers/pricing.yml`; a model without a price
 reports 0 and the cost ceiling does not apply to it.

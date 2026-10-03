@@ -19,6 +19,7 @@ from nerdvana_cli.core import paths
 from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.schema_check import validate_arguments
+from nerdvana_cli.core.signals import classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -82,6 +83,7 @@ class ToolExecutor:
         self._analytics_writer    = analytics_writer
         self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
+        self.signals: Counter[str] = Counter()
         self._pending_injections: list[dict[str, Any]] = []
 
     def drain_injections(self) -> list[dict[str, Any]]:
@@ -152,6 +154,19 @@ class ToolExecutor:
         return ToolResult(tool_use_id=tool_id, content=content, is_error=True)
 
     async def _run_single(
+        self,
+        tool_use: dict[str, Any],
+        tool:     Any,
+        context:  ToolContext,
+    ) -> ToolResult:
+        """Run one call, and count what its result says about how the run is going."""
+        result    = await self._run_checked(tool_use, tool, context)
+        sandbox   = context.state.get("sandbox")
+        confined  = tool_use["name"] == "Bash" and sandbox is not None and getattr(sandbox, "mode", "off") != "off"
+        self.signals.update(classify_result(result.content, result.is_error, shell_confined=confined))
+        return result
+
+    async def _run_checked(
         self,
         tool_use: dict[str, Any],
         tool:     Any,
