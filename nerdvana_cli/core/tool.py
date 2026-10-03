@@ -29,8 +29,14 @@ ConfirmCallback = Callable[[str, str], Awaitable[bool]]
 # tool executor for the duration of one call; unset means no copy is kept.
 TOOL_OUTPUT_DIR: ContextVar[str | None] = ContextVar("tool_output_dir", default=None)
 
+# Most characters of a result to keep (``tools.max_result_chars``). Set by the tool executor for the duration
+# of one call; unset means the tool's own ``max_result_tokens`` applies.
+TOOL_RESULT_CAP: ContextVar[int | None] = ContextVar("tool_result_cap", default=None)
+
 # Share of a truncated result kept from the start; the rest comes from the end.
 _HEAD_SHARE = 0.6
+# Characters a character-limited result leaves for the note that says it was cut (it also names the saved file).
+_NOTE_RESERVE = 400
 
 
 def _save_full_output(tool_name: str, content: str) -> str | None:
@@ -146,16 +152,30 @@ class BaseTool(ABC, Generic[T]):
         return None
 
     def truncate_result(self, content: str) -> str:
-        """Bound *content* to ``max_result_tokens``, keeping its head and tail.
+        """Bound *content* to ``max_result_tokens``, or to the character limit of ``TOOL_RESULT_CAP``, keeping its head and tail.
 
         When the executor has set ``TOOL_OUTPUT_DIR`` the full output is saved
         there first and the note names the file.
         """
+        cap = TOOL_RESULT_CAP.get()
+        if cap is not None:
+            return self._truncate_to_chars(content, cap)
         total = approx_tokens(content)
         if total <= self.max_result_tokens:
             return content
+        keep = int(len(content) * self.max_result_tokens / total * 0.9)
+        return self._cut(content, keep, f"about {total - self.max_result_tokens} of {total} estimated tokens omitted.")
+
+    def _truncate_to_chars(self, content: str, cap: int) -> str:
+        """*content* cut to about *cap* characters; the note is part of the budget, so a cut result is not cut again."""
+        if len(content) <= cap:
+            return content
+        keep = max(cap - _NOTE_RESERVE, cap // 2)
+        return self._cut(content, keep, f"{len(content) - keep} of {len(content)} characters omitted.")
+
+    def _cut(self, content: str, keep: int, omitted: str) -> str:
+        """Keep *keep* characters of *content*, head and tail, and say what was left out and where the whole is."""
         saved = _save_full_output(self.name, content)
-        keep  = int(len(content) * self.max_result_tokens / total * 0.9)
         head  = int(keep * _HEAD_SHARE)
         tail  = keep - head
         where = (
@@ -163,7 +183,7 @@ class BaseTool(ABC, Generic[T]):
             if saved else ""
         )
         note = (
-            f"\n\n... [truncated: about {total - self.max_result_tokens} of {total} estimated tokens omitted."
+            f"\n\n... [truncated: {omitted}"
             f"{where} Prefer narrowing the request (offset/limit, a more specific pattern).] ...\n\n"
         )
         return content[:head] + note + (content[-tail:] if tail > 0 else "")

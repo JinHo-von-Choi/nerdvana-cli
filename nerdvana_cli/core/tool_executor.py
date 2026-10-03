@@ -29,9 +29,10 @@ from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.progress_monitor import ProgressMonitor
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
+from nerdvana_cli.core.settings import ToolsConfig
 from nerdvana_cli.core.signals import NO_PROGRESS, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
-from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, TOOL_RESULT_CAP, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_permission import PermissionGate, refusal
 from nerdvana_cli.core.untrusted import UntrustedTracker
 from nerdvana_cli.types import ToolResult
@@ -302,6 +303,7 @@ class ToolExecutor:
 
         output_dir = paths.user_data_home() / "tool-output" / str(context.state.get("session_id") or "default")
         dir_token  = TOOL_OUTPUT_DIR.set(str(output_dir))
+        cap_token  = TOOL_RESULT_CAP.set(self._result_cap(tool.name))
         edited     = self._diagnosable_edit(tool_use["name"], parsed_args, context)
         baseline   = await self._error_messages(edited) if edited else None
         try:
@@ -328,7 +330,13 @@ class ToolExecutor:
             return refusal(tool_id, result_text)
         finally:
             TOOL_OUTPUT_DIR.reset(dir_token)
+            TOOL_RESULT_CAP.reset(cap_token)
             self._record_call(tool_use, start_ts, time.perf_counter() - t0, success, exc_class, result_text)
+
+    def _result_cap(self, tool_name: str) -> int | None:
+        """The ``tools.max_result_chars`` limit that applies to *tool_name*, if any."""
+        tools = getattr(self._settings, "tools", None)
+        return tools.result_cap(tool_name) if isinstance(tools, ToolsConfig) else None
 
     def _record_call(
         self,
