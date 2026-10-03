@@ -27,6 +27,7 @@ PRICING = """\
 acme:
   cached: {input_per_1m: 10.0, output_per_1m: 40.0, cache_write_per_1m: 12.5, cache_read_per_1m: 1.0}
   plain:  {input_per_1m: 10.0, output_per_1m: 40.0}
+  dear:   {input_per_1m: 100.0, output_per_1m: 400.0}
 """
 
 
@@ -158,3 +159,31 @@ async def test_the_context_estimate_uses_the_whole_prompt_not_just_the_fresh_par
     async for _ in loop.run("one"):
         pass
     assert loop._context_budget.current(loop.state.messages) >= 50_000
+
+
+async def test_each_request_is_priced_for_the_model_that_served_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, table: PricingTable,
+) -> None:
+    loop = _loop(monkeypatch, tmp_path, table, [
+        {"input_tokens": 1000, "output_tokens": 10},
+        {"input_tokens": 1100, "output_tokens": 20},
+    ])
+    async for _ in loop.run("one"):
+        pass
+    loop.settings.model.model = "dear"
+    async for _ in loop.run("two"):
+        pass
+    expected = table.estimate_cost("acme", "cached", 1000, 10) + table.estimate_cost("acme", "dear", 1100, 20)
+    assert loop.session_cost_usd() == pytest.approx(expected)
+
+
+async def test_the_total_adds_what_finished_sub_agents_spent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, table: PricingTable,
+) -> None:
+    loop = _loop(monkeypatch, tmp_path, table, [{"input_tokens": 1000, "output_tokens": 10}])
+    async for _ in loop.run("one"):
+        pass
+    own = loop.session_cost_usd()
+    loop.budget.spent += 0.25
+    assert loop.session_cost_usd() == pytest.approx(own)
+    assert loop.total_cost_usd() == pytest.approx(own + 0.25)
