@@ -123,7 +123,7 @@ class PermissionConfig(BaseModel):
     always_deny: list[str] = Field(default_factory=list)
     # Ask before a Bash command or a state-changing MCP call that repeats text returned by the web or an MCP server.
     gate_untrusted_sources: bool = True
-    # A second model call that judges each call the policy would run without asking (core/classifier.py).
+    # A second model call that judges each call the policy would run without asking (core/safety/classifier.py).
     # "shadow" records what it would have done next to the real decision and changes nothing; "enforce"
     # turns an allow into an ask or a refusal. It never relaxes an ask or a refusal.
     classifier: Literal["off", "shadow", "enforce"] = "off"
@@ -153,7 +153,7 @@ class SessionConfig(BaseModel):
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
     # Replace secret-looking values (credential-named environment values, key and token shapes) with
-    # [REDACTED] in the output of commands and external tools before the model sees it. See core/secrets.py.
+    # [REDACTED] in the output of commands and external tools before the model sees it. See core/safety/secrets.py.
     mask_secrets: bool = True
     mask_extra_patterns: list[str] = Field(default_factory=list)
     # Model to switch to, once per session, when the run shows trouble ("model" or "provider:model"); empty = never.

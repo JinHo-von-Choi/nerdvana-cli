@@ -348,7 +348,7 @@ class ProfileManager:
             return yaml.safe_load(text) or {}
         except (FileNotFoundError, ModuleNotFoundError, AttributeError):
             # importlib.resources.files requires Python 3.9+; fallback to __file__
-            here = Path(__file__).parent.parent / "resources" / "profiles" / kind / filename
+            here = Path(__file__).parents[2] / "resources" / "profiles" / kind / filename
             if here.exists():
                 with here.open() as fh:
                     return yaml.safe_load(fh) or {}
@@ -363,7 +363,7 @@ class ProfileManager:
                 names.update(p.stem for p in directory.glob("*.yml"))
 
         # Built-in
-        builtin_dir = Path(__file__).parent.parent / "resources" / "profiles" / kind
+        builtin_dir = Path(__file__).parents[2] / "resources" / "profiles" / kind
         if builtin_dir.is_dir():
             names.update(p.stem for p in builtin_dir.glob("*.yml"))
 

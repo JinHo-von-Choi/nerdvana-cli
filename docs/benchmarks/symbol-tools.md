@@ -92,7 +92,7 @@ What changed:
   than 200 files mention the identifier the result carries a notice that references in the rest may be missing.
   `lsp_rename` shares the path and carries the same notice.
 - The expected files of the benchmark no longer include a file that defines its own function or class of the same
-  name (three of the 33 runs failed on `MaskResult`, which `core/secrets.py` defines separately; the server was
+  name (three of the 33 runs failed on `MaskResult`, which `core/safety/secrets.py` defines separately; the server was
   right and the expectation was wrong).
 - `replace_symbol_body` replaced the range up to the next line at the symbol's indentation. That range holds the
   blank lines after the symbol, and it ends too early at a decorator line or at the closing parenthesis of a

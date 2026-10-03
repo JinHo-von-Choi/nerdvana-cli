@@ -1,7 +1,7 @@
 """Confinement of stdio MCP server processes with the Landlock launcher.
 
 A stdio MCP server is code from a third party that runs as the user. The per-server ``sandbox`` setting
-starts it through the launcher of ``core/sandbox.py`` instead, which restricts what the process and its
+starts it through the launcher of ``core/safety/sandbox.py`` instead, which restricts what the process and its
 children can write (and, on a kernel that offers it, which TCP connections they can make). Reading is not
 restricted, as with the ``Bash`` tool.
 
@@ -15,9 +15,9 @@ import shlex
 from dataclasses import dataclass
 from typing import Literal
 
-from nerdvana_cli.core import sandbox as core_sandbox
 from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
-from nerdvana_cli.core.sandbox import SandboxPolicy
+from nerdvana_cli.core.safety import sandbox as core_sandbox
+from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.mcp.config import McpServerConfig
 
 CONFINED    = "confined"

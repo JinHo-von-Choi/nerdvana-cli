@@ -12,10 +12,10 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.commands.approvals_command import build_report, render
-from nerdvana_cli.core.approvals import Suggestion, normalise, suggest_rules
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks.hooks import HookEngine
-from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
+from nerdvana_cli.core.safety.approvals import Suggestion, normalise, suggest_rules
+from nerdvana_cli.core.safety.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

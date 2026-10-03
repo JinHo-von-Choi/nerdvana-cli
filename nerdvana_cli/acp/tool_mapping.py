@@ -13,9 +13,9 @@ from typing import Any
 from acp import text_block, tool_content, tool_diff_content
 from acp.schema import PlanEntry, PlanEntryStatus, ToolCallLocation, ToolKind
 
-from nerdvana_cli.core.approvals import normalise
-from nerdvana_cli.core.edit_tools import EDIT_PATH_ATTRS
-from nerdvana_cli.core.policy import primary_argument
+from nerdvana_cli.core.safety.approvals import normalise
+from nerdvana_cli.core.safety.edit_tools import EDIT_PATH_ATTRS
+from nerdvana_cli.core.safety.policy import primary_argument
 
 # Longest tool result and longest title sent to the editor; the model still gets the whole result.
 MAX_RESULT_CHARS = 10_000

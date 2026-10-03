@@ -175,7 +175,7 @@ class _Writer(BaseTool[Any]):
 
 async def _write(path: str, scope: list[str] | None, answer: bool | None, tmp_path: Path) -> tuple[ToolResult, _Writer, Any]:
     from nerdvana_cli.core.hooks.hooks import HookEngine
-    from nerdvana_cli.core.policy import PermissionPolicy
+    from nerdvana_cli.core.safety.policy import PermissionPolicy
     from nerdvana_cli.core.tool_executor import ToolExecutor
 
     tool     = _Writer()

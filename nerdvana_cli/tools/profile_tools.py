@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from nerdvana_cli.core.profiles import ProfileManager
+from nerdvana_cli.core.safety.profiles import ProfileManager
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

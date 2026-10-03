@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.commands.approvals_command import build_report, render
-from nerdvana_cli.core.approvals import compare_verdicts
+from nerdvana_cli.core.safety.approvals import compare_verdicts
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter
 

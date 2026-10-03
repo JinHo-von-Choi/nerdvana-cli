@@ -68,11 +68,11 @@ from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.phase_effort import PhaseEffort
 from nerdvana_cli.core.plan_gate import plan_for
-from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
 from nerdvana_cli.core.rewind import Rewinder
 from nerdvana_cli.core.run_limits import RunLimits
-from nerdvana_cli.core.sandbox import SandboxPolicy
+from nerdvana_cli.core.safety.policy import PermissionPolicy
+from nerdvana_cli.core.safety.sandbox import SandboxPolicy
 from nerdvana_cli.core.server_compaction import ServerCompaction
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.skills import SkillLoader

@@ -12,7 +12,8 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.classifier import (
+from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.safety.classifier import (
     ALLOW,
     ASK,
     DENY,
@@ -28,7 +29,6 @@ from nerdvana_cli.core.classifier import (
     parse_verdict,
     provider_completion,
 )
-from nerdvana_cli.core.config.settings import NerdvanaSettings
 
 
 class _Fake:
@@ -255,7 +255,7 @@ def test_the_model_comes_from_the_setting_then_the_categories_then_the_session(m
         async def send(self, system: str, messages: Any, tools: Any) -> dict[str, Any]:
             return {"content": "ok", "usage": {"input_tokens": 3}}
 
-    monkeypatch.setattr("nerdvana_cli.core.classifier.create_provider", lambda **kwargs: _Provider(**kwargs))
+    monkeypatch.setattr("nerdvana_cli.core.safety.classifier.create_provider", lambda **kwargs: _Provider(**kwargs))
     monkeypatch.setenv("OPENAI_API_KEY", "k")
     settings                = NerdvanaSettings()
     settings.model.provider = "anthropic"
@@ -295,7 +295,7 @@ async def test_a_provider_that_reports_an_error_is_a_failure(monkeypatch: pytest
         async def send(self, system: str, messages: Any, tools: Any) -> dict[str, Any]:
             return {"content": "rate limited", "is_error": True}
 
-    monkeypatch.setattr("nerdvana_cli.core.classifier.create_provider", lambda **kwargs: _Broken(**kwargs))
+    monkeypatch.setattr("nerdvana_cli.core.safety.classifier.create_provider", lambda **kwargs: _Broken(**kwargs))
     settings = NerdvanaSettings()
     completion = provider_completion(settings)
     assert completion is not None

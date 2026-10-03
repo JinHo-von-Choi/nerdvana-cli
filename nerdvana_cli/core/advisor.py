@@ -7,7 +7,7 @@ The agent hands a short question and an excerpt of the recent conversation to th
 ``advisor.model`` and gets guidance back. The advisor has no tools and does no work; unlike an escalation it
 does not take over the session. What it is sent is bounded: the last ``advisor.max_context_messages``
 messages, each cut short with tool output cut hardest, and every secret-looking value replaced (see
-``core/secrets.py``), never the whole history. Each consultation is a request on the advisor's model: it is
+``core/safety/secrets.py``), never the whole history. Each consultation is a request on the advisor's model: it is
 recorded in the ledger under the agent type ``advisor``, priced for that model, and counts against
 ``session.max_cost_usd`` and the token limit like any other request of the session.
 
@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 from nerdvana_cli.core import signals
 from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.secrets import SecretMasker
+from nerdvana_cli.core.safety.secrets import SecretMasker
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider, resolve_api_key
 from nerdvana_cli.types import Message, Role

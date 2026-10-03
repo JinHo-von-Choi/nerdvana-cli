@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import sandbox
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.sandbox import SETUP_FAILED, SandboxPolicy, plan_launch, wrap_command, writable_paths
+from nerdvana_cli.core.safety import sandbox
+from nerdvana_cli.core.safety.sandbox import SETUP_FAILED, SandboxPolicy, plan_launch, wrap_command, writable_paths
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 

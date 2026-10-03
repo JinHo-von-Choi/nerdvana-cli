@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 import yaml
 
-from nerdvana_cli.core.profiles import (
+from nerdvana_cli.core.safety.profiles import (
     ContextProfile,
     ModeProfile,
     ProfileManager,

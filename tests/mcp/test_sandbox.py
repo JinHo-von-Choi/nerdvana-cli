@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import sandbox
+from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.mcp.config import McpServerConfig, load_mcp_config
 from nerdvana_cli.mcp.manager import McpManager

@@ -15,11 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import egress_proxy
-from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.config.egress_rules import ProxyCredential, normalize_pattern
 from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
-from nerdvana_cli.core.egress_proxy import (
+from nerdvana_cli.core.safety import egress_proxy
+from nerdvana_cli.core.safety.agent_scope import apply_write_scope
+from nerdvana_cli.core.safety.egress_proxy import (
     EgressProxy,
     PreparedLaunch,
     host_allowed,
@@ -28,7 +28,7 @@ from nerdvana_cli.core.egress_proxy import (
     parse_request,
     split_host_port,
 )
-from nerdvana_cli.core.sandbox import Launch, SandboxPolicy, plan_launch, proxy_environment
+from nerdvana_cli.core.safety.sandbox import Launch, SandboxPolicy, plan_launch, proxy_environment
 from nerdvana_cli.core.signals import EGRESS_DENIED, classify_result
 
 
@@ -380,7 +380,7 @@ async def test_an_unset_credential_variable_stops_the_request_before_it_leaves(u
 
 
 def test_the_launcher_may_connect_to_the_proxy_port_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core import sandbox
+    from nerdvana_cli.core.safety import sandbox
 
     monkeypatch.setattr(sandbox, "landlock_abi", lambda: 4)
     policy = SandboxPolicy("require", False, allowed_domains=("example.com",))
@@ -401,7 +401,7 @@ def test_the_launcher_may_connect_to_the_proxy_port_only(monkeypatch: pytest.Mon
 
 
 async def test_no_proxy_is_started_unless_the_policy_and_the_kernel_need_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    from nerdvana_cli.core import sandbox
+    from nerdvana_cli.core.safety import sandbox
 
     monkeypatch.setattr(sandbox, "landlock_abi", lambda: 4)
     for policy in (None, SandboxPolicy("off", False, allowed_domains=("a.example",)), SandboxPolicy("auto", True)):

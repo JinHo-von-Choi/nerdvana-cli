@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nerdvana_cli.core import sandbox
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext
@@ -144,7 +144,7 @@ async def test_isolation_outside_a_repository_is_an_error_result(tmp_path: Path)
 
 @pytest.mark.skipif(sandbox.landlock_abi() < 1, reason="the kernel has no Landlock")
 async def test_a_sandboxed_agent_can_commit_in_its_worktree(repo: Path) -> None:
-    from nerdvana_cli.core.sandbox import SandboxPolicy
+    from nerdvana_cli.core.safety.sandbox import SandboxPolicy
     from nerdvana_cli.tools.agent_tool import enter_worktree
     from nerdvana_cli.tools.bash_tool import BashArgs, BashTool
 

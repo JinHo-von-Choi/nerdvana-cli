@@ -316,8 +316,8 @@ def _check_pricing_coverage() -> CheckResult:
 def _check_sandbox() -> CheckResult:
     """Report whether shell commands can be confined, and what the configuration asks for."""
     from nerdvana_cli.core.config.settings import NerdvanaSettings
-    from nerdvana_cli.core.egress_proxy import describe_egress
-    from nerdvana_cli.core.sandbox import landlock_abi
+    from nerdvana_cli.core.safety.egress_proxy import describe_egress
+    from nerdvana_cli.core.safety.sandbox import landlock_abi
 
     try:
         settings = NerdvanaSettings.load()

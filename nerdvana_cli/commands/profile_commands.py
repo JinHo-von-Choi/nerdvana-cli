@@ -10,7 +10,7 @@ import contextlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.profiles import ProfileManager
+    from nerdvana_cli.core.safety.profiles import ProfileManager
     from nerdvana_cli.ui.app import NerdvanaApp
 
 
@@ -91,7 +91,7 @@ async def handle_context(app: NerdvanaApp, args: str) -> None:
 
 def _get_profile_manager(app: NerdvanaApp) -> ProfileManager:
     """Return the ProfileManager from the app, creating one if needed."""
-    from nerdvana_cli.core.profiles import ProfileManager
+    from nerdvana_cli.core.safety.profiles import ProfileManager
 
     # Dynamic attribute — NerdvanaApp is a TUI class we cannot easily annotate here.
     _app: Any = app  # noqa: ANN401  (intentional escape hatch)

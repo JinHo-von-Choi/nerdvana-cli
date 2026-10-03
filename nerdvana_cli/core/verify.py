@@ -18,7 +18,7 @@ import signal
 import time
 from dataclasses import dataclass
 
-from nerdvana_cli.core.sandbox import SandboxPolicy, plan_launch
+from nerdvana_cli.core.safety.sandbox import SandboxPolicy, plan_launch
 
 DEFAULT_TIMEOUT = 300
 DEFAULT_TAIL    = 4000
