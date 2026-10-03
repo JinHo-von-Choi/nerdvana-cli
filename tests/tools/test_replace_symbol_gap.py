@@ -19,9 +19,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nerdvana_cli.core.code_editor import CodeEditor
-from nerdvana_cli.core.symbol import LanguageServerSymbol, Location
-from nerdvana_cli.core.symbol_lines import trim_trailing_gap
+from nerdvana_cli.codeintel.code_editor import CodeEditor
+from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location
+from nerdvana_cli.codeintel.symbol_lines import trim_trailing_gap
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools import symbol_edit_tools as se
 

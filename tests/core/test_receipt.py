@@ -14,10 +14,10 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from nerdvana_cli.cli.receipt import RECEIPT_VERSION, build_receipt
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.analytics import AnalyticsReader, AnalyticsWriter, CallOrigin
 from nerdvana_cli.core.hooks import HookEngine
-from nerdvana_cli.core.receipt import RECEIPT_VERSION, build_receipt
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

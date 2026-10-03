@@ -286,7 +286,7 @@ async def test_a_project_command_typed_in_a_prompt_expands_into_its_template(pro
 async def test_tools_are_created_in_the_session_directory_and_the_process_directory_is_left_alone(project: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import os
 
-    from nerdvana_cli.core import lsp_client
+    from nerdvana_cli.codeintel import lsp_client
 
     seen: list[str] = []
 

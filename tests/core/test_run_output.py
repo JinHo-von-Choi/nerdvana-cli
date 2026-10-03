@@ -13,13 +13,7 @@ from typing import Any
 import pytest
 from rich.console import Console
 
-from nerdvana_cli.core.agent_loop import (
-    COMPACT_STATUS_PREFIX,
-    CONTEXT_USAGE_PREFIX,
-    TOOL_DONE_PREFIX,
-    TOOL_STATUS_PREFIX,
-)
-from nerdvana_cli.core.run_output import (
+from nerdvana_cli.cli.run_output import (
     EXIT_BUDGET,
     EXIT_CONFIG,
     EXIT_FAILURE,
@@ -29,6 +23,12 @@ from nerdvana_cli.core.run_output import (
     RunReporter,
     RunResult,
     classify_chunk,
+)
+from nerdvana_cli.core.agent_loop import (
+    COMPACT_STATUS_PREFIX,
+    CONTEXT_USAGE_PREFIX,
+    TOOL_DONE_PREFIX,
+    TOOL_STATUS_PREFIX,
 )
 
 # ---------------------------------------------------------------------------

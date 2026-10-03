@@ -18,7 +18,7 @@ import json
 import os
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from nerdvana_cli.core.lsp_workspace import notice_of
+from nerdvana_cli.codeintel.lsp_workspace import notice_of
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 
 # Re-export from sibling modules for backward compatibility
@@ -39,9 +39,9 @@ from nerdvana_cli.tools.symbol_edit_tools import (  # noqa: F401
 from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.code_editor import CodeEditor
-    from nerdvana_cli.core.lsp_client import LspClient
-    from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+    from nerdvana_cli.codeintel.code_editor import CodeEditor
+    from nerdvana_cli.codeintel.lsp_client import LspClient
+    from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ class SymbolOverviewTool(BaseTool[SymbolOverviewArgs]):
         output: dict[str, Any] = {"symbols": sym_list}
 
         if args.with_graph:
-            from nerdvana_cli.core.symbol_graph import SymbolGraph  # noqa: PLC0415
+            from nerdvana_cli.codeintel.symbol_graph import SymbolGraph  # noqa: PLC0415
             graph = SymbolGraph()
             for sym in symbols:
                 graph.add_symbol(sym)

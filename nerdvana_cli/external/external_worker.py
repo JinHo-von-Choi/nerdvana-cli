@@ -28,7 +28,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from nerdvana_cli.core.external_projects import ExternalProject
+from nerdvana_cli.external.external_projects import ExternalProject
 
 logger = logging.getLogger(__name__)
 

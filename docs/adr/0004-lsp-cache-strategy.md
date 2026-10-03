@@ -6,7 +6,7 @@
 
 ## Context
 
-`nerdvana_cli/core/lsp_client.py` is invoked for every `find_references`,
+`nerdvana_cli/codeintel/lsp_client.py` is invoked for every `find_references`,
 `goto_definition`, and `diagnostics` call that a tool-use turn triggers.
 Current measurements (small fixture — 3 files, 8 symbols) show the harness
 exits with `status: no-lsp-server-on-path` in most CI environments, so no

@@ -49,8 +49,8 @@ class TestHandleThinking:
         with patch("nerdvana_cli.commands.system_commands.handle_thinking.__module__"):
             pass
         with (
-            patch("nerdvana_cli.core.setup.load_config", return_value={}),
-            patch("nerdvana_cli.core.setup.save_config") as mock_save,
+            patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+            patch("nerdvana_cli.cli.setup.save_config") as mock_save,
         ):
             await handle_thinking(app, "on")
 
@@ -65,8 +65,8 @@ class TestHandleThinking:
     async def test_off_disables_thinking(self) -> None:
         app = _make_app(show_thinking=True)
         with (
-            patch("nerdvana_cli.core.setup.load_config", return_value={}),
-            patch("nerdvana_cli.core.setup.save_config") as mock_save,
+            patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+            patch("nerdvana_cli.cli.setup.save_config") as mock_save,
         ):
             await handle_thinking(app, "off")
 
@@ -88,8 +88,8 @@ class TestHandleThinking:
     async def test_save_config_exception_shows_warning(self) -> None:
         app = _make_app(show_thinking=True)
         with (
-            patch("nerdvana_cli.core.setup.load_config", side_effect=OSError("disk full")),
-            patch("nerdvana_cli.core.setup.save_config"),
+            patch("nerdvana_cli.cli.setup.load_config", side_effect=OSError("disk full")),
+            patch("nerdvana_cli.cli.setup.save_config"),
         ):
             await handle_thinking(app, "off")
 
@@ -109,8 +109,8 @@ async def test_the_toggle_reaches_the_provider_that_requests_summaries(monkeypat
 
     from nerdvana_cli.commands.system_commands import handle_thinking
 
-    monkeypatch.setattr("nerdvana_cli.core.setup.load_config", lambda: {})
-    monkeypatch.setattr("nerdvana_cli.core.setup.save_config", lambda cfg: None)
+    monkeypatch.setattr("nerdvana_cli.cli.setup.load_config", lambda: {})
+    monkeypatch.setattr("nerdvana_cli.cli.setup.save_config", lambda cfg: None)
     config = SimpleNamespace(show_thinking=True)
     app    = SimpleNamespace(
         settings    = SimpleNamespace(model=SimpleNamespace(show_thinking=True)),

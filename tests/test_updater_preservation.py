@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nerdvana_cli.core import updater
+from nerdvana_cli.cli import updater
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -14,14 +14,16 @@ from __future__ import annotations
 from tests.contracts.import_graph import parsed_sources, runtime_imports
 
 FORBIDDEN: dict[str, frozenset[str]] = {
-    "types":     frozenset({"utils", "core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "main"}),
-    "utils":     frozenset({"core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "main"}),
-    "providers": frozenset({"core", "tools", "ui", "server", "commands", "main"}),
-    "core":      frozenset({"tools", "ui", "server", "commands", "main"}),
-    "tools":     frozenset({"ui", "server", "commands", "main"}),
-    "mcp":       frozenset({"tools", "ui", "server", "commands", "main"}),
-    "agents":    frozenset({"tools", "ui", "server", "commands", "main"}),
-    "server":    frozenset({"ui", "commands", "main"}),
+    "types":     frozenset({"utils", "core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "cli", "main"}),
+    "utils":     frozenset({"core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "cli", "main"}),
+    "providers": frozenset({"core", "tools", "ui", "server", "commands", "cli", "main"}),
+    "codeintel": frozenset({"core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "cli", "main"}),
+    "core":      frozenset({"codeintel", "external", "tools", "ui", "server", "commands", "cli", "main"}),
+    "external":  frozenset({"tools", "ui", "server", "commands", "cli", "main"}),
+    "tools":     frozenset({"ui", "server", "commands", "cli", "main"}),
+    "mcp":       frozenset({"tools", "ui", "server", "commands", "cli", "main"}),
+    "agents":    frozenset({"tools", "ui", "server", "commands", "cli", "main"}),
+    "server":    frozenset({"ui", "commands", "cli", "main"}),
     "ui":        frozenset({"server", "main"}),
     "commands":  frozenset({"main"}),
 }

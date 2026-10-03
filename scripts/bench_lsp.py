@@ -1,6 +1,6 @@
 """LSP benchmark harness — measure cold-index, goto-definition, find-references.
 
-Drives ``core.lsp_client.LspClient`` against a fixture project and emits a JSON
+Drives ``codeintel.lsp_client.LspClient`` against a fixture project and emits a JSON
 summary on stdout. Designed to be invoked manually or from a nightly workflow;
 not part of the PR critical path because it requires ``pyright`` on PATH.
 
@@ -40,7 +40,7 @@ import sys
 import time
 from pathlib import Path
 
-from nerdvana_cli.core.lsp_client import LspClient, LspError
+from nerdvana_cli.codeintel.lsp_client import LspClient, LspError
 from nerdvana_cli.tools.lsp import create_lsp_tools
 
 

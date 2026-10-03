@@ -6,7 +6,7 @@ Date:   2026-10-03
     nerdvana schedule add "0 3 * * *" --prompt "..." [--cwd DIR] [--max-cost-usd X] [--approval-mode plan|default] [--name N]
     nerdvana schedule list | remove NAME | run NAME | daemon | install-systemd
 
-The behavior behind these commands is in ``core.scheduler``; see docs/scheduling.md.
+The behavior behind these commands is in ``cli.scheduler``; see docs/scheduling.md.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from nerdvana_cli.core.cron import ScheduleError
-from nerdvana_cli.core.scheduler import (
+from nerdvana_cli.cli.cron import ScheduleError
+from nerdvana_cli.cli.scheduler import (
     DEFAULT_APPROVAL_MODE,
     DEFAULT_DAILY_MAX_COST_USD,
     DEFAULT_JOB_MAX_COST_USD,

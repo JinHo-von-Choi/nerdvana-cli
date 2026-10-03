@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nerdvana_cli.core.symbol import LanguageServerSymbol, Location, _sym_from_dict
+from nerdvana_cli.codeintel.symbol import LanguageServerSymbol, Location, _sym_from_dict
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools import read_ledger
 from nerdvana_cli.tools.file_tools import FileEditArgs, FileEditTool

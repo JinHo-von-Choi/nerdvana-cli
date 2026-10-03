@@ -16,10 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core import scheduler
-from nerdvana_cli.core.cron import ScheduleError
-from nerdvana_cli.core.scheduler import (
+from nerdvana_cli.cli import scheduler
+from nerdvana_cli.cli.cron import ScheduleError
+from nerdvana_cli.cli.scheduler import (
     COMMAND_ENV,
     Job,
     JobLock,
@@ -39,6 +38,7 @@ from nerdvana_cli.core.scheduler import (
     systemd_unit,
     validate_job,
 )
+from nerdvana_cli.core import paths as core_paths
 
 FAKE = textwrap.dedent('''
     import json, os, sys, time

@@ -19,9 +19,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nerdvana_cli.core import lsp_client
-from nerdvana_cli.core.lsp_client import LspClient, LspError
-from nerdvana_cli.core.lsp_workspace import NoticedList, mentioning_files, notice_of
+from nerdvana_cli.codeintel import lsp_client
+from nerdvana_cli.codeintel.lsp_client import LspClient, LspError
+from nerdvana_cli.codeintel.lsp_workspace import NoticedList, mentioning_files, notice_of
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.lsp import LspFindReferencesTool, LspRenameTool
 from nerdvana_cli.tools.symbol_tools import FindReferencingSymbolsArgs, FindReferencingSymbolsTool

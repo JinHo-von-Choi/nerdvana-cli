@@ -177,12 +177,12 @@ class NerdvanaMcpServer:
 
         # Symbol tools, only when a language server is available
         try:
-            from nerdvana_cli.core.lsp_client import LspClient
+            from nerdvana_cli.codeintel.lsp_client import LspClient
             lsp = LspClient()
             if lsp.has_any_server():
                 self._lsp = lsp
-                from nerdvana_cli.core.code_editor import CodeEditor
-                from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+                from nerdvana_cli.codeintel.code_editor import CodeEditor
+                from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
                 from nerdvana_cli.tools.symbol_tools import create_symbol_tools
                 retriever = LanguageServerSymbolRetriever(client=lsp)
                 editor    = CodeEditor(project_root=lsp._project_root)  # noqa: SLF001

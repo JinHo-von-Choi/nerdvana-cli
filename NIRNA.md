@@ -23,7 +23,7 @@
 - Skills: markdown-based prompt plugins (.nerdvana/skills/*.md), /trigger activation
 - Agents: 6 builtin types (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) dispatched via AgentTool with their own system prompt and max_turns; allowed_tools filters the parent session's tools per agent ("@read" admits READ/SYMBOLIC tools); sub-agents run under a per-provider concurrency bound
 - TaskPanel: Textual widget (ui/task_panel.py) renders live AgentTool/SwarmTool sub-task progress in the right pane, driven by TaskState updates from agent_loop
-- LSP: LspClient (core/lsp_client.py) speaks JSON-RPC 2.0 over stdio to language servers; 4 tools (lsp_diagnostics, lsp_goto_definition, lsp_find_references, lsp_rename) registered with graceful degradation when no server is available
+- LSP: LspClient (codeintel/lsp_client.py) speaks JSON-RPC 2.0 over stdio to language servers; 4 tools (lsp_diagnostics, lsp_goto_definition, lsp_find_references, lsp_rename) registered with graceful degradation when no server is available
 - Recovery: provider failures are classified (providers/errors.py) and core/provider_recovery.py decides retry with backoff, fallback, compaction, non-streaming resend or give-up; nothing is retried after output streamed. Provider streams are bounded by idle and total timeouts (core/stream_guard.py). End-of-turn hooks (context_limit_recovery, ralph_loop_check) may continue a turn at most 3 times per prompt; the todo guard (core/todos.py) keeps the loop on open todo items until three nudges make no progress
 - Planning gate: opt-in two-phase mode (planning_gate=true in YAML) that forces a Plan agent pass before code execution; child agents always run with planning_gate=False to prevent recursion
 - Model fallback: core/settings.py ModelConfig.fallback_models (`model` or `provider:model`) and max_retries; the original provider, model and key are restored after the run
@@ -33,11 +33,11 @@
 ## Key Components
 - core/agent_loop.py: streaming agent loop, tool execution, context compaction, recovery (planning_gate, provider recovery, todo guard, background task reports, ultrawork), session resume (restore_history) and close_session (SESSION_END)
 - core/compact.py: compaction strategy module shared by agent_loop and SessionState
-- core/lsp_client.py: stdio JSON-RPC 2.0 LspClient, request/response correlation, capability negotiation
+- codeintel/lsp_client.py: stdio JSON-RPC 2.0 LspClient, request/response correlation, capability negotiation
 - core/hooks.py: HookEngine event system, HookContext (with stop_reason field, default None)
 - core/builtin_hooks.py: session start context injection (tools/settings/NIRNA.md)
 - core/skills.py: SkillLoader with 3-tier discovery (builtin < global < project)
-- core/updater.py: GitHub release check, self-update via git pull
+- cli/updater.py: GitHub release check, self-update via git pull
 - agents/builtin.py: 6 builtin agent definitions (general-purpose, Explore, Plan, code-reviewer, git-management, test-writer) with system prompts and allowed_tools
 - agents/registry.py: agent registry, .nerdvana/agents/*.yml custom loader, allowed_tools filtering
 - providers/base.py: BaseProvider Protocol, ProviderConfig, ProviderEvent (error_kind, status_code, retry_after), MODEL_CONTEXT_WINDOWS

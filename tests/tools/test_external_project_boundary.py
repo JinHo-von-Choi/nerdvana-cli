@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.external_projects import ExternalProjectRegistry
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ToolContext
+from nerdvana_cli.external.external_projects import ExternalProjectRegistry
 from nerdvana_cli.tools.external_project_tools import (
     BOUNDARY_ROOT_ENV_VAR,
     RegisterExternalProjectArgs,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nerdvana_cli.core.setup import _resolve_default_provider_index
+from nerdvana_cli.cli.setup import _resolve_default_provider_index
 
 PROVIDERS_DISPLAY = [
     ("anthropic", "Anthropic (Claude)", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
@@ -78,7 +78,7 @@ def test_wizard_default_uses_saved_provider_openrouter():
 def test_wizard_default_no_saved_config(tmp_path, monkeypatch):
     """When no config file exists, saved_provider is empty, default_idx is '1'."""
 
-    from nerdvana_cli.core.setup import load_config
+    from nerdvana_cli.cli.setup import load_config
 
     cfg_path = tmp_path / "nerdvana.yml"
     monkeypatch.setattr(
@@ -104,7 +104,7 @@ def test_wizard_default_with_saved_provider_in_config(tmp_path, monkeypatch):
         lambda: cfg_path,
     )
 
-    from nerdvana_cli.core.setup import load_config
+    from nerdvana_cli.cli.setup import load_config
     existing_cfg = load_config()
     saved_provider = (existing_cfg.get("model") or {}).get("provider", "")
     result = _resolve_default_provider_index(saved_provider, PROVIDERS_DISPLAY)

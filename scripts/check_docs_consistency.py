@@ -102,7 +102,7 @@ def code_tool_names() -> set[str]:
     appear only when a language server is installed, but the documentation
     describes them either way.
     """
-    from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.codeintel.lsp_client import LspClient
     from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.tools.lsp import create_lsp_tools
     from nerdvana_cli.tools.parism_tool import ParismTool

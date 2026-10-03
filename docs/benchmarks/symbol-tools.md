@@ -56,7 +56,7 @@ What the numbers say:
 - `find_referencing_symbols` returned the definition itself and nothing from any other file in all 33 runs. A
   probe confirmed why: the server answers only for files it has open, plus what those import. After two other
   files were opened by diagnostics calls the same query returned seven locations in four files. The client
-  (`core/lsp_client.py`) opens a file only when a tool is asked about it, so a reference search across the
+  (`codeintel/lsp_client.py`) opens a file only when a tool is asked about it, so a reference search across the
   repository sees almost nothing. Anything built on cross-file references (rename, safe delete, an impact check
   before an edit) inherits that limit; it has to be fixed or the files opened before this tool is relied on.
 - `replace_symbol_body` applied correctly in 4 of 4 runs, and each time the blank lines after the symbol were not
@@ -85,7 +85,7 @@ What changed:
   it was eighteen in two files, waiting up to ten seconds changed nothing, and passing `workspaceFolders` in
   `initialize` only made the files known after the server had indexed for a few seconds (the first answer is
   still partial). The client now sends `workspaceFolders`, and before a references or rename request it opens
-  every workspace file that mentions the identifier (`core/lsp_workspace.py`: whole word, same file suffix, no
+  every workspace file that mentions the identifier (`codeintel/lsp_workspace.py`: whole word, same file suffix, no
   hidden, dependency or build directories, at most 200 files, nearest to the definition first) and resyncs the
   files that are open (a changed file with `didChange`, a deleted one with `didClose`). A request without an
   answer in time fails with a message that names the method and says the server may still be indexing; when more
@@ -111,6 +111,6 @@ reaches the other files; a persistent index of identifiers would remove the scan
 
 Limits that remain: a file that uses the symbol only under another name and never mentions the original (an
 alias imported elsewhere and re-exported) is not opened by the scan, and pyright reports it only once its own
-indexing has reached it. The 200 file cap is a constant of `core/lsp_workspace.py`. The line based fallback for a
+indexing has reached it. The 200 file cap is a constant of `codeintel/lsp_workspace.py`. The line based fallback for a
 server that gives no symbol extent still ends a symbol at the first line at its indentation. Editing a file with
 CRLF line endings through any symbol edit tool rewrites it with LF, which is outside this change.

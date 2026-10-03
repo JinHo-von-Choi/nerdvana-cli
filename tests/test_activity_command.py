@@ -57,8 +57,8 @@ class TestHandleActivity:
         app.query_one.return_value = widget
 
         with (
-            patch("nerdvana_cli.core.setup.load_config", return_value={}),
-            patch("nerdvana_cli.core.setup.save_config") as mock_save,
+            patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+            patch("nerdvana_cli.cli.setup.save_config") as mock_save,
         ):
             await handle_activity(app, "on")
 
@@ -77,8 +77,8 @@ class TestHandleActivity:
         app.query_one.return_value = widget
 
         with (
-            patch("nerdvana_cli.core.setup.load_config", return_value={}),
-            patch("nerdvana_cli.core.setup.save_config") as mock_save,
+            patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+            patch("nerdvana_cli.cli.setup.save_config") as mock_save,
         ):
             await handle_activity(app, "off")
 
@@ -103,8 +103,8 @@ class TestHandleActivity:
         app.query_one.side_effect = Exception("widget not found")
 
         with (
-            patch("nerdvana_cli.core.setup.load_config", return_value={}),
-            patch("nerdvana_cli.core.setup.save_config"),
+            patch("nerdvana_cli.cli.setup.load_config", return_value={}),
+            patch("nerdvana_cli.cli.setup.save_config"),
         ):
             await handle_activity(app, "off")
 
@@ -118,8 +118,8 @@ class TestHandleActivity:
         app.query_one.return_value = _make_widget()
 
         with (
-            patch("nerdvana_cli.core.setup.load_config", side_effect=OSError("disk full")),
-            patch("nerdvana_cli.core.setup.save_config"),
+            patch("nerdvana_cli.cli.setup.load_config", side_effect=OSError("disk full")),
+            patch("nerdvana_cli.cli.setup.save_config"),
         ):
             await handle_activity(app, "off")
 

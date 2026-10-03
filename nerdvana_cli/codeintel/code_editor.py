@@ -201,7 +201,7 @@ class CodeEditor:
             raise StalePreviewError(preview_id, stale_paths)
 
         # Apply workspace edit
-        from nerdvana_cli.core.lsp_client import _apply_workspace_edit  # noqa: PLC0415
+        from nerdvana_cli.codeintel.lsp_client import _apply_workspace_edit  # noqa: PLC0415
         result = _apply_workspace_edit(
             entry.workspace_edit,
             cwd=self._project_root,

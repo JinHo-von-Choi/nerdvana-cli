@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from nerdvana_cli.cli.supervisor import COMMAND_ENV
 from nerdvana_cli.commands.agents_command import format_age, render_event
 from nerdvana_cli.core.run_store import SUCCEEDED, RunRecord, RunStore
-from nerdvana_cli.core.supervisor import COMMAND_ENV
 from nerdvana_cli.main import app
 
 FAKE = textwrap.dedent('''

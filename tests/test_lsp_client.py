@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nerdvana_cli.core.lsp_client import LspClient, LspError
+from nerdvana_cli.codeintel.lsp_client import LspClient, LspError
 from nerdvana_cli.tools.lsp import create_lsp_tools
 
 
@@ -115,7 +115,7 @@ async def test_servers_are_started_in_stdio_mode_with_their_own_arguments(tmp_pa
         client = LspClient(project_root=str(tmp_path))
         with patch("shutil.which", side_effect=lambda b, a=available: f"/usr/bin/{b}" if b == a else None), \
              patch("asyncio.create_subprocess_exec", side_effect=_exec), \
-             patch("nerdvana_cli.core.lsp_client._track_proc"):
+             patch("nerdvana_cli.codeintel.lsp_client._track_proc"):
             await client._start_server(".py")
         assert started[-1] == expected
         assert client._binaries[".py"] == available

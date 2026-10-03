@@ -14,8 +14,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from nerdvana_cli.commands.review_command import parse_findings, render_findings, should_fail
-from nerdvana_cli.core.review_context import (
+from nerdvana_cli.cli.review_context import (
     ChangedSymbol,
     ReviewError,
     build_context,
@@ -24,6 +23,7 @@ from nerdvana_cli.core.review_context import (
     parse_changes,
     render_prompt,
 )
+from nerdvana_cli.commands.review_command import parse_findings, render_findings, should_fail
 from nerdvana_cli.main import app
 
 LIB = (

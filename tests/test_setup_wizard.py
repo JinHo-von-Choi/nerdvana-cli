@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.core.setup helpers and wizard flow."""
+"""Tests for nerdvana_cli.cli.setup helpers and wizard flow."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from nerdvana_cli.core import paths, setup
-from nerdvana_cli.core.setup import (
+from nerdvana_cli.cli import setup
+from nerdvana_cli.cli.setup import (
     get_config_path,
     has_config_file,
     has_valid_api_key,
@@ -19,6 +19,7 @@ from nerdvana_cli.core.setup import (
     run_setup,
     save_config,
 )
+from nerdvana_cli.core import paths
 from nerdvana_cli.providers.base import DEFAULT_MODELS, PROVIDER_KEY_ENVVARS, ProviderName
 
 
@@ -129,8 +130,8 @@ def test_run_setup_force_reruns_wizard(
         return str(kwargs.get("default", ""))
 
     with (
-        patch("nerdvana_cli.core.setup.Prompt.ask", side_effect=fake_prompt),
-        patch("nerdvana_cli.core.setup.Confirm.ask", return_value=True),
+        patch("nerdvana_cli.cli.setup.Prompt.ask", side_effect=fake_prompt),
+        patch("nerdvana_cli.cli.setup.Confirm.ask", return_value=True),
     ):
         result = run_setup(force=True)
 
@@ -159,9 +160,9 @@ def test_run_setup_custom_model_when_not_default(
     confirm_values = iter([False, True])  # use default model? no; (remaining yes)
 
     with (
-        patch("nerdvana_cli.core.setup.Prompt.ask", side_effect=fake_prompt),
+        patch("nerdvana_cli.cli.setup.Prompt.ask", side_effect=fake_prompt),
         patch(
-            "nerdvana_cli.core.setup.Confirm.ask",
+            "nerdvana_cli.cli.setup.Confirm.ask",
             side_effect=lambda *a, **k: next(confirm_values, True),
         ),
     ):
@@ -185,8 +186,8 @@ def test_run_setup_ollama_local_mode_needs_no_key(
         return str(kwargs.get("default", ""))
 
     with (
-        patch("nerdvana_cli.core.setup.Prompt.ask", side_effect=fake_prompt),
-        patch("nerdvana_cli.core.setup.Confirm.ask", return_value=True),
+        patch("nerdvana_cli.cli.setup.Prompt.ask", side_effect=fake_prompt),
+        patch("nerdvana_cli.cli.setup.Confirm.ask", return_value=True),
     ):
         result = run_setup(force=True)
 
@@ -211,8 +212,8 @@ def test_run_setup_ollama_cloud_mode_uses_env_key(
         return str(kwargs.get("default", ""))
 
     with (
-        patch("nerdvana_cli.core.setup.Prompt.ask", side_effect=fake_prompt),
-        patch("nerdvana_cli.core.setup.Confirm.ask", return_value=True),
+        patch("nerdvana_cli.cli.setup.Prompt.ask", side_effect=fake_prompt),
+        patch("nerdvana_cli.cli.setup.Confirm.ask", return_value=True),
     ):
         result = run_setup(force=True)
 

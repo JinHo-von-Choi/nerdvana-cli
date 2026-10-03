@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nerdvana_cli.core.lsp_client import (
+from nerdvana_cli.codeintel.lsp_client import (
     DEFAULT_LSP_INIT_TIMEOUT,
     LSP_INIT_TIMEOUTS,
     LspClient,

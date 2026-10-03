@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nerdvana_cli.core.code_editor import CodeEditor, StalePreviewError
+from nerdvana_cli.codeintel.code_editor import CodeEditor, StalePreviewError
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.main import app
 from nerdvana_cli.tools.bash_tool import _build_env
@@ -245,7 +245,7 @@ class _JsonRpcOnlyServer:
 
 def _force_update_notice(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make the startup check report a newer release, unconditionally."""
-    from nerdvana_cli.core import updater
+    from nerdvana_cli.cli import updater
 
     async def _fake_check(_current: str, ttl_hours: int = 24) -> dict[str, str]:
         return {"version": "99.0.0", "url": "https://example.invalid/99.0.0"}

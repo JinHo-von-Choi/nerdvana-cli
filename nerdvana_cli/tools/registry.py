@@ -107,7 +107,7 @@ def create_tool_registry(
         registry.register(QueryExternalProjectTool())
 
     # LSP tools — registered only when a language server binary is installed
-    from nerdvana_cli.core.lsp_client import LspClient
+    from nerdvana_cli.codeintel.lsp_client import LspClient
     from nerdvana_cli.tools.lsp import create_lsp_tools
     lsp = LspClient()
     if lsp.has_any_server():
@@ -115,8 +115,8 @@ def create_tool_registry(
             registry.register(lsp_tool)
 
         # Phase D: semantic symbol tools
-        from nerdvana_cli.core.code_editor import CodeEditor
-        from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
+        from nerdvana_cli.codeintel.code_editor import CodeEditor
+        from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
         from nerdvana_cli.tools.symbol_tools import create_symbol_tools
 
         retriever = LanguageServerSymbolRetriever(client=lsp)

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.external_projects import ExternalProject, ExternalProjectRegistry
+from nerdvana_cli.external.external_projects import ExternalProject, ExternalProjectRegistry
 
 # ---------------------------------------------------------------------------
 # Fixtures

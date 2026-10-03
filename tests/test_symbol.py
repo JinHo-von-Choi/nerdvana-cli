@@ -1,4 +1,4 @@
-"""Unit tests for nerdvana_cli.core.symbol.
+"""Unit tests for nerdvana_cli.codeintel.symbol.
 
 Tests NamePathResolver, SymbolDictGrouper, LanguageServerSymbol.
 No LSP process required.
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerdvana_cli.core.symbol import (
+from nerdvana_cli.codeintel.symbol import (
     NamePathResolver,
     SymbolDictGrouper,
     _sym_from_dict,
@@ -197,7 +197,7 @@ class TestLanguageServerSymbol:
 
 def test_decorated_symbol_keeps_definition_start_and_name_position() -> None:
     """A decorated class starts on its decorator; its name sits on the next line."""
-    from nerdvana_cli.core.symbol import _sym_from_dict
+    from nerdvana_cli.codeintel.symbol import _sym_from_dict
 
     raw = {
         "name":           "User",

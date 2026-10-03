@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import pytest
 
-from nerdvana_cli.core.lsp_client import (
+from nerdvana_cli.codeintel.lsp_client import (
     _LIVE_PROCS,
     LspClient,
     _apply_workspace_edit,
@@ -148,7 +148,7 @@ def test_unreadable_target_is_reported_not_silently_skipped(
     """A file that cannot be opened must leave a warning and a skipped entry."""
     missing = tmp_path / "gone.txt"
 
-    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.lsp_client"):
+    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.codeintel.lsp_client"):
         result = _apply_workspace_edit(
             _edit_for(missing, [_text_edit(0, 0, 0, 1, "x")]),
             cwd=os.path.realpath(tmp_path),

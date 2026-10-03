@@ -64,7 +64,7 @@ async def _refresh_parism(app: NerdvanaApp) -> None:
 
 async def handle_update(app: NerdvanaApp, args: str) -> None:
     """Handle /update command. Sub-args:
-    - empty: self-update via core.updater.run_self_update.
+    - empty: self-update via cli.updater.run_self_update.
     - 'parism': force-refresh @nerdvana/parism through the npx cache.
     """
     target = args.strip().lower()
@@ -72,7 +72,7 @@ async def handle_update(app: NerdvanaApp, args: str) -> None:
         await _refresh_parism(app)
         return
 
-    from nerdvana_cli.core.updater import run_self_update
+    from nerdvana_cli.cli.updater import run_self_update
 
     app._add_chat_message("[dim]Checking for updates...[/dim]")
     success, message = run_self_update()
@@ -137,7 +137,7 @@ async def handle_thinking(app: NerdvanaApp, args: str) -> None:
         provider_config.show_thinking = new_value
 
     try:
-        from nerdvana_cli.core.setup import load_config, save_config
+        from nerdvana_cli.cli.setup import load_config, save_config
         existing = load_config()
         existing.setdefault("model", {})
         existing["model"]["show_thinking"] = new_value
@@ -169,7 +169,7 @@ async def handle_activity(app: NerdvanaApp, args: str) -> None:
     app.settings.session.show_activity = new_value
 
     try:
-        from nerdvana_cli.core.setup import load_config, save_config
+        from nerdvana_cli.cli.setup import load_config, save_config
         existing = load_config()
         existing.setdefault("session", {})
         existing["session"]["show_activity"] = new_value
