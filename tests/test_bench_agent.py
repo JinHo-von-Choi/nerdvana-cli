@@ -133,7 +133,7 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="")
+    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="", isolate=False, no_network=False)
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, script: str) -> object:
