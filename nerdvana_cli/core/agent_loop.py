@@ -10,11 +10,10 @@ import asyncio
 import contextlib
 import json
 import logging
-import math
 import re
 from collections import Counter
 from collections.abc import AsyncGenerator, Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -25,12 +24,18 @@ from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.budget import Budget
-from nerdvana_cli.core.compact import FALLBACK_PROMPT, CompactionState, ai_compact
-from nerdvana_cli.core.context_budget import ContextBudget, message_tokens
+from nerdvana_cli.core.compact import (
+    FALLBACK_PROMPT,
+    CompactionState,
+    ai_compact,
+    compact_messages,
+    drop_orphan_tool_results,
+)
+from nerdvana_cli.core.context_budget import ContextBudget
 from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
 from nerdvana_cli.core.images import prompt_content, transcript_text
-from nerdvana_cli.core.loop_hooks import LoopHookEngine
-from nerdvana_cli.core.loop_state import LoopState
+from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
+from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
 from nerdvana_cli.core.observation_mask import mask_observations
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.provider_recovery import (
@@ -45,11 +50,12 @@ from nerdvana_cli.core.provider_recovery import (
 from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
-from nerdvana_cli.core.tool_ids import collect_tool_use_ids, new_tool_use_id, repair_tool_ids
+from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.tool_index import ToolIndex
 from nerdvana_cli.core.verify import run_verify
 from nerdvana_cli.providers.base import ProviderName
@@ -96,107 +102,6 @@ def _needs_planning(prompt: str) -> bool:
 
 def _is_ultrawork(prompt: str) -> bool:
     return bool(_ULTRAWORK_PATTERN.search(prompt))
-
-
-def estimate_tokens(text: str) -> int:
-    return math.ceil(len(text) / 4)
-
-
-def estimate_messages_tokens(msgs: list[Any]) -> int:
-    return message_tokens(msgs)
-
-
-def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
-    if not msgs or estimate_messages_tokens(msgs) <= max_tokens:
-        return msgs
-    keep = min(10, len(msgs))
-    recent = msgs[-keep:]
-    budget = max_tokens - estimate_messages_tokens(recent)
-    if budget <= 0:
-        return msgs[-4:]
-    early: list[Any] = []
-    for m in msgs[:-keep]:
-        cost = estimate_tokens(m.content if isinstance(m.content, str) else json.dumps(m.content))
-        if budget - cost < 0:
-            break
-        early.append(m)
-        budget -= cost
-    dropped = len(msgs) - len(early) - len(recent)
-    if dropped > 0:
-        return early + [Message(role=Role.USER, content=f"[context compacted: {dropped} earlier messages removed to fit context window]")] + recent
-    return early + recent
-
-
-def _hook_injection_messages(executor: Any) -> list[Message]:
-    """Turn the messages AFTER_TOOL hooks queued on *executor* into user messages.
-
-    The caller appends them after the batch's tool results, never between a tool
-    call and its result.
-    """
-    return [
-        Message(role=Role.USER, content=str(msg["content"]))
-        for msg in executor.drain_injections()
-        if msg.get("content")
-    ]
-
-
-def _drop_orphan_tool_results(msgs: list[Any]) -> list[Any]:
-    """Remove tool results whose originating tool_use is no longer in *msgs*.
-
-    Truncation can cut an assistant message that requested tools while keeping
-    the results it produced. Providers reject a tool_result that has no
-    matching tool_use, so the widowed results are dropped here.
-    """
-    known_ids: set[str] = set()
-    kept: list[Any] = []
-    for msg in msgs:
-        if msg.role == Role.ASSISTANT and msg.tool_uses:
-            known_ids.update(str(tu.get("id", "")) for tu in msg.tool_uses)
-        elif msg.role == Role.TOOL and str(msg.tool_use_id or "") not in known_ids:
-            continue
-        kept.append(msg)
-    return kept
-
-
-@dataclass
-class _Flow:
-    """Whether the run ends after the current step, and the context size measured for it."""
-
-    finished:       bool = False
-    context_tokens: int  = 0
-
-
-@dataclass
-class _Turn:
-    """One request to the provider and what its response has delivered so far."""
-
-    messages:        list[dict[str, Any]]
-    used_ids:        set[str]
-    sent_count:      int
-    asst_text:       str                          = ""
-    provider_blocks: list[dict[str, Any]]         = field(default_factory=list)
-    thinking_buffer: str                          = ""
-    tool_uses:       list[dict[str, Any]]         = field(default_factory=list)
-    seen_calls:      set[tuple[str, str, str]]    = field(default_factory=set)
-
-    def add_call(self, call_id: str, name: str, arguments: dict[str, Any] | None, thought_signature: str = "") -> None:
-        """Collect a tool call, keeping ids unique and dropping a repeated copy.
-
-        A provider may echo a call it already sent (same id, name and arguments),
-        which must run once, or reuse an id for a different call, which gets a
-        fresh id because providers reject a request holding two calls with one id.
-        """
-        call: dict[str, Any] = {"id": call_id or "", "name": name, "input": arguments or {}}
-        if thought_signature:
-            call["thought_signature"] = thought_signature
-        signature = (call["id"], call["name"], json.dumps(call["input"], sort_keys=True, default=str))
-        if signature in self.seen_calls:
-            return
-        self.seen_calls.add(signature)
-        if not call["id"] or call["id"] in self.used_ids:
-            call["id"] = new_tool_use_id(call["name"], self.used_ids)
-        self.used_ids.add(call["id"])
-        self.tool_uses.append(call)
 
 
 _VERIFY_FAILED = (
@@ -272,7 +177,6 @@ class AgentLoop:
         from nerdvana_cli.core.command_hooks import load_command_hooks
         from nerdvana_cli.core.context_reminder import ContextReminder
         from nerdvana_cli.core.hooks import HookEngine, HookEvent
-        from nerdvana_cli.core.skills import SkillLoader
         from nerdvana_cli.core.user_hooks import load_user_hooks
         self.hooks = HookEngine()
         self.hooks.register(HookEvent.SESSION_START, session_start_context_injection)
@@ -284,13 +188,7 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_TOOL, self._dir_rules.handle)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
         self._command_hooks   = load_command_hooks(self.hooks, settings)
-        from nerdvana_cli.tools.skill_tool import ActivateSkillTool
-        shared_skills = registry.get(ActivateSkillTool.name)
-        if isinstance(shared_skills, ActivateSkillTool):
-            self.skill_loader = shared_skills.loader
-        else:
-            self.skill_loader = SkillLoader.from_settings(settings)
-            self.skill_loader.load_all()
+        self.skill_loader = self._skill_loader_for(registry, settings)
         self._active_skill: str | None = None
         self._role_prompt = role_prompt
         self._reminder    = ContextReminder(cwd=settings.cwd or ".", max_recent=5)
@@ -432,7 +330,7 @@ class AgentLoop:
         self._auto_goal = Goal("Keep the project's tests passing", command, max_attempts=self.settings.goal.max_attempts)
         return self._auto_goal
 
-    async def _verify_goal(self, flow: _Flow, goal: Goal) -> AsyncGenerator[str, None]:
+    async def _verify_goal(self, flow: LoopFlow, goal: Goal) -> AsyncGenerator[str, None]:
         """Run the verification command of *goal* now that the model says it is done.
 
         A pass ends the run; running out of attempts ends it as unmet; otherwise the failure is put in
@@ -859,7 +757,7 @@ class AgentLoop:
                 self._keep_todos_in_view()
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
-        self.state.messages = _drop_orphan_tool_results(compact_messages(self.state.messages, thr))
+        self.state.messages = drop_orphan_tool_results(compact_messages(self.state.messages, thr))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
         self._context_budget.reset()
         self._keep_todos_in_view()
@@ -978,7 +876,7 @@ class AgentLoop:
                 content     = tr.content,
                 is_error    = tr.is_error,
             )
-        self.state.messages.extend(_hook_injection_messages(self.tool_executor))
+        self.state.messages.extend(hook_injection_messages(self.tool_executor))
 
     def _new_tool_context(self) -> ToolContext:
         """The context every tool call of this run receives."""
@@ -1011,7 +909,7 @@ class AgentLoop:
         try:
             while True:
                 state = state.evolve(iteration=state.iteration + 1)
-                flow  = _Flow()
+                flow  = LoopFlow()
                 async for notice in self._check_run_limits(state.iteration, flow):
                     yield notice
                 if flow.finished:
@@ -1041,7 +939,7 @@ class AgentLoop:
         finally:
             self._restore_model(saved)
 
-    async def _check_run_limits(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
+    async def _check_run_limits(self, iteration: int, flow: LoopFlow) -> AsyncGenerator[str, None]:
         """Stop the run when the turn or cost limit is reached, and warn about an unenforceable one."""
         if iteration > self.settings.session.max_turns:
             self.last_stop = "max_turns"
@@ -1075,7 +973,7 @@ class AgentLoop:
                 f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"
             )
 
-    async def _prepare_context(self, iteration: int, flow: _Flow) -> AsyncGenerator[str, None]:
+    async def _prepare_context(self, iteration: int, flow: LoopFlow) -> AsyncGenerator[str, None]:
         """Report finished background work, compact when the window is nearly full, and show usage."""
         self._inject_queued_input()
         self._report_background_tasks()
@@ -1104,7 +1002,7 @@ class AgentLoop:
             self.session.record_system("observation_masking", {"masked": result.masked, "tokens_saved": result.tokens_saved})
             self._context_budget.reset()
 
-    def _build_turn(self, tools: list[Any]) -> _Turn:
+    def _build_turn(self, tools: list[Any]) -> LoopTurn:
         """Prepare the next request: a history with unique tool call ids, and its provider form."""
         repaired = repair_tool_ids(self.state.messages)
         if repaired:
@@ -1113,15 +1011,15 @@ class AgentLoop:
         messages = self._to_provider_messages()
         if self._fire_before_api_call(tools):
             messages = self._to_provider_messages()
-        return _Turn(messages=messages, used_ids=used_ids, sent_count=len(self.state.messages))
+        return LoopTurn(messages=messages, used_ids=used_ids, sent_count=len(self.state.messages))
 
     async def _stream_response(
         self,
         system_prompt: str,
         tools:         list[Any],
         tool_ctx:      ToolContext,
-        turn:          _Turn,
-        flow:          _Flow,
+        turn:          LoopTurn,
+        flow:          LoopFlow,
     ) -> AsyncGenerator[str, None]:
         """Consume one provider response, acting on each event until it reports ``done``."""
         async for ev in guarded_stream(
@@ -1164,8 +1062,8 @@ class AgentLoop:
         self,
         stop:     str,
         tool_ctx: ToolContext,
-        turn:     _Turn,
-        flow:     _Flow,
+        turn:     LoopTurn,
+        flow:     LoopFlow,
     ) -> AsyncGenerator[str, None]:
         """Act on why the response ended: continue the run (flow stays open) or end it."""
         if stop == "max_tokens":
@@ -1214,8 +1112,8 @@ class AgentLoop:
         self,
         exc:           Exception,
         recovery:      RecoveryPlanner,
-        turn:          _Turn,
-        flow:          _Flow,
+        turn:          LoopTurn,
+        flow:          LoopFlow,
         system_prompt: str,
         tools:         list[Any],
         tool_ctx:      ToolContext,
@@ -1269,6 +1167,18 @@ class AgentLoop:
         self._escalated_to = None
         self.provider      = self.create_provider_from_settings()
 
+    @staticmethod
+    def _skill_loader_for(registry: ToolRegistry, settings: NerdvanaSettings) -> SkillLoader:
+        """The loader the ActivateSkill tool uses, so ``/clear`` resets its activations; a fresh one without the tool."""
+        from nerdvana_cli.tools.skill_tool import ActivateSkillTool
+
+        shared = registry.get(ActivateSkillTool.name)
+        if isinstance(shared, ActivateSkillTool):
+            return shared.loader
+        loader = SkillLoader.from_settings(settings)
+        loader.load_all()
+        return loader
+
     def _model_state(self) -> tuple[str, str, str, str]:
         """The settings that name the model in use: provider, model, API key and base URL."""
         return (self.settings.model.provider, self.settings.model.model, self.settings.model.api_key, self.settings.model.base_url)
@@ -1311,7 +1221,7 @@ class AgentLoop:
                 self.session.record_assistant_message(content, tool_uses, result.get("provider_blocks"))
                 for tr in await self.tool_executor.run_batch(tool_uses, context):
                     self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
-                self.state.messages.extend(_hook_injection_messages(self.tool_executor))
+                self.state.messages.extend(hook_injection_messages(self.tool_executor))
                 continue
             if content:
                 self.state.messages.append(Message(role=Role.ASSISTANT, content=content, provider_blocks=list(result.get("provider_blocks") or [])))

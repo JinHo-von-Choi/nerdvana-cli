@@ -19,6 +19,10 @@ second), after which the same pattern can be noted again.
 
 from __future__ import annotations
 
+from typing import Any
+
+from nerdvana_cli.core.edit_tools import edited_path, is_applied_edit
+
 READ  = "read"    # a read-only tool: reading, searching, listing
 EDIT  = "edit"    # a tool that changes a file
 OTHER = "other"   # anything else (a command, a sub-agent, an external tool): counts as making progress
@@ -49,6 +53,22 @@ class ProgressMonitor:
         self._read_noted   = False
         self._turn_calls   = 0
         self._turn_reads   = 0
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> ProgressMonitor:
+        """A monitor with the limits of ``session.no_progress_*`` (the defaults for a settings object without them)."""
+        session = getattr(settings, "session", None)
+        return cls(
+            getattr(session, "no_progress_failed_edits", DEFAULT_FAILED_EDITS),
+            getattr(session, "no_progress_read_turns", DEFAULT_READ_TURNS),
+        )
+
+    def observe_call(self, tool_name: str, tool_input: dict[str, Any], read_only: bool, is_error: bool) -> None:
+        """Record one executed call by what the tool is: an applied edit, a read-only tool, or anything else."""
+        if is_applied_edit(tool_name, tool_input):
+            self.observe(EDIT, edited_path(tool_input), is_error)
+        else:
+            self.observe(READ if read_only else OTHER, "", is_error)
 
     def observe(self, kind: str, path: str, is_error: bool) -> None:
         """Record one executed call of the current turn; *path* is the file an edit is about, if any."""

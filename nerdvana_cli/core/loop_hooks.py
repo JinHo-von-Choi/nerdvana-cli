@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from nerdvana_cli.core.loop_state import LoopState  # noqa: TC001
+from nerdvana_cli.types import Message, Role
 
 _RETRYABLE_PATTERNS = re.compile(
     r"(429|529|503|timeout|rate.?limit|too many requests|service unavailable)",
@@ -95,3 +96,16 @@ class LoopHookEngine:
     def _is_retryable_error(self, error: Exception) -> bool:
         """Return True if *error* should trigger a model fallback / retry."""
         return bool(_RETRYABLE_PATTERNS.search(str(error)))
+
+
+def hook_injection_messages(executor: Any) -> list[Message]:
+    """Turn the messages AFTER_TOOL hooks queued on *executor* into user messages.
+
+    The caller appends them after the batch's tool results, never between a tool
+    call and its result.
+    """
+    return [
+        Message(role=Role.USER, content=str(msg["content"]))
+        for msg in executor.drain_injections()
+        if msg.get("content")
+    ]

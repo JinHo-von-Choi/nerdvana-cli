@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.agent_loop import _Turn
+from nerdvana_cli.core.loop_state import LoopTurn
 from nerdvana_cli.providers.base import ProviderConfig, ProviderName
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 
@@ -55,7 +55,7 @@ def test_a_call_without_a_signature_reports_none() -> None:
 
 
 def test_the_loop_keeps_the_signature_on_the_stored_call() -> None:
-    turn = _Turn(messages=[], used_ids=set(), sent_count=0)
+    turn = LoopTurn(messages=[], used_ids=set(), sent_count=0)
     turn.add_call("c1", "Read", {"p": 1}, ENCODED)
     turn.add_call("c2", "Grep", {}, "")
     assert turn.tool_uses[0]["thought_signature"] == ENCODED
