@@ -41,7 +41,7 @@ from nerdvana_cli.acp.tool_mapping import (
     tool_locations,
     tool_title,
 )
-from nerdvana_cli.cli.bootstrap import loop_factories
+from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.hooks import HookContext, HookEvent
 from nerdvana_cli.core.run_output import classify_chunk
@@ -51,7 +51,6 @@ from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.user_commands import UserCommandLoader
 from nerdvana_cli.mcp.config import McpServerConfig
 from nerdvana_cli.mcp.manager import McpManager
-from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.types import Message, Role
 
 logger = logging.getLogger(__name__)
@@ -182,22 +181,14 @@ class AcpSession:
         The language-server tools take the project root from the process directory when they are created, and
         one process serves sessions of different directories, so the change lasts for this synchronous step only.
         """
-        task_registry = TaskRegistry()
         with contextlib.chdir(self.cwd):
-            registry = create_tool_registry(
-                settings      = self.settings,
-                task_registry = task_registry,
-                mcp_tools     = self._mcp.get_all_tools() if self._mcp else [],
-            )
-            self.loop = AgentLoop(
-                settings          = self.settings,
-                registry          = registry,
+            self.loop = build_agent_loop(self.settings, ExecutionProfile(
                 session           = self._storage,
-                task_registry     = task_registry,
+                task_registry     = TaskRegistry(),
+                mcp_tools         = self._mcp.get_all_tools() if self._mcp else [],
                 on_thinking_chunk = self._on_thinking if self.settings.model.show_thinking else None,
                 on_confirm        = self._confirm,
-                factories         = loop_factories(),
-            )
+            ))
         self.loop.usage_listener = self._on_usage
         self.loop.hooks.register(HookEvent.BEFORE_TOOL, self._before_tool)
         self.loop.hooks.register(HookEvent.AFTER_TOOL, self._after_tool)
