@@ -89,11 +89,11 @@ def server_rw(tmp_audit, acl_permit_all):
 
 
 def test_read_only_tools_registered(server_ro):
-    """Read-only server must expose exactly the 6 default tools."""
+    """Read-only server must expose exactly the 7 default tools."""
     tool_names = {t.name for t in server_ro.fmcp._tool_manager.list_tools()}
     expected = {
         "symbol_overview", "find_symbol", "find_referencing_symbols",
-        "ReadMemory", "ListMemories", "GetCurrentConfig",
+        "ReadMemory", "ListMemories", "GetCurrentConfig", "FileRead",
     }
     assert expected == tool_names
 
@@ -104,7 +104,7 @@ def test_write_tools_registered_when_allow_write(server_rw):
     write_expected = {
         "replace_symbol_body", "insert_before_symbol", "insert_after_symbol",
         "RenameSymbol", "WriteMemory", "EditMemory", "DeleteMemory",
-        "safe_delete_symbol", "restart_language_server",
+        "safe_delete_symbol", "restart_language_server", "FileEdit",
     }
     assert write_expected.issubset(tool_names)
 

@@ -3,12 +3,15 @@
 Exposes nerdvana tools over MCP 1.0 (stdio + HTTP JSON-RPC).
 
 Default (read-only) tools:
-  symbol_overview, find_symbol, find_referencing_symbols,
+  symbol_overview, find_symbol, find_referencing_symbols, FileRead,
   ReadMemory, ListMemories, GetCurrentConfig
 
 With ``--allow-write``:
-  + replace_symbol_body, insert_before_symbol, insert_after_symbol,
+  + replace_symbol_body, insert_before_symbol, insert_after_symbol, FileEdit,
     WriteMemory, EditMemory, DeleteMemory, safe_delete_symbol
+
+FileRead tags every line with an anchor and FileEdit refuses a file that was not read or has changed since,
+so another agent can use this server as its edit backend. Each client has a read ledger of its own.
 
 Every tool call goes through AuthManager + ACLManager + AuditLogger.
 
@@ -18,6 +21,7 @@ Every tool call goes through AuthManager + ACLManager + AuditLogger.
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import json
 import logging as _logging
@@ -145,6 +149,7 @@ class _QuotaErrorMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 
 _READ_ONLY_TOOLS: frozenset[str] = frozenset({
+    "FileRead",
     "symbol_overview",
     "find_symbol",
     "find_referencing_symbols",
@@ -154,6 +159,7 @@ _READ_ONLY_TOOLS: frozenset[str] = frozenset({
 })
 
 _WRITE_TOOLS: frozenset[str] = frozenset({
+    "FileEdit",
     "replace_symbol_body",
     "insert_before_symbol",
     "insert_after_symbol",
@@ -375,6 +381,13 @@ class NerdvanaMcpServer:
         cwd = str(self.project_path) if self.project_path else "."
 
         self._tool_context = ToolContext(cwd=cwd)
+        self._client_contexts: dict[str, ToolContext] = {}
+        self._cwd = cwd
+        self._lsp: Any = None
+        from nerdvana_cli.tools.file_tools import FileEditTool, FileReadTool
+
+        self._tool_map["FileRead"] = FileReadTool()
+        self._tool_map["FileEdit"] = FileEditTool()
 
         # Memory tools (no external deps)
         for tool in (
@@ -395,6 +408,7 @@ class NerdvanaMcpServer:
             from nerdvana_cli.core.lsp_client import LspClient
             lsp = LspClient()
             if lsp.has_any_server():
+                self._lsp = lsp
                 from nerdvana_cli.core.code_editor import CodeEditor
                 from nerdvana_cli.core.symbol import LanguageServerSymbolRetriever
                 from nerdvana_cli.tools.symbol_tools import create_symbol_tools
@@ -416,6 +430,7 @@ class NerdvanaMcpServer:
         self._register_read_only_tools()
         if self.allow_write:
             self._register_write_tools()
+            self._register_file_edit()
 
     def _register_read_only_tools(self) -> None:
         """Register the six default read-only tools."""
@@ -464,7 +479,11 @@ class NerdvanaMcpServer:
             """Return the current NerdVana configuration as JSON."""
             return await server._dispatch("GetCurrentConfig", {})
 
-        for fn in (symbol_overview, find_symbol, find_referencing_symbols,
+        async def FileRead(path: str, offset: int = 0, limit: int = 0) -> str:  # noqa: N802
+            """Read a file; every line is prefixed with an anchor N#hhhhhh (line number and content hash) that FileEdit accepts."""
+            return await server._dispatch("FileRead", {"path": path, "offset": offset, "limit": limit})
+
+        for fn in (symbol_overview, find_symbol, find_referencing_symbols, FileRead,
                    ReadMemory, ListMemories, GetCurrentConfig):
             self._fmcp.add_tool(fn, name=fn.__name__, description=fn.__doc__ or "")
 
@@ -577,6 +596,28 @@ class NerdvanaMcpServer:
                    safe_delete_symbol, restart_language_server):
             self._fmcp.add_tool(fn, name=fn.__name__, description=fn.__doc__ or "")
 
+    def _register_file_edit(self) -> None:
+        """Register FileEdit, the write counterpart of FileRead (requires allow_write=True AND confirm=true in call)."""
+        server = self
+
+        async def FileEdit(  # noqa: N802
+            path: str,
+            new_string: str,
+            anchor_hash: str = "",
+            old_string: str = "",
+            replace_all: bool = False,
+            confirm: bool = False,
+        ) -> str:
+            """Edit a file read with FileRead: replace the line named by anchor_hash (N#hhhhhh), or an exact old_string. Refused when the file changed since this client read it. Requires confirm=true."""
+            server._check_write_confirm(confirm)
+            return await server._dispatch(
+                "FileEdit",
+                {"path": path, "new_string": new_string, "anchor_hash": anchor_hash or None,
+                 "old_string": old_string or None, "replace_all": replace_all},
+            )
+
+        self._fmcp.add_tool(FileEdit, name="FileEdit", description=FileEdit.__doc__ or "")
+
     # ------------------------------------------------------------------
     # Dispatch — auth → ACL → audit → actual tool stub
     # ------------------------------------------------------------------
@@ -682,7 +723,7 @@ class NerdvanaMcpServer:
             # we release with tokens=0.
             raw_result: Any = None
             try:
-                raw_result = await self._call_tool_raw(tool_name, args)
+                raw_result = await self._call_tool_raw(tool_name, args, client_identity)
             finally:
                 tokens_used = getattr(raw_result, "tokens", 0) if raw_result is not None else 0
                 self._quota_store.release(client_identity, tokens=tokens_used)
@@ -711,7 +752,27 @@ class NerdvanaMcpServer:
             )
             raise
 
-    async def _call_tool_raw(self, tool_name: str, args: dict[str, Any]) -> Any:
+    def _context_for(self, client_identity: str | None) -> ToolContext:
+        """The tool context of one client: its own read ledger, so one client's reads never vouch for another's edits."""
+        if client_identity is None:
+            return self._tool_context
+        if client_identity not in self._client_contexts:
+            context = ToolContext(cwd=self._cwd)
+            context.state["session_id"] = f"mcp:{client_identity}"
+            self._client_contexts[client_identity] = context
+        return self._client_contexts[client_identity]
+
+    async def _error_messages(self, path: str) -> list[str] | None:
+        """Messages of the error-level diagnostics of a file, None when no language server could say."""
+        if self._lsp is None:
+            return None
+        try:
+            found = await asyncio.wait_for(self._lsp.diagnostics(path), timeout=5.0)
+        except Exception:  # noqa: BLE001 - a slow or broken server must not fail an edit
+            return None
+        return [str(d.get("message", "")) for d in found if d.get("severity") == "error"]
+
+    async def _call_tool_raw(self, tool_name: str, args: dict[str, Any], client_identity: str | None = None) -> Any:
         """Execute the named tool and return the raw ``ToolResult`` (with tokens).
 
         Internal method used by ``_dispatch`` so it can read ``ToolResult.tokens``
@@ -738,12 +799,18 @@ class NerdvanaMcpServer:
 
         # Parse and validate args
         parsed = tool.parse_args(args)
-        ctx    = self._tool_context
+        ctx    = self._context_for(client_identity)
         error  = tool.validate_input(parsed, ctx)
         if error:
             raise ValueError(f"invalid args for {tool_name!r}: {error}")
 
-        result = await tool.call(parsed, ctx, can_use_tool=None)
+        target   = str(Path(ctx.cwd) / args["path"]) if tool_name == "FileEdit" else ""
+        baseline = await self._error_messages(target) if target else None
+        result   = await tool.call(parsed, ctx, can_use_tool=None)
+        if target and baseline is not None and not result.is_error:
+            fresh = [m for m in (await self._error_messages(target) or []) if m not in baseline]
+            if fresh:
+                result.content += "\n\nNew errors reported by the language server after this edit:\n" + "\n".join(f"- {m}" for m in fresh[:5])
 
         if result.is_error:
             # Wrap JSON error payload in a ToolResult so tokens is accessible.
