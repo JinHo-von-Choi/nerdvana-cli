@@ -12,6 +12,9 @@ Files are plain-text with a .md extension.
 
 Concurrency: each read/write acquires an exclusive fcntl.flock on the file.
 
+Each file-backed scope also keeps a sidecar index (core/memory_index.py) with the
+created and last-modified times, the source and the last load of every entry.
+
 Author: 최진호
 Date:   2026-04-18
 """
@@ -19,6 +22,7 @@ Date:   2026-04-18
 from __future__ import annotations
 
 import fcntl
+import logging
 import os
 import re
 import time
@@ -28,7 +32,10 @@ from pathlib import Path
 from typing import IO
 
 from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.memory_index import MemoryIndex, MemorySource, effective_modified
 from nerdvana_cli.utils.path import validate_path
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Scope enum
@@ -49,11 +56,14 @@ class MemoryScope(StrEnum):
 class MemoryEntry:
     """A single memory record returned by list."""
 
-    name:  str
-    scope: MemoryScope
-    size:  int
-    mtime: float
-    importance: float = 0.5  # Unix timestamp
+    name:       str
+    scope:      MemoryScope
+    size:       int
+    mtime:      float  # Unix timestamp of the last modification
+    importance: float = 0.5
+    created:    float = 0.0  # Unix timestamp of creation
+    source:     str   = MemorySource.UNKNOWN.value
+    loaded_at:  float | None = None  # Unix timestamp of the last read; None when never read
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +73,13 @@ class MemoryEntry:
 _SAFE_NAME     = re.compile(r"^[A-Za-z0-9_./-]+$")
 _DOTDOT_GUARD  = re.compile(r"(^|/)\.\.(/|$)")
 _ABSOLUTE_NAME = re.compile(r"^(?:[/\\]|[A-Za-z]:)")
+
+# Largest memory name and entry accepted. Memories are short notes, not file storage.
+MAX_NAME_LENGTH   = 200
+MAX_CONTENT_BYTES = 64 * 1024
+
+# Scopes backed by a directory of ``.md`` files, in lookup order.
+_FILE_SCOPES = (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL)
 
 
 def _validate_name(name: str) -> None:
@@ -74,10 +91,16 @@ def _validate_name(name: str) -> None:
     """
     if not name:
         raise ValueError("Memory name must not be empty.")
+    if len(name) > MAX_NAME_LENGTH:
+        raise ValueError(f"Memory name is too long ({len(name)} characters, limit {MAX_NAME_LENGTH}).")
     if _ABSOLUTE_NAME.match(name):
         raise ValueError(
             f"Memory name {name!r} is invalid: absolute paths, UNC shares and "
             "drive-letter prefixes are not allowed."
+        )
+    if "%" in name:
+        raise ValueError(
+            f"Memory name {name!r} is invalid: percent-encoded characters are not allowed."
         )
     if not _SAFE_NAME.match(name):
         raise ValueError(
@@ -87,6 +110,25 @@ def _validate_name(name: str) -> None:
     if _DOTDOT_GUARD.search(name):
         raise ValueError(
             f"Memory name {name!r} is invalid: '..' path traversal is not allowed."
+        )
+    if any(not part or part.startswith(".") for part in name.split("/")):
+        raise ValueError(
+            f"Memory name {name!r} is invalid: empty and dot-prefixed path segments are not allowed."
+        )
+
+
+def _check_content(content: str) -> None:
+    """Raise ValueError if *content* is larger than one memory entry may be."""
+    size = len(content.encode("utf-8"))
+    if size > MAX_CONTENT_BYTES:
+        raise ValueError(f"Memory content is too large ({size} bytes, limit {MAX_CONTENT_BYTES}).")
+
+
+def _check_rule_name(name: str) -> None:
+    """Raise ValueError if *name* cannot head a section of NIRNA.md (one line, bounded length)."""
+    if not name.strip() or "\n" in name or "\r" in name or len(name) > MAX_NAME_LENGTH:
+        raise ValueError(
+            f"Rule name is invalid: it must be a single line of at most {MAX_NAME_LENGTH} characters."
         )
 
 
@@ -170,22 +212,59 @@ class MemoriesManager:
             return self._global_dir()
         return None  # PROJECT_RULE and AGENT_EXPERIENCE handled separately
 
+    def _index_for(self, scope: MemoryScope) -> MemoryIndex:
+        """The sidecar index of a file-backed *scope*."""
+        base_dir = self._base_dir_for(scope)
+        assert base_dir is not None
+        return MemoryIndex(base_dir)
+
+    def _locate(self, name: str, scope: MemoryScope | None = None) -> tuple[MemoryScope, Path] | None:
+        """Scope and path of the existing memory *name* (in *scope* only, when given), or None."""
+        for candidate in (scope,) if scope is not None else _FILE_SCOPES:
+            base_dir = self._base_dir_for(candidate)
+            assert base_dir is not None
+            path = _memory_path(base_dir, name)
+            if path.exists():
+                return candidate, path
+        return None
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def write(self, name: str, content: str, scope: MemoryScope) -> str:
-        """Write *content* to the memory identified by *name* under *scope*.
+    def validate_write(self, name: str, content: str, scope: MemoryScope) -> None:
+        """Raise unless *content* may be stored as *name* under *scope*.
 
-        Returns a human-readable confirmation string.
-        Raises NotImplementedError for AGENT_EXPERIENCE.
+        Raises NotImplementedError for AGENT_EXPERIENCE and ValueError for a malformed
+        or escaping name or for oversized content.
         """
         if scope == MemoryScope.AGENT_EXPERIENCE:
             raise NotImplementedError(
                 "AGENT_EXPERIENCE memories are managed by AnchorMind. "
                 "Run: mcp__anchormind__remember  (or use the AnchorMind CLI)."
             )
+        _check_content(content)
+        if scope == MemoryScope.PROJECT_RULE:
+            _check_rule_name(name)
+            return
+        base_dir = self._base_dir_for(scope)
+        assert base_dir is not None
+        _memory_path(base_dir, name)
 
+    def write(
+        self,
+        name:    str,
+        content: str,
+        scope:   MemoryScope,
+        source:  MemorySource = MemorySource.USER,
+    ) -> str:
+        """Write *content* to the memory identified by *name* under *scope*.
+
+        *source* is recorded as the entry's origin. Returns a human-readable
+        confirmation string. Raises NotImplementedError for AGENT_EXPERIENCE and
+        ValueError for an invalid name or oversized content.
+        """
+        self.validate_write(name, content, scope)
         if scope == MemoryScope.PROJECT_RULE:
             return self._append_to_nirnamd(name, content)
 
@@ -193,73 +272,104 @@ class MemoriesManager:
         assert base_dir is not None
         path = _memory_path(base_dir, name)
         path.parent.mkdir(parents=True, exist_ok=True)
-        mode = "r+" if path.exists() else "w"
-        if mode == "r+":
-            with open(path, mode, encoding="utf-8") as fp:
-                _locked_write(fp, content)
-        else:
-            with open(path, "w", encoding="utf-8") as fp:
-                _locked_write(fp, content)
+        with open(path, "r+" if path.exists() else "w", encoding="utf-8") as fp:
+            _locked_write(fp, content)
+        self._index_for(scope).record_write(name, content, source=source.value)
         return f"Wrote memory '{name}' [{scope}] ({len(content)} bytes) → {path}"
+
+    def scope_of(self, name: str) -> MemoryScope | None:
+        """The first file-backed scope that holds memory *name*, or None."""
+        found = self._locate(name)
+        return found[0] if found else None
+
+    def peek(self, name: str, scope: MemoryScope) -> str | None:
+        """Content of memory *name* in *scope* without recording a load, or None when absent."""
+        found = self._locate(name, scope)
+        if found is None:
+            return None
+        with open(found[1], encoding="utf-8") as fp:
+            return _locked_read(fp)
 
     def read(self, name: str) -> str:
         """Return the content of memory *name*, searching all file-backed scopes.
 
-        Search order: PROJECT_KNOWLEDGE → USER_GLOBAL.
-        Raises FileNotFoundError if not found in any scope.
+        Search order: PROJECT_KNOWLEDGE → USER_GLOBAL. The read is recorded as
+        the entry's last load. Raises FileNotFoundError if not found in any scope.
         """
-        for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
-            base_dir = self._base_dir_for(scope)
-            assert base_dir is not None
-            path = _memory_path(base_dir, name)
-            if path.exists():
-                with open(path, encoding="utf-8") as fp:
-                    return _locked_read(fp)
-        raise FileNotFoundError(f"Memory '{name}' not found in project or global scope.")
+        found = self._locate(name)
+        if found is None:
+            raise FileNotFoundError(f"Memory '{name}' not found in project or global scope.")
+        scope, path = found
+        with open(path, encoding="utf-8") as fp:
+            content = _locked_read(fp)
+        try:
+            self._index_for(scope).record_load(name, content, path.stat().st_mtime)
+        except OSError as exc:
+            logger.warning("Could not record the load of memory %r: %s", name, exc)
+        return content
 
-    def delete(self, name: str) -> str:
-        """Delete memory *name* from any file-backed scope.
+    def delete(self, name: str, scope: MemoryScope | None = None) -> str:
+        """Delete memory *name* from *scope*, or from the first file-backed scope that has it.
 
         Returns a confirmation string. Raises FileNotFoundError if absent.
         """
-        for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
-            base_dir = self._base_dir_for(scope)
-            assert base_dir is not None
-            path = _memory_path(base_dir, name)
-            if path.exists():
-                os.remove(path)
-                return f"Deleted memory '{name}' [{scope}] from {path}"
-        raise FileNotFoundError(f"Memory '{name}' not found.")
+        found = self._locate(name, scope)
+        if found is None:
+            raise FileNotFoundError(f"Memory '{name}' not found.")
+        found_scope, path = found
+        os.remove(path)
+        self._index_for(found_scope).drop(name)
+        return f"Deleted memory '{name}' [{found_scope}] from {path}"
 
     def rename(self, old_name: str, new_name: str, new_scope: MemoryScope | None = None) -> str:
         """Rename *old_name* to *new_name*, optionally changing scope.
 
-        For cross-scope rename: reads old, writes to new scope, deletes old.
+        For cross-scope rename: reads old, writes to new scope, deletes old. The entry
+        keeps its creation time and source.
         Raises FileNotFoundError if source is absent.
         Raises ValueError if source or destination name is invalid.
         """
         _validate_name(new_name)
 
-        # Locate source in file-backed scopes
-        src_scope: MemoryScope | None = None
-        src_path:  Path | None        = None
-        for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
-            base_dir = self._base_dir_for(scope)
-            assert base_dir is not None
-            path = _memory_path(base_dir, old_name)
-            if path.exists():
-                src_scope = scope
-                src_path  = path
-                break
-
-        if src_scope is None or src_path is None:
+        found = self._locate(old_name)
+        if found is None:
             raise FileNotFoundError(f"Memory '{old_name}' not found.")
+        src_scope, src_path = found
 
-        content = self.read(old_name)
+        with open(src_path, encoding="utf-8") as fp:
+            content = _locked_read(fp)
+        prior        = self._index_for(src_scope).get(old_name)
+        source       = MemorySource(prior.source) if prior else MemorySource.UNKNOWN
         target_scope = new_scope if new_scope is not None else src_scope
-        self.write(new_name, content, target_scope)
+        self.write(new_name, content, target_scope, source=source)
+        if prior is not None:
+            self._index_for(target_scope).record_write(new_name, content, created=prior.created)
         os.remove(src_path)
+        self._index_for(src_scope).drop(old_name)
         return f"Renamed '{old_name}' → '{new_name}' [{target_scope}]"
+
+    def preview_edit(
+        self,
+        name:   str,
+        needle: str,
+        repl:   str,
+        mode:   str = "literal",
+    ) -> tuple[MemoryScope, str, int]:
+        """Apply the edit of :meth:`edit` to a copy: ``(scope, new content, replacement count)``.
+
+        Raises FileNotFoundError if *name* is not found and ValueError if *mode* is invalid.
+        """
+        if mode not in ("literal", "regex"):
+            raise ValueError(f"mode must be 'literal' or 'regex', got {mode!r}")
+        found = self._locate(name)
+        if found is None:
+            raise FileNotFoundError(f"Memory '{name}' not found.")
+        scope, path = found
+        with open(path, encoding="utf-8") as fp:
+            original = _locked_read(fp)
+        if mode == "literal":
+            return scope, original.replace(needle, repl), original.count(needle)
+        return scope, re.sub(needle, repl, original), len(re.findall(needle, original))
 
     def edit(
         self,
@@ -278,24 +388,16 @@ class MemoriesManager:
 
         Returns a confirmation string.
         Raises FileNotFoundError if *name* is not found.
-        Raises ValueError if *mode* is invalid.
+        Raises ValueError if *mode* is invalid or the result exceeds the size limit.
         """
-        if mode not in ("literal", "regex"):
-            raise ValueError(f"mode must be 'literal' or 'regex', got {mode!r}")
-
-        for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
-            base_dir = self._base_dir_for(scope)
-            assert base_dir is not None
-            path = _memory_path(base_dir, name)
-            if path.exists():
-                with open(path, "r+", encoding="utf-8") as fp:
-                    original = _locked_read(fp)
-                    updated  = original.replace(needle, repl) if mode == "literal" else re.sub(needle, repl, original)
-                    _locked_write(fp, updated)
-                count = original.count(needle) if mode == "literal" else len(re.findall(needle, original))
-                return f"Edited '{name}': {count} replacement(s) applied."
-
-        raise FileNotFoundError(f"Memory '{name}' not found.")
+        scope, updated, count = self.preview_edit(name, needle, repl, mode)
+        _check_content(updated)
+        found = self._locate(name, scope)
+        assert found is not None
+        with open(found[1], "r+", encoding="utf-8") as fp:
+            _locked_write(fp, updated)
+        self._index_for(scope).record_write(name, updated)
+        return f"Edited '{name}': {count} replacement(s) applied."
 
     def list_memories(
         self,
@@ -309,11 +411,12 @@ class MemoriesManager:
             min_importance: Minimum importance threshold (0.0-1.0).
         """
         entries: list[MemoryEntry] = []
-        for scope in (MemoryScope.PROJECT_KNOWLEDGE, MemoryScope.USER_GLOBAL):
+        for scope in _FILE_SCOPES:
             base_dir = self._base_dir_for(scope)
             assert base_dir is not None
             if not base_dir.exists():
                 continue
+            records = self._index_for(scope).records()
             for root, _, files in os.walk(base_dir):
                 for fname in files:
                     if not fname.endswith(".md"):
@@ -324,11 +427,15 @@ class MemoriesManager:
                     if topic and not display.startswith(topic):
                         continue
                     stat = fpath.stat()
+                    meta = records.get(display)
                     entry = MemoryEntry(
-                        name  = display,
-                        scope = scope,
-                        size  = stat.st_size,
-                        mtime = stat.st_mtime,
+                        name      = display,
+                        scope     = scope,
+                        size      = stat.st_size,
+                        mtime     = effective_modified(meta, fpath, stat.st_mtime),
+                        created   = meta.created if meta else stat.st_mtime,
+                        source    = meta.source if meta else MemorySource.UNKNOWN.value,
+                        loaded_at = meta.loaded_at if meta else None,
                     )
                     if entry.importance >= min_importance:
                         entries.append(entry)
@@ -385,13 +492,15 @@ class MemoriesManager:
         self,
         days: int = 30,
         topic: str | None = None,
+        never_loaded: bool = False,
     ) -> list[MemoryEntry]:
         """Return memories not modified in specified days.
 
         Args:
             days: Number of days since last modification.
             topic: Optional slash-namespace prefix filter.
+            never_loaded: Keep only entries that no read has ever recorded.
         """
         cutoff = time.time() - (days * 86400)
         entries = self.list_memories(topic=topic)
-        return [e for e in entries if e.mtime < cutoff]
+        return [e for e in entries if e.mtime < cutoff and (e.loaded_at is None or not never_loaded)]

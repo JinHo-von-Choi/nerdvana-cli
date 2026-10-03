@@ -224,6 +224,16 @@ def global_memories_dir() -> Path:
     return user_data_home() / "memories" / "global"
 
 
+def project_memory_inbox_dir(cwd: str) -> Path:
+    """Directory of memory proposals awaiting review (<cwd>/.nerdvana/memory-inbox/)."""
+    return Path(cwd) / ".nerdvana" / "memory-inbox"
+
+
+def memory_audit_log() -> Path:
+    """Append-only log of memory approvals, rejections and forgets (~/.nerdvana/logs/memory-audit.jsonl)."""
+    return user_data_home() / "logs" / "memory-audit.jsonl"
+
+
 # ---------------------------------------------------------------------------
 # Runtime profile paths
 # ---------------------------------------------------------------------------
