@@ -23,11 +23,26 @@ REPO = Path(__file__).resolve().parents[2]
 FORBIDDEN_PREFIXES = ("docs/retrospectives/", "docs/adr/", "docs/plans/", "docs/superpowers/", ".nerdvana/", ".claude/")
 FORBIDDEN_NAME = re.compile(r"(^|[/\-_.])(retro(spective)?s?|postmortems?|handoff|scratch|brainstorm)([\-_./]|$)", re.IGNORECASE)
 
-# Names and addresses of the author's own systems, and phrases that narrate the development process.
+# Phrases that narrate the development process, and any absolute path into a personal home directory.
 INTERNAL_TERMS = re.compile(
-    r"anchormind|memento[-_ ]?mcp|\bpmcp\b|nerdvana-synthetic|\.claude/projects|/home/nirna|~/jobs/|개발\s*플랜|작업\s*분담|retrospective|docs/plans|parent roadmap|analysis report",
+    r"개발\s*플랜|작업\s*분담|retrospective|docs/plans|parent roadmap|analysis report|/home/(?!user/|runner/|someone/)[a-z][\w.-]*/|\.claude/projects",
     re.IGNORECASE,
 )
+
+# Names of the author's own systems are not written in this public file. They live one per line, as regular
+# expressions, in the untracked file tests/contracts/.internal_terms (see .gitignore); a clone without it
+# skips that part of the check, the author's machine and the pre-push hook run it.
+LOCAL_TERMS_FILE = Path(__file__).with_name(".internal_terms")
+
+
+def _local_terms() -> re.Pattern[str] | None:
+    if not LOCAL_TERMS_FILE.is_file():
+        return None
+    lines = [line.strip() for line in LOCAL_TERMS_FILE.read_text(encoding="utf-8").splitlines()]
+    patterns = [line for line in lines if line and not line.startswith("#")]
+    return re.compile("|".join(patterns), re.IGNORECASE) if patterns else None
+
+
 # Plan phase and task codes (case sensitive: lower case "phase 1" is ordinary prose).
 PLAN_CODES = re.compile("Pha" + r"se [0-9A-Z]|T-" + r"0A|Task " + "E1")
 
@@ -53,6 +68,7 @@ def test_no_development_process_document_is_tracked() -> None:
 
 def test_no_tracked_text_names_an_internal_system_or_narrates_the_development() -> None:
     offenders: list[str] = []
+    local = _local_terms()
     for name in _tracked():
         if name in EXEMPT or name == "uv.lock" or name.endswith((".png", ".ico", ".jpg", ".gif")):
             continue
@@ -61,7 +77,7 @@ def test_no_tracked_text_names_an_internal_system_or_narrates_the_development() 
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        match = INTERNAL_TERMS.search(text) or PLAN_CODES.search(text)
+        match = INTERNAL_TERMS.search(text) or PLAN_CODES.search(text) or (local.search(text) if local else None)
         if match:
             line = text.count("\n", 0, match.start()) + 1
             offenders.append(f"{name}:{line}: {match.group(0)}")
@@ -71,7 +87,7 @@ def test_no_tracked_text_names_an_internal_system_or_narrates_the_development() 
 def test_the_patterns_recognise_what_they_look_for() -> None:
     assert FORBIDDEN_NAME.search("docs/2026-04-18-retrospective-phase.md")
     assert not FORBIDDEN_NAME.search("docs/skills.md")
-    for sample in ("calls mcp__anchormind__remember", "see /home/nirna/jobs", "개발 플랜 요약"):
+    for sample in ("see /home/alice/jobs", "개발 플랜 요약"):
         assert INTERNAL_TERMS.search(sample), sample
     assert PLAN_CODES.search("Pha" + "se G2 notes") and PLAN_CODES.search("see T-" + "0A-05")
     assert not (INTERNAL_TERMS.search("a phase of the run and a plan for the user") or PLAN_CODES.search("phase 1 of the project"))
