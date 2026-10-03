@@ -87,6 +87,10 @@ class SessionConfig(BaseModel):
     project_doc_max_tokens: int = 0
     # Refuse to run when max_cost_usd is set but the model has no known price.
     require_price: bool = False
+    # Model to switch to, once per session, when the run shows trouble ("model" or "provider:model"); empty = never.
+    escalation_model: str = ""
+    # Signal name -> how many occurrences trigger the switch (see core/signals.py).
+    escalation_signals: dict[str, int] = Field(default_factory=lambda: {"verify_failed": 1, "repeat_refused": 1, "cas_rejected": 3, "new_diagnostics": 4})
     # MCP tools whose full declarations are sent only after the model loads them with ToolSearch:
     # "auto" defers them once their declarations pass defer_tools_threshold tokens, "always", "never".
     defer_tools: Literal["auto", "always", "never"] = "auto"

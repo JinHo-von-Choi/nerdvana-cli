@@ -36,6 +36,7 @@ COMPACTION          = "compaction"
 WRAP_UP             = "wrap_up"
 VERIFY_FAILED       = "verify_failed"
 TOOL_NOT_LOADED     = "tool_not_loaded"
+ESCALATED           = "escalated"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (
@@ -77,6 +78,14 @@ def classify_result(content: str, is_error: bool, *, shell_confined: bool = Fals
     if shell_confined and "Permission denied" in content:
         return [*found, SANDBOX_DENIED]
     return [*found, TOOL_ERROR]
+
+
+def escalation_reason(counts: dict[str, int], thresholds: dict[str, int]) -> str:
+    """The first signal (in the order of *thresholds*) that reached its limit, as text; empty when none did."""
+    for name, limit in thresholds.items():
+        if limit > 0 and counts.get(name, 0) >= limit:
+            return f"{name} x{counts[name]}"
+    return ""
 
 
 def merge(*counters: Counter[str]) -> dict[str, int]:

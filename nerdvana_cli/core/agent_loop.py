@@ -37,6 +37,7 @@ from nerdvana_cli.core.provider_recovery import (
     RETRY,
     ProviderCallError,
     RecoveryPlanner,
+    parse_fallback,
 )
 from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.core.session import SessionStorage
@@ -216,6 +217,7 @@ class AgentLoop:
     _goal_loaded:             bool
     _budget:                  Budget | None
     _tool_index:              ToolIndex | None
+    _escalated:               bool
     last_stop:                str
     turns_used:               int
     _cost_limit_warned:       bool
@@ -447,6 +449,31 @@ class AgentLoop:
             return ""
         return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
 
+    def _maybe_escalate(self) -> str:
+        """Switch to ``session.escalation_model`` once, when the run's signals reach their thresholds.
+
+        Returns the notice to show, or an empty string when nothing changed. The thinking blocks kept on
+        earlier assistant messages belong to the model that wrote them, so they are dropped on a switch.
+        """
+        session = self.settings.session
+        if self._escalated or not session.escalation_model:
+            return ""
+        reason = signals.escalation_reason(self.signal_summary(), session.escalation_signals)
+        if not reason:
+            return ""
+        self._escalated = True
+        from nerdvana_cli.providers.factory import resolve_api_key
+
+        provider, model = parse_fallback(session.escalation_model)
+        if provider and provider != self.settings.model.provider and not resolve_api_key(ProviderName(provider)):
+            logger.warning("escalation to %s skipped: no credential for provider %s", session.escalation_model, provider)
+            return ""
+        self._signals[signals.ESCALATED] += 1
+        self._switch_model(provider, model)
+        for message in self.state.messages:
+            message.provider_blocks = []
+        return f"\n[bold yellow][Escalating to {self.settings.model.provider}:{model}: {reason}][/bold yellow]\n"
+
     def _init_telemetry(self, origin: CallOrigin | None) -> None:
         """State for attributing requests and counting trouble: who this loop is and what it has seen."""
         self.origin                = origin or CallOrigin()
@@ -459,6 +486,7 @@ class AgentLoop:
         self._goal_loaded          = False
         self._budget               = None
         self._tool_index           = None
+        self._escalated            = False
 
     def _over_token_limit(self) -> str:
         """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
@@ -956,6 +984,9 @@ class AgentLoop:
                 flow.finished  = True
                 yield notice
                 return
+        escalated = self._maybe_escalate()
+        if escalated:
+            yield escalated
         if self._cost_limit_unenforceable():
             if self.settings.session.require_price:
                 self.last_stop = "unpriced"
