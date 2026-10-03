@@ -17,6 +17,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
+from nerdvana_cli.core.compaction_block import last_compaction_index
 from nerdvana_cli.core.token_estimator import approx_tokens
 
 # What an image costs in a request, whatever its size on disk: providers bill by pixels, a few thousand tokens at most.
@@ -79,7 +80,13 @@ class ContextBudget:
         self._anchor = None
 
     def current(self, messages: Sequence[Any]) -> int:
-        """Tokens the next request built from *messages* is expected to use."""
-        if self._anchor is not None and self._anchor_index <= len(messages):
-            return self._anchor + message_tokens(messages[self._anchor_index:])
-        return self._overhead + message_tokens(messages)
+        """Tokens the next request built from *messages* is expected to use.
+
+        A message that carries a compaction block stands for everything before it (the provider leaves
+        those out), so without a measurement only the messages from the last such block on are estimated.
+        """
+        start  = last_compaction_index(messages)
+        anchor = self._anchor
+        if anchor is not None and self._anchor_index <= len(messages) and (start == 0 or self._anchor_index > start):
+            return anchor + message_tokens(messages[self._anchor_index:])
+        return self._overhead + message_tokens(messages[start:])

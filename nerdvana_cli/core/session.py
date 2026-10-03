@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.compaction_block import carries_compaction
 from nerdvana_cli.types import Message, Role
 
 # Transcript tool results are capped at this many characters when recorded.
@@ -65,13 +66,9 @@ def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
             uses = [tu for tu in entry.get("tool_uses") or [] if str(tu.get("id", "")) in answered]
             known.update(str(tu.get("id", "")) for tu in uses)
             content = str(entry.get("content", ""))
-            if content or uses:
-                messages.append(Message(
-                    role            = Role.ASSISTANT,
-                    content         = content,
-                    tool_uses       = uses,
-                    provider_blocks = list(entry.get("provider_blocks") or []),
-                ))
+            blocks  = list(entry.get("provider_blocks") or [])
+            if content or uses or carries_compaction(blocks):
+                messages.append(Message(role=Role.ASSISTANT, content=content, tool_uses=uses, provider_blocks=blocks))
         elif kind == "tool_result":
             tool_use_id = str(entry.get("tool_use_id", ""))
             if tool_use_id not in known:
