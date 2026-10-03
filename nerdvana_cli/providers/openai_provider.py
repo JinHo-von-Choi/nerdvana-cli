@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Sequence
+import logging
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 from rich.console import Console
 
-from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, ProviderConfig, ProviderEvent, ProviderName
 from nerdvana_cli.providers.errors import DECODE, error_fields
 from nerdvana_cli.providers.thinking_parser import ThinkBlockParser
 from nerdvana_cli.types import ToolSpec
@@ -19,9 +20,22 @@ except ImportError:  # pragma: no cover – runtime guard in _get_client
     AsyncOpenAI = None  # type: ignore[assignment,misc]
 
 console = Console()
+logger  = logging.getLogger(__name__)
 
 
 _UNSUPPORTED_PARAM_STATUS = frozenset({400, 422})
+
+_EFFORT_WITH_TOOLS_NOTE = (
+    "reasoning_effort {effort!r} is sent with tools to the OpenAI Chat Completions endpoint, which supports "
+    "tool calling only with reasoning_effort 'none' on GPT-5.4 and later; set model.reasoning_effort to 'none'"
+)
+
+
+def is_official_openai(config: ProviderConfig) -> bool:
+    """Report whether *config* addresses OpenAI itself rather than another OpenAI-compatible server."""
+    if config.provider != ProviderName.OPENAI:
+        return False
+    return config.base_url.rstrip("/") in ("", DEFAULT_BASE_URLS[ProviderName.OPENAI])
 
 
 def _is_stream_options_unsupported(exc: BaseException) -> bool:
@@ -110,6 +124,50 @@ def _collect_tool_call(tc: Any, slots: list[dict[str, str]], slot_by_index: dict
             slot["arguments"] += _safe_str(tc.function.arguments)
 
 
+def parse_arguments(raw: str | None) -> dict[str, Any]:
+    """The JSON object in a tool call's *raw* arguments; empty or unparseable arguments give an empty input."""
+    try:
+        return json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def _tool_use_events(slots: list[dict[str, str]]) -> Iterator[ProviderEvent]:
+    """One ``tool_use_complete`` event per collected call."""
+    for slot in slots:
+        yield ProviderEvent(
+            type="tool_use_complete",
+            tool_use_id=slot["id"],
+            tool_name=slot["name"],
+            tool_input_complete=parse_arguments(slot["arguments"]),
+        )
+
+
+def _with_note(text: str, exc: BaseException, note: str) -> str:
+    """*text* followed by *note* when the endpoint refused the request body, the case the note explains."""
+    if note and getattr(exc, "status_code", None) in _UNSUPPORTED_PARAM_STATUS:
+        return f"{text} ({note})"
+    return text
+
+
+def _error_event(exc: Exception, note: str = "") -> ProviderEvent:
+    """The error event for a failed request, with the encoding failures told apart."""
+    text = str(exc)
+    if isinstance(exc, UnicodeDecodeError):
+        return ProviderEvent(
+            type="error",
+            error=f"UTF-8 decoding error from API: {exc}. Try a different model or provider.",
+            **error_fields(exc),
+        )
+    if "utf-8" in text.lower() or "decode" in text.lower():
+        return ProviderEvent(
+            type="error",
+            error=f"Encoding error from API: {text}. This may be a model-specific issue.",
+            **error_fields(exc, kind=DECODE),
+        )
+    return ProviderEvent(type="error", error=_with_note(text, exc, note), **error_fields(exc))
+
+
 def _safe_str(value: Any) -> str:
     """Safely convert any value to string, handling encoding errors."""
     if value is None:
@@ -130,6 +188,7 @@ class OpenAIProvider:
     def __init__(self, config: ProviderConfig):
         self.config = config
         self._client: AsyncOpenAI | None = None
+        self._effort_warned = False
 
     def _get_client(self) -> AsyncOpenAI:
         """Return cached AsyncOpenAI client (lazy-init)."""
@@ -180,6 +239,7 @@ class OpenAIProvider:
 
         api_tools = self._build_tools(tools)
         api_messages = self._convert_messages(system_prompt, messages)
+        effort_note = self._effort_note(bool(api_tools))
 
         try:
             # Some providers don't support stream_options
@@ -254,17 +314,8 @@ class OpenAIProvider:
 
             stop_reason = _stop_reason(finish_reason, bool(slots))
             if stop_reason == "tool_use":
-                for slot in slots:
-                    try:
-                        input_data = json.loads(slot["arguments"]) if slot["arguments"] else {}
-                    except (json.JSONDecodeError, UnicodeDecodeError):
-                        input_data = {}
-                    yield ProviderEvent(
-                        type="tool_use_complete",
-                        tool_use_id=slot["id"],
-                        tool_name=slot["name"],
-                        tool_input_complete=input_data,
-                    )
+                for event in _tool_use_events(slots):
+                    yield event
 
             if reported is not None:
                 yield ProviderEvent(type="usage", usage=_usage_dict(reported))
@@ -280,22 +331,8 @@ class OpenAIProvider:
 
             yield ProviderEvent(type="done", stop_reason=stop_reason)
 
-        except UnicodeDecodeError as e:
-            yield ProviderEvent(
-                type="error",
-                error=f"UTF-8 decoding error from API: {e}. Try a different model or provider.",
-                **error_fields(e),
-            )
         except Exception as e:
-            error_str = str(e)
-            if "utf-8" in error_str.lower() or "decode" in error_str.lower():
-                yield ProviderEvent(
-                    type="error",
-                    error=f"Encoding error from API: {error_str}. This may be a model-specific issue.",
-                    **error_fields(e, kind=DECODE),
-                )
-            else:
-                yield ProviderEvent(type="error", error=error_str, **error_fields(e))
+            yield _error_event(e, effort_note)
 
     async def send(
         self,
@@ -311,6 +348,7 @@ class OpenAIProvider:
 
         api_tools = self._build_tools(tools)
         api_messages = self._convert_messages(system_prompt, messages)
+        effort_note = self._effort_note(bool(api_tools))
 
         try:
             response = await client.chat.completions.create(
@@ -331,16 +369,11 @@ class OpenAIProvider:
 
                 if choice.message.tool_calls:
                     for tc in choice.message.tool_calls:
-                        try:
-                            input_data = json.loads(tc.function.arguments) if tc.function.arguments else {}  # type: ignore[union-attr]
-                        except (json.JSONDecodeError, UnicodeDecodeError):
-                            input_data = {}
-
                         tool_uses.append(
                             {
                                 "id": tc.id,
                                 "name": tc.function.name,  # type: ignore[union-attr]
-                                "input": input_data,
+                                "input": parse_arguments(tc.function.arguments),  # type: ignore[union-attr]
                             }
                         )
 
@@ -356,7 +389,21 @@ class OpenAIProvider:
         except UnicodeDecodeError as e:
             return {"content": f"UTF-8 decoding error: {e}", "is_error": True}
         except Exception as e:
-            return {"content": str(e), "is_error": True}
+            return {"content": _with_note(str(e), e, effort_note), "is_error": True}
+
+    def _effort_note(self, has_tools: bool) -> str:
+        """The limit a request meets when it sends tools with a reasoning effort to OpenAI's chat endpoint.
+
+        Empty when there is no conflict. The first conflict of a provider instance is logged as a warning.
+        """
+        effort = self.config.reasoning_effort
+        if not (has_tools and effort and effort.lower() != "none" and is_official_openai(self.config)):
+            return ""
+        note = _EFFORT_WITH_TOOLS_NOTE.format(effort=effort)
+        if not self._effort_warned:
+            self._effort_warned = True
+            logger.warning(note)
+        return note
 
     def _effort_kwargs(self) -> dict[str, Any]:
         """The ``reasoning_effort`` request field, present only when the setting is."""
