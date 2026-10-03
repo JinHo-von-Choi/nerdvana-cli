@@ -98,6 +98,7 @@ class ProviderConfig:
     extended_thinking: bool = False
     thinking_budget: int = 8192
     show_thinking: bool = True
+    reasoning_effort: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:

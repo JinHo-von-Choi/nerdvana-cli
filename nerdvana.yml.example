@@ -74,6 +74,7 @@ model:
   # Show thinking: asks Anthropic models for thinking summaries and renders <think>...</think>
   # blocks as a dim italic prefix above the answer.
   show_thinking: true
+  reasoning_effort: ""
 
 # Per-provider last-used model. Updated automatically by /provider and /model.
 # Keys are provider names (anthropic, openai, dashscope, ...); values are model IDs.

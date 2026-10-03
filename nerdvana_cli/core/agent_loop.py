@@ -605,7 +605,8 @@ class AgentLoop:
             base_url=self.settings.model.base_url, max_tokens=self.settings.model.max_tokens, temperature=self.settings.model.temperature,
             prompt_caching=self.settings.model.prompt_caching,
             extended_thinking=self.settings.model.extended_thinking,
-            thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking)
+            thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking,
+            reasoning_effort=self.settings.model.reasoning_effort)
 
     def _reset_run_counters(self) -> None:
         """Zero the stop status, the typed-ahead queue and the session's usage totals."""
