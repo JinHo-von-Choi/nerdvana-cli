@@ -259,6 +259,14 @@ See [goals.md](goals.md).
 |-------|------|---------|-------------|
 | `review` | bool | `false` | `true`: a memory the agent writes, edits, renames or deletes with the memory tools is not applied. It waits in the project's inbox until the user approves it with `nerdvana memory approve` or `/memory approve`, and neither the prompt hint nor `ReadMemory` and `ListMemories` show it before then. A value that is not a boolean stops startup, so a typo never turns review off. See [memory.md](memory.md). |
 
+### `workflow` (WorkflowConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Offer the `Workflow` tool to the model, which runs a declared workflow by name (each call asks for confirmation). `nerdvana workflow run` works whatever this says. A value that is not a boolean stops startup. See [workflows.md](workflows.md). |
+| `max_parallel` | int | `4` | Agents of one workflow run working at once; never above `session.max_parallel_agents`. |
+| `max_agents` | int | `50` | Most agents one `foreach` fan-out may start. A longer list stops the run before any agent of that step starts. |
+
 ### `agents` (AgentsConfig)
 
 | Field | Type | Default | Description |

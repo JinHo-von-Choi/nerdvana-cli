@@ -213,6 +213,16 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 
 [docs/scheduling.md](docs/scheduling.md) 참고.
 
+### 워크플로 (`nerdvana workflow ...`)
+
+| 서브명령어 | 설명 |
+|-|-|
+| `nerdvana workflow list` | 프로젝트(`.nerdvana/workflows`), `~/.nerdvana/workflows`, 번들 워크플로 목록 |
+| `nerdvana workflow show <이름>` | 워크플로의 입력과 단계를 표시 |
+| `nerdvana workflow run <이름>` | 선언된 다중 에이전트 워크플로를 실행합니다 (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`, `--approval-mode`). 파일이 쓰기를 허용하지 않으면 에이전트는 읽기 전용이고, 끝난 단위는 저장되어 중단된 실행을 이어서 할 수 있습니다 |
+
+[docs/workflows.md](docs/workflows.md) 참고.
+
 ### 세션 기록 (`nerdvana session ...`)
 
 | 서브명령어 | 설명 |
@@ -641,6 +651,7 @@ mypy nerdvana_cli/
 | [docs/hooks.md](docs/hooks.md) | 훅 이벤트 체계와 브리지 규약 |
 | [docs/managed-policy.md](docs/managed-policy.md) | 관리자가 모든 사용자·프로젝트 설정 위에 두는 기기 단위 설정 |
 | [docs/scheduling.md](docs/scheduling.md) | 예약 실행: 크론과 간격 작업, 데몬, 비용 상한 |
+| [docs/workflows.md](docs/workflows.md) | 선언형 다중 에이전트 워크플로: 단계, 병렬 실행, 교차 검증, 재개, 비용 상한 |
 | [docs/agents.md](docs/agents.md) | 에이전트 타입, 도구 예산, 스웜 패턴 |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP 서버 테넌트별 쿼터 스키마 |
 | [docs/testing-live.md](docs/testing-live.md) | 실 제공자 시험 행렬과 비밀값 설정 |

@@ -174,6 +174,15 @@ goal:
   # run that changed files is accepted as finished. See docs/goals.md.
   auto_verify: false
 
+workflow:
+  # true: the model may run declared workflows with the Workflow tool (each call asks for
+  # confirmation). `nerdvana workflow run` always works. See docs/workflows.md.
+  enabled: false
+  # Agents of one run working at once (never above session.max_parallel_agents), and the most
+  # agents one foreach fan-out may start.
+  max_parallel: 4
+  max_agents: 50
+
 memory:
   # true: memories the agent proposes wait in an inbox until you approve them
   # (nerdvana memory inbox, nerdvana memory approve <id>). See docs/memory.md.

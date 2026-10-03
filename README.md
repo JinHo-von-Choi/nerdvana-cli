@@ -231,6 +231,16 @@ The result object (`schema_version` 1; fields are only ever added):
 
 See [docs/scheduling.md](docs/scheduling.md).
 
+### Workflows (`nerdvana workflow ...`)
+
+| Subcommand | Purpose |
+|-|-|
+| `nerdvana workflow list` | List the workflows of the project (`.nerdvana/workflows`), of `~/.nerdvana/workflows` and the bundled ones |
+| `nerdvana workflow show <name>` | Show a workflow's inputs and steps |
+| `nerdvana workflow run <name>` | Run a declared multi-agent workflow (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`, `--approval-mode`); agents are read-only unless the file allows writing, and finished units are kept so a stopped run can resume |
+
+See [docs/workflows.md](docs/workflows.md).
+
 ### Session transcripts (`nerdvana session ...`)
 
 | Subcommand | Purpose |
@@ -662,6 +672,7 @@ mypy nerdvana_cli/
 | [docs/hooks.md](docs/hooks.md) | Hook event system and bridge protocol |
 | [docs/managed-policy.md](docs/managed-policy.md) | Machine-wide settings an administrator sets above every user and project setting |
 | [docs/scheduling.md](docs/scheduling.md) | Scheduled runs: cron and interval jobs, the daemon, cost ceilings |
+| [docs/workflows.md](docs/workflows.md) | Declared multi-agent workflows: steps, fan-out, cross-checking, resume, cost ceiling |
 | [docs/agents.md](docs/agents.md) | Agent types, tool budgets, and swarm patterns |
 | [docs/mcp-client.md](docs/mcp-client.md) | MCP servers as a client: protocol revisions, limits, skills over MCP, confining stdio servers |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP server per-tenant quota config schema |
