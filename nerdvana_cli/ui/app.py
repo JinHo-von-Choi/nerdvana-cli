@@ -181,6 +181,7 @@ class NerdvanaApp(App[object]):
         self._agent_loop: AgentLoop | None = None
         self._is_generating = False
         self._confirm_lock  = asyncio.Lock()
+        self._pending_images: list[dict[str, Any]] | None = None
         self._commands_cache:   list[UserCommand] = []
         self._commands_scanned: float             = float("-inf")
         self._pending_provider: str = ""  # provider name awaiting API key input
@@ -231,6 +232,11 @@ class NerdvanaApp(App[object]):
 
         self.push_screen(AskUserScreen(question, options), _on_dismiss)
         return await answer
+
+    def take_pending_images(self) -> list[dict[str, Any]] | None:
+        """The images attached by ``/image`` for the next prompt, handed over once."""
+        images, self._pending_images = self._pending_images, None
+        return images
 
     async def _confirm_prompt(self, tool_name: str, message: str) -> bool:
         """Ask the user to allow a tool call through a modal.

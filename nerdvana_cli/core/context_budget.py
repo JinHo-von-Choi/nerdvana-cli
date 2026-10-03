@@ -19,13 +19,23 @@ from typing import Any
 
 from nerdvana_cli.core.token_estimator import approx_tokens
 
+# What an image costs in a request, whatever its size on disk: providers bill by pixels, a few thousand tokens at most.
+IMAGE_TOKENS = 1500
+
+
+def _blocks_tokens(blocks: Sequence[Any]) -> int:
+    """Estimated tokens of content blocks: images at a flat figure instead of their base64 text."""
+    plain  = [b for b in blocks if not (isinstance(b, dict) and b.get("type") == "image")]
+    images = len(blocks) - len(plain)
+    return approx_tokens(json.dumps(plain, ensure_ascii=False)) + images * IMAGE_TOKENS
+
 
 def message_tokens(messages: Sequence[Any]) -> int:
     """Estimated tokens of *messages*, tool calls included."""
     total = 0
     for message in messages:
         content = message.content
-        total  += approx_tokens(content if isinstance(content, str) else json.dumps(content, ensure_ascii=False))
+        total  += approx_tokens(content) if isinstance(content, str) else _blocks_tokens(content)
         if message.tool_uses:
             total += approx_tokens(json.dumps(message.tool_uses, ensure_ascii=False))
         if getattr(message, "provider_blocks", None):

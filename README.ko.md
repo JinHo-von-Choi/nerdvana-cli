@@ -156,6 +156,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `--output-format text\|json\|stream-json` | `text`(기본)는 사람이 읽는 스트림입니다. `json`은 끝에 결과 객체 하나를 출력합니다. `stream-json`은 한 줄에 이벤트 하나를 출력하고 같은 결과 객체로 끝납니다. 두 JSON 형식에서 stdout에는 JSON만 나가고 안내 문구는 stderr로 갑니다. |
 | `--max-turns N` | 모델 턴이 N번이 되면 멈춥니다. |
 | `--max-total-tokens N` | 모든 요청의 입력과 출력 토큰 합이 N에 이르면 멈춥니다. 가격을 몰라도 모든 모델에서 동작합니다. |
+| `--image PATH` | 프롬프트에 이미지(PNG, JPEG, GIF, WebP, 5 MB 이하, 최대 6개)를 첨부합니다(반복 가능). 형식은 파일 첫 바이트로 판단하며, 이미지를 받지 못하는 모델은 제공자의 오류로 답합니다. |
 | `--set section.field=value` | 이 실행에서만 설정 하나를 덮어씁니다(반복 가능, 값은 YAML로 읽음). 예: `--set session.compact_threshold=0.5`. `permissions`, `hooks`, `sandbox` 섹션은 이 방법으로 바꿀 수 없고 각자의 옵션을 씁니다. |
 | `--scope PATH` | `--verify` 와 함께: 작업이 다루는 경로(반복 가능). 그 밖의 편집은 먼저 묻고, 물을 사람이 없으면 거부합니다. |
 | `--verify COMMAND` | 작업이 끝났는지 판정하는 명령입니다. 모델이 끝났다고 하면 이 명령을 실행하고, 종료 코드가 0이 아니면 출력의 끝부분을 모델에 돌려주어 계속 일하게 합니다. 통과하거나, `--verify-attempts N`번 실패하거나(기본 `goal.max_attempts`, 5), 턴·비용 한도에 이르면 끝납니다. 결과에 `verification` 객체가 붙습니다. |
@@ -321,6 +322,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/route-knowledge` | 콘텐츠를 분류하여 WriteMemory 스코프 제안 |
 | `/dashboard` | 관찰 가능성 대시보드 토글 |
 | `/health` | 7일간 도구 호출 건강 요약 표시 |
+| `/image` | `/image <경로> [<경로> ...] <질문>` 은 앞쪽의 이미지 파일을 첨부해 질문합니다. 기록에는 그림이 아니라 파일 이름만 남습니다 |
 | `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
 | `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |

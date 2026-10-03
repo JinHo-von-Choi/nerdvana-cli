@@ -328,6 +328,19 @@ def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any
     return receipt if receipt["files_changed"] or verification else None
 
 
+def _load_run_images(paths: list[str], cwd: str, reporter: Any, outcome: Any) -> list[dict[str, Any]]:
+    """The image blocks named by ``--image``; a file that cannot be sent ends the command with the configuration exit code."""
+    from nerdvana_cli.core.images import ImageError, load_images
+    from nerdvana_cli.core.run_output import EXIT_CONFIG
+
+    try:
+        return load_images(paths, cwd)
+    except ImageError as exc:
+        outcome.stop = "config"
+        reporter.failure(outcome, str(exc))
+        raise typer.Exit(EXIT_CONFIG) from exc
+
+
 def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     """Copy what the finished loop measured into the run result."""
     outcome.turns        = loop.turns_used
@@ -377,6 +390,7 @@ def run(
     sandbox: str = typer.Option("", "--sandbox", help="Confine shell commands to a write scope: off | auto | require (default: sandbox.mode from the configuration)"),
     verify: str = typer.Option("", "--verify", help="Command that decides whether the task is done: the run goes on until it exits with status 0"),
     verify_attempts: int = typer.Option(0, "--verify-attempts", help="Failed verifications before giving up (0 = goal.max_attempts)"),
+    image: list[str] | None = typer.Option(None, "--image", help="Attach an image (PNG, JPEG, GIF or WebP) to the prompt (repeatable)"),  # noqa: B008
     scope: list[str] | None = typer.Option(None, "--scope", help="With --verify: paths the task is about; an edit elsewhere is refused unless someone approves it"),  # noqa: B008
     set_values: list[str] | None = typer.Option(None, "--set", help="Override one setting for this run: section.field=value (repeatable), e.g. --set session.compact_threshold=0.5"),  # noqa: B008
 ) -> None:
@@ -450,6 +464,7 @@ def run(
     )
     outcome.session_id = session.session_id
     started            = time.monotonic()
+    images             = _load_run_images(image or [], settings.cwd, reporter, outcome)
     if verify:
         loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts, scope=list(scope or [])))
 
@@ -457,7 +472,7 @@ def run(
         loop.usage_listener = reporter.request
         reporter.start(session.session_id, settings.model.provider, settings.model.model)
         try:
-            async for chunk in loop.run(prompt):
+            async for chunk in loop.run(prompt, images):
                 reporter.chunk(chunk)
         except Exception as exc:  # noqa: BLE001
             if not reporter.machine_readable:

@@ -174,6 +174,7 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--max-turns N` | Stop after N model turns. |
 | `--max-cost-usd X` | Stop once the estimated cost of the run reaches X USD (needs a known price for the model). |
 | `--max-total-tokens N` | Stop once the input and output tokens of all requests reach N. Needs no price, so it works for any model. |
+| `--image PATH` | Attach an image (PNG, JPEG, GIF or WebP, up to 5 MB, at most 6) to the prompt (repeatable). The type is read from the file's first bytes; a model that cannot take images answers with its provider's error. |
 | `--set section.field=value` | Override one setting for this run (repeatable; the value is read as YAML), e.g. `--set session.compact_threshold=0.5`. The `permissions`, `hooks` and `sandbox` sections cannot be changed this way; use their own options. |
 | `--scope PATH` | With `--verify`: paths the task is about (repeatable). An edit outside them asks first, and is refused when nobody can be asked. |
 | `--verify COMMAND` | The command that decides whether the task is done. When the model says it is finished the command runs, and if it does not exit with status 0 the end of its output goes back to the model, which keeps working. The run ends when it passes, after `--verify-attempts N` failures (default `goal.max_attempts`, 5) or at a turn or cost limit. The result gets a `verification` object. |
@@ -342,6 +343,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/route-knowledge` | Classify content → suggest WriteMemory scope |
 | `/dashboard` | Toggle observability dashboard |
 | `/health` | Show 7-day tool call health summary |
+| `/image` | `/image <path> [<path> ...] <question>` sends a prompt with the image files at the start attached; the transcript keeps the file names, not the pictures |
 | `/btw` | `/btw <question>` asks a side question with the conversation as context; neither the question nor the answer is added to the history, and the cached start of the request is reused |
 | `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |

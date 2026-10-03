@@ -367,6 +367,8 @@ class GeminiProvider:
                             )
                         elif item.get("type") == "text":
                             parts_u.append({"text": item["text"]})
+                        elif item.get("type") == "image":
+                            parts_u.append({"inlineData": {"mimeType": item["media_type"], "data": base64.b64decode(item["data"])}})
                     contents.append({"role": "user", "parts": parts_u})
                 else:
                     contents.append({"role": "user", "parts": [{"text": str(content)}]})

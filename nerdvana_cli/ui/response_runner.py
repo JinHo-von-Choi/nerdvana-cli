@@ -98,7 +98,7 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
 
         app._agent_loop._on_thinking_chunk = _on_thinking_chunk
 
-        async for chunk in app._agent_loop.run(prompt):
+        async for chunk in app._agent_loop.run(prompt, app.take_pending_images()):
             if chunk.startswith(CONTEXT_USAGE_PREFIX):
                 pct = int(chunk[len(CONTEXT_USAGE_PREFIX):])
                 app._update_context_usage(pct)

@@ -77,6 +77,17 @@ def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:
     return finish_reason or "end_turn"
 
 
+def _content_parts(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Text and image blocks as chat-completions content parts (images as data URLs)."""
+    parts: list[dict[str, Any]] = []
+    for block in blocks:
+        if block.get("type") == "image":
+            parts.append({"type": "image_url", "image_url": {"url": f"data:{block['media_type']};base64,{block['data']}"}})
+        elif block.get("type") == "text":
+            parts.append({"type": "text", "text": block.get("text", "")})
+    return parts
+
+
 def _collect_tool_call(tc: Any, slots: list[dict[str, str]], slot_by_index: dict[int | None, dict[str, str]]) -> None:
     """Fold one streamed tool call delta into its slot.
 
@@ -370,6 +381,10 @@ class OpenAIProvider:
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
+
+            if role == "user" and isinstance(content, list) and any(b.get("type") == "image" for b in content if isinstance(b, dict)):
+                api_messages.append({"role": "user", "content": _content_parts(content)})
+                continue
 
             # Ensure content is a safe string
             if not isinstance(content, str):

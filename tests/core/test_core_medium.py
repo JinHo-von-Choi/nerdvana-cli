@@ -75,7 +75,7 @@ class _HangingLoop:
         self._on_thinking_chunk: Any = None
         self.started             = asyncio.Event()
 
-    async def run(self, prompt: str) -> Any:
+    async def run(self, prompt: str, images: Any = None) -> Any:
         for chunk in self._chunks:
             yield chunk
         self.started.set()
@@ -116,6 +116,9 @@ class _FakeApp:
         return True
 
     def _wake_for_background(self) -> None:
+        return None
+
+    def take_pending_images(self) -> None:
         return None
 
     def _drain_queued_input(self) -> None:

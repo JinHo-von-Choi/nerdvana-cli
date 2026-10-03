@@ -31,6 +31,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
     from nerdvana_cli.commands import (
         btw_command,
         goal_command,
+        image_command,
         memory_commands,
         model_commands,
         observability_commands,
@@ -63,6 +64,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         "/health":          observability_commands.handle_health,
         "/dashboard":       observability_commands.handle_dashboard,
         "/btw":             btw_command.handle_btw,
+        "/image":           image_command.handle_image,
         "/goal":            goal_command.handle_goal,
         "/thinking":        system_commands.handle_thinking,
         "/activity":        system_commands.handle_activity,
