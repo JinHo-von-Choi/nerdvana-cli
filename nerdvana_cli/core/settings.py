@@ -141,7 +141,8 @@ class ParismConfig(BaseModel):
 class HookConfig(BaseModel):
     # Project-local hooks (<cwd>/.nerdvana/hooks/*.py) execute code carried
     # by the repository, so they stay off until the user opts in and
-    # approves each file's digest. See core.user_hooks.
+    # approves each file's digest. Project skills (<cwd>/.agents/skills,
+    # <cwd>/.nerdvana/skills) are gated the same way. See core.user_hooks.
     allow_project_hooks: bool = False
 
 
@@ -250,8 +251,9 @@ def _build_section(
 
 
 class SkillsConfig(BaseModel):
-    # Also scan ~/.claude/skills and <cwd>/.claude/skills, one tier below
-    # the matching nerdvana skill directories. See core.skills.
+    # Also scan ~/.claude/skills and <cwd>/.claude/skills, one tier below the
+    # matching .agents and nerdvana skill directories. Skills under <cwd> load
+    # only for a trusted project. See core.skills.
     include_claude_skills: bool = False
 
 

@@ -2,6 +2,7 @@
 name: compress-context
 description: Compress conversation context into a concise handoff summary
 trigger: /compress-context
+disable-model-invocation: true
 ---
 
 CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.

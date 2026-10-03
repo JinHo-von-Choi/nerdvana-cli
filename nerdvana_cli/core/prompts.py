@@ -43,6 +43,7 @@ def build_system_prompt(
         _active_tool_augment_section() if active_tool_mode else None,
         _using_tools_section(tools),
         _deferred_tools_section(deferred_tools or []),
+        _skills_section(tools),
         _parism_section() if parism_active else None,
         _tone_and_style_section(),
         _output_efficiency_section(),
@@ -193,6 +194,21 @@ def _deferred_tools_section(lines: list[str]) -> str:
         "",
         "These tools are not declared in this request. Call ToolSearch with 'select:<name>' (or keywords) to load "
         "one, then call it from your next step on.",
+        *lines,
+    ])
+
+
+def _skills_section(tools: list[Any] | None) -> str:
+    """The skill catalog (name and description per skill), or nothing when no skill can be activated."""
+    activate = next((t for t in tools or [] if getattr(t, "name", "") == "ActivateSkill"), None)
+    lines    = activate.catalog_lines() if activate is not None else []
+    if not lines:
+        return ""
+    return "\n".join([
+        "# Skills",
+        "",
+        "Skills hold specialized instructions for specific tasks. When a task matches a skill's description, call "
+        "ActivateSkill with its name to load the full instructions before you proceed.",
         *lines,
     ])
 

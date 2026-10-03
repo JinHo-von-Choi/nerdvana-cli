@@ -281,11 +281,13 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_TOOL, self._dir_rules.handle)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
         self._command_hooks   = load_command_hooks(self.hooks, settings)
-        self.skill_loader = SkillLoader(
-            project_dir=settings.cwd,
-            include_claude_skills=settings.skills.include_claude_skills,
-        )
-        self.skill_loader.load_all()
+        from nerdvana_cli.tools.skill_tool import ActivateSkillTool
+        shared_skills = registry.get(ActivateSkillTool.name)
+        if isinstance(shared_skills, ActivateSkillTool):
+            self.skill_loader = shared_skills.loader
+        else:
+            self.skill_loader = SkillLoader.from_settings(settings)
+            self.skill_loader.load_all()
         self._active_skill: str | None = None
         self._role_prompt = role_prompt
         self._reminder    = ContextReminder(cwd=settings.cwd or ".", max_recent=5)
@@ -675,6 +677,7 @@ class AgentLoop:
         self._turn_marks.clear()
         self._dir_rules.reset()
         self._context_budget.reset()
+        self.skill_loader.reset_activations()
 
     def _prepare_tools(self) -> list[Any]:
         """The tools this run may use, with MCP tools deferred behind ToolSearch when their declarations are large.
