@@ -403,7 +403,7 @@ class AnthropicProvider:
                 }])
             elif role == "assistant":
                 # Thinking blocks go back first and unchanged, as the API requires.
-                blocks: list[dict[str, Any]] = [dict(b) for b in msg.get("provider_blocks") or []]
+                blocks: list[dict[str, Any]] = [dict(b) for b in msg.get("provider_blocks") or [] if b.get("type") in ("thinking", "redacted_thinking")]
                 if isinstance(content, str) and content.strip() and not (content == "[tool execution]" and msg.get("tool_uses")):
                     blocks.append({"type": "text", "text": content})
                 for tool_use in msg.get("tool_uses") or []:

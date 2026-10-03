@@ -20,6 +20,7 @@ from nerdvana_cli.providers.base import (
 )
 from nerdvana_cli.providers.gemini_provider import GeminiProvider
 from nerdvana_cli.providers.openai_provider import OpenAIProvider
+from nerdvana_cli.providers.openai_responses import OpenAIResponsesProvider, uses_responses
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,19 @@ def provider_class_for(
     return _PROVIDER_CLASSES.get(provider)
 
 
+def _select_class(config: ProviderConfig) -> type[AnthropicProvider] | type[OpenAIProvider] | type[GeminiProvider]:
+    """The adapter class for *config*: the registered one, or the OpenAI Responses variant when it selects that API."""
+    provider_cls = _PROVIDER_CLASSES.get(config.provider)
+    if provider_cls is None:
+        logger.warning(
+            "Provider %s is not registered in _PROVIDER_CLASSES; using OpenAIProvider", config.provider.value
+        )
+        provider_cls = OpenAIProvider
+    if provider_cls is OpenAIProvider and uses_responses(config):
+        return OpenAIResponsesProvider
+    return provider_cls
+
+
 def resolve_api_key(provider: ProviderName) -> str:
     """Resolve API key from environment variables."""
     env_vars = PROVIDER_KEY_ENVVARS.get(provider, [])
@@ -79,6 +93,7 @@ def create_provider(
     thinking_budget: int = 8192,
     show_thinking: bool = True,
     reasoning_effort: str = "",
+    openai_api: str = "auto",
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
@@ -115,15 +130,10 @@ def create_provider(
         thinking_budget=thinking_budget,
         show_thinking=show_thinking,
         reasoning_effort=reasoning_effort,
+        openai_api=openai_api,
     )
 
-    provider_cls = _PROVIDER_CLASSES.get(provider)
-    if provider_cls is None:
-        logger.warning(
-            "Provider %s is not registered in _PROVIDER_CLASSES; using OpenAIProvider", provider.value
-        )
-        provider_cls = OpenAIProvider
-    return provider_cls(config)
+    return _select_class(config)(config)
 
 
 def print_providers_table() -> None:

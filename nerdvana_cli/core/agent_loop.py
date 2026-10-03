@@ -536,7 +536,7 @@ class AgentLoop:
             prompt_caching=self.settings.model.prompt_caching,
             extended_thinking=self.settings.model.extended_thinking,
             thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking,
-            reasoning_effort=self.settings.model.reasoning_effort)
+            reasoning_effort=self.settings.model.reasoning_effort, openai_api=self.settings.model.openai_api)
 
     def _reset_run_counters(self) -> None:
         """Zero the stop status, the typed-ahead queue and the session's usage totals."""

@@ -99,6 +99,9 @@ class ProviderConfig:
     thinking_budget: int = 8192
     show_thinking: bool = True
     reasoning_effort: str = ""
+    # Which OpenAI API the OpenAI-compatible adapter speaks: ``auto`` (Responses on OpenAI's own
+    # endpoint, Chat Completions elsewhere), ``chat`` or ``responses``.
+    openai_api: str = "auto"
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
