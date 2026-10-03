@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.commands import doctor_command as dc
+from nerdvana_cli.commands import doctor_mcp
 
 
 @pytest.fixture(autouse=True)
@@ -114,17 +115,17 @@ class TestFallbackModels:
 
 class TestMcpConfig:
     def test_skip_without_files(self) -> None:
-        assert dc._check_mcp_config().status == "skip"
+        assert doctor_mcp._check_mcp_config().status == "skip"
 
     def test_ok_for_existing_stdio_command(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(dc.shutil, "which", lambda cmd: f"/bin/{cmd}")
         _mcp(tmp_path, {"a": {"command": "npx", "args": ["-y", "pkg"]}})
-        assert dc._check_mcp_config().status == "ok"
+        assert doctor_mcp._check_mcp_config().status == "ok"
 
     def test_warn_for_missing_command(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(dc.shutil, "which", lambda cmd: None)
         _mcp(tmp_path, {"a": {"command": "ghost-bin"}})
-        r = dc._check_mcp_config()
+        r = doctor_mcp._check_mcp_config()
         assert r.status == "warn"
         assert "ghost-bin" in r.detail
 
@@ -134,13 +135,13 @@ class TestMcpConfig:
         def _boom(*_a: object, **_k: object) -> int:
             raise AssertionError("network used")
 
-        monkeypatch.setattr(dc, "_ping_http", _boom)
+        monkeypatch.setattr(doctor_mcp, "_ping_http", _boom)
         _mcp(tmp_path, {"web": {"type": "http", "url": "https://example.invalid/mcp"}})
-        assert dc._check_mcp_config().status == "ok"
+        assert doctor_mcp._check_mcp_config().status == "ok"
 
     def test_fail_on_invalid_json(self, tmp_path: Path) -> None:
         (tmp_path / ".mcp.json").write_text("{not json", encoding="utf-8")
-        r = dc._check_mcp_config()
+        r = doctor_mcp._check_mcp_config()
         assert r.status == "fail"
         assert ".mcp.json" in r.detail
 
@@ -149,7 +150,7 @@ class TestMcpConfig:
             tmp_path,
             {"a": "oops", "b": {"type": "carrier-pigeon"}, "c": {"type": "sse"}, "d": {"command": "x", "args": "y"}},
         )
-        r = dc._check_mcp_config()
+        r = doctor_mcp._check_mcp_config()
         assert r.status == "fail"
         for name in ("a:", "b:", "c:", "d:"):
             assert name in r.detail
@@ -158,7 +159,7 @@ class TestMcpConfig:
         data = tmp_path / "data"
         data.mkdir()
         (data / "mcp.json").write_text(json.dumps({"mcpServers": []}), encoding="utf-8")
-        assert dc._check_mcp_config().status == "fail"
+        assert doctor_mcp._check_mcp_config().status == "fail"
 
 
 class TestStrictSemantics:
@@ -167,7 +168,7 @@ class TestStrictSemantics:
             dc._check_config_warnings,
             dc._check_model_resolution,
             dc._check_fallback_models,
-            dc._check_mcp_config,
+            doctor_mcp._check_mcp_config,
         ):
             assert fn in dc._ALL_CHECKS
 

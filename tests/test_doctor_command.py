@@ -259,13 +259,13 @@ class TestCheckLspServers:
 
 class TestCheckMcpServers:
     def test_skip_when_no_config(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_mcp_servers
+        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
         with patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={}):
             r = _check_mcp_servers()
         assert r.status == "skip"
 
     def test_ok_for_stdio_with_existing_command(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_mcp_servers
+        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="test", transport="stdio", command="python3")
@@ -278,7 +278,7 @@ class TestCheckMcpServers:
         assert r.status == "ok"
 
     def test_warn_for_stdio_with_missing_command(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_mcp_servers
+        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="test", transport="stdio", command="nonexistent-tool")
@@ -291,26 +291,26 @@ class TestCheckMcpServers:
         assert r.status == "warn"
 
     def test_ok_for_http_200(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_mcp_servers
+        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="remote", transport="http", url="http://localhost:10830")
         with (
             patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={"remote": cfg}),
-            patch("nerdvana_cli.commands.doctor_command._ping_http", return_value=200),
+            patch("nerdvana_cli.commands.doctor_mcp._ping_http", return_value=200),
         ):
             r = _check_mcp_servers()
 
         assert r.status == "ok"
 
     def test_warn_for_http_unreachable(self) -> None:
-        from nerdvana_cli.commands.doctor_command import _check_mcp_servers
+        from nerdvana_cli.commands.doctor_mcp import _check_mcp_servers
         from nerdvana_cli.mcp.config import McpServerConfig
 
         cfg = McpServerConfig(name="dead", transport="http", url="http://localhost:19999")
         with (
             patch("nerdvana_cli.mcp.config.load_mcp_config", return_value={"dead": cfg}),
-            patch("nerdvana_cli.commands.doctor_command._ping_http", return_value=-1),
+            patch("nerdvana_cli.commands.doctor_mcp._ping_http", return_value=-1),
         ):
             r = _check_mcp_servers()
 
