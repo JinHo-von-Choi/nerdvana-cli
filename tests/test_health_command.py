@@ -101,9 +101,10 @@ class TestHandleHealth:
         assert "30d" in messages[0] or "Health" in messages[0]
 
     @pytest.mark.asyncio
-    async def test_no_data(self) -> None:
+    async def test_no_data(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from nerdvana_cli.commands.observability_commands import handle_health
 
+        monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path))
         messages: list[str] = []
         app = _make_app(messages)
         await handle_health(app, "")
