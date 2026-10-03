@@ -361,6 +361,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/image` | `/image <경로> [<경로> ...] <질문>` 은 앞쪽의 이미지 파일을 첨부해 질문합니다. 기록에는 그림이 아니라 파일 이름만 남습니다 |
 | `/history` | `/history <검색어> [--since 7d] [--cwd DIR]` 로 과거 세션 기록을 검색합니다 |
 | `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
+| `/steer` | `/steer <텍스트>` 는 진행 중인 단계(모델 응답이나 실행 중인 도구)를 멈추고 그 텍스트로 다음 단계를 시작합니다. Ctrl+T 는 입력창의 내용을 같은 방식으로 보냅니다 ([docs/background.md](docs/background.md) 참조) |
 | `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/policy` | 적용 중인 관리형 정책 파일과 각 항목이 한 일을 표시합니다 ([docs/managed-policy.md](docs/managed-policy.md)) |
 | `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |

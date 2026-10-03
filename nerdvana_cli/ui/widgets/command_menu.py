@@ -32,6 +32,7 @@ SLASH_COMMANDS = [
     ("/goal", "Hold the agent to a verification command"),
     ("/history", "Search past session transcripts"),
     ("/btw", "Ask a side question; the conversation is left as it is"),
+    ("/steer", "Interrupt the step in progress and give the agent new instructions"),
     ("/image", "Send a prompt with an image attached"),
     ("/thinking", "Toggle inline thinking display (on/off)"),
     ("/activity", "Toggle activity indicator (on/off)"),

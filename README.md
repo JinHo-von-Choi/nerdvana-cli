@@ -383,6 +383,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/image` | `/image <path> [<path> ...] <question>` sends a prompt with the image files at the start attached; the transcript keeps the file names, not the pictures |
 | `/history` | `/history <query> [--since 7d] [--cwd DIR]` searches past session transcripts |
 | `/btw` | `/btw <question>` asks a side question with the conversation as context; neither the question nor the answer is added to the history, and the cached start of the request is reused |
+| `/steer` | `/steer <text>` interrupts the step in progress (the model's response or the running tools) and starts the next one with the text; Ctrl+T sends what is typed the same way; see [docs/background.md](docs/background.md) |
 | `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/policy` | Show the managed policy files that apply and what each control did (see [docs/managed-policy.md](docs/managed-policy.md)) |
 | `/thinking` | Toggle inline thinking display (on/off, persists to config.yml) |

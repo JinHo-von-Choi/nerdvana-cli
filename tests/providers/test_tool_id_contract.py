@@ -368,6 +368,7 @@ class RecordingSession:
 class TestSessionLogToolName:
     async def test_session_log_names_the_executed_tool(self):
         from nerdvana_cli.core.agent_loop import AgentLoop
+        from nerdvana_cli.core.input_queue import InputQueue
         from nerdvana_cli.types import SessionState, ToolResult
 
         first  = make_tool_use_id(TOOL_NAME)
@@ -389,7 +390,7 @@ class TestSessionLogToolName:
                 return []
 
         session = RecordingSession()
-        loop = SimpleNamespace(session=session, tool_executor=Executor(), state=SessionState())
+        loop = SimpleNamespace(session=session, tool_executor=Executor(), state=SessionState(), input_queue=InputQueue())
 
         markers = [m async for m in AgentLoop._handle_tool_use_stop(loop, "", tool_uses, None)]
 
