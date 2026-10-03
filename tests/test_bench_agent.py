@@ -248,3 +248,13 @@ def test_the_gate_flag_passes_the_tasks_verify_command_to_the_agent() -> None:
     gated = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=True, model="", provider=""))
     assert "--verify" not in plain
     assert gated[gated.index("--verify") + 1] == "python check.py"
+
+
+def test_token_totals_are_summed_from_each_attempts_usage() -> None:
+    attempts = [
+        bench.Attempt("a", 1, True,  usage={"input_tokens": 1000, "output_tokens": 50, "cache_read_tokens": 800}),
+        bench.Attempt("a", 2, False, usage={"input_tokens": 500, "output_tokens": 20}),
+    ]
+    summary = bench.summarize(attempts, 2)
+    assert summary["tokens"] == {"input_tokens": 1500, "output_tokens": 70, "cache_read_tokens": 800, "cache_write_tokens": 0}
+    assert "1,500 in (800 from cache)" in bench.render(summary)

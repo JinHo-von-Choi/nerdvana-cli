@@ -86,6 +86,7 @@ class Attempt:
     duration_s:   float = 0.0
     error:        str   = ""
     signals:      dict[str, int] = field(default_factory=dict)
+    usage:        dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +203,7 @@ def summarize(attempts: list[Attempt], k: int, tags: dict[str, tuple[str, ...]] 
         "signals_in_failed_attempts": dict(sorted(failed_signals.items())),
         "signals_in_passed_attempts": dict(sorted(passed_signals.items())),
         "stop_reasons":               dict(sorted(Counter(a.stop or "none" for a in attempts if not a.passed).items())),
+        "tokens":                     {key: sum(a.usage.get(key, 0) for a in attempts) for key in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")},
         "mean_pass_at_1_ci":   [low, high],
         "by_tag":              {tag: {"tasks": len(rates), "mean_pass_at_1": sum(rates) / len(rates)} for tag, rates in sorted(by_tag.items())},
         "k":                   k,
@@ -235,6 +237,9 @@ def render(summary: dict[str, Any]) -> str:
         names = sorted(set(summary["signals_in_failed_attempts"]) | set(summary["signals_in_passed_attempts"]))
         lines += ["", f"{'signal (count over attempts)':<30} {'in failed':>9} {'in passed':>9}"]
         lines += [f"  {name:<28} {summary['signals_in_failed_attempts'].get(name, 0):>9} {summary['signals_in_passed_attempts'].get(name, 0):>9}" for name in names]
+    tokens = summary["tokens"]
+    if tokens["input_tokens"]:
+        lines += ["", f"tokens: {tokens['input_tokens']:,} in ({tokens['cache_read_tokens']:,} from cache), {tokens['output_tokens']:,} out"]
     per_solved = summary["cost_per_solved_task"]
     lines.append("")
     lines.append(
@@ -334,6 +339,7 @@ def run_attempt(task: Task, number: int, options: argparse.Namespace, root: Path
         result.turns     = int(report.get("num_turns", 0) or 0)
         result.cost_usd  = float(report.get("total_cost_usd", 0.0) or 0.0)
         result.signals   = {str(k): int(v) for k, v in (report.get("signals") or {}).items()}
+        result.usage     = {str(k): int(v) for k, v in (report.get("usage") or {}).items()}
         if not report:
             result.error = f"no result object in the output (exit {agent.returncode}): {agent.stderr.strip()[-300:]}"
         elif report.get("is_error"):
