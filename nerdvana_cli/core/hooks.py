@@ -19,6 +19,12 @@ class HookEvent(StrEnum):
     AFTER_TOOL = "after_tool"
     BEFORE_API_CALL = "before_api_call"
     AFTER_API_CALL = "after_api_call"
+    PERMISSION_DENIED = "permission_denied"
+    PRE_COMPACT = "pre_compact"
+    POST_COMPACT = "post_compact"
+    PRE_MODEL_SWITCH = "pre_model_switch"
+    POST_MODEL_SWITCH = "post_model_switch"
+    INSTRUCTIONS_LOADED = "instructions_loaded"
 
 
 @dataclass
@@ -40,8 +46,9 @@ class HookResult:
     """Result from a hook handler.
 
     Fields:
-        allow: If False, block the associated action.
-        message: Message to display to the user.
+        allow: If False, block the associated action (a tool call, or a PRE_COMPACT compaction).
+        message: Message to display to the user. For PERMISSION_DENIED it is a retry hint appended
+            to the refusal text; for a block it is the reason.
         inject_messages: List of dicts to insert into the conversation stream.
             Must follow standard message format (role="user"/"assistant"/etc.).
             For sticky information that belongs in the system_prompt, use
@@ -81,6 +88,11 @@ class HookEngine:
             except Exception as e:
                 logger.warning("Hook handler %s failed: %s", handler.__name__, e)
         return results
+
+    def emit(self, event: HookEvent, settings: Any = None, tool_name: str = "", tool_input: dict[str, Any] | None = None, **extra: Any) -> list[HookResult]:
+        """Fire *event* with *extra* as the context's ``extra`` payload; returns what the handlers answered."""
+        context = HookContext(event=event, settings=settings, tool_name=tool_name, tool_input=tool_input or {}, extra=extra)
+        return self.fire(context)
 
     def has_handlers(self, event: HookEvent) -> bool:
         return bool(self._handlers.get(event))

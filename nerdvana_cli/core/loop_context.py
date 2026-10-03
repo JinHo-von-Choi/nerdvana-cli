@@ -11,6 +11,7 @@ from typing import Any
 
 from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
+from nerdvana_cli.core.nirnamd import load_nirna_files
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.todos import describe, load_todos, open_items
 from nerdvana_cli.types import Message, Role
@@ -70,6 +71,8 @@ async def session_start_context(settings: NerdvanaSettings, hooks: HookEngine, t
             parts.append(snapshot)
     except Exception as exc:  # noqa: BLE001
         logger.debug("context snapshot skipped: %s", exc)
+    documents = [{"path": doc.path, "type": doc.type, "chars": len(doc.content)} for doc in load_nirna_files(cwd=settings.cwd or ".")]
+    hooks.emit(HookEvent.INSTRUCTIONS_LOADED, settings, files=documents)
     for result in hooks.fire(HookContext(event=HookEvent.SESSION_START, settings=settings, tools=tools)):
         if result.system_prompt_append:
             parts.append(result.system_prompt_append)

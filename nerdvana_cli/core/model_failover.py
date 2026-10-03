@@ -7,11 +7,13 @@ Date:   2026-10-03
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import signals
+from nerdvana_cli.core.hooks import HookEvent
 from nerdvana_cli.core.loop_hooks import hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopTurn
 from nerdvana_cli.core.provider_recovery import (
@@ -67,12 +69,34 @@ class ModelFailover:
         config.model       = model
         self._loop.provider = self._loop.create_provider_from_settings()
 
+    @contextlib.contextmanager
+    def _announced(self, reason: str, provider: str | None, model: str) -> Iterator[None]:
+        """Run a switch to *model* between its PRE_MODEL_SWITCH and POST_MODEL_SWITCH hooks."""
+        config  = self._loop.settings.model
+        current = (config.provider, config.model)
+        target  = (provider or config.provider, model)
+        self._emit(HookEvent.PRE_MODEL_SWITCH, current, target, reason)
+        yield
+        self._emit(HookEvent.POST_MODEL_SWITCH, current, target, reason)
+
+    def _emit(self, event: HookEvent, current: tuple[str, str], target: tuple[str, str], reason: str) -> None:
+        """Tell hooks the model is about to change (or has changed) from *current* to *target*."""
+        loop = self._loop
+        loop.hooks.emit(event, loop.settings, from_provider=current[0], from_model=current[1], to_provider=target[0], to_model=target[1], reason=reason)
+
     def restore_model(self, saved: ModelState) -> None:
         """After a prompt, go back to the model it started on, or to the one the session escalated to."""
-        config = self._loop.settings.model
-        config.provider, config.model, config.api_key, config.base_url = self._escalated_to or saved
+        config  = self._loop.settings.model
+        target  = self._escalated_to or saved
+        current = (config.provider, config.model)
+        changed = current != (target[0], target[1])
+        if changed:
+            self._emit(HookEvent.PRE_MODEL_SWITCH, current, (target[0], target[1]), "restore")
+        config.provider, config.model, config.api_key, config.base_url = target
         self._escalated_to  = None
         self._loop.provider = self._loop.create_provider_from_settings()
+        if changed:
+            self._emit(HookEvent.POST_MODEL_SWITCH, current, (target[0], target[1]), "restore")
 
     def maybe_escalate(self) -> str:
         """Switch to ``session.escalation_model`` once, when the run's signals reach their thresholds.
@@ -93,7 +117,8 @@ class ModelFailover:
             logger.warning("escalation to %s skipped: no credential for provider %s", session.escalation_model, provider)
             return ""
         loop._signals[signals.ESCALATED] += 1
-        self.switch_model(provider, model)
+        with self._announced("escalation", provider, model):
+            self.switch_model(provider, model)
         self._escalated_to = self.model_state()
         for message in loop.state.messages:
             message.provider_blocks = []
@@ -137,7 +162,8 @@ class ModelFailover:
             return
         if action.kind == FALLBACK:
             loop._signals[signals.PROVIDER_FALLBACK] += 1
-            self.switch_model(action.provider, action.model)
+            with self._announced("fallback", action.provider, action.model):
+                self.switch_model(action.provider, action.model)
             yield f"\n[dim yellow][Fallback: {loop.settings.model.provider}:{action.model}][/dim yellow]\n"
             return
         loop.last_stop = "provider_error"

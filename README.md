@@ -151,13 +151,13 @@ nerdvana providers
 
 ```yaml
 hooks:
-  - event: before_tool        # before_tool, after_tool, session_start or session_end
-    match: "Bash"             # tool name glob (before_tool and after_tool), default "*"
+  - event: before_tool        # before_tool, after_tool, session_start, session_end, permission_denied, pre_compact, post_compact, pre_model_switch, post_model_switch or instructions_loaded
+    match: "Bash"             # tool name glob (before_tool, after_tool and permission_denied), default "*"
     command: "scripts/check-command.sh"
     timeout: 5                # seconds, 1 to 30
 ```
 
-The command runs in the project directory and receives one JSON object on stdin (`event`, `tool_name`, `tool_input`, `cwd`, and `tool_result` for `after_tool`); `NERDVANA_HOOK_EVENT` and `NERDVANA_TOOL_NAME` are set. Exit code `0` carries on. Exit code `2` blocks a `before_tool` call and tells the model the command's output, or passes an `after_tool` command's output to the model as a message. Any other exit code, a timeout, or a command that cannot start is logged and ignored, so a broken hook never stops the agent. The agent waits for a hook while it runs, so keep them fast.
+The command runs in the project directory and receives one JSON object on stdin (`event`, `tool_name`, `tool_input`, `cwd`, `tool_result` for `after_tool` and `details` for the events that are not about a tool); `NERDVANA_HOOK_EVENT` and `NERDVANA_TOOL_NAME` are set. Exit code `0` carries on. Exit code `2` blocks a `before_tool` call and tells the model the command's output, passes an `after_tool` command's output to the model as a message, appends a `permission_denied` command's output to the refusal as a retry hint, or cancels a `pre_compact` compaction. The events and their payload are in [docs/hooks.md](docs/hooks.md). Any other exit code, a timeout, or a command that cannot start is logged and ignored, so a broken hook never stops the agent. The agent waits for a hook while it runs, so keep them fast.
 
 A project `hooks.yml` runs shell commands that come with the repository, so it follows the rules of project Python hooks: it needs `hooks.allow_project_hooks: true` and an approved digest (`nerdvana hook trust <path>`), and editing the file revokes the approval.
 
