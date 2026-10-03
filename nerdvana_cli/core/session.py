@@ -18,12 +18,14 @@ _TRANSCRIPT_RESULT_CAP = 500
 _SESSION_ID_RE         = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
-def resume_session_id() -> str | None:
-    """Session id requested through ``NERDVANA_RESUME``, or None.
+def resume_session_id(requested: str | None = None) -> str | None:
+    """Session id to resume, or None.
 
-    Values that could escape the sessions directory are ignored.
+    *requested* is the id handed over by the caller; without it the
+    ``NERDVANA_RESUME`` environment variable is read. Values that could escape
+    the sessions directory are ignored.
     """
-    raw = os.environ.get("NERDVANA_RESUME", "").strip()
+    raw = (os.environ.get("NERDVANA_RESUME", "") if requested is None else requested).strip()
     if not raw or raw in {".", ".."} or not _SESSION_ID_RE.match(raw):
         return None
     return raw

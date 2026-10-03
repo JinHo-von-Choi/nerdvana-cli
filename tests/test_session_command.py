@@ -180,3 +180,38 @@ class TestSessionPurge:
     def test_no_sessions_no_crash(self, tmp_path: Path) -> None:
         result = self._run(["session", "purge"], str(tmp_path))
         assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# CLI integration: session resume
+# ---------------------------------------------------------------------------
+
+class TestSessionResume:
+    def test_resume_hands_the_id_to_the_repl_without_the_environment(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import os
+
+        from nerdvana_cli.main import app
+        _make_session(tmp_path / "sessions", "abc123", [{"role": "user", "content": "x"}])
+        monkeypatch.delenv("NERDVANA_RESUME", raising=False)
+        calls: list[dict[str, object]] = []
+
+        async def fake_repl(**kwargs: object) -> None:
+            calls.append(kwargs)
+
+        monkeypatch.setattr("nerdvana_cli.cli.runtime.repl_loop", fake_repl)
+        result = CliRunner().invoke(app, ["session", "resume", "abc123"], env={"NERDVANA_DATA_HOME": str(tmp_path)})
+        assert result.exit_code == 0, result.output
+        assert calls == [{"resume_id": "abc123"}]
+        assert "NERDVANA_RESUME" not in os.environ
+
+    def test_the_tui_keeps_the_id_it_is_given(self) -> None:
+        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.ui.app import NerdvanaApp
+        assert NerdvanaApp(settings=NerdvanaSettings(), resume_id="abc123")._resume_id == "abc123"
+
+    def test_unknown_session_exits_with_an_error(self, tmp_path: Path) -> None:
+        from nerdvana_cli.main import app
+        result = CliRunner().invoke(app, ["session", "resume", "nope"], env={"NERDVANA_DATA_HOME": str(tmp_path)})
+        assert result.exit_code == 1

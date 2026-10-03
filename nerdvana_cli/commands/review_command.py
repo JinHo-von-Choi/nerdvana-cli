@@ -55,10 +55,10 @@ def render_findings(findings: list[dict[str, Any]]) -> str:
 async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     """Run the read-only code-reviewer agent on *prompt* and return its answer."""
     from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
+    from nerdvana_cli.cli.runtime import resolve_run_provider
     from nerdvana_cli.core.model_routing import apply_model_spec, select_model
     from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
-    from nerdvana_cli.main import _resolve_run_provider
     from nerdvana_cli.tools.registry import create_subagent_registry
 
     settings     = NerdvanaSettings.load()
@@ -69,7 +69,7 @@ async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
         settings.model.model = model
     else:
         apply_model_spec(settings, select_model("", "review", "", "", settings.agents.categories))
-    name, key_missing = _resolve_run_provider(settings)
+    name, key_missing = resolve_run_provider(settings)
     if key_missing:
         raise ReviewError(f"No API key found for {name}.")
     definition = next(d for d in BUILTIN_AGENTS if d.agent_type == "code-reviewer")

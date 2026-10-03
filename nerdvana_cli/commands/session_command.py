@@ -12,7 +12,6 @@ Date:   2026-04-29
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -148,20 +147,19 @@ def session_list(
 
 @session_app.command("resume")
 def session_resume(session_id: str = typer.Argument(..., help="Session ID to resume.")) -> None:
-    """Resume a session by setting NERDVANA_RESUME and launching the REPL."""
+    """Resume a session by launching the REPL on its transcript."""
     sessions_dir = _sessions_dir()
     target       = sessions_dir / f"{session_id}.jsonl"
     if not target.exists():
         console.print(f"[red]Session '{session_id}' not found.[/red]")
         raise typer.Exit(1)
 
-    os.environ["NERDVANA_RESUME"] = session_id
     console.print(f"[dim]Resuming session {session_id}…[/dim]")
     import asyncio
 
-    from nerdvana_cli.main import repl_loop
+    from nerdvana_cli.cli.runtime import repl_loop
 
-    asyncio.run(repl_loop())
+    asyncio.run(repl_loop(resume_id=session_id))
 
 
 @session_app.command("purge")

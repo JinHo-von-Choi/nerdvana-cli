@@ -24,11 +24,6 @@ KNOWN_CYCLES: frozenset[frozenset[str]] = frozenset({
         "nerdvana_cli.tools.registry",
         "nerdvana_cli.tools.swarm_tool",
     }),
-    frozenset({
-        "nerdvana_cli.commands.review_command",
-        "nerdvana_cli.commands.session_command",
-        "nerdvana_cli.main",
-    }),
 })
 
 

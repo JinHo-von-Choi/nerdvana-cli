@@ -29,7 +29,6 @@ KNOWN_LONG: dict[str, int] = {
     "core/activity_state.py:summarize_tool_call": 108,
     "server/mcp_server.py:NerdvanaMcpServer._register_write_tools": 108,
     "core/agent_loop.py:AgentLoop.__init__": 102,
-    "main.py:repl_loop": 101,
     "server/mcp_server.py:NerdvanaMcpServer._dispatch": 100,
     "commands/model_commands.py:switch_provider": 95,
     "core/settings.py:NerdvanaSettings.load": 92,

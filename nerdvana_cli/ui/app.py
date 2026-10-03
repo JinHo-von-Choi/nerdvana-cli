@@ -172,12 +172,14 @@ class NerdvanaApp(App[object]):
         settings: NerdvanaSettings,
         parism_client: Any = None,
         mcp_manager: Any = None,
+        resume_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.settings       = settings
         self.parism_client  = parism_client
         self.mcp_manager    = mcp_manager
+        self._resume_id     = resume_id
         self._agent_loop: AgentLoop | None = None
         self._is_generating = False
         self._confirm_lock  = asyncio.Lock()
@@ -277,15 +279,13 @@ class NerdvanaApp(App[object]):
 
     def on_mount(self) -> None:
         """Initialize agent loop and display welcome."""
-
-        mcp_tools     = self.mcp_manager.get_all_tools() if self.mcp_manager else []
         registry      = create_tool_registry(
             parism_client = self.parism_client,
-            mcp_tools     = mcp_tools,
+            mcp_tools     = self.mcp_manager.get_all_tools() if self.mcp_manager else [],
             settings      = self.settings,
             task_registry = self._task_registry,
         )
-        resume_id = resume_session_id()
+        resume_id = resume_session_id(self._resume_id)
         session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
 
         _on_activity_change = make_activity_change_callback(self, threading.get_ident())

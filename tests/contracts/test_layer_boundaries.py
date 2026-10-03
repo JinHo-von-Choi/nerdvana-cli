@@ -29,8 +29,6 @@ FORBIDDEN: dict[str, frozenset[str]] = {
 # (source file relative to the package root, target package)
 ALLOWED: frozenset[tuple[str, str]] = frozenset({
     ("core/agent_loop.py", "tools"),
-    ("commands/review_command.py", "main"),
-    ("commands/session_command.py", "main"),
 })
 
 
