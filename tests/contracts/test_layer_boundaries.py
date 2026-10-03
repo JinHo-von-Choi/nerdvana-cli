@@ -11,12 +11,7 @@ Date:   2026-10-03
 
 from __future__ import annotations
 
-import ast
-from pathlib import Path
-
-import nerdvana_cli
-
-ROOT = Path(nerdvana_cli.__file__).resolve().parent
+from tests.contracts.import_graph import parsed_sources, runtime_imports
 
 FORBIDDEN: dict[str, frozenset[str]] = {
     "types":     frozenset({"utils", "core", "providers", "tools", "agents", "mcp", "ui", "server", "commands", "main"}),
@@ -24,54 +19,33 @@ FORBIDDEN: dict[str, frozenset[str]] = {
     "providers": frozenset({"core", "tools", "ui", "server", "commands", "main"}),
     "core":      frozenset({"tools", "ui", "server", "commands", "main"}),
     "tools":     frozenset({"ui", "server", "commands", "main"}),
+    "mcp":       frozenset({"tools", "ui", "server", "commands", "main"}),
+    "agents":    frozenset({"tools", "ui", "server", "commands", "main"}),
+    "server":    frozenset({"ui", "commands", "main"}),
+    "ui":        frozenset({"server", "main"}),
+    "commands":  frozenset({"main"}),
 }
 
 # (source file relative to the package root, target package)
 ALLOWED: frozenset[tuple[str, str]] = frozenset({
     ("core/agent_loop.py", "tools"),
+    ("commands/review_command.py", "main"),
+    ("commands/session_command.py", "main"),
 })
-
-
-def _is_type_checking_guard(node: ast.If) -> bool:
-    test = node.test
-    if isinstance(test, ast.Name):
-        return test.id == "TYPE_CHECKING"
-    return isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
-
-
-def _runtime_imports(tree: ast.AST) -> list[tuple[int, str]]:
-    """(line, module) of every nerdvana_cli import outside TYPE_CHECKING blocks."""
-    found: list[tuple[int, str]] = []
-
-    def visit(node: ast.AST) -> None:
-        if isinstance(node, ast.If) and _is_type_checking_guard(node):
-            for child in node.orelse:
-                visit(child)
-            return
-        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            found.append((node.lineno, node.module))
-        elif isinstance(node, ast.Import):
-            found.extend((node.lineno, alias.name) for alias in node.names)
-        for child in ast.iter_child_nodes(node):
-            visit(child)
-
-    visit(tree)
-    return [(line, module) for line, module in found if module.startswith("nerdvana_cli.")]
 
 
 def _edges() -> list[tuple[str, int, str, str]]:
     """(source file, line, source package, target package) for cross-package imports."""
     edges: list[tuple[str, int, str, str]] = []
-    for path in sorted(ROOT.rglob("*.py")):
-        rel = path.relative_to(ROOT)
-        if len(rel.parts) < 2:
+    for rel, tree in parsed_sources().items():
+        parts = rel.split("/")
+        if len(parts) < 2:
             continue
-        source = rel.parts[0]
-        tree   = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for line, module in _runtime_imports(tree):
+        source = parts[0]
+        for line, module in runtime_imports(tree):
             target = module.split(".")[1]
             if target != source:
-                edges.append((rel.as_posix(), line, source, target))
+                edges.append((rel, line, source, target))
     return edges
 
 
