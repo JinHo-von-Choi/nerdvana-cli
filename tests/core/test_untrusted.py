@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.hooks import HookEngine
+from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.signals import UNTRUSTED_SOURCE
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor

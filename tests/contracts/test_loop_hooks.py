@@ -15,7 +15,7 @@ from nerdvana_cli.core.builtin_hooks import (
     ralph_loop_check,
 )
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings, SessionConfig
-from nerdvana_cli.core.hooks import HookEngine, HookEvent
+from nerdvana_cli.core.hooks.hooks import HookEngine, HookEvent
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.loop_state import LoopState
 from nerdvana_cli.core.tool import ToolRegistry

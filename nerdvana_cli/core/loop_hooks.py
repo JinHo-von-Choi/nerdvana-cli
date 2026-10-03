@@ -63,7 +63,7 @@ class LoopHookEngine:
         Returns:
             Tuple of (possibly evolved LoopState, list of messages to inject).
         """
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
+        from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
 
         stop_reason = response.get("stop_reason") if isinstance(response, dict) else getattr(response, "stop_reason", None)
         hook_ctx = HookContext(

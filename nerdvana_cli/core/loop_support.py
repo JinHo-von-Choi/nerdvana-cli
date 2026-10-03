@@ -13,7 +13,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from nerdvana_cli.core.classifier import ClassifierFeed, Completion
-from nerdvana_cli.core.hooks import HookEvent
+from nerdvana_cli.core.hooks.hooks import HookEvent
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop

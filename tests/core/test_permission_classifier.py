@@ -17,7 +17,7 @@ import pytest
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
+from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.session import SessionStorage

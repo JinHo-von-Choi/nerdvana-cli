@@ -157,8 +157,8 @@ def skill_trust(
     Approval binds to the file's current bytes; editing it revokes the approval until this is run again.
     Project skills also need hooks.allow_project_hooks set to true.
     """
+    from nerdvana_cli.core.hooks.user_hooks import trust_project_hook
     from nerdvana_cli.core.skills import SKILL_DIR_FILENAME
-    from nerdvana_cli.core.user_hooks import trust_project_hook
 
     target = path / SKILL_DIR_FILENAME if path.is_dir() else path
     if not target.is_file():

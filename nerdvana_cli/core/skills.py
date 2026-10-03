@@ -39,7 +39,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from nerdvana_cli.core.config import paths
-from nerdvana_cli.core.user_hooks import hook_digest, load_trust_record, project_hooks_enabled
+from nerdvana_cli.core.hooks.user_hooks import hook_digest, load_trust_record, project_hooks_enabled
 
 logger = logging.getLogger(__name__)
 
