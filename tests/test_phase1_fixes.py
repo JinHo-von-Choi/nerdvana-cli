@@ -20,6 +20,7 @@ from nerdvana_cli.core.agent_loop import (
     AgentLoop,
 )
 from nerdvana_cli.core.settings import (
+    AdvisorConfig,
     ModelConfig,
     NerdvanaSettings,
     SandboxConfig,
@@ -51,6 +52,7 @@ def _make_settings(**overrides) -> NerdvanaSettings:
     settings.skills = SkillsConfig()
     settings.sandbox = SandboxConfig()
     settings.secrets = SecretsConfig()
+    settings.advisor = AdvisorConfig()
     settings.cwd = "/tmp"
     settings.verbose = False
     return settings

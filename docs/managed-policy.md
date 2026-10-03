@@ -67,8 +67,8 @@ files never decides a result:
   message that names the file and the key that refused it.
 - `/model` and `/provider` in the REPL refuse a model outside the policy and say why.
   The model a sub-agent asks for is refused the same way and the parent's model is used.
-- `model.fallback_models`, `session.escalation_model` and `agents.categories` entries
-  outside the policy are dropped.
+- `model.fallback_models`, `session.escalation_model`, `advisor.model` and `agents.categories`
+  entries outside the policy are dropped.
 - MCP servers outside `mcp.allowed_servers` are left out when the server list is read.
 
 ## A broken file stops the start

@@ -59,16 +59,28 @@ class RunLimits:
 
         Returns the request's estimated cost in USD.
         """
+        model = self._settings.model
+        cost  = self.record_other(model.provider, model.model, usage, origin)
+        if self._cache_watch.observe(model.model, usage, signal_summary()):
+            self._counts[signals.CACHE_MISS] += 1
+        return cost
+
+    def record_other(self, provider: str, model: str, usage: dict[str, int], origin: CallOrigin) -> float:
+        """Add a request to the totals, the ledger and the session's cost under the model that served it.
+
+        ``record`` is this for the session's own model; the advisor's requests come here directly. Returns
+        the request's estimated cost in USD.
+        """
+        self._add_tokens(usage)
+        cost = self.analytics_writer.record_api_call(provider, model, usage, origin)
+        self.cost_usd += cost
+        return cost
+
+    def _add_tokens(self, usage: dict[str, int]) -> None:
         self.input_tokens       += usage.get("input_tokens", 0)
         self.output_tokens      += usage.get("output_tokens", 0)
         self.cache_read_tokens  += usage.get("cache_read_tokens", 0)
         self.cache_write_tokens += usage.get("cache_write_tokens", 0)
-        model = self._settings.model
-        cost  = self.analytics_writer.record_api_call(model.provider, model.model, usage, origin)
-        self.cost_usd += cost
-        if self._cache_watch.observe(model.model, usage, signal_summary()):
-            self._counts[signals.CACHE_MISS] += 1
-        return cost
 
     def record_auxiliary(self, usage: dict[str, int], origin: CallOrigin, provider: str, model: str) -> float:
         """Add a request that is not the agent's own (the action classifier's) on *provider* and *model* to the totals.
@@ -93,10 +105,7 @@ class RunLimits:
 
     def absorb_subagent(self, usage: dict[str, int], signal_counts: dict[str, int]) -> None:
         """Add a finished sub-agent's token totals and signal counts to this session's own."""
-        self.input_tokens       += usage.get("input_tokens", 0)
-        self.output_tokens      += usage.get("output_tokens", 0)
-        self.cache_read_tokens  += usage.get("cache_read_tokens", 0)
-        self.cache_write_tokens += usage.get("cache_write_tokens", 0)
+        self._add_tokens(usage)
         self._counts.update(signal_counts)
 
     def total_cost_usd(self) -> float:

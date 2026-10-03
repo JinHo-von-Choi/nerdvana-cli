@@ -229,7 +229,7 @@ class ManagedPolicy:
         return allowed
 
     def _restrict_models(self, settings: NerdvanaSettings) -> dict[str, list[str]]:
-        """Drop the fallback, escalation and category models the policy refuses; returns what was dropped."""
+        """Drop the fallback, escalation, advisor and category models the policy refuses; returns what was dropped."""
         from nerdvana_cli.core.provider_recovery import parse_fallback
 
         provider = settings.model.provider
@@ -239,16 +239,20 @@ class ManagedPolicy:
             return self.model_refusal(model, other or provider) is not None
 
         escalation = settings.session.escalation_model
+        advisor    = getattr(getattr(settings, "advisor", None), "model", "")
         dropped = {
             "model.fallback_models":    [spec for spec in settings.model.fallback_models if refused(spec)],
             "agents.categories":        [name for name, spec in settings.agents.categories.items() if refused(spec)],
             "session.escalation_model": [escalation] if escalation and refused(escalation) else [],
+            "advisor.model":            [advisor] if advisor and refused(advisor) else [],
         }
         settings.model.fallback_models = [s for s in settings.model.fallback_models if s not in dropped["model.fallback_models"]]
         for name in dropped["agents.categories"]:
             del settings.agents.categories[name]
         if dropped["session.escalation_model"]:
             settings.session.escalation_model = ""
+        if dropped["advisor.model"]:
+            settings.advisor.model = ""
         return dropped
 
     def apply(self, settings: NerdvanaSettings) -> list[AppliedKey]:

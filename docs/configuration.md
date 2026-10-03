@@ -128,7 +128,7 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `subagent_budget_fraction` | float | `0.5` | With `max_cost_usd` set, each sub-agent (an `Agent` call, or one `Swarm` split between its tasks) may spend this share of what is still unspent and unpromised, stops there and returns what it has, and its spend counts against `max_cost_usd`. `0` gives sub-agents no share. See [agents.md](agents.md). |
 | `defer_tools` | string | `auto` | MCP tools whose full declaration is sent only after the model loads them with `ToolSearch`: `auto` defers them once their declarations add up to more than `defer_tools_threshold` tokens, `always` defers them whatever their size, `never` declares them all. The system prompt lists deferred tools by name with one line each. Sub-agents declare every tool. See [mcp-deferred-tools.md](mcp-deferred-tools.md). |
 | `defer_tools_threshold` | int | `3000` | Size, in estimated tokens, above which `defer_tools: auto` defers the MCP tools. |
-| `escalation_model` | string | `` | Model to switch to, once per session, when the run shows trouble: `model` for the current provider or `provider:model` (the provider's API key must be in the environment). Empty = never. Start on a cheap model (`model.model` or an agent category) and let this one take over only if it is needed. The thinking blocks of the earlier model are dropped on the switch, and providers that cache the start of a request reread it once. |
+| `escalation_model` | string | `` | Model to switch to, once per session, when the run shows trouble: `model` for the current provider or `provider:model` (the provider's API key must be in the environment). Empty = never. Start on a cheap model (`model.model` or an agent category) and let this one take over only if it is needed. The thinking blocks of the earlier model are dropped on the switch, and providers that cache the start of a request reread it once. With `advisor.on_signals` the advisor is asked first and the switch only follows if the signal keeps coming; see [advisor.md](advisor.md). |
 | `escalation_signals` | map | `verify_failed: 1`, `repeat_refused: 1`, `cas_rejected: 3`, `new_diagnostics: 4` | Signal name to the number of occurrences that triggers the escalation; the signals are the ones counted in the `signals` of a run result. |
 | `no_progress_failed_edits` | int | `3` | Tell the model once when this many edits in a row to one file all failed (a stale or wrong anchor it keeps retrying); counted as `no_progress`. `0` turns the check off. See [goals.md](goals.md). |
 | `no_progress_read_turns` | int | `12` | Tell the model once when this many turns in a row used only read-only tools, with no edit and no command run; counted as `no_progress`. `0` turns the check off. |
@@ -262,6 +262,18 @@ Servers are declared in JSON, not in `nerdvana.yml`: `~/.nerdvana/mcp.json` and 
 | `auto_verify` | bool | `false` | Without a goal, run the project's detected test command before accepting that a run which changed files is finished: `pytest -q` (a `pyproject.toml`, a `pytest.ini` or Python tests under `tests/`), `npm test` (a `test` script in `package.json`), `cargo test` (`Cargo.toml`) or `go test ./...` (`go.mod`), the first that applies whose program is installed. Nothing detected means no check. It uses `max_attempts`, `verify_timeout` and the sandbox policy like a goal. Sub-agents are not checked. See [goals.md](goals.md). |
 
 See [goals.md](goals.md).
+
+### `advisor` (AdvisorConfig)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `false` | Registers the `Advisor` tool, with which the model puts a short question to the model named by `model` at a decision point, and allows the signal-triggered consultation of `on_signals`. Only the main agent consults: sub-agents get neither. See [advisor.md](advisor.md). |
+| `model` | string | `` | The advisor's model: `model` on the current provider or `provider:model` (the provider's API key must be in the environment), the same form as `session.escalation_model`. Empty = no advisor. A model outside the managed policy is dropped like the escalation model. |
+| `max_calls` | int | `3` | Consultations per run, the tool's and the signal-triggered one together. The next one is refused with a message and the run carries on. `0` refuses every consultation. |
+| `max_context_messages` | int | `12` | How many of the most recent messages go to the advisor with the question. Each is cut short (tool output hardest) and secret-looking values are replaced before anything is sent; the whole history is never sent. |
+| `on_signals` | bool | `false` | When a signal of `session.escalation_signals` reaches its threshold, ask the advisor once per session and put its guidance in front of the model instead of switching models. If the advisor cannot answer, or a signal keeps coming after the advice, `session.escalation_model` (when set) is switched to as before. Works without an `escalation_model`. |
+
+A consultation is a request on the advisor's model: it is recorded in the ledger under the agent type `advisor`, priced for that model, and counts against `session.max_cost_usd` and `session.max_total_tokens`. The cost limit is only enforced for a model the price table knows.
 
 ### `memory` (MemoryConfig)
 
@@ -433,4 +445,11 @@ parism:
 checkpoint:
   enabled: true
   per_session_max: 50
+
+advisor:
+  enabled: false
+  model: ""
+  max_calls: 3
+  max_context_messages: 12
+  on_signals: false
 ```
