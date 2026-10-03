@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import re
 
+from nerdvana_cli.core.phase_effort import PLANNING, phase_level
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
 
@@ -31,12 +32,14 @@ async def plan_for(prompt: str, settings: NerdvanaSettings, factories: LoopFacto
 
 
 async def draft_plan(prompt: str, settings: NerdvanaSettings, factories: LoopFactories) -> str:
-    """The plan a read-only sub-agent drafts for *prompt*; empty when *factories* cannot start sub-agents."""
+    """The plan a read-only sub-agent drafts for *prompt* at the planning effort; empty when *factories* cannot start sub-agents."""
     run_subagent, registry_for = factories.run_subagent, factories.subagent_registry
     if run_subagent is None or registry_for is None:
         return ""
     child = settings.model_copy(deep=True)
     child.session.planning_gate = False
+    child.model.reasoning_effort = phase_level(child.model, PLANNING)
+    child.model.effort_planning = child.model.effort_implementation = child.model.effort_verification = ""
     reg = registry_for(settings=child, allowed_tools=["Glob", "Grep", "FileRead", "Bash"])
     cfg = SubagentConfig(agent_id="plan_agent", name="Plan", max_turns=20,
                          prompt=f"Create an implementation plan for the following task:\n\n{prompt}",

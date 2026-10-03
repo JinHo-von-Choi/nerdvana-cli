@@ -189,6 +189,7 @@ in `nerdvana_cli/core/`:
 |-|-|-|
 | `run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
 | `model_failover.py` | `ModelFailover` | escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `phase_effort.py` | `PhaseEffort`, `phase_level` | reasoning effort per phase: planning, implementation, verification |
 | `server_compaction.py` | `ServerCompaction` | asking the provider to compact the history, with `core/compact.py` as the fallback |
 | `compaction_block.py` | `last_compaction_index` | where in the history a provider's compaction block stands |
 | `goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |

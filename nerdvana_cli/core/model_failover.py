@@ -16,6 +16,7 @@ from nerdvana_cli.core import signals
 from nerdvana_cli.core.hooks import HookEvent
 from nerdvana_cli.core.loop_hooks import hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopTurn
+from nerdvana_cli.core.phase_effort import IMPLEMENTATION
 from nerdvana_cli.core.provider_recovery import (
     COMPACT,
     FALLBACK,
@@ -59,6 +60,11 @@ class ModelFailover:
         model = self._loop.settings.model
         return (model.provider, model.model, model.api_key, model.base_url)
 
+    def begin_run(self) -> ModelState:
+        """Start a run at the implementation effort. Returns the model state to restore."""
+        self._loop.phase_effort.enter(IMPLEMENTATION)
+        return self.model_state()
+
     def switch_model(self, provider: str | None, model: str) -> None:
         """Point the loop at *model*, on *provider* when one is given."""
         config = self._loop.settings.model
@@ -68,6 +74,7 @@ class ModelFailover:
             config.base_url = ""
         config.model       = model
         self._loop.provider = self._loop.create_provider_from_settings()
+        self._loop.phase_effort.reapply()
 
     @contextlib.contextmanager
     def _announced(self, reason: str, provider: str | None, model: str) -> Iterator[None]:
@@ -85,16 +92,23 @@ class ModelFailover:
         loop.hooks.emit(event, loop.settings, from_provider=current[0], from_model=current[1], to_provider=target[0], to_model=target[1], reason=reason)
 
     def restore_model(self, saved: ModelState) -> None:
-        """After a prompt, go back to the model it started on, or to the one the session escalated to."""
+        """After a prompt, go back to the model it started on, or to the one the session escalated to.
+
+        The provider is only rebuilt when the model changed during the prompt, so the effort changes it
+        keeps for the conversation (see ``core/phase_effort.py``) carry over to the next prompt.
+        """
         config  = self._loop.settings.model
         target  = self._escalated_to or saved
         current = (config.provider, config.model)
+        moved   = self.model_state() != target
         changed = current != (target[0], target[1])
         if changed:
             self._emit(HookEvent.PRE_MODEL_SWITCH, current, (target[0], target[1]), "restore")
         config.provider, config.model, config.api_key, config.base_url = target
-        self._escalated_to  = None
-        self._loop.provider = self._loop.create_provider_from_settings()
+        self._escalated_to = None
+        self._loop.phase_effort.restore()
+        if moved:
+            self._loop.provider = self._loop.create_provider_from_settings()
         if changed:
             self._emit(HookEvent.POST_MODEL_SWITCH, current, (target[0], target[1]), "restore")
 

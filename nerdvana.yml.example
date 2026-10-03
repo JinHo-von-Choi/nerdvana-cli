@@ -79,6 +79,13 @@ model:
   # accepts differs); OpenAI and Gemini take their own words. Empty keeps the provider's default.
   reasoning_effort: ""
 
+  # Reasoning effort per phase, in the same words; empty = reasoning_effort. The plan agent (session.planning_gate)
+  # drafts at effort_planning, the main run works at effort_implementation, and the turns after a failed goal
+  # verification run at effort_verification. Cache cost per provider: docs/configuration.md.
+  effort_planning: ""
+  effort_implementation: ""
+  effort_verification: ""
+
   # Which OpenAI API OpenAI-compatible providers speak: auto (Responses on OpenAI's own endpoint,
   # Chat Completions elsewhere), chat, or responses.
   openai_api: auto
