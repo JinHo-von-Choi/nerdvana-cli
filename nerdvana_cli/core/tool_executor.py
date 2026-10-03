@@ -17,8 +17,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
+from nerdvana_cli.core.approvals import normalise
 from nerdvana_cli.core.concurrency import RepeatDetector
-from nerdvana_cli.core.policy import PermissionPolicy
+from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
 from nerdvana_cli.core.signals import SECRET_MASKED, classify_result
@@ -234,7 +235,7 @@ class ToolExecutor:
     ) -> ToolResult | None:
         """Apply the permission policy; ask the user when it says so. None means allowed."""
         tool_id     = tool_use["id"]
-        perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context))
+        perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context), tool_use["input"])
         if perm_result.behavior == PermissionBehavior.DENY:
             return self._refusal(tool_id, f"Permission denied: {perm_result.message}")
         if perm_result.behavior == PermissionBehavior.ASK:
@@ -243,9 +244,17 @@ class ToolExecutor:
                 tool_name = tool_use["name"],
                 message   = self._with_preview(tool, parsed_args, context, perm_result.message),
             )
+            self._record_answer(tool_use, granted)
             if not granted:
                 return self._refusal(tool_id, f"Permission denied by user: {perm_result.message}")
         return None
+
+    def _record_answer(self, tool_use: dict[str, Any], granted: bool) -> None:
+        """Keep the user's answer so repeated approvals can be offered as rules (``nerdvana approvals``)."""
+        if self._analytics_writer is None:
+            return
+        with contextlib.suppress(Exception):
+            self._analytics_writer.record_approval(tool_use["name"], normalise(primary_argument(tool_use["name"], tool_use["input"])), granted)
 
     @staticmethod
     def _with_preview(tool: Any, parsed_args: Any, context: ToolContext, message: str) -> str:
