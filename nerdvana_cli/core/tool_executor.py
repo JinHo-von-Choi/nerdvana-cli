@@ -19,15 +19,9 @@ from typing import TYPE_CHECKING, Any
 from nerdvana_cli.core import paths
 from nerdvana_cli.core.approvals import normalise
 from nerdvana_cli.core.concurrency import RepeatDetector
+from nerdvana_cli.core.edit_tools import EDIT_PATH_ATTRS, EDIT_TOOL_NAMES
 from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
-from nerdvana_cli.core.progress_monitor import (
-    DEFAULT_FAILED_EDITS,
-    DEFAULT_READ_TURNS,
-    EDIT,
-    OTHER,
-    READ,
-    ProgressMonitor,
-)
+from nerdvana_cli.core.progress_monitor import ProgressMonitor
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
 from nerdvana_cli.core.signals import NO_PROGRESS, OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
@@ -61,21 +55,6 @@ class ToolExecutor:
     - BEFORE_TOOL / AFTER_TOOL hooks are fired via the provided HookEngine.
     """
 
-    # Edit-tool names that trigger a checkpoint before execution
-    _EDIT_TOOL_NAMES: frozenset[str] = frozenset({
-        "FileEdit",
-        "FileWrite",
-        "replace_symbol_body",
-        "insert_before_symbol",
-        "insert_after_symbol",
-        "safe_delete_symbol",
-    })
-
-    # Argument attributes that carry the file an edit tool is about to change,
-    # in resolution order. File tools expose ``path``; symbol tools expose
-    # ``relative_path``.
-    _EDIT_PATH_ATTRS: tuple[str, ...] = ("path", "relative_path", "file_path")
-
     def __init__(
         self,
         registry:           ToolRegistry,
@@ -94,11 +73,7 @@ class ToolExecutor:
         self._analytics_writer    = analytics_writer
         self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
-        session                   = getattr(settings, "session", None)
-        self._progress            = ProgressMonitor(
-            getattr(session, "no_progress_failed_edits", DEFAULT_FAILED_EDITS),
-            getattr(session, "no_progress_read_turns", DEFAULT_READ_TURNS),
-        )
+        self._progress            = ProgressMonitor.from_settings(settings)
         self.signals: Counter[str] = Counter()
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
@@ -187,17 +162,8 @@ class ToolExecutor:
         sandbox   = context.state.get("sandbox")
         confined  = tool_use["name"] == "Bash" and sandbox is not None and getattr(sandbox, "mode", "off") != "off"
         self.signals.update(classify_result(result.content, result.is_error, shell_confined=confined))
-        self._observe_progress(tool_use, tool, result)
+        self._progress.observe_call(tool_use["name"], tool_use["input"], tool.is_read_only, result.is_error)
         return result
-
-    def _observe_progress(self, tool_use: dict[str, Any], tool: Any, result: ToolResult) -> None:
-        """Tell the progress monitor what kind of call this was and whether it failed."""
-        tool_input = tool_use["input"]
-        if tool_use["name"] in self._EDIT_TOOL_NAMES and tool_input.get("apply", True):
-            path = next((value for attr in self._EDIT_PATH_ATTRS if isinstance(value := tool_input.get(attr), str) and value.strip()), "")
-            self._progress.observe(EDIT, path, result.is_error)
-        else:
-            self._progress.observe(READ if tool.is_read_only else OTHER, "", result.is_error)
 
     async def _run_checked(
         self,
@@ -224,7 +190,7 @@ class ToolExecutor:
             return refusal
 
         # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
-        if self._checkpoint_manager is not None and tool_use["name"] in self._EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
+        if self._checkpoint_manager is not None and tool_use["name"] in EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
             self._capture_checkpoint(tool_use["name"], parsed_args)
 
         return await self._execute(tool_use, tool, parsed_args, context, repeats)
@@ -329,7 +295,7 @@ class ToolExecutor:
     def _check_edit_scope(self, tool_use: dict[str, Any], parsed_args: Any, context: ToolContext) -> ToolResult | None:
         """Refuse an edit outside ``sandbox.edit_scope``; None means allowed or no scope is set."""
         scope = context.state.get("edit_scope")
-        if scope is None or tool_use["name"] not in self._EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
+        if scope is None or tool_use["name"] not in EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
             return None
         root    = Path(context.cwd).resolve()
         allowed = [(root / entry).resolve() for entry in scope]
@@ -376,7 +342,7 @@ class ToolExecutor:
         A goal's scope says what the work is about. Leaving it is allowed, but a person decides.
         """
         scope = context.state.get("goal_scope")
-        if not scope or tool_use["name"] not in self._EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
+        if not scope or tool_use["name"] not in EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
             return None
         root    = Path(context.cwd).resolve()
         allowed = [(root / entry).resolve() for entry in scope]
@@ -601,7 +567,7 @@ class ToolExecutor:
 
     def _diagnosable_edit(self, tool_name: str, parsed_args: Any, context: ToolContext) -> str | None:
         """Absolute path of the file an edit will change, when diagnostics can check it."""
-        if tool_name not in self._EDIT_TOOL_NAMES or self._lsp_client() is None:
+        if tool_name not in EDIT_TOOL_NAMES or self._lsp_client() is None:
             return None
         session = getattr(self._settings, "session", None)
         if not getattr(session, "post_edit_diagnostics", True):
@@ -650,13 +616,13 @@ class ToolExecutor:
 
     def _note_edit(self, tool_name: str, parsed_args: Any) -> None:
         """Count an applied edit per file (a symbol edit that is only a preview is not one)."""
-        if tool_name in self._EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
+        if tool_name in EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
             with contextlib.suppress(Exception):  # a counter must never fail the edit it describes
                 self.edited.update(self._edit_targets(parsed_args))
 
     def _edit_targets(self, parsed_args: Any) -> list[str]:
         """Return the file paths carried by a parsed edit-tool argument object."""
-        for attr in self._EDIT_PATH_ATTRS:
+        for attr in EDIT_PATH_ATTRS:
             value = getattr(parsed_args, attr, None)
             if isinstance(value, str) and value.strip():
                 return [value]

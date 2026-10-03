@@ -21,9 +21,10 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.activity_state import ActivityState
-from nerdvana_cli.core.agent_loop import AgentLoop, compact_messages
+from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.analytics import AnalyticsWriter
 from nerdvana_cli.core.checkpoint import CheckpointManager
+from nerdvana_cli.core.compact import compact_messages
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
 from nerdvana_cli.core.session import SessionStorage

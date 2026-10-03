@@ -6,11 +6,14 @@ Falls back to FALLBACK_PROMPT when the skill file is not found.
 """
 from __future__ import annotations
 
+import json
 import logging
+import math
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from nerdvana_cli.core.context_budget import message_tokens
 from nerdvana_cli.types import Message, Role
 
 logger = logging.getLogger(__name__)
@@ -219,3 +222,50 @@ def compact_with_blocks(
         compacted.extend(block)
 
     return compacted
+
+
+def estimate_tokens(text: str) -> int:
+    return math.ceil(len(text) / 4)
+
+
+def estimate_messages_tokens(msgs: list[Any]) -> int:
+    return message_tokens(msgs)
+
+
+def compact_messages(msgs: list[Any], max_tokens: int) -> list[Any]:
+    if not msgs or estimate_messages_tokens(msgs) <= max_tokens:
+        return msgs
+    keep = min(10, len(msgs))
+    recent = msgs[-keep:]
+    budget = max_tokens - estimate_messages_tokens(recent)
+    if budget <= 0:
+        return msgs[-4:]
+    early: list[Any] = []
+    for m in msgs[:-keep]:
+        cost = estimate_tokens(m.content if isinstance(m.content, str) else json.dumps(m.content))
+        if budget - cost < 0:
+            break
+        early.append(m)
+        budget -= cost
+    dropped = len(msgs) - len(early) - len(recent)
+    if dropped > 0:
+        return early + [Message(role=Role.USER, content=f"[context compacted: {dropped} earlier messages removed to fit context window]")] + recent
+    return early + recent
+
+
+def drop_orphan_tool_results(msgs: list[Any]) -> list[Any]:
+    """Remove tool results whose originating tool_use is no longer in *msgs*.
+
+    Truncation can cut an assistant message that requested tools while keeping
+    the results it produced. Providers reject a tool_result that has no
+    matching tool_use, so the widowed results are dropped here.
+    """
+    known_ids: set[str] = set()
+    kept: list[Any] = []
+    for msg in msgs:
+        if msg.role == Role.ASSISTANT and msg.tool_uses:
+            known_ids.update(str(tu.get("id", "")) for tu in msg.tool_uses)
+        elif msg.role == Role.TOOL and str(msg.tool_use_id or "") not in known_ids:
+            continue
+        kept.append(msg)
+    return kept
