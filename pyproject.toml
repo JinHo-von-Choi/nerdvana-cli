@@ -45,21 +45,21 @@ dependencies = [
 # against the new major, rather than by widening it to unblock a resolve.
 # All providers, installs everything
 all = [
-    "anthropic>=0.39.0,<1.0",
-    "openai>=1.50.0,<3.0",
-    "google-genai>=0.4.0,<2.0",
+    "anthropic>=0.39.0,<2.0",
+    "openai>=1.50.0,<4.0",
+    "google-genai>=0.4.0,<3.0",
     "mcp>=1.0.0,<2.0",
 ]
 # Individual providers
-anthropic = ["anthropic>=0.39.0,<1.0"]
-openai = ["openai>=1.50.0,<3.0"]
-gemini = ["google-genai>=0.4.0,<2.0"]
+anthropic = ["anthropic>=0.39.0,<2.0"]
+openai = ["openai>=1.50.0,<4.0"]
+gemini = ["google-genai>=0.4.0,<3.0"]
 mcp = ["mcp>=1.0.0,<2.0"]
 # Development
 dev = [
-    "anthropic>=0.39.0,<1.0",
-    "openai>=1.50.0,<3.0",
-    "google-genai>=0.4.0,<2.0",
+    "anthropic>=0.39.0,<2.0",
+    "openai>=1.50.0,<4.0",
+    "google-genai>=0.4.0,<3.0",
     "tiktoken>=0.7.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- The provider SDK ranges now allow anthropic 1.x, openai 3.x and google-genai 2.x (the adapters were exercised against anthropic 1.11, openai 3.24 and google-genai 2.28: their test suites pass and a MiniMax tool loop runs through openai 3.24; the Anthropic and Gemini adapters were not called against their real APIs).
+
 ### Added
 
 - `model.reasoning_effort` sets OpenAI `reasoning_effort` and the Gemini thinking level for a session or, with `--set model.reasoning_effort=high`, for one run. The value is sent as written; a Gemini value other than `minimal`, `low`, `medium` or `high` stops the request with an error, and an OpenAI value the model does not accept is refused by the API. Empty (the default) changes nothing.
