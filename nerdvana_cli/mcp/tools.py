@@ -10,13 +10,27 @@ from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.types import ToolResult
 
 
+def _hint(tool_def: dict[str, Any], key: str) -> bool | None:
+    """The boolean MCP tool annotation *key*, or None when the server did not state one."""
+    annotations = tool_def.get("annotations")
+    value = annotations.get(key) if isinstance(annotations, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 def _normalize_server_name(name: str) -> str:
     """Normalize server name: replace hyphens with underscores."""
     return re.sub(r"[^a-zA-Z0-9_]", "_", name)
 
 
 class McpToolAdapter(BaseTool[dict[str, Any]]):
-    """Wraps a single MCP server tool as a BaseTool for the registry."""
+    """Wraps a single MCP server tool as a BaseTool for the registry.
+
+    The server's annotations are hints from a third party, so they only ever make the tool
+    stricter than the default: a tool runs next to other calls only when it declares itself
+    read-only (``readOnlyHint``), and one that declares itself destructive
+    (``destructiveHint``) asks before it runs (``McpDestructiveToolAdapter``). A tool that
+    says nothing is serialized and treated as a state-changing external tool.
+    """
 
     # MCP tools are treated as EXTERNAL write operations by default.
     category:              ClassVar[ToolCategory]   = ToolCategory.WRITE
@@ -41,8 +55,8 @@ class McpToolAdapter(BaseTool[dict[str, Any]]):
         self._client          = client
         self._server_name     = server_name
         self._tool_name       = raw_tool_name
-        self.is_concurrency_safe = True
-        self.is_destructive      = False
+        self.is_concurrency_safe = _hint(tool_def, "readOnlyHint") is True
+        self.is_destructive      = _hint(tool_def, "destructiveHint") is True and _hint(tool_def, "readOnlyHint") is not True
 
     async def call(
         self,
@@ -76,3 +90,15 @@ class McpToolAdapter(BaseTool[dict[str, Any]]):
             import json
             schema_str = f"\n\nInput schema:\n```json\n{json.dumps(self.input_schema, indent=2)}\n```"
         return f"## {self.name}\n\n{self.description_text}{schema_str}"
+
+
+class McpDestructiveToolAdapter(McpToolAdapter):
+    """An MCP tool whose server declares it destructive; every call asks first."""
+
+    category: ClassVar[ToolCategory] = ToolCategory.DESTRUCTIVE
+
+
+def build_mcp_tool(server_name: str, tool_def: dict[str, Any], client: McpClient) -> McpToolAdapter:
+    """The adapter that fits the annotations of *tool_def*."""
+    destructive = _hint(tool_def, "destructiveHint") is True and _hint(tool_def, "readOnlyHint") is not True
+    return (McpDestructiveToolAdapter if destructive else McpToolAdapter)(server_name, tool_def, client)

@@ -8,7 +8,7 @@ import logging
 
 from nerdvana_cli.mcp.client import McpClient
 from nerdvana_cli.mcp.config import McpServerConfig
-from nerdvana_cli.mcp.tools import McpToolAdapter
+from nerdvana_cli.mcp.tools import McpToolAdapter, build_mcp_tool
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class McpManager:
             await asyncio.wait_for(client.connect(), timeout=timeout)
             raw_tools   = await client.list_tools()
             adapters    = [
-                McpToolAdapter(name, tool_def, client)
+                build_mcp_tool(name, tool_def, client)
                 for tool_def in raw_tools
             ]
             self._clients[name] = client
