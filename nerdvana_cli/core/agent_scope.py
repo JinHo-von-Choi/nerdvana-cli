@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 
 
 def apply_write_scope(settings: NerdvanaSettings, definition: Any, cwd: str = "") -> bool:

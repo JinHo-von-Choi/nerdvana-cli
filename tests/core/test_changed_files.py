@@ -63,7 +63,7 @@ async def test_a_command_that_changes_nothing_adds_nothing(tmp_path: Path) -> No
 
 
 def test_the_setting_is_off_by_default() -> None:
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     assert NerdvanaSettings().session.report_bash_changes is False
 
@@ -71,8 +71,8 @@ def test_the_setting_is_off_by_default() -> None:
 @pytest.mark.parametrize("name", ["report_bash_changes"])
 def test_the_loop_passes_the_flag_to_tools(name: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.core.session import SessionStorage
-    from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.core.tool import ToolRegistry
 
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))

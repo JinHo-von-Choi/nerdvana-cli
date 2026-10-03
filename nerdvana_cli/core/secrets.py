@@ -130,38 +130,3 @@ class SecretMasker:
             text, found = pattern.subn(MARKER, text)
             count += found
         return MaskResult(text, count)
-
-
-_HEADER_NAME   = re.compile(r"^[A-Za-z0-9-]+$")
-_VARIABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-@dataclass(frozen=True)
-class ProxyCredential:
-    """A credential the egress proxy adds to requests for one domain pattern.
-
-    The spec of ``secrets.proxy_credentials`` is ``VARIABLE`` (sent as ``Authorization: Bearer <value>``) or
-    ``Header-Name:VARIABLE`` (the value is sent as it is, so a Basic or API-key header carries its own prefix).
-    """
-
-    domain:   str
-    header:   str
-    variable: str
-    bearer:   bool
-
-    @classmethod
-    def parse(cls, domain: str, spec: str) -> ProxyCredential:
-        """Read one ``domain: spec`` entry; ValueError when the spec is not well formed."""
-        header, colon, variable = spec.strip().rpartition(":")
-        if not _VARIABLE_NAME.match(variable):
-            raise ValueError(f"'{spec}' must be VARIABLE or Header-Name:VARIABLE with an environment variable name")
-        if colon and not _HEADER_NAME.match(header):
-            raise ValueError(f"'{header}' is not a header name")
-        return cls(domain, header if colon else "Authorization", variable, not colon)
-
-    def header_pair(self, environ: Mapping[str, str]) -> tuple[str, str] | None:
-        """The (name, value) to add, or None when the variable is unset, empty or not safe to send in a header."""
-        value = environ.get(self.variable, "")
-        if not value or any(char in value for char in "\r\n\0"):
-            return None
-        return self.header, f"Bearer {value}" if self.bearer else value

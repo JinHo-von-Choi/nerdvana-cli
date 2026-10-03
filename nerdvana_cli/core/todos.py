@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 

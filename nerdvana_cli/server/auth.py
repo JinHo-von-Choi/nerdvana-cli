@@ -30,7 +30,7 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 # ---------------------------------------------------------------------------
 # Data classes

@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import re
 
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.phase_effort import PLANNING, phase_level
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
 
 _COMPLEXITY_SIGNALS: list[str] = [

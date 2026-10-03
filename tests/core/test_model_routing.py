@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 
 from nerdvana_cli.agents.registry import AgentTypeRegistry
-from nerdvana_cli.core.model_routing import apply_model_spec, point_settings_at, select_model
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.model_routing import apply_model_spec, point_settings_at, select_model
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 
 CATEGORIES = {"quick": "claude-haiku-4-5-20251001", "deep": "openai:gpt-4.1"}
 

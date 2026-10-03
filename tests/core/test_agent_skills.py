@@ -17,9 +17,9 @@ from typer.testing import CliRunner
 
 from nerdvana_cli.core import skills as skills_module
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.prompts import build_system_prompt
 from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import Skill, SkillLoader, name_problems, project_skill_trust
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.core.user_hooks import load_trust_record, trust_project_hook

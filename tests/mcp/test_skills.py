@@ -449,7 +449,7 @@ class TestThroughTheManager:
 class TestWholeRegistry:
     @pytest.mark.asyncio
     async def test_activate_skill_is_registered_for_mcp_skills_alone(self, fake_manager: McpManager, tmp_path: Path) -> None:
-        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.core.config.settings import NerdvanaSettings
         from nerdvana_cli.tools.registry import create_tool_registry
 
         settings     = NerdvanaSettings()

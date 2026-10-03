@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ConfirmCallback, ToolRegistry
 from nerdvana_cli.core.tool_index import ToolIndex
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from rich.text import Text
 
 from nerdvana_cli import __version__
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 
 
 def build_banner(settings: NerdvanaSettings, tool_count: int, parism: bool) -> Text:

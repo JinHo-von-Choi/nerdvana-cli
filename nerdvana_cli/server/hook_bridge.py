@@ -26,7 +26,7 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.server.hook_schemas import (
     HOOK_NAMES,
     HookResponse,

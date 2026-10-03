@@ -10,7 +10,7 @@ import contextlib
 from dataclasses import dataclass, field
 
 from nerdvana_cli.cli.runtime import APPROVAL_MODE_MAP, resolve_run_provider
-from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError, apply_settings_overrides
+from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError, apply_settings_overrides
 
 
 class LaunchError(Exception):

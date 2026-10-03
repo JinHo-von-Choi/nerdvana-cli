@@ -22,7 +22,7 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
-from nerdvana_cli.core.paths import user_data_home
+from nerdvana_cli.core.config.paths import user_data_home
 
 # ---------------------------------------------------------------------------
 # Data model

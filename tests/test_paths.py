@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 
 @pytest.fixture

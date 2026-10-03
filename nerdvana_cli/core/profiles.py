@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.utils.path import validate_path
 
 if TYPE_CHECKING:

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.memories import MAX_CONTENT_BYTES, MemoriesManager, MemoryScope
 from nerdvana_cli.core.memory_review import (
     MAX_PENDING,

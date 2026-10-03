@@ -1,6 +1,6 @@
 """Tests for model fallback chain on HTTP errors."""
+from nerdvana_cli.core.config.settings import ModelConfig
 from nerdvana_cli.core.loop_hooks import LoopHookEngine
-from nerdvana_cli.core.settings import ModelConfig
 
 
 def test_model_config_has_fallback() -> None:

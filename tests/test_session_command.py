@@ -281,7 +281,7 @@ class TestSessionResume:
         assert "NERDVANA_RESUME" not in os.environ
 
     def test_the_tui_keeps_the_id_it_is_given(self) -> None:
-        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.core.config.settings import NerdvanaSettings
         from nerdvana_cli.ui.app import NerdvanaApp
         assert NerdvanaApp(settings=NerdvanaSettings(), resume_id="abc123")._resume_id == "abc123"
 

@@ -13,7 +13,7 @@ from nerdvana_cli.commands.doctor_result import CheckResult
 
 def _check_mcp_servers() -> CheckResult:
     """Check reachability of configured MCP servers."""
-    from nerdvana_cli.core.managed_policy import ManagedPolicyError
+    from nerdvana_cli.core.config.managed_policy import ManagedPolicyError
     from nerdvana_cli.mcp.config import McpServerConfig, load_mcp_config
 
     try:
@@ -70,7 +70,7 @@ def _ping_http(url: str, headers: dict[str, str]) -> int:
 
 def _mcp_config_files() -> list[Path]:
     """Global then project MCP config paths, in load order."""
-    from nerdvana_cli.core import paths as _paths
+    from nerdvana_cli.core.config import paths as _paths
 
     return [_paths.user_mcp_json(), Path.cwd() / ".mcp.json"]
 

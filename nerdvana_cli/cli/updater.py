@@ -29,7 +29,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from nerdvana_cli.core.paths import install_root, user_cache_dir, user_data_home
+from nerdvana_cli.core.config.paths import install_root, user_cache_dir, user_data_home
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +341,7 @@ def _prune_snapshots(data_home: Path, keep: int = _SNAPSHOT_KEEP) -> int:
 def _run_post_update_migrate() -> None:
     """Re-run user-data migrations in case the new version added any."""
     try:
-        from nerdvana_cli.core.migrate import run_if_needed
+        from nerdvana_cli.core.config.migrate import run_if_needed
     except ImportError:
         logger.debug("migrate module not available; skipping post-update migrations")
         return

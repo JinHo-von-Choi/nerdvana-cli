@@ -29,7 +29,7 @@ def test_settings_load_model_history(tmp_path):
         "model_history": {"anthropic": "claude-opus-4", "openai": "gpt-4o"},
     })
 
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     s = NerdvanaSettings.load(config_path=cfg)
 
     assert s.model_history == {"anthropic": "claude-opus-4", "openai": "gpt-4o"}
@@ -41,7 +41,7 @@ def test_settings_load_missing_model_history(tmp_path):
         "model": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
     })
 
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     s = NerdvanaSettings.load(config_path=cfg)
 
     assert s.model_history == {}
@@ -49,7 +49,7 @@ def test_settings_load_missing_model_history(tmp_path):
 
 def test_settings_default_model_history_is_dict():
     """NerdvanaSettings() without config has model_history as empty dict."""
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     s = NerdvanaSettings()
     assert isinstance(s.model_history, dict)
     assert s.model_history == {}
@@ -61,7 +61,7 @@ def test_settings_default_model_history_is_dict():
 
 def _make_app_mock(model_history: dict, current_provider: str = "anthropic") -> MagicMock:
     """Build a minimal NerdvanaApp mock for switch_provider tests."""
-    from nerdvana_cli.core.managed_policy import ManagedPolicy
+    from nerdvana_cli.core.config.managed_policy import ManagedPolicy
 
     app = MagicMock()
     app.settings.managed_policy = ManagedPolicy()

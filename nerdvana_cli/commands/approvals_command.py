@@ -68,7 +68,7 @@ def render(report: dict[str, Any]) -> str:
 def approvals_command(since: int, min_approvals: int, json_output: bool) -> None:
     """Print rule suggestions from the recorded answers. Nothing is written to the configuration."""
     from nerdvana_cli.core.analytics import AnalyticsReader
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     try:
         existing = list(NerdvanaSettings.load().permissions.always_allow)

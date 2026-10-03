@@ -207,7 +207,7 @@ def test_list_stale_empty_when_fresh(mgr: MemoriesManager) -> None:
 def test_list_stale_detects_old(mgr: MemoriesManager, tmp_path: Path) -> None:
     mgr.write("old-mem", "data", MemoryScope.PROJECT_KNOWLEDGE)
     # Backdate the file
-    from nerdvana_cli.core import paths as core_paths
+    from nerdvana_cli.core.config import paths as core_paths
     p = core_paths.project_memories_dir(mgr._cwd) / "old-mem.md"
     old_time = time.time() - 40 * 86_400  # 40 days ago
     os.utime(p, (old_time, old_time))

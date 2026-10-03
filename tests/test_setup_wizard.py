@@ -19,7 +19,7 @@ from nerdvana_cli.cli.setup import (
     run_setup,
     save_config,
 )
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.providers.base import DEFAULT_MODELS, PROVIDER_KEY_ENVVARS, ProviderName
 
 

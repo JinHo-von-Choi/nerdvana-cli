@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import paths, user_hooks
+from nerdvana_cli.core import user_hooks
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.user_hooks import load_user_hooks, trust_project_hook
 

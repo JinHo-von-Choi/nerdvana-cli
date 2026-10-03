@@ -57,7 +57,7 @@ def _check_uv_installed() -> CheckResult:
 
 def _check_install_paths() -> CheckResult:
     """~/.nerdvana install root and data home must exist with write access."""
-    from nerdvana_cli.core import paths as _paths
+    from nerdvana_cli.core.config import paths as _paths
 
     root     = _paths.install_root()
     data     = _paths.user_data_home()
@@ -155,7 +155,7 @@ def _check_lsp_servers() -> CheckResult:
 
 def _check_config_warnings() -> CheckResult:
     """Report fields replaced by defaults or ignored while loading the config file."""
-    from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+    from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 
     try:
         settings = NerdvanaSettings.load()
@@ -191,7 +191,7 @@ def _resolve_provider_class(provider_name: str) -> tuple[ProviderName | None, st
 
 def _check_model_resolution() -> CheckResult:
     """Configured provider and model must resolve to a provider class and context window."""
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.providers.base import resolve_context_window
     from nerdvana_cli.providers.factory import provider_class_for
 
@@ -223,8 +223,8 @@ def _check_fallback_models() -> CheckResult:
     Entries are ``model`` (run under the configured provider) or
     ``provider:model`` (switch provider for that fallback).
     """
-    from nerdvana_cli.core.provider_recovery import parse_fallback
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.model_routing import parse_fallback
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.providers.base import ProviderName, detect_provider, resolve_context_window
     from nerdvana_cli.providers.factory import resolve_api_key
 
@@ -271,8 +271,8 @@ PROJECT_DOC_WARN_TOKENS = 3_000
 
 def _check_project_docs() -> CheckResult:
     """Project documents ride along on every request; say how much they add."""
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.core.nirnamd import fit_to_budget, load_nirna_files
-    from nerdvana_cli.core.settings import NerdvanaSettings
     from nerdvana_cli.core.token_estimator import approx_tokens
 
     try:
@@ -293,8 +293,8 @@ def _check_project_docs() -> CheckResult:
 def _check_pricing_coverage() -> CheckResult:
     """The configured model and its fallbacks should have a known price, or a cost limit cannot apply."""
     from nerdvana_cli.core.analytics import PricingTable
-    from nerdvana_cli.core.provider_recovery import parse_fallback
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.model_routing import parse_fallback
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     try:
         settings = NerdvanaSettings.load()
@@ -315,9 +315,9 @@ def _check_pricing_coverage() -> CheckResult:
 
 def _check_sandbox() -> CheckResult:
     """Report whether shell commands can be confined, and what the configuration asks for."""
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.core.egress_proxy import describe_egress
     from nerdvana_cli.core.sandbox import landlock_abi
-    from nerdvana_cli.core.settings import NerdvanaSettings
 
     try:
         settings = NerdvanaSettings.load()

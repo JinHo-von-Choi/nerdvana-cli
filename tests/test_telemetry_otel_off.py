@@ -16,9 +16,9 @@ import yaml
 
 from nerdvana_cli.core import telemetry_otel
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings_sections import OtelConfig
 from nerdvana_cli.core.otel_semconv import Attr, provider_name
-from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.settings_sections import OtelConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
 NOTHING_IMPORTED = textwrap.dedent("""
@@ -26,7 +26,7 @@ NOTHING_IMPORTED = textwrap.dedent("""
     from unittest.mock import MagicMock
 
     from nerdvana_cli.core import telemetry_otel
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
     from nerdvana_cli.tools.bash_tool import _build_env
 
     assert telemetry_otel.setup(NerdvanaSettings()) == ""
@@ -117,7 +117,7 @@ def test_provider_names_follow_the_conventions_where_they_differ() -> None:
 
 
 def test_a_project_file_cannot_turn_tracing_on_or_choose_the_endpoint(tmp_path, monkeypatch) -> None:
-    from nerdvana_cli.core.settings import NerdvanaSettings
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))

@@ -15,12 +15,29 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
-from nerdvana_cli.core.provider_recovery import parse_fallback
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.providers.base import ProviderName
 
+if TYPE_CHECKING:
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
+
 logger = logging.getLogger(__name__)
+
+_PROVIDER_NAMES: frozenset[str] = frozenset(p.value for p in ProviderName)
+
+
+def parse_fallback(entry: str) -> tuple[str | None, str]:
+    """Split a fallback entry into (provider, model).
+
+    ``provider:model`` names another provider; anything else is a model on the
+    current provider. Model names may contain colons (``llama3:8b``), so the
+    prefix only counts when it is a known provider name.
+    """
+    head, sep, tail = entry.partition(":")
+    if sep and head in _PROVIDER_NAMES and tail:
+        return head, tail
+    return None, entry
 
 
 def select_model(model_arg: str, category_arg: str, definition_model: str, definition_category: str, categories: Mapping[str, str]) -> str:

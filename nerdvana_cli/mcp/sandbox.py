@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from nerdvana_cli.core import sandbox as core_sandbox
-from nerdvana_cli.core.sandbox import MODES, SandboxPolicy
+from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
+from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.mcp.config import McpServerConfig
 
 CONFINED    = "confined"
@@ -38,8 +39,8 @@ class ServerLaunch:
 
 def config_problem(config: McpServerConfig) -> str:
     """What is wrong with the sandbox settings of *config*; an empty string when they are usable."""
-    if config.sandbox not in MODES:
-        return f"sandbox must be one of {', '.join(MODES)}, got {config.sandbox!r}"
+    if config.sandbox not in SANDBOX_MODES:
+        return f"sandbox must be one of {', '.join(SANDBOX_MODES)}, got {config.sandbox!r}"
     if not isinstance(config.network, bool):
         return f"network must be true or false, got {config.network!r}"
     return ""

@@ -32,7 +32,6 @@ import hmac
 import ipaddress
 import logging
 import os
-import re
 import secrets as token_source
 import socket
 from collections import deque
@@ -42,12 +41,11 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from nerdvana_cli.core import sandbox
+from nerdvana_cli.core.config.egress_rules import ProxyCredential, normalize_host, normalize_pattern
 from nerdvana_cli.core.sandbox import Launch, SandboxPolicy, plan_launch
-from nerdvana_cli.core.secrets import ProxyCredential
 
 logger = logging.getLogger(__name__)
 
-_PATTERN           = re.compile(r"^(?:\*\.)?[a-z0-9_](?:[a-z0-9_.-]*[a-z0-9_])?$")
 _HEAD_LIMIT        = 65536
 _HEAD_TIMEOUT      = 30.0
 _CONNECT_TIMEOUT   = 15.0
@@ -79,24 +77,6 @@ class Request:
         """The value of the first header called *name* (case-insensitive), empty when absent."""
         lowered = name.lower()
         return next((value for key, value in self.headers if key.lower() == lowered), "")
-
-
-def normalize_host(host: str) -> str:
-    """The host in the form patterns are compared in: lower case, no brackets, no trailing dot."""
-    return host.strip().strip("[]").rstrip(".").lower()
-
-
-def normalize_pattern(entry: str) -> str:
-    """Validate one ``allowed_domains`` entry and return it normalized; ValueError when it is not one.
-
-    An entry is a host name, an IP address, or ``*.suffix``. A scheme, a port, a path or any other wildcard is rejected.
-    """
-    pattern = normalize_host(entry)
-    with contextlib.suppress(ValueError):
-        return str(ipaddress.ip_address(pattern))
-    if not _PATTERN.match(pattern) or pattern.endswith("*."):
-        raise ValueError(f"'{entry}' is not a host name, an IP address or *.suffix")
-    return pattern
 
 
 def host_matches(host: str, pattern: str) -> bool:

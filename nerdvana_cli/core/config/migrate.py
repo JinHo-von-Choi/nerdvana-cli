@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import shutil
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 logger = logging.getLogger(__name__)
 

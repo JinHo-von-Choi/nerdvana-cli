@@ -43,7 +43,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent, HookResult
 from nerdvana_cli.core.user_hooks import load_trust_record, project_hooks_enabled
 

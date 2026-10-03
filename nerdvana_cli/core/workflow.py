@@ -36,7 +36,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.workflow_text import WorkflowError, reference_problem, references, whole_reference
 
 __all__ = [

@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 # ---------------------------------------------------------------------------
 # Time-window parsing

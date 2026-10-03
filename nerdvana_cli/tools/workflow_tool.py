@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.core.workflow import WorkflowError, discover, resolve_inputs
 from nerdvana_cli.core.workflow_engine import COMPLETED, RunContext, RunReport, WorkflowRun

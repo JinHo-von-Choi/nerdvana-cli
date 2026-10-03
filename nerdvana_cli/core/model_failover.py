@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator, Iterator
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import signals
+from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.core.hooks import HookEvent
 from nerdvana_cli.core.loop_hooks import hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopTurn
@@ -24,7 +25,6 @@ from nerdvana_cli.core.provider_recovery import (
     RETRY,
     ProviderCallError,
     RecoveryPlanner,
-    parse_fallback,
 )
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.core.tool_ids import repair_tool_ids

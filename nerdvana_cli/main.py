@@ -34,8 +34,8 @@ from nerdvana_cli.commands.session_command import session_app
 from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
-from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 
@@ -79,7 +79,7 @@ def _maybe_show_update_notice(target: Console | None = None) -> None:
             format_update_notice,
             is_update_check_enabled,
         )
-        from nerdvana_cli.core.settings import NerdvanaSettings
+        from nerdvana_cli.core.config.settings import NerdvanaSettings
 
         try:
             _flag = bool(NerdvanaSettings().session.update_check)
@@ -189,7 +189,7 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
     one that cannot be applied ends the command with the configuration exit code.
     """
     from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.settings import apply_settings_overrides
+    from nerdvana_cli.core.config.settings import apply_settings_overrides
 
     for dotted, value in overrides.items():
         if value:
@@ -290,8 +290,8 @@ def run(
     import time
 
     from nerdvana_cli.cli.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
+    from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
     from nerdvana_cli.core.goal import Goal
-    from nerdvana_cli.core.sandbox import MODES as SANDBOX_MODES
 
     resolved_approval = approval_mode.strip().lower()
     for flag, value, allowed in (

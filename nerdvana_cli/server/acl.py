@@ -31,7 +31,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 
 # ---------------------------------------------------------------------------
 # Built-in defaults (v3 §7.2)

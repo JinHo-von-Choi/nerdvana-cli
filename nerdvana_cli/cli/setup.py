@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from nerdvana_cli.core import paths
+from nerdvana_cli.core.config import paths
 from nerdvana_cli.providers.base import (
     DEFAULT_MODELS,
     PROVIDER_CAPABILITIES,

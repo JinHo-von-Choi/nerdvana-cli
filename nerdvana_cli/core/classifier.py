@@ -25,8 +25,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.model_routing import apply_model_spec
-from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.config.model_routing import apply_model_spec
+from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.providers.factory import create_provider
 
 logger = logging.getLogger(__name__)

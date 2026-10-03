@@ -10,10 +10,9 @@ import yaml  # type: ignore[import-untyped,unused-ignore]
 from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from nerdvana_cli.core import paths as core_paths
-from nerdvana_cli.core.egress_proxy import normalize_pattern
-from nerdvana_cli.core.secrets import ProxyCredential
-from nerdvana_cli.core.settings_sections import (
+from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.config.egress_rules import ProxyCredential, normalize_pattern
+from nerdvana_cli.core.config.settings_sections import (
     AgentsConfig,
     GoalConfig,
     MemoryConfig,
@@ -24,7 +23,7 @@ from nerdvana_cli.core.settings_sections import (
 )
 
 if TYPE_CHECKING:
-    from nerdvana_cli.core.managed_policy import ManagedPolicy
+    from nerdvana_cli.core.config.managed_policy import ManagedPolicy
 
 _SectionT = TypeVar("_SectionT", bound=BaseModel)
 
@@ -448,7 +447,7 @@ class NerdvanaSettings(BaseSettings):
     def managed_policy(self) -> ManagedPolicy:
         """The managed policy read by the last ``load``; an empty policy for settings built another way."""
         if self._managed_policy is None:
-            from nerdvana_cli.core.managed_policy import ManagedPolicy
+            from nerdvana_cli.core.config.managed_policy import ManagedPolicy
 
             self._managed_policy = ManagedPolicy()
         return self._managed_policy
@@ -526,7 +525,7 @@ class NerdvanaSettings(BaseSettings):
 
     def _apply_managed_policy(self) -> None:
         """Read the managed settings files and force their controls onto these settings; a malformed file stops the start."""
-        from nerdvana_cli.core.managed_policy import ManagedPolicyError, load_managed_policy
+        from nerdvana_cli.core.config.managed_policy import ManagedPolicyError, load_managed_policy
 
         try:
             self._managed_policy = load_managed_policy()

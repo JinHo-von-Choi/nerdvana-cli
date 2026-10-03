@@ -46,7 +46,7 @@ from nerdvana_cli.core.secrets import SecretMasker
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop
-    from nerdvana_cli.core.settings_sections import OtelConfig
+    from nerdvana_cli.core.config.settings_sections import OtelConfig
 
 logger = logging.getLogger(__name__)
 
