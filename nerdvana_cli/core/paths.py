@@ -174,6 +174,26 @@ def managed_audit_path() -> Path:
     return user_data_home() / "logs" / "managed-policy.jsonl"
 
 
+def schedule_dir() -> Path:
+    """Root of the scheduler's files (job definitions, run records, lock files)."""
+    return user_data_home() / "schedule"
+
+
+def schedule_jobs_path() -> Path:
+    """YAML file holding the scheduled job definitions."""
+    return schedule_dir() / "jobs.yml"
+
+
+def schedule_runs_dir() -> Path:
+    """Directory with one sub-directory of run records per scheduled job."""
+    return schedule_dir() / "runs"
+
+
+def schedule_lock_path(job_name: str) -> Path:
+    """Lock file that keeps two runs of the same scheduled job from overlapping."""
+    return schedule_dir() / "locks" / f"{job_name}.lock"
+
+
 def ensure_user_dirs() -> None:
     """Create all user subdirectories if they do not exist. Idempotent."""
     root = user_data_home()
