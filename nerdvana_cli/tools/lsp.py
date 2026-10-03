@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from nerdvana_cli.core.lsp_workspace import notice_of
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
@@ -172,14 +173,15 @@ class LspFindReferencesTool(BaseTool[LspPositionArgs]):
         except Exception as e:
             return ToolResult(tool_use_id="", content=f"LSP error: {e}", is_error=True)
 
+        notice = notice_of(refs)
         if not refs:
             return ToolResult(
                 tool_use_id="",
-                content=f"No references found for '{args.symbol}'",
+                content=f"No references found for '{args.symbol}'. {notice}".strip(),
             )
 
         lines = [f"{r['file']}:{r['line']}:{r['col']}" for r in refs]
-        return ToolResult(tool_use_id="", content="\n".join(lines))
+        return ToolResult(tool_use_id="", content="\n".join([*lines, *([notice] if notice else [])]))
 
 
 class LspRenameTool(BaseTool[LspRenameArgs]):
@@ -224,14 +226,15 @@ class LspRenameTool(BaseTool[LspRenameArgs]):
             return ToolResult(tool_use_id="", content=f"LSP error: {e}", is_error=True)
 
         changed = result.get("changed_files", [])
+        notice  = result.get("notice", "")
         if not changed:
-            return ToolResult(tool_use_id="", content="No files changed.")
+            return ToolResult(tool_use_id="", content=f"No files changed. {notice}".strip())
 
         summary = (
             f"Renamed '{args.symbol}' → '{args.new_name}' in {len(changed)} file(s):\n"
         )
         summary += "\n".join(f"  {f}" for f in changed)
-        return ToolResult(tool_use_id="", content=summary)
+        return ToolResult(tool_use_id="", content=f"{summary}\n{notice}".strip())
 
 
 def create_lsp_tools(client: LspClient) -> list[BaseTool[Any]]:

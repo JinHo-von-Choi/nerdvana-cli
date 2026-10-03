@@ -141,17 +141,23 @@ def symbols_of(path: Path, relative: str) -> list[Symbol]:
     return found
 
 
-def _used_names(tree: ast.AST) -> set[str]:
-    """Identifiers a module uses as a name, an attribute or an import; its own definitions are not uses."""
-    names: set[str] = set()
+def _used_names(tree: ast.Module) -> set[str]:
+    """Identifiers a module uses as a name, an attribute or an import.
+
+    A function or class the module defines itself is a different symbol from one of the same name in another
+    module, so using it is not a use of that one unless the module also imports the name.
+    """
+    names:    set[str] = set()
+    imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Name):
             names.add(node.id)
         elif isinstance(node, ast.Attribute):
             names.add(node.attr)
         elif isinstance(node, ast.alias):
-            names.add(node.name.split(".")[-1])
-    return names
+            imported.add(node.name.split(".")[-1])
+    defined = {node.name for node in tree.body if isinstance(node, Definition)}
+    return (names - defined) | imported
 
 
 def identifier_index(root: Path, directories: Iterable[str] = SCAN_DIRS) -> dict[str, set[str]]:

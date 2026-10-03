@@ -87,6 +87,13 @@ class TestGroundTruth:
     def test_a_definition_alone_is_not_a_use(self, bench: ModuleType, project: Path) -> None:
         assert "tail" not in bench.identifier_index(project, ("pkg",))
 
+    def test_using_a_symbol_of_the_same_name_defined_in_the_module_itself_is_not_a_use(self, bench: ModuleType, project: Path) -> None:
+        (project / "pkg" / "own.py").write_text("class Box:\n    pass\n\n\ndef helper():\n    return Box()\n\n\nhelper()\n", encoding="utf-8")
+        (project / "pkg" / "both.py").write_text("from pkg.mod import helper\n\n\ndef helper():\n    return 1\n", encoding="utf-8")
+        index = bench.identifier_index(project, ("pkg",))
+        assert index["helper"] == {"pkg/user.py", "pkg/both.py"}
+        assert index["Box"] == {"pkg/user.py"}
+
     def test_cases_are_discovered_from_the_seed_files(self, bench: ModuleType, project: Path) -> None:
         cases = bench.discover_cases(project, project, ["pkg/mod.py"], per_file=3, edits=2, scan=("pkg",))
         assert {c.tool for c in cases} == {"find_symbol", "symbol_overview", "find_referencing_symbols", "replace_symbol_body"}

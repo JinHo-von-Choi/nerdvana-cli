@@ -18,6 +18,7 @@ import json
 import os
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from nerdvana_cli.core.lsp_workspace import notice_of
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 
 # Re-export from sibling modules for backward compatibility
@@ -351,19 +352,21 @@ class FindReferencingSymbolsTool(BaseTool[FindReferencingSymbolsArgs]):
         except Exception as e:
             return ToolResult(tool_use_id="", content=f"LSP error: {e}", is_error=True)
 
+        notice = notice_of(refs)
         if not refs:
             return ToolResult(
                 tool_use_id="",
-                content=f"No references found for {args.name_path!r}",
+                content=f"No references found for {args.name_path!r}. {notice}".strip(),
             )
 
         ref_list = [
             {"file": r.file_path, "line": r.line, "character": r.character}
             for r in refs
         ]
+        payload: dict[str, Any] = {"references": ref_list, **({"notice": notice} if notice else {})}
         return ToolResult(
             tool_use_id="",
-            content=json.dumps({"references": ref_list}, ensure_ascii=False, indent=2),
+            content=json.dumps(payload, ensure_ascii=False, indent=2),
         )
 
 
