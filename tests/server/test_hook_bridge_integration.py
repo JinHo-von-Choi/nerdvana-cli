@@ -1,4 +1,4 @@
-"""Integration tests for the nerdvana hook CLI — Phase G2.
+"""Integration tests for the nerdvana hook CLI.
 
 Invokes ``nerdvana hook <subcommand>`` as a subprocess, feeds JSON on stdin,
 and validates the stdout JSON response.

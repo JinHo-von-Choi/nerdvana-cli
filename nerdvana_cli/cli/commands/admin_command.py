@@ -1,4 +1,4 @@
-"""`nerdvana admin ...` — administrative sub-commands (Phase G1).
+"""`nerdvana admin ...` — administrative sub-commands.
 
 Currently hosts the ACL sub-group (``nerdvana admin acl ...``); future
 admin-only operations should be wired into ``admin_app`` rather than added to

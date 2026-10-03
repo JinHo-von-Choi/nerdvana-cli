@@ -14,7 +14,7 @@ YAML schema:
     cursor-dev:
       roles: [read-only, edit]
 
-Unknown clients receive the ``read-only`` role (v3.1 §3.1).
+Unknown clients receive the ``read-only`` role.
 
 작성자: 최진호
 작성일: 2026-04-18
@@ -25,7 +25,7 @@ from __future__ import annotations
 import contextlib
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -87,14 +87,6 @@ class ACLDecision:
 
     allowed: bool
     reason:  str = ""
-
-
-@dataclass
-class ClientACL:
-    """Per-client role assignments."""
-
-    client_name: str
-    roles:       list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +257,7 @@ class ACLManager:
     def effective_roles(self, client_identity: str) -> list[str]:
         """Return effective roles for *client_identity* (public API).
 
-        Unknown clients receive [``read-only``] (v3.1 §3.1).
+        Unknown clients receive [``read-only``].
         """
         self._ensure_loaded()
         return self._effective_roles(client_identity)
@@ -274,7 +266,7 @@ class ACLManager:
         """Internal implementation — callers within this module use this directly.
 
         Delegates to the loaded ``_client_roles`` mapping with a default of
-        ``[read-only]`` for unknown identities (v3.1 §3.1).
+        ``[read-only]`` for unknown identities.
         """
         # Exact match
         if client_identity in self._client_roles:

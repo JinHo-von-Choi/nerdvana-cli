@@ -1,4 +1,4 @@
-"""ExternalWorker subprocess orchestrator tests — Phase H.
+"""ExternalWorker subprocess orchestrator tests.
 
 Uses AsyncMock to fake subprocess stdio without real process spawning.
 

@@ -1,4 +1,4 @@
-"""Symbol resolution and LSP-backed symbol retrieval for Phase D.
+"""Symbol resolution and LSP-backed symbol retrieval.
 
 Provides:
 - NamePathResolver   — parse/match ``Module/Class.method`` paths.

@@ -1,4 +1,4 @@
-"""LSP integration tests for Phase D symbol tools.
+"""LSP integration tests for the symbol tools.
 
 Requires pyright or pyright-langserver on PATH.
 Run with: pytest tests/lsp/test_symbol_tools_integration.py -v -m lsp_integration
@@ -8,7 +8,7 @@ fixture directory.
 
 작성자: 최진호
 작성일: 2026-04-18
-수정일: 2026-04-18 (Phase D.1 — InsertBefore, InsertAfter, SafeDelete E2E)
+수정일: 2026-04-18 (InsertBefore, InsertAfter, SafeDelete E2E)
 """
 from __future__ import annotations
 

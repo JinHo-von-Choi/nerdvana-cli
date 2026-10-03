@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli/server/hook_bridge.py — Phase G2.
+"""Tests for nerdvana_cli/server/hook_bridge.py.
 
 Coverage:
   - read_hook_payload: valid JSON, empty stream, malformed JSON (3)

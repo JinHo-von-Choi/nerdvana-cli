@@ -92,7 +92,7 @@ def json_parse_recovery(ctx: HookContext) -> HookResult:
 
 
 def session_start_memory_hint(ctx: HookContext) -> HookResult:
-    """Inject a memory count hint at session start (Phase E).
+    """Inject a memory count hint at session start.
 
     Appends a one-line hint to the system prompt: how many project memories
     exist and that ListMemories can enumerate them.  Body is never injected

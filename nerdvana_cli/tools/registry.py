@@ -91,7 +91,7 @@ def create_tool_registry(
         from nerdvana_cli.tools.swarm_tool import SwarmTool
         registry.register(SwarmTool(settings=settings, task_registry=_task_reg, parent_registry=registry))
 
-    # Phase H: external project tools, gated on an explicit opt-in. A caller
+    # External project tools, gated on an explicit opt-in. A caller
     # that carries no setting gets the closed state, so a missing switch can
     # never widen what a session may reach.
     from nerdvana_cli.tools.external_project_tools import (
@@ -114,7 +114,7 @@ def create_tool_registry(
         for lsp_tool in create_lsp_tools(lsp):
             registry.register(lsp_tool)
 
-        # Phase D: semantic symbol tools
+        # Semantic symbol tools
         from nerdvana_cli.codeintel.code_editor import CodeEditor
         from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
         from nerdvana_cli.tools.symbol_tools import create_symbol_tools

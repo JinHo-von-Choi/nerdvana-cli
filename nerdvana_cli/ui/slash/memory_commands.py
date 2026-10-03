@@ -1,4 +1,4 @@
-"""Memory and checkpoint slash command handlers — Phase E.
+"""Memory and checkpoint slash command handlers.
 
 Commands:
   /undo           — Restore the previous pre-edit checkpoint

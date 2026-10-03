@@ -1,4 +1,4 @@
-"""Tests for memory tools (WriteMemory, ReadMemory, etc.) — Phase E.
+"""Tests for memory tools (WriteMemory, ReadMemory, etc.).
 
 Covers: schema validation, secret scanner, scope routing,
         all 9 tools' call() behaviour.

@@ -214,7 +214,7 @@ class AuthManager:
                     roles           = list(entry.roles),
                 )
 
-        # Unknown CN: fail-closed — reject unrecognised peers (v3.1 §3.1 rev).
+        # Unknown CN: fail-closed — reject unrecognised peers.
         # Previously failed open (authenticated=True + read-only), which allowed
         # CN-spoofing clients unrestricted read access. Now requires explicit
         # registration in mcp_keys.yml to be admitted.

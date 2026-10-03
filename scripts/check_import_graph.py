@@ -34,7 +34,7 @@ BASELINE_FILE = Path(__file__).resolve().parent.parent / ".import_cycles_baselin
 
 def _path_to_module(py_file: Path, root: Path) -> str:
     """
-    파일 경로를 nerdvana_cli.sub.module 형식의 정규화된 모듈명으로 변환한다.
+    파일 경로를 nerdvana_cli.<package>.<module> 형식의 정규화된 모듈명으로 변환한다.
 
     Args:
         py_file: 변환할 .py 파일 경로.
@@ -260,7 +260,7 @@ def _load_baseline() -> set[tuple[str, ...]]:
 def _save_baseline(cycles: list[list[str]]) -> None:
     """현재 사이클을 baseline 파일에 저장."""
     payload = {
-        "description": "known circular imports allowed by Phase 0A baseline",
+        "description": "known circular imports allowed by the baseline",
         "count": len(cycles),
         "cycles": cycles,
     }

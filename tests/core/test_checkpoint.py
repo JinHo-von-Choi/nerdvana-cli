@@ -1,4 +1,4 @@
-"""Tests for Git Checkpoint system — Phase E.
+"""Tests for Git Checkpoint system.
 
 Covers: checkpoint creation, LRU eviction, undo/redo,
         non-git directory silent skip.

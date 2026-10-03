@@ -1,4 +1,4 @@
-"""Phase D semantic symbol tools: Overview, Find, References (read-only).
+"""Semantic symbol tools: Overview, Find, References (read-only).
 
 3 read-only query tools backed by LspClient + LanguageServerSymbolRetriever.
 Edit tools (ReplaceBody, InsertBefore, InsertAfter, SafeDelete) live in

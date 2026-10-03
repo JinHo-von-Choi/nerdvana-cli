@@ -60,7 +60,7 @@ class ToolCategory(StrEnum):
     READ        = "read"
     WRITE       = "write"
     DESTRUCTIVE = "destructive"
-    SYMBOLIC    = "symbolic"   # Phase D symbol-analysis tools (reserved)
+    SYMBOLIC    = "symbolic"   # symbol-analysis tools
     META        = "meta"       # Agent/Swarm/Team/TaskGet/TaskStop etc.
 
 
@@ -105,7 +105,7 @@ class BaseTool(ABC, Generic[T]):
     max_result_tokens:   int            = 30_000
     args_class:          type | None    = None
 
-    # ── Phase 0B metadata ────────────────────────────────────────────────
+    # Metadata
     category:              ClassVar[ToolCategory]    = ToolCategory.READ
     side_effects:          ClassVar[ToolSideEffect]  = ToolSideEffect.NONE
     tags:                  ClassVar[frozenset[str]]  = frozenset()
@@ -205,7 +205,7 @@ class ToolDef(Generic[T]):
     check_permissions_fn:  Any              = None
     validate_input_fn:     Any              = None
     prompt_fn:             Any              = None
-    # Phase 0B metadata
+    # Metadata
     category:              ToolCategory     = ToolCategory.READ
     side_effects:          ToolSideEffect   = ToolSideEffect.NONE
     tags:                  frozenset[str]   = frozenset()

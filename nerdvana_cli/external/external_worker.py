@@ -1,4 +1,4 @@
-"""External project subprocess orchestrator — Phase H.
+"""External project subprocess orchestrator.
 
 Spawns isolated Python subprocesses to query external project directories
 over a stdio MCP channel.  Each subprocess:

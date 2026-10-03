@@ -1,4 +1,4 @@
-"""Tests for AuditLogger — Phase G1.
+"""Tests for AuditLogger.
 
 4 test cases:
   - 1 000 writes completes without error
@@ -49,7 +49,7 @@ def test_1000_writes_no_error(logger):
 
 
 def test_db_size_under_1mb_after_1000_writes(logger):
-    """After 1 000 rows the database file must stay under 1 MB (v3.1 §1.4)."""
+    """After 1 000 rows the database file must stay under 1 MB."""
     for i in range(1000):
         logger.record(
             client_identity = "bulk",

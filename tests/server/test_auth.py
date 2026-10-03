@@ -1,4 +1,4 @@
-"""Tests for AuthManager — Phase G1.
+"""Tests for AuthManager.
 
 7 test cases:
   - HTTP bearer: valid key, invalid key, missing hash prefix

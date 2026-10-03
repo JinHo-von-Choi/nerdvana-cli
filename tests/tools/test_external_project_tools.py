@@ -1,4 +1,4 @@
-"""External project tools — schema and behaviour tests — Phase H.
+"""External project tools — schema and behaviour tests.
 
 작성자: 최진호
 작성일: 2026-04-18

@@ -1,4 +1,4 @@
-"""Tests for NerdvanaMcpServer — Phase G1.
+"""Tests for NerdvanaMcpServer.
 
 10 test cases covering:
   - tool registration (read-only vs write mode)

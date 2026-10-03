@@ -1,4 +1,4 @@
-"""Phase 1 critical fixes — regression tests for C1–C5 and M7.
+"""Critical fixes: regression tests for C1 to C5 and M7.
 
 C1: Unknown stop_reason preserves assistant text
 C2: Ultrawork extended_thinking resets after run()

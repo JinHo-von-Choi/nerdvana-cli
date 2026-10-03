@@ -19,7 +19,6 @@ from typing import Any
 
 from nerdvana_cli.core.context.token_estimator import approx_tokens
 
-MODES = ("auto", "always", "never")
 DEFAULT_THRESHOLD = 3000
 _WORDS = re.compile(r"[a-z0-9]+")
 

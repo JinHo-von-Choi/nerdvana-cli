@@ -1,4 +1,4 @@
-"""NerdVana CLI MCP server package — Phase G1.
+"""NerdVana CLI MCP server package.
 
 Exposes nerdvana tools over MCP 1.0 (stdio + HTTP JSON-RPC) with
 API-key authentication, role-based ACL, and SQLite audit logging.

@@ -1,1 +1,1 @@
-"""Tests for nerdvana_cli.server — Phase G1."""
+"""Tests for nerdvana_cli.server."""

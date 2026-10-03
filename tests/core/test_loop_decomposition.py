@@ -1,4 +1,4 @@
-"""Contract tests for T-0A-03: LoopState immutability and decomposition.
+"""LoopState immutability and decomposition.
 
 Verifies:
 - LoopState.evolve() returns a new instance (immutability).

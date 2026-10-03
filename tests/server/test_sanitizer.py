@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli/server/sanitizer.py — Phase G2.
+"""Tests for nerdvana_cli/server/sanitizer.py.
 
 Coverage:
   - Gate-1 blacklist matching → tagging (5)

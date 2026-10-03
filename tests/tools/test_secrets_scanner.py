@@ -1,4 +1,4 @@
-"""Tests for secrets scanner in WriteMemory — Phase E.
+"""Tests for secrets scanner in WriteMemory.
 
 Covers the 5 regex patterns defined in v3 §5.4.
 
