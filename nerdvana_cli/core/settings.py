@@ -7,10 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
-from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nerdvana_cli.core import paths as core_paths
+from nerdvana_cli.core.egress_proxy import normalize_pattern
+from nerdvana_cli.core.secrets import ProxyCredential
 
 _SectionT = TypeVar("_SectionT", bound=BaseModel)
 
@@ -168,8 +170,11 @@ class SandboxConfig(BaseModel):
     # Landlock). "off" changes nothing, "auto" confines where the system supports it and
     # warns once where it does not, "require" refuses to run a command it cannot confine.
     mode: Literal["off", "auto", "require"] = "off"
-    # False also refuses TCP connections and binds from the command (needs Linux 6.7).
-    network: bool = True
+    # False also refuses TCP connections and binds from the command (needs Linux 6.7). "allowlist"
+    # lets the command reach only the local egress proxy, which passes the hosts in allowed_domains.
+    network: bool | Literal["allowlist"] = True
+    # Host names (exact, or *.suffix for subdomains) the egress proxy lets through when network is "allowlist".
+    allowed_domains: list[str] = Field(default_factory=list)
     # Writable in addition to the project directory and the temporary directories.
     write_paths: list[str] = Field(default_factory=list)
     # The project directory and the temporary directories are writable unless these are turned off.
@@ -179,6 +184,26 @@ class SandboxConfig(BaseModel):
     # Paths (relative to the project) that FileWrite, FileEdit and the symbol edit tools may change;
     # None = anywhere the permissions allow. Applies to the tools, which Landlock cannot confine.
     edit_scope: list[str] | None = None
+
+    @field_validator("allowed_domains")
+    @classmethod
+    def _normalize_domains(cls, entries: list[str]) -> list[str]:
+        return [normalize_pattern(entry) for entry in entries]
+
+
+class SecretsConfig(BaseModel):
+    # Domain (or *.suffix) -> credential the egress proxy adds to plain HTTP requests for it, so the token
+    # stays out of the command's environment: "VARIABLE" sends Authorization: Bearer <value of VARIABLE>,
+    # "Header-Name:VARIABLE" sends the value as it is. The domain must also be in sandbox.allowed_domains.
+    proxy_credentials: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("proxy_credentials")
+    @classmethod
+    def _check_credentials(cls, entries: dict[str, str]) -> dict[str, str]:
+        checked = {normalize_pattern(domain): spec for domain, spec in entries.items()}
+        for domain, spec in checked.items():
+            ProxyCredential.parse(domain, spec)
+        return checked
 
 
 class CheckpointConfig(BaseModel):
@@ -190,7 +215,7 @@ class CheckpointConfig(BaseModel):
 _REMOVED_KEYS = frozenset({"hooks.session_start", "hooks.before_tool", "hooks.after_tool"})
 
 _TOP_LEVEL_KEYS = frozenset({
-    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "goal", "telemetry",
+    "model", "permissions", "session", "parism", "hooks", "checkpoint", "skills", "agents", "sandbox", "secrets", "goal", "telemetry",
     "model_history", "external_projects_enabled", "cwd", "verbose", "config_path",
     # Per-provider keys saved by /provider and read back by the model commands.
     "api_keys",
@@ -201,7 +226,7 @@ _TOP_LEVEL_KEYS = frozenset({
 _ALL_FIELDS_STRICT = frozenset({"*"})
 _MODEL_STRICT_FIELDS = frozenset({"api_key"})
 _HOOKS_STRICT_FIELDS = frozenset({"allow_project_hooks"})
-_SANDBOX_STRICT_FIELDS = frozenset({"mode", "network"})
+_SANDBOX_STRICT_FIELDS = frozenset({"mode", "network", "allowed_domains"})
 
 
 def _is_project_file(path: str) -> bool:
@@ -331,7 +356,7 @@ def apply_settings_overrides(settings: NerdvanaSettings, assignments: list[str])
 
 
 # Sections whose fields decide what the agent may do; a command line override must not loosen them quietly.
-_NO_OVERRIDE_SECTIONS = frozenset({"permissions", "hooks", "sandbox"})
+_NO_OVERRIDE_SECTIONS = frozenset({"permissions", "hooks", "sandbox", "secrets"})
 
 # Sections read from the config file as they are, with the fields that must never be softened.
 _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
@@ -340,6 +365,7 @@ _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("checkpoint", CheckpointConfig, frozenset()),
     ("skills",     SkillsConfig,     frozenset()),
     ("sandbox",    SandboxConfig,    _SANDBOX_STRICT_FIELDS),
+    ("secrets",    SecretsConfig,    _ALL_FIELDS_STRICT),
     ("agents",     AgentsConfig,     frozenset()),
     ("goal",       GoalConfig,       frozenset()),
     ("telemetry",  TelemetryConfig,  frozenset()),
@@ -358,6 +384,7 @@ class NerdvanaSettings(BaseSettings):
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
+    secrets: SecretsConfig = Field(default_factory=SecretsConfig)
     goal: GoalConfig = Field(default_factory=GoalConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     model_history: dict[str, str] = Field(default_factory=dict)

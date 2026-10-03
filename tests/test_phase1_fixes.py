@@ -19,7 +19,14 @@ from nerdvana_cli.core.agent_loop import (
     TOOL_STATUS_PREFIX,
     AgentLoop,
 )
-from nerdvana_cli.core.settings import ModelConfig, NerdvanaSettings, SandboxConfig, SessionConfig, SkillsConfig
+from nerdvana_cli.core.settings import (
+    ModelConfig,
+    NerdvanaSettings,
+    SandboxConfig,
+    SecretsConfig,
+    SessionConfig,
+    SkillsConfig,
+)
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import Role
@@ -43,6 +50,7 @@ def _make_settings(**overrides) -> NerdvanaSettings:
     settings.session = SessionConfig(**session_kw)
     settings.skills = SkillsConfig()
     settings.sandbox = SandboxConfig()
+    settings.secrets = SecretsConfig()
     settings.cwd = "/tmp"
     settings.verbose = False
     return settings

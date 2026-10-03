@@ -167,10 +167,18 @@ sandbox:
   # off | auto | require: confine what the Bash tool can write with the operating system
   # (Linux Landlock). See docs/sandbox.md.
   mode: off
-  # false also refuses TCP connections and binds from the command (Linux 6.7 and later)
+  # false also refuses TCP connections and binds from the command (Linux 6.7 and later);
+  # allowlist lets it reach only a local proxy that passes allowed_domains
   network: true
+  # Hosts the proxy lets through when network is allowlist: a name, *.suffix or an IP address
+  allowed_domains: []
   # Writable in addition to the project directory and the temporary directories
   write_paths: []
+
+secrets:
+  # domain (or *.suffix) -> environment variable the egress proxy adds to plain HTTP requests for it
+  # ("VARIABLE" = Authorization: Bearer, "Header-Name:VARIABLE" = that header). See docs/sandbox.md.
+  proxy_credentials: {}
 
 # Register ListQueryableProjects / RegisterExternalProject / QueryExternalProject.
 # They hand a registered directory to a read-capable subprocess, so the family

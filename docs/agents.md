@@ -116,7 +116,7 @@ allowed_tools:                      # optional — default ["*"] (all)
   - Grep
   - Bash
 write_scope: none                   # optional — what it may write: none, project (default) or a list such as [tests, docs/api]
-network: false                      # optional — false also refuses TCP connections of its commands (Linux 6.7+)
+network: false                      # optional, false also refuses TCP connections of its commands (Linux 6.7+); true does not widen a sandbox.network: allowlist session
 model: claude-opus-5-5              # optional — "model" or "provider:model"; default is the parent's model
 category: deep                      # optional — model taken from agents.categories when no model is set
 system_prompt: |                    # optional — injected into child's system prompt
