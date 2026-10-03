@@ -1,4 +1,4 @@
-from nerdvana_cli.tools.registry import create_subagent_registry
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 
 
 def _names(registry) -> set[str]:

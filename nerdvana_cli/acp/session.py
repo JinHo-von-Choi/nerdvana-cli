@@ -41,6 +41,7 @@ from nerdvana_cli.acp.tool_mapping import (
     tool_locations,
     tool_title,
 )
+from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.hooks import HookContext, HookEvent
 from nerdvana_cli.core.run_output import classify_chunk
@@ -195,6 +196,7 @@ class AcpSession:
                 task_registry     = task_registry,
                 on_thinking_chunk = self._on_thinking if self.settings.model.show_thinking else None,
                 on_confirm        = self._confirm,
+                factories         = loop_factories(),
             )
         self.loop.usage_listener = self._on_usage
         self.loop.hooks.register(HookEvent.BEFORE_TOOL, self._before_tool)

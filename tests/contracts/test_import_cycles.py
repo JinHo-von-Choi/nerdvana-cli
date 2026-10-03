@@ -15,16 +15,7 @@ from __future__ import annotations
 
 from tests.contracts.import_graph import module_graph
 
-KNOWN_CYCLES: frozenset[frozenset[str]] = frozenset({
-    frozenset({
-        "nerdvana_cli.core.agent_loop",
-        "nerdvana_cli.core.subagent",
-        "nerdvana_cli.core.swarm",
-        "nerdvana_cli.tools.agent_tool",
-        "nerdvana_cli.tools.registry",
-        "nerdvana_cli.tools.swarm_tool",
-    }),
-})
+KNOWN_CYCLES: frozenset[frozenset[str]] = frozenset()
 
 
 def _strongly_connected(graph: dict[str, frozenset[str]]) -> list[frozenset[str]]:

@@ -16,7 +16,8 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext
 from nerdvana_cli.tools.agent_tool import AgentToolArgs
-from nerdvana_cli.tools.registry import create_subagent_registry, create_tool_registry
+from nerdvana_cli.tools.registry import create_tool_registry
+from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 
 

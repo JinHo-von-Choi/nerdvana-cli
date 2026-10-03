@@ -20,6 +20,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 
+from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
@@ -325,6 +326,7 @@ class NerdvanaApp(App[object]):
             on_activity_change = make_activity_change_callback(self, threading.get_ident()),
             on_ask_user        = self._ask_user_prompt,
             on_confirm         = self._confirm_prompt,
+            factories          = loop_factories(),
         )
         if resume_id:
             restored = self._agent_loop.restore_history()

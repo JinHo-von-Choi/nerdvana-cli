@@ -12,6 +12,7 @@ from rich.console import Console
 
 from nerdvana_cli import __version__
 from nerdvana_cli.acp.command import acp_command
+from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
@@ -315,16 +316,14 @@ def run(
     from nerdvana_cli.core.task_state import TaskRegistry
 
     task_registry = TaskRegistry()
-    registry      = create_tool_registry(
-        settings      = settings,
-        task_registry = task_registry,
-    )
+    registry      = create_tool_registry(settings=settings, task_registry=task_registry)
     session = SessionStorage(persist=settings.session.persist)
     loop    = AgentLoop(
         settings      = settings,
         registry      = registry,
         session       = session,
         task_registry = task_registry,
+        factories     = loop_factories(),
     )
     outcome.session_id = session.session_id
     started            = time.monotonic()

@@ -27,9 +27,7 @@ FORBIDDEN: dict[str, frozenset[str]] = {
 }
 
 # (source file relative to the package root, target package)
-ALLOWED: frozenset[tuple[str, str]] = frozenset({
-    ("core/agent_loop.py", "tools"),
-})
+ALLOWED: frozenset[tuple[str, str]] = frozenset()
 
 
 def _edges() -> list[tuple[str, int, str, str]]:

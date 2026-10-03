@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from dataclasses import dataclass
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.analytics import CallOrigin
 from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
-from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
+from nerdvana_cli.core.subagent_config import SubagentConfig
+from nerdvana_cli.core.tool import ConfirmCallback
 
 _PROTOCOL_PREFIXES = (
     "\x00TOOL:",
@@ -18,27 +16,6 @@ _PROTOCOL_PREFIXES = (
     "\x00CTX_USAGE:",
     "\x00COMPACT:",
 )
-
-
-@dataclass
-class SubagentConfig:
-    agent_id:  str
-    name:      str
-    prompt:    str
-    settings:  NerdvanaSettings
-    registry:      ToolRegistry
-    max_turns:     int = 50
-    system_prompt: str = ""
-    confirm:       ConfirmCallback | None = None
-    category:      str = ""
-    parent_session_id: str = ""
-    # Fraction of max_turns after which the agent is told to wrap up and answer (0 = never).
-    wrap_up_fraction: float = 0.6
-    # Set by run_subagent: what the agent spent (USD) and why it stopped.
-    cost_usd:      float = 0.0
-    stopped_for:   str   = ""
-    # Called with the agent's token totals and signal counts when it finishes, however it ended: the parent adds them to its own.
-    absorb:        Callable[[dict[str, int], dict[str, int]], None] | None = None
 
 
 def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
@@ -65,7 +42,10 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     child_settings.goal.auto_verify  = False
 
     origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
-    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin)
+    loop   = AgentLoop(
+        settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin,
+        factories=config.factories,
+    )
     loop.wrap_up_at = max(2, int(config.max_turns * config.wrap_up_fraction)) if config.wrap_up_fraction > 0 else 0
     parts: list[str] = []
 

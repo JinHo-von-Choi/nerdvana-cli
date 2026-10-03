@@ -15,7 +15,8 @@ import pytest
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig, run_subagent
+from nerdvana_cli.core.subagent import run_subagent
+from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
 

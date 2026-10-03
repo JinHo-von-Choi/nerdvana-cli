@@ -14,7 +14,7 @@ import pytest
 
 from nerdvana_cli.core import sandbox
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig
+from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.core.worktree import WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree

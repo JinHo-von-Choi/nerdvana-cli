@@ -11,7 +11,8 @@ from typing import Any
 from nerdvana_cli.core.budget import Budget, Envelope
 from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
+from nerdvana_cli.core.subagent import label_confirm, run_subagent
+from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
 
@@ -42,6 +43,8 @@ class SwarmConfig:
     budget:        Any = None
     # Adds a finished worker's token totals and signals to the leader's.
     absorb:        Any = None
+    # The factories each worker's loop is built with.
+    factories:     LoopFactories | None = None
 
 
 async def run_swarm(
@@ -83,6 +86,7 @@ async def run_swarm(
             category  = task.category,
             parent_session_id = config.parent_session_id,
             absorb    = config.absorb,
+            factories = config.factories,
         )
 
         try:

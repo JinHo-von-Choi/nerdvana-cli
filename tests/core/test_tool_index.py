@@ -12,6 +12,7 @@ from typing import Any, ClassVar
 
 import pytest
 
+from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
@@ -156,7 +157,10 @@ def _loop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: _Script, mc
     settings.cwd = str(tmp_path)
     for key, value in session.items():
         setattr(settings.session, key, value)
-    return AgentLoop(settings=settings, registry=registry, session=SessionStorage(session_id="idx", storage_dir=str(tmp_path / "s")))
+    return AgentLoop(
+        settings=settings, registry=registry, session=SessionStorage(session_id="idx", storage_dir=str(tmp_path / "s")),
+        factories=loop_factories(),
+    )
 
 
 async def _drain(loop: AgentLoop, prompt: str = "go") -> None:
