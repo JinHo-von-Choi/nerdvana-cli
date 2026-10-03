@@ -34,7 +34,8 @@ class _Big(BaseTool[Any]):
 
 def test_approx_tokens_counts_non_latin_text_per_character() -> None:
     assert approx_tokens("abcd" * 10) == 10
-    assert approx_tokens("한국어") == 3
+    assert approx_tokens("代理读") == 3
+    assert approx_tokens("한국어") == 5
 
 
 def test_small_result_is_untouched() -> None:

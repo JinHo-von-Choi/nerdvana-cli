@@ -41,6 +41,7 @@ from nerdvana_cli.core.context.loop_context import (
 from nerdvana_cli.core.context.observation_mask import mask_observations
 from nerdvana_cli.core.context.server_compaction import ServerCompaction
 from nerdvana_cli.core.context.skills import SkillLoader
+from nerdvana_cli.core.context.token_estimator import estimator_for
 from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.execution.context_reminder import ContextReminder
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
@@ -207,7 +208,7 @@ class AgentLoop:
         _cs = self.skill_loader.get_by_name("compress-context")
         self._compact_prompt   = _cs.body if _cs else FALLBACK_PROMPT
         self._compaction_state = CompactionState(max_failures=settings.session.compact_max_failures)
-        self._context_budget   = ContextBudget()
+        self._context_budget   = ContextBudget(estimator_for(settings.model.provider, settings.model.model))
         self._todo_guard       = TodoGuard()
         self._end_turn_nudges  = 0
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
@@ -497,7 +498,7 @@ class AgentLoop:
                 self.state.messages.extend(open_todos_note(self.session.session_id))
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
-        self.state.messages = drop_orphan_tool_results(compact_messages(self.state.messages, thr))
+        self.state.messages = drop_orphan_tool_results(compact_messages(self.state.messages, thr, self._context_budget.estimator))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
         self._context_budget.reset()
         self.state.messages.extend(open_todos_note(self.session.session_id))

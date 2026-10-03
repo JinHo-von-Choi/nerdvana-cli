@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 
 from rich.console import Console
 from rich.table import Table
@@ -101,11 +102,11 @@ def create_provider(
     gemini_api: str = "generate_content",
     anthropic_tool_search: str = "off",
     anthropic_compaction: str = "off",
+    count_tokens: Callable[[str], int] | None = None,
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
-    If provider is not specified, auto-detect from model name.
-    If model is not specified, use provider's default model.
+    Without a provider it is detected from the model name; without a model the provider's default is used.
     """
     # Resolve provider
     if provider is None:
@@ -141,6 +142,7 @@ def create_provider(
         gemini_api=gemini_api,
         anthropic_tool_search=anthropic_tool_search,
         anthropic_compaction=anthropic_compaction,
+        count_tokens=count_tokens,
     )
 
     return _select_class(config)(config)

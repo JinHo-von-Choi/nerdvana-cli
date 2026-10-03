@@ -269,7 +269,7 @@ class OpenAIProvider:
             slot_by_index: dict[int | None, dict[str, str]] = {}
             finish_reason: str | None                   = None
             reported:      Any                          = None
-            total_completion_chars = 0
+            completion:    list[str]                    = []
             parser = ThinkBlockParser()
 
             async for chunk in stream:
@@ -286,7 +286,7 @@ class OpenAIProvider:
 
                     # Content delta — handle potential encoding issues
                     if choice.delta.content:
-                        total_completion_chars += len(choice.delta.content)
+                        completion.append(choice.delta.content)
                         parsed = parser.feed(choice.delta.content)
                         if parsed.content:
                             yield ProviderEvent(type="content_delta", content=parsed.content)
@@ -319,15 +319,8 @@ class OpenAIProvider:
 
             if reported is not None:
                 yield ProviderEvent(type="usage", usage=_usage_dict(reported))
-            elif total_completion_chars > 0:
-                # The server reported nothing: estimate from the characters sent and received.
-                yield ProviderEvent(
-                    type="usage",
-                    usage={
-                        "input_tokens": len(str(api_messages) + str(api_tools)) // 4,
-                        "output_tokens": total_completion_chars // 4,
-                    },
-                )
+            elif completion:
+                yield ProviderEvent(type="usage", usage=self._estimated_usage(str(api_messages) + str(api_tools), "".join(completion)))
 
             yield ProviderEvent(type="done", stop_reason=stop_reason)
 
@@ -390,6 +383,11 @@ class OpenAIProvider:
             return {"content": f"UTF-8 decoding error: {e}", "is_error": True}
         except Exception as e:
             return {"content": _with_note(str(e), e, effort_note), "is_error": True}
+
+    def _estimated_usage(self, sent: str, received: str) -> dict[str, int]:
+        """The usage of a response the server reported nothing about, counted with ``config.count_tokens``."""
+        count = self.config.count_tokens or (lambda text: len(text) // 4)
+        return {"input_tokens": count(sent), "output_tokens": count(received)}
 
     def _effort_note(self, has_tools: bool) -> str:
         """The limit a request meets when it sends tools with a reasoning effort to OpenAI's chat endpoint.

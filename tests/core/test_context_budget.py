@@ -65,7 +65,7 @@ def test_anchor_is_ignored_when_history_shrank_below_it() -> None:
 
 
 def test_non_latin_messages_are_not_undercounted() -> None:
-    assert message_tokens(_msgs("가" * 1_000)) == 1_000
+    assert message_tokens(_msgs("가" * 1_000)) == 1_500
 
 
 class _Reporting:
