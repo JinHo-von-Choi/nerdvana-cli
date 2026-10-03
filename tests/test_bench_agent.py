@@ -133,7 +133,7 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", sandbox="require", model="", provider="")
+    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, model="", provider="")
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, script: str) -> object:
@@ -163,7 +163,7 @@ def test_output_without_a_result_object_is_recorded_as_an_error(monkeypatch: pyt
 
 def test_the_agent_command_carries_the_ceilings_and_the_chosen_model() -> None:
     task    = bench.Task("t", "do it", "v", path="x", max_turns=7, max_cost_usd=0.4)
-    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", sandbox="require", model="m1", provider="anthropic"))
+    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", sandbox="require", gate=False, model="m1", provider="anthropic"))
     assert command[command.index("--max-turns") + 1] == "7"
     assert command[command.index("--max-cost-usd") + 1] == "0.4"
     assert command[command.index("--model") + 1] == "m1"
@@ -240,3 +240,11 @@ def test_the_run_result_signals_are_read_from_the_agent_output(monkeypatch: pyte
     script  = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 1, 'total_cost_usd': 0.0, 'signals': {'cas_rejected': 2}}))\n"
     attempt = _run(monkeypatch, tmp_path, script)
     assert attempt.signals == {"cas_rejected": 2}  # type: ignore[attr-defined]
+
+
+def test_the_gate_flag_passes_the_tasks_verify_command_to_the_agent() -> None:
+    task  = bench.Task("t", "do it", "python check.py", path="x")
+    plain = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, model="", provider=""))
+    gated = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=True, model="", provider=""))
+    assert "--verify" not in plain
+    assert gated[gated.index("--verify") + 1] == "python check.py"

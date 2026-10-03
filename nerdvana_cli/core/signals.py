@@ -34,6 +34,7 @@ PROVIDER_RETRY      = "provider_retry"
 PROVIDER_FALLBACK   = "provider_fallback"
 COMPACTION          = "compaction"
 WRAP_UP             = "wrap_up"
+VERIFY_FAILED       = "verify_failed"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (

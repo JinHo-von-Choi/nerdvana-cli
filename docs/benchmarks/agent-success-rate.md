@@ -24,6 +24,7 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | Option | Meaning |
 |-|-|
 | `--attempts N` | attempts per task (default 1) |
+| `--gate` | pass each task's verify command to `nerdvana run --verify`, so the agent is told when it fails and keeps working; compare a gated run with an ungated one to see what the check is worth |
 | `--tag TAG` | run only tasks carrying this tag (repeatable); tags in `benchmarks/tasks` include `python`, `node`, `c`, `bugfix`, `feature`, `refactor`, `multi-file`, `tests`, `recovery`, `permission`, `injection`, `preserve` |
 | `--k K` | k for pass@k (default: the number of attempts) |
 | `--model`, `--provider` | passed to `nerdvana run` |

@@ -26,6 +26,7 @@ SLASH_COMMANDS = [
     ("/route-knowledge", "Classify content → suggest WriteMemory scope"),
     ("/dashboard", "Toggle observability dashboard"),
     ("/health", "Show 7-day tool call health summary"),
+    ("/goal", "Hold the agent to a verification command"),
     ("/thinking", "Toggle inline thinking display (on/off)"),
     ("/activity", "Toggle activity indicator (on/off)"),
     ("/quit", "Exit"),

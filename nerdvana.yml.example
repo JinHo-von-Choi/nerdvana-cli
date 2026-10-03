@@ -122,6 +122,12 @@ agents:
   categories: {}
   #  quick: claude-haiku-4-5-20251001
 
+goal:
+  # A goal (nerdvana run --verify, /goal) is done when its command exits with status 0. See docs/goals.md.
+  verify_timeout: 300
+  max_attempts: 5
+  output_tail_chars: 4000
+
 sandbox:
   # off | auto | require: confine what the Bash tool can write with the operating system
   # (Linux Landlock). See docs/sandbox.md.
