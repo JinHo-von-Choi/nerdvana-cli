@@ -20,8 +20,8 @@ from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent, Ho
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.safety.classifier import ClassifierFeed, Completion
 from nerdvana_cli.core.safety.policy import PermissionPolicy
-from nerdvana_cli.core.session import SessionStorage
-from nerdvana_cli.core.signals import (
+from nerdvana_cli.core.state.session import SessionStorage
+from nerdvana_cli.core.state.signals import (
     CLASSIFIER_ASK,
     CLASSIFIER_DENY,
     CLASSIFIER_ERROR,

@@ -93,7 +93,7 @@ def _stored_loop(session_id: str) -> AgentLoop:
     """An agent loop holding the conversation of the stored session *session_id*."""
     from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
     from nerdvana_cli.core.config.settings import NerdvanaSettings
-    from nerdvana_cli.core.session import SessionStorage
+    from nerdvana_cli.core.state.session import SessionStorage
 
     settings     = NerdvanaSettings.load()
     settings.cwd = os.getcwd()
@@ -104,7 +104,7 @@ def _stored_loop(session_id: str) -> AgentLoop:
 
 def context_command(session_id: str, top: int, json_output: bool) -> int:
     """Print the breakdown for a stored session (the latest when *session_id* is empty); the exit code."""
-    from nerdvana_cli.core.session import SessionStorage, resume_session_id
+    from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 
     wanted = session_id.strip() or SessionStorage.get_last_session() or ""
     sid    = resume_session_id(wanted)

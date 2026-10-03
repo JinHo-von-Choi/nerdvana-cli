@@ -24,10 +24,10 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-from nerdvana_cli.core import signals
 from nerdvana_cli.core.config.model_routing import parse_fallback
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.safety.secrets import SecretMasker
+from nerdvana_cli.core.state import signals
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.providers.factory import create_provider, resolve_api_key
 from nerdvana_cli.types import Message, Role

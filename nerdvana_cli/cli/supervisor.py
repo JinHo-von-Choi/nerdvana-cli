@@ -3,7 +3,7 @@
 Author: 최진호
 Date:   2026-10-03
 
-``start_run`` writes the run record (core/run_store.py), makes a git worktree for it when asked, and starts a
+``start_run`` writes the run record (core/state/run_store.py), makes a git worktree for it when asked, and starts a
 monitor process (``python -m nerdvana_cli.cli.supervisor <id>``) in a session of its own, so it outlives the
 terminal that started it. The monitor starts the run, ``nerdvana run --output-format stream-json``, in its own
 process group with the output going to the run's log, and until the run ends it renews the record's lease,
@@ -30,9 +30,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core import cancellation, run_store
+from nerdvana_cli.core import cancellation
 from nerdvana_cli.core.cancellation import stop_process_group
-from nerdvana_cli.core.run_store import (
+from nerdvana_cli.core.state import run_store
+from nerdvana_cli.core.state.run_store import (
     FAILED,
     FINISHED,
     LOG_FILE,
@@ -50,7 +51,7 @@ from nerdvana_cli.core.run_store import (
     pid_alive,
     read_lines,
 )
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.worktree import Worktree, WorktreeError, create_worktree, has_changes, remove_worktree
 
 logger = logging.getLogger(__name__)

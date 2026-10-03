@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.compaction_block import carries_compaction
 from nerdvana_cli.core.config import paths
+from nerdvana_cli.core.state.compaction_block import carries_compaction
 from nerdvana_cli.types import Message, Role
 
 # Transcript tool results are capped at this many characters when recorded.

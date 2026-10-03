@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 
 
 class TestSessionRestoration:

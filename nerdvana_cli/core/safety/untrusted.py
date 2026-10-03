@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections import Counter, deque
 from typing import Any
 
-from nerdvana_cli.core.signals import UNTRUSTED_SOURCE
+from nerdvana_cli.core.state.signals import UNTRUSTED_SOURCE
 from nerdvana_cli.types import PermissionBehavior, PermissionResult
 
 UNTRUSTED_TOOLS = frozenset({"WebFetch", "WebSearch"})

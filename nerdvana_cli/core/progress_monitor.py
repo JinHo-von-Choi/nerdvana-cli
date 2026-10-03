@@ -3,7 +3,7 @@
 Author: 최진호
 Date:   2026-10-03
 
-The identical-call guard in ``core/concurrency.py`` catches a model that repeats one call. It does not
+The identical-call guard in ``core/state/concurrency.py`` catches a model that repeats one call. It does not
 catch the other common way to stall: different calls that never change anything. Two patterns are
 watched here, from the calls the tool executor has run:
 

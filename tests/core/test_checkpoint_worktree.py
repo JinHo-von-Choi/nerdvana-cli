@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import checkpoint as checkpoint_module
-from nerdvana_cli.core.checkpoint import CheckpointManager, _session_root
+from nerdvana_cli.core.state import checkpoint as checkpoint_module
+from nerdvana_cli.core.state.checkpoint import CheckpointManager, _session_root
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -368,7 +368,7 @@ def test_a_caller_that_names_no_file_is_reported(repo: Path, caplog: pytest.LogC
     """An inert checkpoint call is warned about once, not hidden in debug logs."""
     cp = _manager(repo)
 
-    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.checkpoint"):
+    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.state.checkpoint"):
         cp.before_edit("FileWrite")
         cp.before_edit("FileEdit")
 

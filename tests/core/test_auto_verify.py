@@ -19,8 +19,8 @@ from nerdvana_cli.core import auto_verify
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.goal import MET, PAUSED, UNMET, Goal
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.goal import MET, PAUSED, UNMET, Goal
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
@@ -267,7 +267,7 @@ async def test_an_explicit_goal_takes_the_place_of_the_automatic_check(monkeypat
 
 
 async def test_the_automatic_check_is_not_saved_as_the_goal_of_the_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from nerdvana_cli.core.goal import load_goal
+    from nerdvana_cli.core.state.goal import load_goal
 
     loop = _loop(monkeypatch, tmp_path, _Script([_edit(1), _say("done")]), CHECK)
     await _drain(loop)

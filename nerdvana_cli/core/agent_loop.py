@@ -20,11 +20,9 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.markup import escape
 
-from nerdvana_cli.core import signals
 from nerdvana_cli.core.activity_hooks import register_activity_hooks
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.advisor import Advisor
-from nerdvana_cli.core.budget import Budget
 from nerdvana_cli.core.builtin_hooks import (
     DirectoryRuleInjector,
     context_limit_recovery,
@@ -34,7 +32,6 @@ from nerdvana_cli.core.builtin_hooks import (
     session_start_memory_hint,
 )
 from nerdvana_cli.core.cancellation import race_abort, until_interrupted
-from nerdvana_cli.core.checkpoint import CheckpointManager
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.compact import (
     FALLBACK_PROMPT,
@@ -58,7 +55,6 @@ from nerdvana_cli.core.context.server_compaction import ServerCompaction
 from nerdvana_cli.core.context.skills import SkillLoader
 from nerdvana_cli.core.context.tool_index import ToolIndex
 from nerdvana_cli.core.context_reminder import ContextReminder
-from nerdvana_cli.core.goal import Goal
 from nerdvana_cli.core.goal_gate import GoalGate
 from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
@@ -72,15 +68,19 @@ from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.phase_effort import PhaseEffort
 from nerdvana_cli.core.plan_gate import plan_for
 from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
-from nerdvana_cli.core.rewind import Rewinder
 from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state import signals
+from nerdvana_cli.core.state.budget import Budget
+from nerdvana_cli.core.state.checkpoint import CheckpointManager
+from nerdvana_cli.core.state.goal import Goal
+from nerdvana_cli.core.state.rewind import Rewinder
+from nerdvana_cli.core.state.session import SessionStorage
+from nerdvana_cli.core.state.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
-from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
@@ -299,7 +299,7 @@ class AgentLoop:
         return SandboxPolicy.from_config(self.settings.sandbox, self.settings.secrets.proxy_credentials)
 
     def signal_summary(self) -> dict[str, int]:
-        """How often each kind of trouble came up in this session (see ``core/signals.py``)."""
+        """How often each kind of trouble came up in this session (see ``core/state/signals.py``)."""
         return signals.merge(self._signals, self.tool_executor.signals)
 
     def usage_summary(self) -> dict[str, int]:

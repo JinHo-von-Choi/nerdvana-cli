@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from rich.markup import escape
 
-from nerdvana_cli.core.goal import ACTIVE, PAUSED, Goal, GoalError
+from nerdvana_cli.core.state.goal import ACTIVE, PAUSED, Goal, GoalError
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp

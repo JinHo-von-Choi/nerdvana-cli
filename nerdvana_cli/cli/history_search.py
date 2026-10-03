@@ -3,7 +3,7 @@
 Author: 최진호
 Date:   2026-10-03
 
-Transcripts are append-only JSONL files (``core/session.py``). The search reads the messages of user,
+Transcripts are append-only JSONL files (``core/state/session.py``). The search reads the messages of user,
 assistant and tool results from them. With SQLite FTS5 available it keeps a small index file next to
 the transcripts that is brought up to date on every search: only the bytes appended since the last
 search are read, and a transcript that shrank or vanished is dropped and read again. Without FTS5, or

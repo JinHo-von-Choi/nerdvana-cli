@@ -29,7 +29,7 @@ from nerdvana_cli.core.safety.egress_proxy import (
     split_host_port,
 )
 from nerdvana_cli.core.safety.sandbox import Launch, SandboxPolicy, plan_launch, proxy_environment
-from nerdvana_cli.core.signals import EGRESS_DENIED, classify_result
+from nerdvana_cli.core.state.signals import EGRESS_DENIED, classify_result
 
 
 class FakeUpstream:

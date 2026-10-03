@@ -24,8 +24,8 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
-from nerdvana_cli.core import signals
 from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX, open_todos_note
+from nerdvana_cli.core.state import signals
 from nerdvana_cli.types import Message, Role
 
 if TYPE_CHECKING:

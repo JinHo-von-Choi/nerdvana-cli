@@ -18,7 +18,7 @@ from nerdvana_cli.core.safety.approvals import normalise
 from nerdvana_cli.core.safety.classifier import ALLOW, ASK, DENY, ENFORCE, SHADOW, ActionClassifier, Classification
 from nerdvana_cli.core.safety.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.safety.untrusted import UntrustedTracker
-from nerdvana_cli.core.signals import CLASSIFIER_ASK, CLASSIFIER_DENY, CLASSIFIER_ERROR
+from nerdvana_cli.core.state.signals import CLASSIFIER_ASK, CLASSIFIER_DENY, CLASSIFIER_ERROR
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.types import PermissionBehavior, ToolResult
 

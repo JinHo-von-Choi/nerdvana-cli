@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.todos import sanitize_session_id, todos_dir
+from nerdvana_cli.core.state.todos import sanitize_session_id, todos_dir
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

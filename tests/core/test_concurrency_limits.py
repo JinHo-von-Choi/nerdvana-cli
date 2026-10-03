@@ -10,9 +10,9 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from nerdvana_cli.core.concurrency import RepeatDetector, agent_slot
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.hooks.hooks import HookEngine
+from nerdvana_cli.core.state.concurrency import RepeatDetector, agent_slot
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import ToolResult

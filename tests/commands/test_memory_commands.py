@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.commands import memory_commands as mc
-from nerdvana_cli.core.checkpoint import CheckpointEntry
 from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
+from nerdvana_cli.core.state.checkpoint import CheckpointEntry
 
 # ---------------------------------------------------------------------------
 # Doubles

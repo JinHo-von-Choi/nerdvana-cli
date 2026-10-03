@@ -12,7 +12,7 @@ import pytest
 
 from nerdvana_cli.commands.goal_command import GoalRequest, GoalUsageError, handle_goal, parse_goal_args
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.goal import ACTIVE, PAUSED, Goal
+from nerdvana_cli.core.state.goal import ACTIVE, PAUSED, Goal
 
 # ---------------------------------------------------------------------------
 # Parsing

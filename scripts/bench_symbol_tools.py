@@ -47,7 +47,7 @@ from typing import Any, NamedTuple
 
 ROOT        = Path(__file__).resolve().parent.parent
 SEED_FILES  = (
-    "nerdvana_cli/core/session.py",
+    "nerdvana_cli/core/state/session.py",
     "nerdvana_cli/core/context/token_estimator.py",
     "nerdvana_cli/core/context/context_budget.py",
     "nerdvana_cli/core/context/observation_mask.py",

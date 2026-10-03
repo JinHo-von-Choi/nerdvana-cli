@@ -17,8 +17,8 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from nerdvana_cli.core.compaction_block import last_compaction_index
 from nerdvana_cli.core.context.token_estimator import approx_tokens
+from nerdvana_cli.core.state.compaction_block import last_compaction_index
 
 # What an image costs in a request, whatever its size on disk: providers bill by pixels, a few thousand tokens at most.
 IMAGE_TOKENS = 1500

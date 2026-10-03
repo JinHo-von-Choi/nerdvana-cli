@@ -26,7 +26,7 @@ from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.skills import Skill
 from nerdvana_cli.core.context.user_commands import UserCommand, UserCommandLoader
-from nerdvana_cli.core.session import SessionStorage, resume_session_id
+from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState
 from nerdvana_cli.ui.banner import build_banner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
