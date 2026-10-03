@@ -163,6 +163,11 @@ goal:
   # run that changed files is accepted as finished. See docs/goals.md.
   auto_verify: false
 
+memory:
+  # true: memories the agent proposes wait in an inbox until you approve them
+  # (nerdvana memory inbox, nerdvana memory approve <id>). See docs/memory.md.
+  review: false
+
 sandbox:
   # off | auto | require: confine what the Bash tool can write with the operating system
   # (Linux Landlock). See docs/sandbox.md.
