@@ -192,6 +192,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana version` | 버전 표시 |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
+| `nerdvana approvals` | 계속 승인하는 권한 질문에 대해 `always_allow` 규칙(`Bash(git status)`)을 제안합니다. 설정은 바뀌지 않습니다 |
 | `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
 
 ### 세션 기록 (`nerdvana session ...`)
@@ -509,7 +510,7 @@ model_history: {}
 
 permissions:
   mode: default                    # default | accept-edits | bypass | plan
-  always_allow: []                 # 도구 이름 또는 glob 패턴, 예: ["FileRead", "lsp_*"]
+  always_allow: []                 # 도구 이름 또는 glob 패턴, 예: ["FileRead", "lsp_*", "Bash(git status)"]
   always_deny: []
 
 session:

@@ -208,6 +208,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana version` | Show version |
 | `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |
+| `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written |
 | `nerdvana cost` | Aggregate token usage, cached tokens and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
 
 ### Session transcripts (`nerdvana session ...`)
@@ -534,7 +535,7 @@ model:
 
 permissions:
   mode: default              # default, accept-edits, bypass, plan
-  always_allow: []           # tool names or glob patterns, e.g. ["FileRead", "lsp_*"]
+  always_allow: []           # tool names or glob patterns, e.g. ["FileRead", "lsp_*", "Bash(git status)"]
   always_deny: []
 
 session:

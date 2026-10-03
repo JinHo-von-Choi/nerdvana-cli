@@ -598,5 +598,17 @@ def cost(
     cost_command(since=since, json_output=json_output, by=by)
 
 
+@app.command()
+def approvals(
+    since:       int  = typer.Option(30, "--since", help="Look back this many days"),
+    min_count:   int  = typer.Option(3,  "--min",   help="Approvals needed before a call is suggested"),
+    json_output: bool = typer.Option(False, "--json", help="Machine-readable JSON output"),
+) -> None:
+    """Suggest always_allow rules for permission questions you keep approving (nothing is written)."""
+    from nerdvana_cli.commands.approvals_command import approvals_command
+
+    approvals_command(since=since, min_approvals=min_count, json_output=json_output)
+
+
 if __name__ == "__main__":
     app()

@@ -91,8 +91,8 @@ whole JSON documents, so use `--provider` / `--model`, the `/provider` and
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | str | `"default"` | `default`, `accept-edits`, `bypass`, `plan`; mapped onto the `interactive`, `editing`, `one-shot` and `planning` mode profiles. `--approval-mode` and `session.default_mode` take precedence. |
-| `always_allow` | list[str] | `[]` | Tool names (glob patterns allowed) run without asking. A tool's own refusal still wins. |
-| `always_deny` | list[str] | `[]` | Tool names (glob patterns allowed) always refused, in every mode. |
+| `always_allow` | list[str] | `[]` | Tool names (glob patterns allowed) run without asking; `Tool(pattern)` limits a rule to calls whose main argument matches: the command of `Bash` or `Parism`, the path of a file tool, the URL of `WebFetch`. `Bash(git status)` allows that command, `Bash(git diff *)` allows `git diff` with any arguments, and a command with shell operators (`;`, `&&`, `|`, `$(`, `>` and the like) never matches an allow rule that names arguments. A tool's own refusal still wins. `nerdvana approvals` suggests rules from your own answers. |
+| `always_deny` | list[str] | `[]` | Tool names (glob patterns allowed) always refused, in every mode; `Tool(pattern)` limits a rule to calls whose main argument matches, and for a deny rule a command with shell operators matches like any other. |
 
 Every tool call goes through one policy, in this order: `always_deny`, tools excluded by the active mode, the tool's own refusal, `always_allow`, then the mode's trust level (`strict` asks before any write, `balanced` asks before destructive tools and tools that require confirmation, `yolo` asks nothing). Sub-agents and background agents follow the same policy.
 

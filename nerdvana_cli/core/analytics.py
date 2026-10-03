@@ -23,7 +23,7 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS api_calls (
 );
 CREATE INDEX IF NOT EXISTS idx_api_calls_session ON api_calls(session_id);
 CREATE INDEX IF NOT EXISTS idx_api_calls_ts      ON api_calls(ts);
+
+CREATE TABLE IF NOT EXISTS approvals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  TEXT,
+    ts          TEXT NOT NULL,
+    tool_name   TEXT NOT NULL,
+    arg_key     TEXT,
+    decision    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_call ON approvals(tool_name, arg_key);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id          TEXT    PRIMARY KEY,
@@ -348,6 +358,20 @@ class AnalyticsWriter:
                 logger.debug("analytics: record_api_call error: %s", exc)
         return cost
 
+    def record_approval(self, tool_name: str, arg_key: str, granted: bool) -> None:
+        """Persist the user's answer to one permission question."""
+        if not self._enabled:
+            return
+        with self._lock:
+            try:
+                with _connect(self._db_path) as conn:
+                    conn.execute(
+                        "INSERT INTO approvals (session_id, ts, tool_name, arg_key, decision) VALUES (?, ?, ?, ?, ?)",
+                        (self._session_id, datetime.now(UTC).isoformat(), tool_name, arg_key, "allow" if granted else "deny"),
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("analytics: record_approval error: %s", exc)
+
     # ------------------------------------------------------------------
     # Tool call recording
     # ------------------------------------------------------------------
@@ -486,6 +510,24 @@ class AnalyticsReader:
             ]
         except Exception as exc:  # noqa: BLE001
             logger.debug("analytics: recent_tool_buckets error: %s", exc)
+            return []
+
+    def approvals(self, days: int = 30) -> list[dict[str, Any]]:
+        """Answers to permission questions of the last *days* days, counted per tool and argument."""
+        if not self._exists():
+            return []
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(
+                    """SELECT tool_name, arg_key,
+                              SUM(decision = 'allow') AS allowed, SUM(decision = 'deny') AS denied
+                       FROM approvals WHERE ts >= ? GROUP BY tool_name, arg_key""",
+                    (cutoff,),
+                ).fetchall()
+            return [{"tool": r["tool_name"], "argument": r["arg_key"], "allowed": int(r["allowed"] or 0), "denied": int(r["denied"] or 0)} for r in rows]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("analytics: approvals error: %s", exc)
             return []
 
     def session_cost(self, session_id: str) -> float:
