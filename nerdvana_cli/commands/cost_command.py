@@ -72,7 +72,10 @@ def load_usage_rows(
     if not db_path.exists():
         return []
 
-    if by == "provider":
+    attributed = by in _ATTRIBUTION
+    if attributed:
+        select_cols, group_by = _ATTRIBUTION[by], "1"
+    elif by == "provider":
         select_cols = "COALESCE(provider, '(unknown)') AS provider, '' AS model"
         group_by    = "provider"
     else:
@@ -86,7 +89,7 @@ def load_usage_rows(
             has_api = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='api_calls'").fetchone() is not None
             merged  = _merge_usage(
                 _aggregate(conn, _API_CALLS_SQL, select_cols, group_by, cutoff, has_api) if has_api else [],
-                _aggregate(conn, _TOOL_CALLS_SQL, select_cols, group_by, cutoff, has_api),
+                [] if attributed else _aggregate(conn, _TOOL_CALLS_SQL, select_cols, group_by, cutoff, has_api),
             )
         finally:
             conn.close()
@@ -94,6 +97,14 @@ def load_usage_rows(
         return []
     return sorted(merged, key=lambda r: (-r["cost_usd"], -r["input_tokens"]))
 
+
+# Groupings that need to know which agent made a request, so only per-request rows can answer them.
+# The first column of the report holds the group name (it is named "provider" for all of them).
+_ATTRIBUTION = {
+    "agent":    "COALESCE(NULLIF(agent_type, ''), 'main') AS provider, '' AS model",
+    "category": "COALESCE(NULLIF(category, ''), '(none)') AS provider, '' AS model",
+    "tool":     "COALESCE(NULLIF(last_tool, ''), '(first request)') AS provider, '' AS model",
+}
 
 # Per-request usage the provider reported. Sessions recorded before it existed only have
 # per-tool-call figures, so those are read for the sessions with no per-request rows.
@@ -239,7 +250,7 @@ def build_cost_report(
     raw   = load_usage_rows(path, cutoff, by)
 
     rows: list[dict[str, Any]] = [
-        {**r, "status": "ok" if by == "provider" else _pricing_status(r["provider"], r["model"])}
+        {**r, "status": _pricing_status(r["provider"], r["model"]) if by == "model" else "ok"}
         for r in raw
     ]
     warning_count = sum(1 for row in rows if row["status"] != "ok")
@@ -276,6 +287,9 @@ def _fmt_cost(usd: float, status: str) -> str:
     return f"${usd:.4g}"
 
 
+_FIRST_COLUMN = {"agent": "Agent", "category": "Category", "tool": "Tool (ran just before)"}
+
+
 def render_cost_table(report: dict[str, Any]) -> None:
     """Render the cost report as a Rich table to stdout."""
     from rich.console import Console
@@ -293,8 +307,9 @@ def render_cost_table(report: dict[str, Any]) -> None:
         return
 
     table = Table(show_header=True, header_style="bold")
-    table.add_column("Provider",     style="cyan")
-    table.add_column("Model",        style="")
+    table.add_column(_FIRST_COLUMN.get(report["by"], "Provider"), style="cyan")
+    if report["by"] in ("provider", "model"):
+        table.add_column("Model",    style="")
     table.add_column("Input",        justify="right")
     table.add_column("Output",       justify="right")
     table.add_column("Cache read",   justify="right")
@@ -305,7 +320,7 @@ def render_cost_table(report: dict[str, Any]) -> None:
         cost_str = _fmt_cost(row["cost_usd"], row["status"])
         table.add_row(
             row["provider"],
-            row["model"],
+            *([row["model"]] if report["by"] in ("provider", "model") else []),
             _fmt_tokens(row["input_tokens"]),
             _fmt_tokens(row["output_tokens"]),
             _fmt_tokens(row["cache_read_tokens"]),
@@ -317,7 +332,7 @@ def render_cost_table(report: dict[str, Any]) -> None:
     total_cost_str = f"${report['total_cost_usd']:.4g}"
     table.add_row(
         "[bold]TOTAL[/bold]",
-        "",
+        *([""] if report["by"] in ("provider", "model") else []),
         f"[bold]{_fmt_tokens(report['total_input'])}[/bold]",
         f"[bold]{_fmt_tokens(report['total_output'])}[/bold]",
         f"[bold]{_fmt_tokens(report['total_cache_read'])}[/bold]",
@@ -341,11 +356,11 @@ def render_cost_table(report: dict[str, Any]) -> None:
 
 def cost_command(since: str, json_output: bool, by: str) -> None:
     """Run nerdvana cost logic. Called from main.py."""
-    if by not in ("provider", "model"):
+    if by not in ("provider", "model", *_ATTRIBUTION):
         import typer
         from rich.console import Console
         Console(stderr=True).print(
-            f"[red]Error: --by must be 'provider' or 'model', got '{by}'.[/red]"
+            f"[red]Error: --by must be one of provider, model, {', '.join(_ATTRIBUTION)}; got '{by}'.[/red]"
         )
         raise typer.Exit(1)
 

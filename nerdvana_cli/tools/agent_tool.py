@@ -26,6 +26,20 @@ class AgentToolArgs:
     run_in_background: bool = False
 
 
+def _agent_types() -> Any:
+    """The built-in agent types plus the ones defined under ``.nerdvana/agents`` of the working directory."""
+    import os
+
+    from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
+    from nerdvana_cli.agents.registry import AgentTypeRegistry
+
+    registry = AgentTypeRegistry()
+    for defn in BUILTIN_AGENTS:
+        registry.register(defn)
+    registry.load_from_dir(os.path.join(os.getcwd(), ".nerdvana", "agents"))
+    return registry
+
+
 class AgentTool(BaseTool[AgentToolArgs]):
     """Spawn a subagent to handle a complex, multi-step task independently."""
 
@@ -115,19 +129,9 @@ class AgentTool(BaseTool[AgentToolArgs]):
 
         child_settings = copy.deepcopy(self._settings)
 
-        import os
-
-        from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
-        from nerdvana_cli.agents.registry import AgentTypeRegistry
         from nerdvana_cli.tools.registry import create_subagent_registry
 
-        _agent_type_reg = AgentTypeRegistry()
-        for defn in BUILTIN_AGENTS:
-            _agent_type_reg.register(defn)
-        _agent_type_reg.load_from_dir(
-            os.path.join(os.getcwd(), ".nerdvana", "agents")
-        )
-
+        _agent_type_reg = _agent_types()
         agent_defn = _agent_type_reg.get(args.subagent_type)
         if agent_defn is None:
             available = ", ".join(sorted(_agent_type_reg._agents.keys()))
@@ -155,6 +159,8 @@ class AgentTool(BaseTool[AgentToolArgs]):
             max_turns     = agent_defn.max_turns,
             system_prompt = agent_defn.system_prompt,
             confirm       = label_confirm(context.confirm, task_id),
+            category      = args.category or agent_defn.category,
+            parent_session_id = str(context.state.get("session_id", "")),
         )
 
         if args.run_in_background:

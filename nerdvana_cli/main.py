@@ -418,6 +418,7 @@ def run(
     started            = time.monotonic()
 
     async def _run() -> None:
+        loop.usage_listener = reporter.request
         reporter.start(session.session_id, settings.model.provider, settings.model.model)
         try:
             async for chunk in loop.run(prompt):
@@ -567,7 +568,7 @@ def doctor(
 def cost(
     since:       str  = typer.Option("7d",      "--since", help="Time window (e.g. 7d, 30d, 24h, all)"),
     json_output: bool = typer.Option(False,      "--json",  help="Machine-readable JSON output"),
-    by:          str  = typer.Option("provider", "--by",    help="Group by: provider | model"),
+    by:          str  = typer.Option("provider", "--by",    help="Group by: provider | model | agent | category | tool"),
 ) -> None:
     """Aggregate token usage and USD cost over a time window."""
     from nerdvana_cli.commands.cost_command import cost_command

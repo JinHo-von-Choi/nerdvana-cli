@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.analytics import CallOrigin
 from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
@@ -28,6 +29,8 @@ class SubagentConfig:
     max_turns:     int = 50
     system_prompt: str = ""
     confirm:       ConfirmCallback | None = None
+    category:      str = ""
+    parent_session_id: str = ""
 
 
 def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
@@ -52,7 +55,8 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
 
-    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm)
+    origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
+    loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin)
     parts: list[str] = []
 
     limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)

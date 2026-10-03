@@ -174,7 +174,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 
 `subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
 
-`stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `compaction`, `context`(창 사용률)입니다.
+`stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `request`(요청 하나의 `provider`, `model`, `agent_type`, `turn`, `last_tool`, 캐시 토큰을 포함한 토큰 수, `cost_usd`), `compaction`, `context`(창 사용률)입니다.
 
 ## CLI 서브명령어
 
@@ -189,7 +189,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana version` | 버전 표시 |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
-| `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준) |
+| `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
 
 ### 세션 기록 (`nerdvana session ...`)
 
