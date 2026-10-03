@@ -657,5 +657,20 @@ def review(
         raise typer.Exit(code)
 
 
+@app.command(name="import")
+def import_(
+    source:  str  = typer.Argument(..., help="claude or codex"),
+    write:   bool = typer.Option(False, "--write", help="Copy the commands (without it, only show what would happen)"),
+    project: str  = typer.Option(".", "--project", help="The project directory"),
+) -> None:
+    """Bring over slash commands and permission rules from Claude Code or Codex (the rules are printed, not applied)."""
+    from nerdvana_cli.commands.import_command import SOURCES, import_command
+
+    if source not in SOURCES:
+        console_stderr.print(f"[red]Error: source must be one of {', '.join(SOURCES)}.[/red]")
+        raise typer.Exit(2)
+    print(import_command(source, write, project))
+
+
 if __name__ == "__main__":
     app()
