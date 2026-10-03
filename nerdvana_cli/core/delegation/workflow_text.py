@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from nerdvana_cli.core.schema_check import _type_ok
+from nerdvana_cli.utils.schema_check import _type_ok
 
 REFERENCE = re.compile(r"\$\{([^}]*)\}")
 WHOLE     = re.compile(r"^\s*\$\{([^}]*)\}\s*$")

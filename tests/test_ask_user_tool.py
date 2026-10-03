@@ -9,8 +9,8 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.tools.ask_user_tool import AskUserArgs, AskUserTool
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry

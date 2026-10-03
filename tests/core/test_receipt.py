@@ -17,10 +17,10 @@ from typer.testing import CliRunner
 from nerdvana_cli.cli.receipt import RECEIPT_VERSION, build_receipt
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter, CallOrigin
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.main import app
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import ToolResult

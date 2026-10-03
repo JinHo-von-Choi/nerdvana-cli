@@ -13,12 +13,12 @@ import pytest
 
 from nerdvana_cli.commands.approvals_command import build_report, render
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.safety.approvals import Suggestion, normalise, suggest_rules
 from nerdvana_cli.core.safety.policy import PermissionPolicy, primary_argument
 from nerdvana_cli.core.telemetry.analytics import AnalyticsReader, AnalyticsWriter
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
 ALLOW = PermissionResult(PermissionBehavior.ALLOW)

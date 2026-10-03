@@ -13,11 +13,11 @@ import pytest
 
 from nerdvana_cli.cli.run_output import RunResult
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.state import signals
 from nerdvana_cli.core.state.signals import classify_result
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.types import ToolResult
 
 # ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ def test_the_run_result_carries_the_signals() -> None:
 def test_the_phrases_the_classifier_looks_for_still_exist_in_the_code_that_writes_them() -> None:
     import inspect
 
-    from nerdvana_cli.core import tool_executor
+    from nerdvana_cli.core.execution import tool_executor
     from nerdvana_cli.core.safety import edit_guard, tool_permission
     from nerdvana_cli.tools import file_tools
 

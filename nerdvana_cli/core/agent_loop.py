@@ -54,7 +54,8 @@ from nerdvana_cli.core.context.observation_mask import mask_observations
 from nerdvana_cli.core.context.server_compaction import ServerCompaction
 from nerdvana_cli.core.context.skills import SkillLoader
 from nerdvana_cli.core.context.tool_index import ToolIndex
-from nerdvana_cli.core.context_reminder import ContextReminder
+from nerdvana_cli.core.execution.context_reminder import ContextReminder
+from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.goal_gate import GoalGate
 from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
@@ -82,7 +83,6 @@ from nerdvana_cli.core.stream_guard import guarded_stream
 from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
-from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.types import Message, Role, SessionState
