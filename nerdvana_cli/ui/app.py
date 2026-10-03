@@ -9,34 +9,40 @@ import os
 import threading
 import time
 from collections.abc import Callable
-from pathlib import Path
+from functools import partial
 from typing import Any
 
 from rich.markup import escape
-from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
-from textual.widgets.option_list import Option
 
-from nerdvana_cli import __version__
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.skills import Skill
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState
 from nerdvana_cli.core.user_commands import UserCommand, UserCommandLoader
 from nerdvana_cli.tools.registry import create_tool_registry
+from nerdvana_cli.ui.banner import build_banner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
-from nerdvana_cli.ui.editor_pane import EditorPane, language_for_path
+from nerdvana_cli.ui.editor_controller import EditorBufferController
+from nerdvana_cli.ui.editor_pane import EditorPane
+from nerdvana_cli.ui.live_panels import (
+    refresh_mcp_section,
+    refresh_sidebar_tasks,
+    schedule_sidebar_file_refresh,
+    update_context_usage,
+)
+from nerdvana_cli.ui.menu_controller import handle_option_selected, refresh_command_menu, seed_skill_options
 from nerdvana_cli.ui.project_tree import ProjectTreePane
 from nerdvana_cli.ui.sidebar import Sidebar
-from nerdvana_cli.ui.sidebar_sections import SidebarTasksSection
+from nerdvana_cli.ui.update_notice import check_for_update
 from nerdvana_cli.ui.widgets import (
-    SLASH_COMMANDS,
     ActivityIndicator,
     AskUserScreen,
     ChatMessage,
@@ -49,11 +55,8 @@ from nerdvana_cli.ui.widgets import (
     StreamingOutput,
     ToolStatusLine,
 )
-from nerdvana_cli.utils.path import safe_open_fd, validate_path
 
 logger = logging.getLogger(__name__)
-
-_MAX_EDITOR_FILE_BYTES = 1_000_000
 
 
 def make_activity_change_callback(
@@ -191,8 +194,7 @@ class NerdvanaApp(App[object]):
         self._sidebar_user_visible: bool | None = None  # None = follow auto rule
         self._session_topic: str        = ""
         self._project_root: str         = os.getcwd()
-        self._active_editor_path: str   = ""
-        self._editor_dirty: bool        = False
+        self._editor                    = EditorBufferController(self)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -279,57 +281,16 @@ class NerdvanaApp(App[object]):
 
     def on_mount(self) -> None:
         """Initialize agent loop and display welcome."""
-        registry      = create_tool_registry(
+        registry = create_tool_registry(
             parism_client = self.parism_client,
             mcp_tools     = self.mcp_manager.get_all_tools() if self.mcp_manager else [],
             settings      = self.settings,
             task_registry = self._task_registry,
         )
-        resume_id = resume_session_id(self._resume_id)
-        session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
-
-        _on_activity_change = make_activity_change_callback(self, threading.get_ident())
-
-        self._agent_loop = AgentLoop(
-            settings           = self.settings,
-            registry           = registry,
-            session            = session,
-            task_registry      = self._task_registry,
-            on_activity_change = _on_activity_change,
-            on_ask_user        = self._ask_user_prompt,
-            on_confirm         = self._confirm_prompt,
-        )
-        if resume_id:
-            restored = self._agent_loop.restore_history()
-            self.notify(f"Resumed session {resume_id}: {restored} message(s) restored.")
-
+        skills = self._start_agent_loop(registry).skill_loader.list_skills()
         self._update_banner()
-
-        sidebar = self.query_one("#sidebar", Sidebar)
-        sidebar.set_header(topic=self._session_topic, cwd=self._project_root)
-        sidebar.set_context(
-            provider=self.settings.model.provider,
-            model=self.settings.model.model,
-            pct=0,
-        )
-        sidebar.set_tools([t.name for t in registry.all_tools()])
-        self._refresh_mcp_section()
-        self.set_interval(2.0, self._refresh_mcp_section)
-
-        triggers = [s.trigger for s in self._agent_loop.skill_loader.list_skills()]
-        sidebar.set_skills(triggers)
-        sidebar.set_tasks_registry(self._task_registry)
-        self._task_registry.add_listener(self._on_background_task_finished)
-        self.set_interval(0.5, self._refresh_sidebar_tasks)
-        self.set_interval(2.0, self._schedule_sidebar_file_refresh)
-
-        menu = self.query_one("#command-menu", CommandMenu)
-        # Pre-seed seen set with built-in slash command IDs to avoid DuplicateID
-        _seen_triggers: set[str] = {cmd for cmd, _ in SLASH_COMMANDS}
-        for skill in self._agent_loop.skill_loader.list_skills():
-            if skill.trigger not in _seen_triggers:
-                menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
-                _seen_triggers.add(skill.trigger)
+        self._init_sidebar(registry, skills)
+        seed_skill_options(self.query_one("#command-menu", CommandMenu), skills)
 
         status = self.query_one("#status-bar", StatusBar)
         status.update_status(
@@ -349,7 +310,45 @@ class NerdvanaApp(App[object]):
                 self.query_one("#activity-indicator", ActivityIndicator).styles.display = "none"
 
         self._show_load_warnings()
-        self._check_update_task = asyncio.create_task(self._check_update())
+        self._check_update_task = asyncio.create_task(check_for_update(self))
+
+    def _start_agent_loop(self, registry: Any) -> AgentLoop:
+        """Create the agent loop on its session and restore the history of a resumed one."""
+        resume_id = resume_session_id(self._resume_id)
+        session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
+
+        self._agent_loop = AgentLoop(
+            settings           = self.settings,
+            registry           = registry,
+            session            = session,
+            task_registry      = self._task_registry,
+            on_activity_change = make_activity_change_callback(self, threading.get_ident()),
+            on_ask_user        = self._ask_user_prompt,
+            on_confirm         = self._confirm_prompt,
+        )
+        if resume_id:
+            restored = self._agent_loop.restore_history()
+            self.notify(f"Resumed session {resume_id}: {restored} message(s) restored.")
+        return self._agent_loop
+
+    def _init_sidebar(self, registry: Any, skills: list[Skill]) -> None:
+        """Fill the sidebar sections and start the timers that keep them current."""
+        sidebar = self.query_one("#sidebar", Sidebar)
+        sidebar.set_header(topic=self._session_topic, cwd=self._project_root)
+        sidebar.set_context(
+            provider=self.settings.model.provider,
+            model=self.settings.model.model,
+            pct=0,
+        )
+        sidebar.set_tools([t.name for t in registry.all_tools()])
+        refresh_mcp_section(self)
+        self.set_interval(2.0, partial(refresh_mcp_section, self))
+
+        sidebar.set_skills([s.trigger for s in skills])
+        sidebar.set_tasks_registry(self._task_registry)
+        self._task_registry.add_listener(self._on_background_task_finished)
+        self.set_interval(0.5, partial(refresh_sidebar_tasks, self))
+        self.set_interval(2.0, partial(schedule_sidebar_file_refresh, self))
 
     def _show_load_warnings(self) -> None:
         """Show config problems recovered during loading, once at startup."""
@@ -361,29 +360,6 @@ class NerdvanaApp(App[object]):
             f"[yellow]Config warnings (run `nerdvana doctor` for details):[/yellow]\n{escape(lines)}",
         )
 
-    def _refresh_mcp_section(self) -> None:
-        """Update sidebar MCP section from mcp_manager.get_status()."""
-        if not self.mcp_manager:
-            return
-        status_map = self.mcp_manager.get_status()
-        servers: list[tuple[str, str]] = [
-            (name, "connected" if ok else "error")
-            for name, ok in status_map.items()
-        ]
-        with contextlib.suppress(Exception):
-            self.query_one("#sidebar", Sidebar).set_mcp(servers)
-
-    def _refresh_sidebar_tasks(self) -> None:
-        """Refresh sidebar task rows when the widget is still mounted."""
-        with contextlib.suppress(Exception):
-            self.query_one("#sidebar-tasks", SidebarTasksSection).refresh_rows()
-
-    def _schedule_sidebar_file_refresh(self) -> None:
-        """Schedule async sidebar file refresh when the sidebar is still mounted."""
-        with contextlib.suppress(Exception):
-            sidebar = self.query_one("#sidebar", Sidebar)
-            asyncio.create_task(sidebar.refresh_files())
-
     def on_resize(self, event: object) -> None:
         """Apply the 140-col breakpoint unless the user has explicitly toggled."""
         sidebar = self.query_one("#sidebar", Sidebar)
@@ -391,28 +367,6 @@ class NerdvanaApp(App[object]):
             return
         auto_show = self.size.width >= self._SIDEBAR_BREAKPOINT
         sidebar.set_class(not auto_show, "hidden")
-
-    async def _check_update(self) -> None:
-        from nerdvana_cli import __version__
-        from nerdvana_cli.core.updater import (
-            cached_or_check,
-            format_update_notice,
-            is_update_check_enabled,
-        )
-
-        try:
-            flag = bool(self.settings.session.update_check)
-        except Exception:
-            flag = True
-        if not is_update_check_enabled(flag):
-            return
-
-        result = await cached_or_check(__version__)
-        if result and result.get("version"):
-            with contextlib.suppress(Exception):
-                self._add_chat_message(
-                    format_update_notice(__version__, result["version"], result.get("url", ""))
-                )
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
@@ -509,11 +463,6 @@ class NerdvanaApp(App[object]):
         from nerdvana_cli.commands.model_commands import handle_api_key_input
         await handle_api_key_input(self, api_key)
 
-    async def _switch_provider(self, provider_name: str, api_key: str) -> None:
-        """Switch to a provider with the given API key."""
-        from nerdvana_cli.commands.model_commands import switch_provider
-        await switch_provider(self, provider_name, api_key)
-
     def _show_session_context(self, registry: Any) -> None:
         """Show session startup context summary."""
         from nerdvana_cli.commands.session_commands import show_session_context
@@ -541,43 +490,14 @@ class NerdvanaApp(App[object]):
 
     def _update_context_usage(self, pct: int) -> None:
         """Update the context usage bar widget."""
-        try:
-            bar = self.query_one("#context-bar", Static)
-        except Exception:
-            return
-        color = "green" if pct < 60 else "yellow" if pct < 80 else "red"
-        bar_w   = 20
-        filled  = int(bar_w * pct / 100)
-        bar_str = "\u2588" * filled + "\u2591" * (bar_w - filled)
-        bar.update(Text.from_markup(f"[{color}]ctx [{bar_str}] {pct}%[/{color}]"))
-        with contextlib.suppress(Exception):
-            self.query_one("#sidebar", Sidebar).set_context(
-                provider=self.settings.model.provider,
-                model=self.settings.model.model,
-                pct=pct,
-            )
+        update_context_usage(self, pct)
 
     def _update_banner(self) -> None:
         """Update the logo banner with current provider/model info."""
-        banner = self.query_one("#logo-banner", Static)
         registry_count = len(self._agent_loop.registry.all_tools()) if self._agent_loop else 0
-        ctx_k = self.settings.session.max_context_tokens // 1000
-        ctx_display = f"{ctx_k}K" if ctx_k < 1000 else f"{ctx_k // 1000}M"
-        banner.update(Text.from_markup(
-            "[bold bright_white]"
-            " ███╗   ██╗███████╗██████╗ ██████╗ ██╗   ██╗ █████╗ ███╗   ██╗ █████╗ \n"
-            " ████╗  ██║██╔════╝██╔══██╗██╔══██╗██║   ██║██╔══██╗████╗  ██║██╔══██╗\n"
-            " ██╔██╗ ██║█████╗  ██████╔╝██║  ██║██║   ██║███████║██╔██╗ ██║███████║\n"
-            " ██║╚██╗██║██╔══╝  ██╔══██╗██║  ██║╚██╗ ██╔╝██╔══██║██║╚██╗██║██╔══██║\n"
-            " ██║ ╚████║███████╗██║  ██║██████╔╝ ╚████╔╝ ██║  ██║██║ ╚████║██║  ██║\n"
-            " ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═════╝   ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝\n"
-            "[/bold bright_white]"
-            "[dim]https://nerdvana.kr | Feedback: jinho.von.choi@nerdvana.kr\n"
-            f"v{__version__} | {self.settings.model.provider}/{self.settings.model.model} | "
-            f"ctx:{ctx_display} | Tools: {registry_count}"
-            + (" | Parism" if self.parism_client else "")
-            + "[/dim]"
-        ))
+        self.query_one("#logo-banner", Static).update(
+            build_banner(self.settings, registry_count, self.parism_client is not None)
+        )
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands by delegating to ``ui.command_dispatcher``."""
@@ -596,62 +516,11 @@ class NerdvanaApp(App[object]):
         ):
             input_widget._pending_multiline = None
 
-        menu = self.query_one("#command-menu", CommandMenu)
-        if event.value.startswith("/"):
-            query = event.value.lower()
-            menu.clear_options()
-            for cmd, desc in SLASH_COMMANDS:
-                if query == "/" or cmd.startswith(query):
-                    menu.add_option(Option(f"{cmd}  {desc}", id=cmd))
-            if self._agent_loop:
-                _seen: set[str] = {cmd for cmd, _ in SLASH_COMMANDS}
-                for skill in self._agent_loop.skill_loader.list_skills():
-                    if skill.trigger not in _seen and (query == "/" or skill.trigger.startswith(query)):
-                        menu.add_option(Option(f"{skill.trigger}  {skill.description}", id=skill.trigger))
-                        _seen.add(skill.trigger)
-                for command in self._user_commands():
-                    if command.trigger not in _seen and (query == "/" or command.trigger.startswith(query)):
-                        menu.add_option(Option(f"{command.trigger}  {command.description}", id=command.trigger))
-                        _seen.add(command.trigger)
-            if menu.option_count > 0:
-                menu.add_class("visible")
-            else:
-                menu.remove_class("visible")
-        else:
-            menu.remove_class("visible")
+        refresh_command_menu(self, event.value)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Handle command menu, model selector, or provider selector."""
-        # Provider selector
-        if isinstance(event.option_list, ProviderSelector):
-            selector = self.query_one("#provider-selector", ProviderSelector)
-            selector.remove_class("visible")
-            provider_name = event.option.id
-            if provider_name:
-                from nerdvana_cli.commands.model_commands import handle_provider_selection
-                asyncio.create_task(handle_provider_selection(self, provider_name))
-            return
-
-        # Model selector
-        if isinstance(event.option_list, ModelSelector):
-            model_selector = self.query_one("#model-selector", ModelSelector)
-            model_selector.remove_class("visible")
-            model_id = event.option.id
-            if model_id:
-                input_widget = self.query_one("#user-input", Input)
-                input_widget.value = f"/model {model_id}"
-                self.call_later(input_widget.action_submit)
-                input_widget.focus()
-            return
-
-        # Command menu
-        menu = self.query_one("#command-menu", CommandMenu)
-        input_widget = self.query_one("#user-input", Input)
-        menu.remove_class("visible")
-        cmd = event.option.id
-        if cmd:
-            input_widget.value = cmd
-            self.call_later(input_widget.action_submit)
+        handle_option_selected(self, event)
 
     def action_clear_chat(self) -> None:
         """Clear chat action (Ctrl+L)."""
@@ -683,22 +552,7 @@ class NerdvanaApp(App[object]):
 
     def action_save_editor(self) -> None:
         """Save the active editor buffer using the safe path helpers."""
-        editor        = self.query_one("#editor-pane", EditorPane)
-        relative_path = editor.current_path()
-        if not relative_path:
-            self._add_chat_message("[dim]No editor buffer to save[/dim]", raw_text="No editor buffer to save")
-            return
-
-        try:
-            self._save_editor_buffer(relative_path, editor.current_text())
-        except Exception as exc:
-            self._add_chat_message(f"[red]Save failed: {exc}[/red]", raw_text=f"Save failed: {exc}")
-            return
-
-        editor.mark_clean()
-        self._active_editor_path = relative_path
-        self._editor_dirty       = False
-        self._add_chat_message(f"[dim]Saved {relative_path}[/dim]", raw_text=f"Saved {relative_path}")
+        self._editor.save_active()
 
     def action_toggle_sidebar(self) -> None:
         """Toggle sidebar visibility. Sets a user-override that suppresses on_resize."""
@@ -714,66 +568,16 @@ class NerdvanaApp(App[object]):
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         """Open selected project file in the editor pane."""
-        try:
-            relative_path = self._relative_project_path(event.path)
-            self._open_editor_buffer(relative_path)
-        except Exception as exc:
-            self._add_chat_message(f"[red]Open failed: {exc}[/red]", raw_text=f"Open failed: {exc}")
+        self._editor.open_selected(event.path)
 
     def _open_editor_buffer(self, relative_path: str) -> None:
         """Load a relative project path into the direct editor pane."""
-        text   = self._read_editor_buffer(relative_path)
-        editor = self.query_one("#editor-pane", EditorPane)
-        editor.load_buffer(
-            relative_path = relative_path,
-            text          = text,
-            language      = language_for_path(relative_path),
-        )
-        editor.show_pane()
-        editor.focus_editor()
-        self._active_editor_path = relative_path
-        self._editor_dirty       = False
+        self._editor.open(relative_path)
 
     def _read_editor_buffer(self, relative_path: str) -> str:
         """Read a project file through validated, symlink-aware path handling."""
-        path_error = validate_path(relative_path, self._project_root)
-        if path_error:
-            raise PermissionError(path_error)
-
-        fd = safe_open_fd(relative_path, self._project_root, os.O_RDONLY)
-        with os.fdopen(fd, "rb") as handle:
-            data = handle.read(_MAX_EDITOR_FILE_BYTES + 1)
-
-        if len(data) > _MAX_EDITOR_FILE_BYTES:
-            raise ValueError(f"Editor refuses files larger than {_MAX_EDITOR_FILE_BYTES} bytes")
-        if b"\x00" in data:
-            raise ValueError("Editor refuses binary files")
-        return data.decode("utf-8", errors="replace")
+        return self._editor.read(relative_path)
 
     def _save_editor_buffer(self, relative_path: str, content: str) -> None:
         """Write a project file through validated, symlink-aware path handling."""
-        path_error = validate_path(relative_path, self._project_root)
-        if path_error:
-            raise PermissionError(path_error)
-
-        fd = safe_open_fd(
-            relative_path,
-            self._project_root,
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-        )
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(content)
-
-    def _relative_project_path(self, path: str | Path) -> str:
-        """Convert an absolute selected path into a validated project-relative path."""
-        root     = Path(self._project_root).resolve()
-        selected = Path(path).expanduser().resolve()
-        try:
-            relative_path = str(selected.relative_to(root))
-        except ValueError as exc:
-            raise PermissionError(f"Path is outside project root: {selected}") from exc
-
-        path_error = validate_path(relative_path, self._project_root)
-        if path_error:
-            raise PermissionError(path_error)
-        return relative_path
+        self._editor.write(relative_path, content)
