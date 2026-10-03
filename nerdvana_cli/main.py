@@ -299,15 +299,24 @@ async def repl_loop(
             await parism_client.disconnect()
 
 
-def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any]) -> None:
+def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], assignments: list[str]) -> None:
     """Set each ``section.field`` of *settings* from a command-line value, skipping the unset ones.
 
-    Unset means empty, zero or False, the options' defaults.
+    Unset means empty, zero or False, the options' defaults. *assignments* are the ``--set`` strings;
+    one that cannot be applied ends the command with the configuration exit code.
     """
+    from nerdvana_cli.core.run_output import EXIT_CONFIG
+    from nerdvana_cli.core.settings import apply_settings_overrides
+
     for dotted, value in overrides.items():
         if value:
             section, field = dotted.split(".")
             setattr(getattr(settings, section), field, value)
+    try:
+        apply_settings_overrides(settings, assignments)
+    except ValueError as exc:
+        console_stderr.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(EXIT_CONFIG) from exc
 
 
 def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
@@ -358,6 +367,7 @@ def run(
     sandbox: str = typer.Option("", "--sandbox", help="Confine shell commands to a write scope: off | auto | require (default: sandbox.mode from the configuration)"),
     verify: str = typer.Option("", "--verify", help="Command that decides whether the task is done: the run goes on until it exits with status 0"),
     verify_attempts: int = typer.Option(0, "--verify-attempts", help="Failed verifications before giving up (0 = goal.max_attempts)"),
+    set_values: list[str] | None = typer.Option(None, "--set", help="Override one setting for this run: section.field=value (repeatable), e.g. --set session.compact_threshold=0.5"),  # noqa: B008
 ) -> None:
     """Run a single prompt non-interactively.
 
@@ -403,7 +413,7 @@ def run(
         "session.require_price":    require_price,
         "sandbox.mode":             sandbox,
         "session.default_mode":     _APPROVAL_MODE_MAP[resolved_approval][0] if resolved_approval else "",
-    })
+    }, set_values or [])
 
     prov, key_missing = _resolve_run_provider(settings)
     outcome.provider = settings.model.provider

@@ -173,6 +173,7 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--max-turns N` | Stop after N model turns. |
 | `--max-cost-usd X` | Stop once the estimated cost of the run reaches X USD (needs a known price for the model). |
 | `--max-total-tokens N` | Stop once the input and output tokens of all requests reach N. Needs no price, so it works for any model. |
+| `--set section.field=value` | Override one setting for this run (repeatable; the value is read as YAML), e.g. `--set session.compact_threshold=0.5`. The `permissions`, `hooks` and `sandbox` sections cannot be changed this way; use their own options. |
 | `--verify COMMAND` | The command that decides whether the task is done. When the model says it is finished the command runs, and if it does not exit with status 0 the end of its output goes back to the model, which keeps working. The run ends when it passes, after `--verify-attempts N` failures (default `goal.max_attempts`, 5) or at a turn or cost limit. The result gets a `verification` object. |
 | `--sandbox off\|auto\|require` | Confine what shell commands can write for this run, overriding `sandbox.mode` (see [docs/sandbox.md](docs/sandbox.md)). |
 | `--require-price` | Refuse to run when `--max-cost-usd` is set but the model has no known price. |

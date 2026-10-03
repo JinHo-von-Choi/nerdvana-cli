@@ -156,6 +156,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `--output-format text\|json\|stream-json` | `text`(기본)는 사람이 읽는 스트림입니다. `json`은 끝에 결과 객체 하나를 출력합니다. `stream-json`은 한 줄에 이벤트 하나를 출력하고 같은 결과 객체로 끝납니다. 두 JSON 형식에서 stdout에는 JSON만 나가고 안내 문구는 stderr로 갑니다. |
 | `--max-turns N` | 모델 턴이 N번이 되면 멈춥니다. |
 | `--max-total-tokens N` | 모든 요청의 입력과 출력 토큰 합이 N에 이르면 멈춥니다. 가격을 몰라도 모든 모델에서 동작합니다. |
+| `--set section.field=value` | 이 실행에서만 설정 하나를 덮어씁니다(반복 가능, 값은 YAML로 읽음). 예: `--set session.compact_threshold=0.5`. `permissions`, `hooks`, `sandbox` 섹션은 이 방법으로 바꿀 수 없고 각자의 옵션을 씁니다. |
 | `--verify COMMAND` | 작업이 끝났는지 판정하는 명령입니다. 모델이 끝났다고 하면 이 명령을 실행하고, 종료 코드가 0이 아니면 출력의 끝부분을 모델에 돌려주어 계속 일하게 합니다. 통과하거나, `--verify-attempts N`번 실패하거나(기본 `goal.max_attempts`, 5), 턴·비용 한도에 이르면 끝납니다. 결과에 `verification` 객체가 붙습니다. |
 | `--sandbox off\|auto\|require` | 이 실행에서 셸 명령의 쓰기 범위를 제한하며 `sandbox.mode` 보다 우선합니다([docs/sandbox.md](docs/sandbox.md)). |
 | `--require-price` | `--max-cost-usd` 를 줬는데 모델의 가격을 모르면 실행을 거부합니다. |

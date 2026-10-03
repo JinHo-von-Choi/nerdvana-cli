@@ -248,6 +248,31 @@ class AgentsConfig(BaseModel):
     categories: dict[str, str] = Field(default_factory=dict)
 
 
+def apply_settings_overrides(settings: NerdvanaSettings, assignments: list[str]) -> None:
+    """Apply ``section.field=value`` overrides (the value read as YAML) to *settings*, validating each one.
+
+    Raises ValueError for an unknown field or a value the field rejects. The sections that govern
+    permissions and hooks cannot be overridden this way.
+    """
+    for assignment in assignments:
+        path, sep, raw = assignment.partition("=")
+        section_name, dot, field_name = path.strip().partition(".")
+        if not sep or not dot or not field_name:
+            raise ValueError(f"--set expects section.field=value, got '{assignment}'")
+        if section_name in _NO_OVERRIDE_SECTIONS:
+            raise ValueError(f"--set cannot change the '{section_name}' section")
+        section = getattr(settings, section_name, None)
+        if not isinstance(section, BaseModel) or field_name not in type(section).model_fields:
+            raise ValueError(f"unknown setting '{path.strip()}'")
+        try:
+            type(section).__pydantic_validator__.validate_assignment(section, field_name, yaml.safe_load(raw))
+        except Exception as exc:  # noqa: BLE001 - pydantic's error text says what is wrong
+            raise ValueError(f"invalid value for '{path.strip()}': {exc}") from exc
+
+
+# Sections whose fields decide what the agent may do; a command line override must not loosen them quietly.
+_NO_OVERRIDE_SECTIONS = frozenset({"permissions", "hooks", "sandbox"})
+
 # Sections read from the config file as they are, with the fields that must never be softened.
 _PLAIN_SECTIONS: tuple[tuple[str, type[BaseModel], frozenset[str]], ...] = (
     ("parism",     ParismConfig,     frozenset()),

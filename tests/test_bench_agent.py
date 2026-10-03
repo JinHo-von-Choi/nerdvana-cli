@@ -133,7 +133,7 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, model="", provider="")
+    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="")
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, script: str) -> object:
@@ -163,7 +163,7 @@ def test_output_without_a_result_object_is_recorded_as_an_error(monkeypatch: pyt
 
 def test_the_agent_command_carries_the_ceilings_and_the_chosen_model() -> None:
     task    = bench.Task("t", "do it", "v", path="x", max_turns=7, max_cost_usd=0.4)
-    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", sandbox="require", gate=False, model="m1", provider="anthropic"))
+    command = bench.agent_command(task, argparse.Namespace(approval_mode="plan", sandbox="require", gate=False, set=[], model="m1", provider="anthropic"))
     assert command[command.index("--max-turns") + 1] == "7"
     assert command[command.index("--max-cost-usd") + 1] == "0.4"
     assert command[command.index("--model") + 1] == "m1"
@@ -244,8 +244,8 @@ def test_the_run_result_signals_are_read_from_the_agent_output(monkeypatch: pyte
 
 def test_the_gate_flag_passes_the_tasks_verify_command_to_the_agent() -> None:
     task  = bench.Task("t", "do it", "python check.py", path="x")
-    plain = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, model="", provider=""))
-    gated = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=True, model="", provider=""))
+    plain = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider=""))
+    gated = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=True, set=[], model="", provider=""))
     assert "--verify" not in plain
     assert gated[gated.index("--verify") + 1] == "python check.py"
 
@@ -258,3 +258,10 @@ def test_token_totals_are_summed_from_each_attempts_usage() -> None:
     summary = bench.summarize(attempts, 2)
     assert summary["tokens"] == {"input_tokens": 1500, "output_tokens": 70, "cache_read_tokens": 800, "cache_write_tokens": 0}
     assert "1,500 in (800 from cache)" in bench.render(summary)
+
+
+def test_set_overrides_are_passed_to_every_attempt() -> None:
+    task    = bench.Task("t", "do it", "v", path="x")
+    command = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=["session.compact_threshold=0.5", "session.max_turns=9"], model="", provider=""))
+    pairs   = [command[i + 1] for i, word in enumerate(command) if word == "--set"]
+    assert pairs == ["session.compact_threshold=0.5", "session.max_turns=9"]
