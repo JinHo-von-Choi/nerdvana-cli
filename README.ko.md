@@ -158,6 +158,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `--max-total-tokens N` | 모든 요청의 입력과 출력 토큰 합이 N에 이르면 멈춥니다. 가격을 몰라도 모든 모델에서 동작합니다. |
 | `--image PATH` | 프롬프트에 이미지(PNG, JPEG, GIF, WebP, 5 MB 이하, 최대 6개)를 첨부합니다(반복 가능). 형식은 파일 첫 바이트로 판단하며, 이미지를 받지 못하는 모델은 제공자의 오류로 답합니다. |
 | `--set section.field=value` | 이 실행에서만 설정 하나를 덮어씁니다(반복 가능, 값은 YAML로 읽음). 예: `--set session.compact_threshold=0.5`. `permissions`, `hooks`, `sandbox` 섹션은 이 방법으로 바꿀 수 없고 각자의 옵션을 씁니다. |
+| `--resume SESSION_ID` | 그 세션에 기록된 대화를 이어서 실행합니다(`nerdvana session list` 참고). 프롬프트는 다음 메시지가 됩니다. 기록된 대화가 없는 세션은 잘못된 옵션(종료 코드 2)입니다. `nerdvana agents resume` 이 이 옵션을 씁니다. |
 | `--scope PATH` | `--verify` 와 함께: 작업이 다루는 경로(반복 가능). 그 밖의 편집은 먼저 묻고, 물을 사람이 없으면 거부합니다. |
 | `--verify COMMAND` | 작업이 끝났는지 판정하는 명령입니다. 모델이 끝났다고 하면 이 명령을 실행하고, 종료 코드가 0이 아니면 출력의 끝부분을 모델에 돌려주어 계속 일하게 합니다. 통과하거나, `--verify-attempts N`번 실패하거나(기본 `goal.max_attempts`, 5), 턴·비용 한도에 이르면 끝납니다. 결과에 `verification` 객체가 붙습니다. |
 | `--sandbox off\|auto\|require` | 이 실행에서 셸 명령의 쓰기 범위를 제한하며 `sandbox.mode` 보다 우선합니다([docs/sandbox.md](docs/sandbox.md)). |
@@ -223,6 +224,17 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana workflow run <이름>` | 선언된 다중 에이전트 워크플로를 실행합니다 (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`, `--approval-mode`). 파일이 쓰기를 허용하지 않으면 에이전트는 읽기 전용이고, 끝난 단위는 저장되어 중단된 실행을 이어서 할 수 있습니다 |
 
 [docs/workflows.md](docs/workflows.md) 참고.
+### 백그라운드 에이전트 (`nerdvana agents ...`)
+
+| `nerdvana agents start "<프롬프트>"` | 터미널보다 오래 사는 감독 프로세스 아래에서 백그라운드 실행을 시작합니다(`--worktree` 는 전용 worktree, `--max-cost-usd`, 같은 `--key` 로 다시 시작하면 기존 실행을 돌려줌, `--cwd`, `--approval-mode`) |
+| `nerdvana agents list` | 실행 목록과 상태, 경과 시간, 지금까지의 비용, 마지막 신호 표시. 프로세스가 사라진 실행은 `orphaned` 로 표시됩니다 |
+| `nerdvana agents show <id>` | 실행의 기록, 로그 끝부분, 결과 표시 |
+| `nerdvana agents attach <id>` | 실행이 끝날 때까지 로그를 따라갑니다. Ctrl+C 는 따라가기만 멈춥니다 |
+| `nerdvana agents stop <id>` | 실행에 종료를 요청하고, 유예 시간이 지나면 강제 종료합니다 |
+| `nerdvana agents resume <id>` | 고아가 되었거나 중지·실패한 실행을 세션 기록에서 다시 시작합니다 |
+| `nerdvana agents clean` | `--days`(기본 7일) 전에 끝난 실행의 기록을 지웁니다. 변경이 있는 worktree 는 남기고 경로를 출력합니다 |
+
+세션의 백그라운드 `Agent` 작업도 같은 저장소에 기록됩니다. [docs/background.md](docs/background.md) 참고.
 
 ### 세션 기록 (`nerdvana session ...`)
 

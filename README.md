@@ -177,6 +177,7 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--max-total-tokens N` | Stop once the input and output tokens of all requests reach N. Needs no price, so it works for any model. |
 | `--image PATH` | Attach an image (PNG, JPEG, GIF or WebP, up to 5 MB, at most 6) to the prompt (repeatable). The type is read from the file's first bytes; a model that cannot take images answers with its provider's error. |
 | `--set section.field=value` | Override one setting for this run (repeatable; the value is read as YAML), e.g. `--set session.compact_threshold=0.5`. The `permissions`, `hooks` and `sandbox` sections cannot be changed this way; use their own options. |
+| `--resume SESSION_ID` | Continue the recorded conversation of that session (see `nerdvana session list`); the prompt is the next message. A session with no recorded conversation is an invalid option (exit code 2). `nerdvana agents resume` uses it. |
 | `--scope PATH` | With `--verify`: paths the task is about (repeatable). An edit outside them asks first, and is refused when nobody can be asked. |
 | `--verify COMMAND` | The command that decides whether the task is done. When the model says it is finished the command runs, and if it does not exit with status 0 the end of its output goes back to the model, which keeps working. The run ends when it passes, after `--verify-attempts N` failures (default `goal.max_attempts`, 5) or at a turn or cost limit. The result gets a `verification` object. |
 | `--sandbox off\|auto\|require` | Confine what shell commands can write for this run, overriding `sandbox.mode` (see [docs/sandbox.md](docs/sandbox.md)). |
@@ -241,6 +242,17 @@ See [docs/scheduling.md](docs/scheduling.md).
 | `nerdvana workflow run <name>` | Run a declared multi-agent workflow (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`, `--approval-mode`); agents are read-only unless the file allows writing, and finished units are kept so a stopped run can resume |
 
 See [docs/workflows.md](docs/workflows.md).
+### Background agents (`nerdvana agents ...`)
+
+| `nerdvana agents start "<prompt>"` | Start a run in the background under a supervisor that outlives the terminal (`--worktree` for a worktree of its own, `--max-cost-usd`, `--key` so a repeated start returns the existing run, `--cwd`, `--approval-mode`) |
+| `nerdvana agents list` | List the runs with status, age, cost so far and last signal; a run whose process is gone shows as `orphaned` |
+| `nerdvana agents show <id>` | Show a run's record, the tail of its log and its result |
+| `nerdvana agents attach <id>` | Follow a run's log until it ends; Ctrl+C only detaches |
+| `nerdvana agents stop <id>` | Ask the run to end, kill it after a grace period |
+| `nerdvana agents resume <id>` | Start an orphaned, stopped or failed run again from its session transcript |
+| `nerdvana agents clean` | Remove records of runs that ended `--days` ago (default 7); a worktree with changes is kept and its path printed |
+
+Background `Agent` tasks of a session are recorded in the same store. See [docs/background.md](docs/background.md).
 
 ### Session transcripts (`nerdvana session ...`)
 

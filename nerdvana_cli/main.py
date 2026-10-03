@@ -25,6 +25,7 @@ from nerdvana_cli.cli.runtime import (
 )
 from nerdvana_cli.commands.admin_command import admin_app
 from nerdvana_cli.commands.history_command import history_app
+from nerdvana_cli.commands.agents_command import agents_app
 from nerdvana_cli.commands.hook_command import hook_app
 from nerdvana_cli.commands.mcp_command import mcp_app
 from nerdvana_cli.commands.memory_command import memory_app
@@ -33,6 +34,8 @@ from nerdvana_cli.commands.session_command import session_app
 from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
@@ -53,6 +56,7 @@ app.add_typer(admin_app)
 app.command(name="acp")(acp_command)
 app.add_typer(schedule_app)
 app.add_typer(workflow_app)
+app.add_typer(agents_app)
 
 
 def _maybe_show_update_notice(target: Console | None = None) -> None:
@@ -235,6 +239,23 @@ def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     outcome.duration_ms  = duration_ms
 
 
+def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outcome: Any) -> tuple[SessionStorage, AgentLoop]:
+    """The session and agent loop of a run: a new session, or with ``--resume`` the recorded one with its conversation restored."""
+    from nerdvana_cli.core.run_output import EXIT_CONFIG
+    from nerdvana_cli.core.task_state import TaskRegistry
+
+    resumed = resume_session_id(resume) if resume else None
+    session = SessionStorage(session_id=resumed, persist=settings.session.persist)
+    if resume and not (resumed and session.load_messages()):
+        outcome.stop = "config"
+        reporter.failure(outcome, f"Cannot resume session '{resume}': no recorded conversation.")
+        raise typer.Exit(EXIT_CONFIG)
+    loop = build_agent_loop(settings, ExecutionProfile(session=session, task_registry=TaskRegistry()))
+    if resumed:
+        loop.restore_history()
+    return session, loop
+
+
 @app.command()
 def run(
     prompt: str = typer.Argument(..., help="Prompt to run"),
@@ -260,6 +281,7 @@ def run(
     image: list[str] | None = typer.Option(None, "--image", help="Attach an image (PNG, JPEG, GIF or WebP) to the prompt (repeatable)"),  # noqa: B008
     scope: list[str] | None = typer.Option(None, "--scope", help="With --verify: paths the task is about; an edit elsewhere is refused unless someone approves it"),  # noqa: B008
     set_values: list[str] | None = typer.Option(None, "--set", help="Override one setting for this run: section.field=value (repeatable), e.g. --set session.compact_threshold=0.5"),  # noqa: B008
+    resume: str = typer.Option("", "--resume", help="Continue the recorded conversation of this session id; the prompt is the next message"),
 ) -> None:
     """Run a single prompt non-interactively.
 
@@ -315,10 +337,7 @@ def run(
         reporter.failure(outcome, f"No API key found for {prov}.")
         raise typer.Exit(EXIT_CONFIG)
 
-    from nerdvana_cli.core.task_state import TaskRegistry
-
-    session = SessionStorage(persist=settings.session.persist)
-    loop    = build_agent_loop(settings, ExecutionProfile(session=session, task_registry=TaskRegistry()))
+    session, loop = _start_run_loop(settings, resume, reporter, outcome)
     outcome.session_id = session.session_id
     started            = time.monotonic()
     images             = _load_run_images(image or [], settings.cwd, reporter, outcome)

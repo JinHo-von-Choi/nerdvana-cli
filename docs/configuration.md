@@ -31,6 +31,7 @@ defaults below, never to a lower-priority file.
 | `NERDVANA_HOME` | Install root (read-only at runtime); default `~/.nerdvana-cli` |
 | `NERDVANA_DATA_HOME` | User data root; default `~/.nerdvana`. The MCP server key, ACL and audit files (`mcp_keys.yml`, `mcp_acl.yml`, `audit.sqlite`) live here too; one that exists only in `~/.nerdvana` is still read from there, with a warning |
 | `NERDVANA_MANAGED_DIR` | One more directory of managed settings files, read after `/etc/nerdvana/managed-settings.d/`. It must exist when set. Managed files only restrict, so it cannot loosen the system directory. See [managed-policy.md](managed-policy.md) |
+| `NERDVANA_AGENTS_COMMAND` | The command `nerdvana agents start` runs for each background run, split like a shell line; default is this interpreter running `nerdvana_cli.main`. See [background.md](background.md) |
 | `NERDVANA_SCHEDULE_COMMAND` | The command the scheduler starts to run a job, split like a shell line; default is this interpreter running `nerdvana_cli.main`. See [scheduling.md](scheduling.md) |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | Register the external project tools (`external_projects_enabled` without a config file) |
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | Boundary root the external project tools may not escape |
@@ -177,6 +178,8 @@ Note: Built-in recovery hooks (`context_limit_recovery`, `json_parse_recovery`, 
 Neither has a field in `nerdvana.yml`. The managed policy is read from its own drop-in files
 ([managed-policy.md](managed-policy.md)); scheduled jobs are stored under the data root in
 `schedule/jobs.yml` and managed with `nerdvana schedule` ([scheduling.md](scheduling.md)).
+Background runs (`nerdvana agents`, and `Agent` tasks started with `run_in_background`) are
+recorded under the data root in `runs/` ([background.md](background.md)).
 
 ### MCP server quota
 
