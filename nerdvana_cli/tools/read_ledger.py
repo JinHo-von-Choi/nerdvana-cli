@@ -19,6 +19,7 @@ from typing import Any
 _DEFAULT_SESSION: str = "default"
 
 _ledgers: dict[str, dict[str, str]] = {}
+_ranges: dict[str, dict[str, list[tuple[int, int, str]]]] = {}
 _lock = threading.Lock()
 
 
@@ -54,10 +55,41 @@ def lookup(session: str, path_key: str) -> str | None:
         return _ledgers.get(session, {}).get(path_key)
 
 
+def range_digest(lines: list[str]) -> str:
+    """The digest of a run of lines, newlines included, as the file holds them."""
+    return content_digest("".join(lines).encode("utf-8", errors="surrogateescape"))
+
+
+def record_range(session: str, path_key: str, start: int, end: int, digest: str) -> None:
+    """Remember that lines ``start``..``end`` (1-based, inclusive) of a file were shown with this digest.
+
+    A symbol read shows part of a file. The part can be edited later without reading the whole file,
+    as long as those lines still have this digest.
+    """
+    with _lock:
+        entries = _ranges.setdefault(session, {}).setdefault(path_key, [])
+        entries[:] = [e for e in entries if e[:2] != (start, end)]
+        entries.append((start, end, digest))
+
+
+def lookup_ranges(session: str, path_key: str) -> list[tuple[int, int, str]]:
+    """The recorded ranges of a file: ``(start, end, digest)`` triples."""
+    with _lock:
+        return list(_ranges.get(session, {}).get(path_key, ()))
+
+
+def drop_ranges(session: str, path_key: str) -> None:
+    """Forget the ranges of a file, as after an edit that moved its lines."""
+    with _lock:
+        _ranges.get(session, {}).pop(path_key, None)
+
+
 def clear(session: str | None = None) -> None:
     """Drop the ledger of one session, or every ledger when ``session`` is None."""
     with _lock:
         if session is None:
             _ledgers.clear()
+            _ranges.clear()
         else:
             _ledgers.pop(session, None)
+            _ranges.pop(session, None)

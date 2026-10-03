@@ -15,6 +15,7 @@ This module re-exports all 8 Args + 8 Tool classes for backward compatibility.
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
@@ -194,7 +195,10 @@ class FindSymbolTool(BaseTool[FindSymbolArgs]):
             },
             "include_body": {
                 "type":        "boolean",
-                "description": "Not yet implemented; reserved for 0.5.1",
+                "description": (
+                    "Include the symbol's source, each line prefixed with an anchor 'N#hhhhhh'. A symbol shown this way "
+                    "can be changed with FileEdit (anchor_hash) without reading the whole file first."
+                ),
                 "default":     False,
             },
             "within_relative_path": {
@@ -238,10 +242,47 @@ class FindSymbolTool(BaseTool[FindSymbolArgs]):
             )
 
         results = [s.to_dict(include_children=False) for s in symbols]
+        if args.include_body:
+            _attach_bodies(symbols, results, context)
         return ToolResult(
             tool_use_id="",
             content=json.dumps({"matches": results}, ensure_ascii=False, indent=2),
         )
+
+
+_MAX_BODIES     = 5
+_MAX_BODY_LINES = 300
+
+
+def _attach_bodies(symbols: list[Any], results: list[dict[str, Any]], context: ToolContext) -> None:
+    """Add the anchored source of each symbol to its result and remember the lines that were shown.
+
+    The shown lines go into the read ledger as a range, which lets FileEdit change them without a read of the
+    whole file. A symbol the server gave no extent for, or whose file cannot be read, gets no body.
+    """
+    from nerdvana_cli.tools import read_ledger
+    from nerdvana_cli.tools.file_tools import _decode_text, _format_with_hashes, _read_bytes
+
+    session = read_ledger.session_key(context)
+    shown   = 0
+    for symbol, result in zip(symbols, results, strict=False):
+        if shown >= _MAX_BODIES or not symbol.end_line:
+            continue
+        path = symbol.location.file_path
+        rel  = os.path.relpath(path, context.cwd) if os.path.isabs(path) else path
+        try:
+            lines = _decode_text(_read_bytes(rel, context.cwd), "strict").splitlines(keepends=True)
+        except (OSError, ValueError):
+            continue
+        start, end = symbol.location.line, min(symbol.end_line, len(lines), symbol.location.line + _MAX_BODY_LINES - 1)
+        if start < 1 or end < start:
+            continue
+        read_ledger.record_range(session, read_ledger.resolve_key(rel, context.cwd), start, end, read_ledger.range_digest(lines[start - 1:end]))
+        result["lines"] = [start, end]
+        result["body"]  = _format_with_hashes(lines[start - 1:end], start)
+        if end < symbol.end_line:
+            result["truncated"] = True
+        shown += 1
 
 
 # ---------------------------------------------------------------------------
