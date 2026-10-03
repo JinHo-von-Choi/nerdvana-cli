@@ -18,6 +18,7 @@ class StatusBar(Static):
         parism: bool = False,
         thinking: bool = False,
         elapsed_s: float = 0.0,
+        cache_read: int = 0,
     ) -> None:
         parts: list[str] = []
         if thinking:
@@ -30,6 +31,8 @@ class StatusBar(Static):
             parts.append(f"{provider}/{model}")
         if not thinking and (tokens_in or tokens_out):
             parts.append(f"tokens: {tokens_in} in / {tokens_out} out")
+            if tokens_in and cache_read:
+                parts.append(f"cache: {min(100, round(100 * cache_read / tokens_in))}%")
         if tools:
             tool_text = f"tools: {tools}"
             if parism:

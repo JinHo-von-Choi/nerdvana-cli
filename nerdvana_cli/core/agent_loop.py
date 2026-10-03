@@ -24,6 +24,7 @@ from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
 from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.budget import Budget
+from nerdvana_cli.core.cache_watch import CacheWatch
 from nerdvana_cli.core.compact import (
     FALLBACK_PROMPT,
     CompactionState,
@@ -266,6 +267,8 @@ class AgentLoop:
         origin = replace(self.origin, turn=self.turns_used, last_tool=self._last_tool)
         cost   = self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage, origin)
         self._cost_total += cost
+        if self._cache_watch.observe(self.settings.model.model, usage, self.signal_summary()):
+            self._signals[signals.CACHE_MISS] += 1
         if self.usage_listener is not None:
             self.usage_listener({
                 **usage, "provider": self.settings.model.provider, "model": self.settings.model.model,
@@ -452,6 +455,7 @@ class AgentLoop:
         self.usage_listener:       Callable[[dict[str, Any]], None] | None = None
         self._last_tool            = ""
         self._signals: Counter[str] = Counter()
+        self._cache_watch          = CacheWatch()
         # Turn at which the model is told to stop exploring and answer; 0 = never. Sub-agents set it.
         self.wrap_up_at            = 0
         self._goal                 = None
@@ -487,6 +491,14 @@ class AgentLoop:
     def session_cost_usd(self) -> float:
         """Estimated USD cost of every provider request this session made itself, each priced for the model that served it."""
         return self._cost_total
+
+    def absorb_subagent(self, usage: dict[str, int], signal_counts: dict[str, int]) -> None:
+        """Add a finished sub-agent's token totals and signal counts to this session's own."""
+        self._usage_input_total       += usage.get("input_tokens", 0)
+        self._usage_output_total      += usage.get("output_tokens", 0)
+        self._usage_cache_read_total  += usage.get("cache_read_tokens", 0)
+        self._usage_cache_write_total += usage.get("cache_write_tokens", 0)
+        self._signals.update(signal_counts)
 
     def total_cost_usd(self) -> float:
         """What the session spent: its own requests plus what its finished sub-agents spent."""
@@ -888,6 +900,8 @@ class AgentLoop:
         )
         context.state["session_id"] = self.session.session_id
         context.state["budget"]     = (self.budget, self.session_cost_usd)
+        context.state["absorb"]     = self.absorb_subagent
+        context.state["report_bash_changes"] = self.settings.session.report_bash_changes
         context.state["tool_index"] = self._tool_index
         context.state["sandbox"]    = self._sandbox_policy()
         context.state["edit_scope"] = self.settings.sandbox.edit_scope

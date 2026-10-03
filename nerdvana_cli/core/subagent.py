@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from nerdvana_cli.core.agent_loop import AgentLoop
@@ -36,6 +37,8 @@ class SubagentConfig:
     # Set by run_subagent: what the agent spent (USD) and why it stopped.
     cost_usd:      float = 0.0
     stopped_for:   str   = ""
+    # Called with the agent's token totals and signal counts when it finishes, however it ended: the parent adds them to its own.
+    absorb:        Callable[[dict[str, int], dict[str, int]], None] | None = None
 
 
 def label_confirm(confirm: ConfirmCallback | None, label: str) -> ConfirmCallback | None:
@@ -67,14 +70,18 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     parts: list[str] = []
 
     limit = getattr(child_settings.session, "max_parallel_agents", DEFAULT_AGENT_SLOTS)
-    async with agent_slot(child_settings.model.provider, limit):
-        async for chunk in loop.run(config.prompt):
-            if abort.is_set():
-                return "".join(parts) + "\n[aborted]", 0
-            if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
-                parts.append(chunk)
+    try:
+        async with agent_slot(child_settings.model.provider, limit):
+            async for chunk in loop.run(config.prompt):
+                if abort.is_set():
+                    return "".join(parts) + "\n[aborted]", 0
+                if not any(chunk.startswith(p) for p in _PROTOCOL_PREFIXES):
+                    parts.append(chunk)
+    finally:
+        config.cost_usd = loop.session_cost_usd()
+        if config.absorb is not None:
+            config.absorb(loop.usage_summary(), loop.signal_summary())
 
-    config.cost_usd    = loop.session_cost_usd()
     config.stopped_for = loop.last_stop
     if loop.last_stop == "max_cost":
         parts.append(f"\n[Stopped: this agent used its share of the cost budget (${config.cost_usd:.4f}); the result above is partial.]")

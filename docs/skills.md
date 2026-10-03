@@ -56,3 +56,7 @@ Frontmatter that is not valid YAML only because a value contains an unquoted col
 ## Checking what loaded
 
 `/skills` lists the loaded skills in a session. Warnings about names, shadowing and untrusted project skills go to the log.
+
+## Permissions for bundled files and scripts
+
+Reading a skill's bundled files needs no extra permission: the file tools read any path they can open without asking, so `references/` and `assets/` are available after `ActivateSkill` lists them. A script under `scripts/` runs through `Bash` like any other command, with the same permission rules and sandbox. There is no automatic allowance for a skill's directory, because that would let a skill run its own scripts unasked; add a `Bash(...)` rule to `permissions.always_allow` for the scripts you trust.

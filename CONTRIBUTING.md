@@ -42,6 +42,30 @@ All three commands must exit with code 0.
 
 ---
 
+## Changing the system prompt, tool schemas or loop behaviour
+
+A change to what every request carries (the system prompt, the tool list and their descriptions, the
+compaction or masking rules, the default settings of the loop) can shift the success rate and the cost
+without any test failing. Besides the quality gate:
+
+1. Run `uv run pytest tests/core/test_prompt_prefix_stability.py`: the start of the request must stay
+   byte-identical from turn to turn, or the provider's prompt cache is lost.
+2. Run the benchmark before and after with at least 4 attempts per task and compare the two files:
+
+   ```bash
+   uv run python scripts/bench_agent.py benchmarks/tasks --attempts 4 --yes --isolate --out before.jsonl
+   # apply the change, then
+   uv run python scripts/bench_agent.py benchmarks/tasks --attempts 4 --yes --isolate --out after.jsonl
+   uv run python scripts/bench_compare.py before.jsonl after.jsonl
+   ```
+
+   `docs/benchmarks/agent-success-rate.md` explains the options and how to read the interval. A change that
+   cannot be told apart in pass rate but costs more input tokens is a regression.
+3. Watch the `cache_miss` signal in the run result: it counts requests whose cache read fell to zero with
+   nothing in the loop to explain it.
+
+---
+
 ## Optional gates
 
 **LSP integration tests** — requires `pyright` and `typescript-language-server` on PATH:

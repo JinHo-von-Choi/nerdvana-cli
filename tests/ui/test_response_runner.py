@@ -79,6 +79,7 @@ class _Usage:
     def __init__(self, tokens_in: int = 11, tokens_out: int = 22) -> None:
         self.input_tokens  = tokens_in
         self.output_tokens = tokens_out
+        self.cache_read_tokens = 0
 
 
 class _State:

@@ -123,6 +123,8 @@ class SessionConfig(BaseModel):
     observation_masking: bool = False
     mask_keep_last: int = 6
     mask_trigger_tokens: int = 20_000
+    # Name the files a Bash command changed in a git working tree at the end of its output.
+    report_bash_changes: bool = False
     planning_gate: bool = False  # enable complexity-triggered Plan agent before execution
     # Phase F: runtime profiles — default context and mode names
     default_context: str = "standalone"
