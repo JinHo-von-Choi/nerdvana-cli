@@ -29,6 +29,7 @@ from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 from nerdvana_cli.tools.registry import create_tool_registry
 
@@ -326,7 +327,7 @@ def run(
         loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts, scope=list(scope or [])))
 
     async def _run() -> None:
-        loop.usage_listener = reporter.request
+        loop.usage_listener = chain_usage_listeners(loop.usage_listener, reporter.request)
         reporter.start(session.session_id, settings.model.provider, settings.model.model)
         try:
             async for chunk in loop.run(prompt, images):

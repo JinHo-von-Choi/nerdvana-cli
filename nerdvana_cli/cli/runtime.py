@@ -18,6 +18,7 @@ from rich.prompt import Prompt
 
 from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
 from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError
+from nerdvana_cli.core.telemetry_otel import setup as setup_tracing
 
 console        = Console()
 console_stderr = Console(stderr=True)
@@ -57,7 +58,13 @@ def resolve_run_provider(settings: NerdvanaSettings) -> tuple[str, bool]:
     """Fill in the provider and its API key from the model name and the environment.
 
     Returns the provider name and whether a key is still missing (local providers need none).
+    This is the step every command that runs an agent takes before building one, so it is also
+    where OpenTelemetry tracing is switched on when ``telemetry.otel`` asks for it; a notice on
+    stderr says why it stays off when it cannot start.
     """
+    notice = setup_tracing(settings)
+    if notice:
+        console_stderr.print(f"[dim yellow]{notice}[/dim yellow]")
     from nerdvana_cli.providers import ProviderName, detect_provider
     from nerdvana_cli.providers.factory import resolve_api_key
 

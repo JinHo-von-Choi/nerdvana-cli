@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from nerdvana_cli.core.activity_state import summarize_tool_call
 from nerdvana_cli.core.hooks import HookContext, HookEvent, HookResult
+from nerdvana_cli.core.telemetry_otel import observe_loop
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.agent_loop import AgentLoop
@@ -64,8 +65,9 @@ def make_after_api_call_handler(loop: AgentLoop) -> _Handler:
 
 
 def register_activity_hooks(loop: AgentLoop) -> None:
-    """Register the four activity-state hooks on the loop's hook bus."""
+    """Register the four activity-state hooks on the loop's hook bus, and start tracing the loop when tracing is on."""
     loop.hooks.register(HookEvent.BEFORE_API_CALL, make_before_api_call_handler(loop))
     loop.hooks.register(HookEvent.BEFORE_TOOL,     make_before_tool_handler(loop))
     loop.hooks.register(HookEvent.AFTER_TOOL,      make_after_tool_handler(loop))
     loop.hooks.register(HookEvent.AFTER_API_CALL,  make_after_api_call_handler(loop))
+    observe_loop(loop)
