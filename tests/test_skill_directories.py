@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core.settings import NerdvanaSettings, SkillsConfig
+from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.settings_sections import SkillsConfig
 from nerdvana_cli.core.skills import MAX_SKILL_BYTES, SkillLoader
 
 

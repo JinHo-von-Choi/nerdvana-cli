@@ -17,7 +17,8 @@ import yaml
 from nerdvana_cli.core import telemetry_otel
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.otel_semconv import Attr, provider_name
-from nerdvana_cli.core.settings import NerdvanaSettings, OtelConfig
+from nerdvana_cli.core.settings import NerdvanaSettings
+from nerdvana_cli.core.settings_sections import OtelConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
 NOTHING_IMPORTED = textwrap.dedent("""

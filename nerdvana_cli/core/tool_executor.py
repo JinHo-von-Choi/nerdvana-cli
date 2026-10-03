@@ -30,7 +30,7 @@ from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.progress_monitor import ProgressMonitor
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
-from nerdvana_cli.core.settings import ToolsConfig
+from nerdvana_cli.core.settings_sections import ToolsConfig
 from nerdvana_cli.core.signals import NO_PROGRESS, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, TOOL_RESULT_CAP, ToolContext, ToolRegistry
