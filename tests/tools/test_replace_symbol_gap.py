@@ -21,6 +21,7 @@ import pytest
 
 from nerdvana_cli.core.code_editor import CodeEditor
 from nerdvana_cli.core.symbol import LanguageServerSymbol, Location
+from nerdvana_cli.core.symbol_lines import trim_trailing_gap
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools import symbol_edit_tools as se
 
@@ -134,15 +135,15 @@ async def test_a_signature_over_several_lines_does_not_end_the_symbol_early(tmp_
 class TestTrimTrailingGap:
     def test_blank_and_comment_lines_at_the_end_of_the_range_are_left_out(self) -> None:
         lines = ["def f():\n", "    x = 1\n", "    # note\n", "\n", "\n", "def g():\n"]
-        assert se._trim_trailing_gap(lines, 0, 5) == 2
+        assert trim_trailing_gap(lines, 0, 5) == 2
 
     def test_slash_comments_count_for_other_languages(self) -> None:
         lines = ["function f() {\n", "  x();\n", "  // note\n", "\n"]
-        assert se._trim_trailing_gap(lines, 0, 4) == 2
+        assert trim_trailing_gap(lines, 0, 4) == 2
 
     def test_the_range_never_shrinks_below_the_symbol_header(self) -> None:
-        assert se._trim_trailing_gap(["# only a comment\n", "\n"], 0, 2) == 1
+        assert trim_trailing_gap(["# only a comment\n", "\n"], 0, 2) == 1
 
     @pytest.mark.parametrize("end", [1, 3])
     def test_a_range_that_ends_on_a_statement_is_unchanged(self, end: int) -> None:
-        assert se._trim_trailing_gap(["def f():\n", "    a = 1\n", "    return a\n"], 0, end) == end
+        assert trim_trailing_gap(["def f():\n", "    a = 1\n", "    return a\n"], 0, end) == end

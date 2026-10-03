@@ -22,6 +22,7 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
+from nerdvana_cli.core.symbol_lines import outside_symbol, trim_trailing_gap, with_trailing_blank_lines
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 
@@ -254,24 +255,6 @@ def _find_symbol_end(lines: list[str], start_line: int) -> int:
     return len(lines)
 
 
-_COMMENT_PREFIXES = ("#", "//")
-
-
-def _trim_trailing_gap(lines: list[str], start_line: int, end_line: int) -> int:
-    """Return *end_line* moved up past the blank and comment-only lines that end the range.
-
-    ``_find_symbol_end`` runs up to the next line at the symbol's indentation, so the blank lines (and any
-    comment lines) between the symbol's last statement and the next statement are inside the range. A
-    replacement must leave them where they are.
-    """
-    while end_line > start_line + 1:
-        text = lines[end_line - 1].strip()
-        if text and not text.startswith(_COMMENT_PREFIXES):
-            break
-        end_line -= 1
-    return end_line
-
-
 # ---------------------------------------------------------------------------
 # Shared tool base
 # ---------------------------------------------------------------------------
@@ -379,7 +362,7 @@ class ReplaceSymbolBodyTool(SymbolEditTool[ReplaceSymbolBodyArgs]):
         if isinstance(located, ToolResult):
             return located
         abs_path, start_line, end_line, original_lines = located
-        end_line = _trim_trailing_gap(original_lines, start_line, end_line)
+        end_line = trim_trailing_gap(original_lines, start_line, end_line)
 
         uri       = _path_to_uri(abs_path)
         new_lines = body.splitlines(keepends=True)
@@ -544,7 +527,7 @@ class SafeDeleteSymbolTool(SymbolEditTool[SafeDeleteSymbolArgs]):
         relative_path: str,
         body:          str = "",
     ) -> ToolResult:
-        located = await _locate_symbol_lines(self._retriever, name_path, relative_path)
+        located = await _locate_symbol_lines(self._retriever, name_path, relative_path, exact_extent=True)
         if isinstance(located, ToolResult):
             return located
         abs_path, start_line, end_line, original_lines = located
@@ -559,7 +542,7 @@ class SafeDeleteSymbolTool(SymbolEditTool[SafeDeleteSymbolArgs]):
 
         target = symbols[0]
         try:
-            refs = await self._retriever.find_references(target)
+            refs = outside_symbol(await self._retriever.find_references(target), abs_path, start_line, end_line)
         except Exception as e:
             return ToolResult(tool_use_id="", content=f"LSP error: {e}", is_error=True)
 
@@ -583,7 +566,7 @@ class SafeDeleteSymbolTool(SymbolEditTool[SafeDeleteSymbolArgs]):
                 relative_path  = relative_path,
                 abs_path       = abs_path,
                 start_line     = start_line,
-                end_line       = end_line,
+                end_line       = with_trailing_blank_lines(original_lines, end_line),
                 original_lines = original_lines,
             )
         except Exception as e:
