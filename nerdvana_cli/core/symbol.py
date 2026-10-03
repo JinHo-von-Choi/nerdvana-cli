@@ -250,6 +250,7 @@ class LanguageServerSymbol:
     children:  list[LanguageServerSymbol]  = field(default_factory=list)
     detail:    str                         = ""
     name_location: Location | None         = None
+    end_line:  int                         = 0   # last line of the definition, 1-based; 0 when the server gave no range
 
     # -- helpers --
 
@@ -299,6 +300,8 @@ def _sym_from_dict(
         line      = (start.get("line") or 0) + 1,   # convert to 1-based
         character = start.get("character") or 0,
     )
+    end_raw       = (raw.get("range") or {}).get("end") or {}
+    end_line      = end_raw["line"] + 1 if isinstance(end_raw.get("line"), int) else 0
     selection     = (raw.get("selectionRange") or {}).get("start")
     name_location = (
         Location(
@@ -325,6 +328,7 @@ def _sym_from_dict(
         children      = children,
         detail        = detail,
         name_location = name_location,
+        end_line      = end_line,
     )
 
 

@@ -252,10 +252,39 @@ def _ledger_error(
     """Return an error text unless the file is unchanged since it was read."""
     recorded = read_ledger.lookup(session, key)
     if recorded is None:
-        return f"{path} has not been read in this session. Call FileRead on it before {verb}."
+        return f"{path} has not been read in this session. Call FileRead on it before {verb} (or find_symbol with include_body for the symbol you are changing)."
     if recorded != digest:
         return f"{path} changed since it was last read. Call FileRead again before {verb}."
     return None
+
+
+def _range_authority(session: str, key: str, anchor: str, raw_lines: list[str]) -> tuple[int, int] | None:
+    """The shown range an anchor edit may rely on instead of a read of the whole file.
+
+    A symbol read shows lines ``start``..``end``; the edit is allowed when the anchored line is inside such a
+    range and those lines are exactly as they were shown.
+    """
+    parsed = _parse_anchor(anchor)
+    if parsed is None:
+        return None
+    lineno = parsed[0]
+    for start, end, digest in read_ledger.lookup_ranges(session, key):
+        if start <= lineno <= end <= len(raw_lines) and read_ledger.range_digest(raw_lines[start - 1:end]) == digest:
+            return start, end
+    return None
+
+
+def _keep_shown_range(session: str, key: str, shown: tuple[int, int], new_content: str, old_line_count: int) -> None:
+    """After an edit made on the strength of a shown range, keep only that range, resized.
+
+    The whole file was not read, so no whole-file digest is recorded; the other ranges are dropped because
+    the edit may have moved their lines.
+    """
+    lines = new_content.splitlines(keepends=True)
+    start, end = shown[0], shown[1] + len(lines) - old_line_count
+    read_ledger.drop_ranges(session, key)
+    if 1 <= start <= end <= len(lines):
+        read_ledger.record_range(session, key, start, end, read_ledger.range_digest(lines[start - 1:end]))
 
 
 def _record_written(relative_path: str, cwd: str, session: str, key: str) -> None:
@@ -541,6 +570,62 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
             return "old_string cannot be empty or whitespace-only"
         return None
 
+    def _replace_anchor_line(
+        self,
+        args:    FileEditArgs,
+        context: ToolContext,
+        content: str,
+        session: str,
+        key:     str,
+        shown:   tuple[int, int] | None,
+    ) -> ToolResult:
+        """Replace the line an anchor names; *shown* is the symbol range the edit relies on instead of a whole-file read."""
+        raw_lines = content.splitlines(keepends=True)
+        parsed    = _parse_anchor(args.anchor_hash or "")
+        if parsed is None:
+            return ToolResult(
+                tool_use_id="",
+                content=(
+                    f"Malformed anchor '{args.anchor_hash}'. Use the 'N#hhhhhh' form "
+                    "shown by FileRead (line number, '#', 6 hex chars)."
+                ),
+                is_error=True,
+            )
+        lineno, line_hash = parsed
+        target_idx        = _resolve_anchor(lineno, line_hash, raw_lines)
+        if target_idx is None:
+            return ToolResult(
+                tool_use_id="",
+                content=(
+                    f"Anchor '{args.anchor_hash}' does not identify a unique line in "
+                    f"{args.path}. Current lines around {lineno}:\n"
+                    f"{_lines_around(raw_lines, lineno)}"
+                ),
+                is_error=True,
+            )
+        line_count            = len(raw_lines)
+        raw_lines[target_idx] = args.new_string
+        new_content = "".join(raw_lines)
+        try:
+            _atomic_write(args.path, context.cwd, new_content)
+            if shown is None:
+                _record_written(args.path, context.cwd, session, key)
+            else:
+                _keep_shown_range(session, key, shown, new_content, line_count)
+        except OSError as exc:
+            if _is_symlink_block_error(exc):
+                return ToolResult(
+                    tool_use_id="",
+                    content=f"Symbolic link blocked: {args.path}",
+                    is_error=True,
+                )
+            raise
+        context.file_state[args.path] = new_content
+        return ToolResult(
+            tool_use_id="",
+            content=f"Replaced anchor line {target_idx + 1} in {args.path}",
+        )
+
     async def call(
         self,
         args: FileEditArgs,
@@ -577,53 +662,15 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
             session = read_ledger.session_key(context)
             key     = read_ledger.resolve_key(args.path, context.cwd)
             stale   = _ledger_error("editing", args.path, session, key, read_ledger.content_digest(data))
-            if stale:
-                return ToolResult(tool_use_id="", content=stale, is_error=True)
             content = _decode_text(data, "strict")
+            shown   = None
+            if stale and args.anchor_hash is not None:
+                shown = _range_authority(session, key, args.anchor_hash, content.splitlines(keepends=True))
+            if stale and shown is None:
+                return ToolResult(tool_use_id="", content=stale, is_error=True)
 
-            # ── anchor_hash path ──────────────────────────────────────────
             if args.anchor_hash is not None:
-                raw_lines = content.splitlines(keepends=True)
-                parsed    = _parse_anchor(args.anchor_hash)
-                if parsed is None:
-                    return ToolResult(
-                        tool_use_id="",
-                        content=(
-                            f"Malformed anchor '{args.anchor_hash}'. Use the 'N#hhhhhh' form "
-                            "shown by FileRead (line number, '#', 6 hex chars)."
-                        ),
-                        is_error=True,
-                    )
-                lineno, line_hash = parsed
-                target_idx        = _resolve_anchor(lineno, line_hash, raw_lines)
-                if target_idx is None:
-                    return ToolResult(
-                        tool_use_id="",
-                        content=(
-                            f"Anchor '{args.anchor_hash}' does not identify a unique line in "
-                            f"{args.path}. Current lines around {lineno}:\n"
-                            f"{_lines_around(raw_lines, lineno)}"
-                        ),
-                        is_error=True,
-                    )
-                raw_lines[target_idx] = args.new_string
-                new_content = "".join(raw_lines)
-                try:
-                    _atomic_write(args.path, context.cwd, new_content)
-                    _record_written(args.path, context.cwd, session, key)
-                except OSError as exc:
-                    if _is_symlink_block_error(exc):
-                        return ToolResult(
-                            tool_use_id="",
-                            content=f"Symbolic link blocked: {args.path}",
-                            is_error=True,
-                        )
-                    raise
-                context.file_state[args.path] = new_content
-                return ToolResult(
-                    tool_use_id="",
-                    content=f"Replaced anchor line {target_idx + 1} in {args.path}",
-                )
+                return self._replace_anchor_line(args, context, content, session, key, shown)
             # ── old_string path (backward-compatible) ─────────────────────
             assert args.old_string is not None
             if args.old_string not in content:
