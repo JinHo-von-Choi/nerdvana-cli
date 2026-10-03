@@ -26,11 +26,14 @@ def build_system_prompt(
     active_tool_mode: bool = False,
     project_doc_max_tokens: int = 0,
     deferred_tools: list[str] | None = None,
+    git_info: dict[str, str] | None = None,
 ) -> str:
     """Build the complete system prompt from ordered sections.
 
     active_tool_mode: when true, inject the stronger active-tool augment
     section. Triggered by ultrawork keyword or extended_thinking flag.
+    git_info: the git summary to print; a session passes the one it took at its
+    start so the prompt, which providers cache from its first byte, stays the same.
     """
     nirna_files   = fit_to_budget(load_nirna_files(cwd=cwd), project_doc_max_tokens)
     nirna_section = format_nirna_for_prompt(nirna_files)
@@ -47,7 +50,7 @@ def build_system_prompt(
         _parism_section() if parism_active else None,
         _tone_and_style_section(),
         _output_efficiency_section(),
-        _environment_section(model=model, provider=provider, cwd=cwd),
+        _environment_section(model=model, provider=provider, cwd=cwd, git_info=git_info),
         nirna_section,
     ]
     return "\n\n".join(s for s in sections if s)
@@ -338,6 +341,11 @@ def _refresh_git_info(key: str) -> None:
             _git_refreshing.discard(key)
 
 
+def git_snapshot(cwd: str) -> dict[str, str]:
+    """The git summary of *cwd* as it is now, for a caller that keeps it fixed for a whole session."""
+    return _git_info(cwd)
+
+
 async def warm_git_info(cwd: str) -> None:
     """Fill the git cache from a worker thread before a prompt is built.
 
@@ -388,6 +396,7 @@ def _environment_section(
     model: str = "",
     provider: str = "",
     cwd: str = ".",
+    git_info: dict[str, str] | None = None,
 ) -> str:
     parts = ["# Environment"]
     if provider and model:
@@ -398,7 +407,7 @@ def _environment_section(
     parts.append(f"- OS version: {platform.platform()}")
     parts.append(f"- Shell: {os.environ.get('SHELL', 'unknown')}")
 
-    git = _git_info(cwd)
+    git = git_info if git_info is not None else _git_info(cwd)
     parts.append(f"- Is a git repository: {git.get('is_repo', 'false')}")
     if git.get("is_repo") == "true":
         if git.get("branch"):
@@ -406,7 +415,7 @@ def _environment_section(
         if git.get("main_branch"):
             parts.append(f"- Main branch: {git['main_branch']}")
         if git.get("status"):
-            parts.append(f"- Git status: {git['status']}")
+            parts.append(f"- Git status when the session started: {git['status']}")
         if git.get("recent"):
             parts.append("- Recent commits:")
             for line in git["recent"].splitlines():

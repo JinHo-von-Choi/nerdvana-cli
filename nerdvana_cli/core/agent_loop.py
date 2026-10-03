@@ -299,6 +299,7 @@ class AgentLoop:
         self._todo_guard       = TodoGuard()
         self._end_turn_nudges  = 0
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
+        self._git_snapshot: dict[str, str] | None = None
         self._session_ended   = False
         self.provider         = self.create_provider_from_settings()
         _cp_cfg = getattr(settings, "checkpoint", None)
@@ -674,6 +675,7 @@ class AgentLoop:
         self._queued_input = []
         self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
+        self._git_snapshot = None
         self._turn_marks.clear()
         self._dir_rules.reset()
         self._context_budget.reset()
@@ -705,11 +707,14 @@ class AgentLoop:
 
     def build_system_prompt(self) -> str:
         from nerdvana_cli.core.prompts import build_system_prompt as _b
+        from nerdvana_cli.core.prompts import git_snapshot
+        if self._git_snapshot is None:
+            self._git_snapshot = git_snapshot(self.settings.cwd)
         return _b(tools=[t for t in self.registry.all_tools() if self.policy.is_visible(t.name)], parism_active=self.registry.get("Parism") is not None,
                   model=self.settings.model.model, provider=self.settings.model.provider, cwd=self.settings.cwd,
                   active_tool_mode=bool(self.settings.model.extended_thinking),
                   project_doc_max_tokens=self.settings.session.project_doc_max_tokens,
-                  deferred_tools=self._tool_index.index_lines() if self._tool_index else None)
+                  deferred_tools=self._tool_index.index_lines() if self._tool_index else None, git_info=self._git_snapshot)
 
     def activate_skill(self, skill_body: str) -> None: self._active_skill = skill_body  # noqa: E704
     def deactivate_skill(self) -> None: self._active_skill = None  # noqa: E704
