@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import sys
+from pathlib import Path
+
 import pytest
 
 from nerdvana_cli.mcp.client import McpClient
@@ -39,29 +43,43 @@ class TestMcpClientNotConnected:
             await client.list_resources()
 
 
+def _fake_server_config() -> McpServerConfig:
+    return McpServerConfig(
+        name="fake",
+        transport="stdio",
+        command=sys.executable,
+        args=[str(Path(__file__).parent / "mcp" / "fake_server.py")],
+    )
+
+
 class TestMcpClientListTools:
-    """list_tools() sends tools/list and returns the tools array."""
+    """list_tools() requests tools/list and returns the tools array."""
 
     @pytest.mark.asyncio
     async def test_list_tools_returns_tools(self):
-        client = McpClient(_make_config())
-        client._connected = True
+        client = McpClient(_fake_server_config())
+        await client.connect()
+        try:
+            tools = await client.list_tools()
+        finally:
+            await client.disconnect()
 
-        expected_tools = [
-            {"name": "tool_a", "description": "Does A"},
-            {"name": "tool_b", "description": "Does B"},
-        ]
+        assert [tool["name"] for tool in tools] == ["echo", "fail", "ask", "list_count"]
+        assert tools[0]["description"] == "Echo the arguments"
+        assert tools[0]["inputSchema"]["properties"] == {"text": {"type": "string"}}
 
-        async def mock_send_request(method, params):
-            if method == "tools/list":
-                return {"tools": expected_tools}
-            return {}
+    @pytest.mark.asyncio
+    async def test_second_listing_is_served_from_the_cache_while_the_server_ttl_holds(self):
+        client = McpClient(_fake_server_config())
+        await client.connect()
+        try:
+            await client.list_tools()
+            await client.list_tools()
+            served = await client.call_tool("list_count")
+        finally:
+            await client.disconnect()
 
-        client._send_request = mock_send_request
-
-        tools = await client.list_tools()
-        assert tools == expected_tools
-        assert len(tools) == 2
+        assert served["content"][0]["text"] == "1"
 
 
 class TestMcpClientCallTool:
@@ -69,26 +87,27 @@ class TestMcpClientCallTool:
 
     @pytest.mark.asyncio
     async def test_call_tool_returns_result(self):
-        client = McpClient(_make_config())
-        client._connected = True
+        client = McpClient(_fake_server_config())
+        await client.connect()
+        try:
+            result = await client.call_tool("echo", {"text": "Hello from tool"})
+        finally:
+            await client.disconnect()
 
-        expected_result = {
-            "content": [{"type": "text", "text": "Hello from tool"}],
-            "isError": False,
-        }
+        assert result["isError"] is False
+        assert json.loads(result["content"][0]["text"]) == {"text": "Hello from tool"}
 
-        async def mock_send_request(method, params):
-            if method == "tools/call":
-                assert params["name"] == "my_tool"
-                assert params["arguments"] == {"query": "test"}
-                return expected_result
-            return {}
+    @pytest.mark.asyncio
+    async def test_an_error_result_keeps_its_is_error_flag(self):
+        client = McpClient(_fake_server_config())
+        await client.connect()
+        try:
+            result = await client.call_tool("fail")
+        finally:
+            await client.disconnect()
 
-        client._send_request = mock_send_request
-
-        result = await client.call_tool("my_tool", {"query": "test"})
-        assert result == expected_result
-        assert result["content"][0]["text"] == "Hello from tool"
+        assert result["isError"] is True
+        assert result["content"][0]["text"] == "it failed"
 
 
 class TestMcpClientDisconnected:
