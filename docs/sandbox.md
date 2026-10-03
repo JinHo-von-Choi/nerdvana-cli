@@ -42,6 +42,11 @@ Tools that keep state outside the project, such as package managers and compiler
 with a cache in the home directory, need those directories in `write_paths`, for
 example `~/.cache`, `~/.npm` or `~/.cargo`.
 
+## Per agent
+
+An agent definition can narrow the policy for its sub-agents with `write_scope` and `network`; see
+[agents.md](agents.md).
+
 ## What it does not do
 
 - It does not stop reading. A confined command can read any file the user can, including

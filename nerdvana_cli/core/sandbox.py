@@ -67,8 +67,6 @@ _FS_BASE = (
 # The only rights that can be granted on something that is not a directory.
 _FS_FILE_RIGHTS = _FS_WRITE_FILE | _FS_TRUNCATE
 
-_ALWAYS_WRITABLE = ("/tmp", "/var/tmp", "/dev")  # noqa: S108 - scratch space every command expects
-
 
 class SandboxError(RuntimeError):
     """The restriction could not be set up."""
@@ -81,6 +79,8 @@ class SandboxPolicy:
     mode:        str                = "off"
     network:     bool               = True
     write_paths: tuple[str, ...]    = ()
+    project:     bool               = True   # the project directory is writable
+    scratch:     bool               = True   # /tmp and the system temporary directory are writable
 
 
 @dataclass(frozen=True)
@@ -167,8 +167,17 @@ def _syscall_prctl() -> None:
 
 
 def writable_paths(policy: SandboxPolicy, cwd: str) -> list[str]:
-    """Where a confined command may write: the project, scratch space and the configured extras."""
-    candidates = [cwd, tempfile.gettempdir(), *_ALWAYS_WRITABLE, *policy.write_paths]
+    """Where a confined command may write: the project, scratch space and the configured extras.
+
+    ``/dev`` is always included (commands write to ``/dev/null``); ``project`` and ``scratch`` can switch the
+    project directory and the temporary directories off for a role that must not change anything.
+    """
+    candidates = [
+        *([cwd] if policy.project else []),
+        *([tempfile.gettempdir(), "/tmp", "/var/tmp"] if policy.scratch else []),  # noqa: S108
+        "/dev",
+        *policy.write_paths,
+    ]
     seen: list[str] = []
     for candidate in candidates:
         resolved = os.path.realpath(os.path.expanduser(candidate))

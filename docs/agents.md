@@ -50,6 +50,23 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 - **System prompt:** "You are a test-writing agent. Write thorough tests using the project's existing test framework. Follow TDD: write failing test first, then implement minimal code to pass. Do not refactor existing code."
 - **Use:** TDD test generation and execution.
 
+## What a sub-agent may write
+
+`write_scope` narrows what the sub-agents of an agent type can change, in two ways at once:
+
+| Value | Commands (`Bash`) | File and symbol edit tools |
+|-|-|-|
+| unset or `project` | the session's `sandbox` policy | the session's permissions |
+| `none` | nothing writable, not even the project or `/tmp` | every edit refused |
+| a list of paths | only those paths and the temporary directories | only those paths, relative to the project |
+
+The built-in `Explore`, `Plan` and `code-reviewer` agents use `none`. Commands are confined by the
+operating system (Landlock, see [sandbox.md](sandbox.md)) and a scope turns `sandbox.mode` from `off` to
+`auto` for that agent, so on a system without Landlock the commands run unconfined and only the edit tools are
+held to the scope. A session whose `sandbox.mode` is `require` keeps it. The edit tools run in the application and
+are held to the scope by the tool executor, with relative paths resolved against the project and `..` and
+look-alike directory names refused. A refused edit is counted as `out_of_scope` in the run's signals.
+
 ## Sharing the cost limit
 
 With `session.max_cost_usd` set, a sub-agent does not get the whole limit. Each `Agent` call is
@@ -88,6 +105,8 @@ allowed_tools:                      # optional — default ["*"] (all)
   - Glob
   - Grep
   - Bash
+write_scope: none                   # optional — what it may write: none, project (default) or a list such as [tests, docs/api]
+network: false                      # optional — false also refuses TCP connections of its commands (Linux 6.7+)
 model: claude-opus-5-5              # optional — "model" or "provider:model"; default is the parent's model
 category: deep                      # optional — model taken from agents.categories when no model is set
 system_prompt: |                    # optional — injected into child's system prompt

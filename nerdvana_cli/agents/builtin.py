@@ -13,6 +13,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
     ),
     AgentDefinition(
         agent_type="Explore",
+        write_scope="none",
         description="Fast agent for codebase exploration — glob, grep, read only.",
         max_turns=12,
         allowed_tools=["Glob", "Grep", "FileRead", "@read"],
@@ -24,6 +25,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
     ),
     AgentDefinition(
         agent_type="Plan",
+        write_scope="none",
         description="Software architect agent for designing implementation plans.",
         max_turns=15,
         allowed_tools=["Glob", "Grep", "FileRead", "@read"],
@@ -34,6 +36,7 @@ BUILTIN_AGENTS: list[AgentDefinition] = [
     ),
     AgentDefinition(
         agent_type="code-reviewer",
+        write_scope="none",
         description="Code review agent — read-only analysis of code quality and correctness.",
         max_turns=12,
         allowed_tools=["FileRead", "Grep", "Glob", "@read"],
