@@ -203,6 +203,35 @@ def _pricing_status(provider: str, model: str) -> str:
 # Main aggregation helper
 # ---------------------------------------------------------------------------
 
+def cache_hit_ratio(cache_read_tokens: int, input_tokens: int) -> float | None:
+    """The share of input tokens served from the prompt cache (0 to 1); None when there was no input.
+
+    ``input_tokens`` is the whole prompt, the cached part included.
+    """
+    if input_tokens <= 0:
+        return None
+    return round(min(cache_read_tokens / input_tokens, 1.0), 4)
+
+
+def _invalid_window_report(since: str, by: str, message: str) -> dict[str, Any]:
+    """The report for a ``--since`` value that cannot be read: no rows, zero totals and the error text."""
+    return {
+        "error": message,
+        "rows":  [],
+        "total_input":    0,
+        "total_output":   0,
+        "total_cache_read":  0,
+        "total_cache_write": 0,
+        "cache_hit_ratio":   None,
+        "total_cost_usd": 0.0,
+        "warning_count":  0,
+        "since":          since,
+        "by":             by,
+        "cutoff_iso":     "invalid",
+        "generated_at":   datetime.now(UTC).isoformat(),
+    }
+
+
 def build_cost_report(
     since:   str = "7d",
     by:      str = "provider",
@@ -215,6 +244,7 @@ def build_cost_report(
         ``total_input``    — aggregate input token count.
         ``total_output``   — aggregate output token count.
         ``total_cache_read`` / ``total_cache_write`` — tokens served from or written to the prompt cache.
+        ``cache_hit_ratio`` : ``total_cache_read`` over ``total_input`` (also per row), None without input.
         ``total_cost_usd`` — aggregate USD cost.
         ``warning_count``  — number of rows whose pricing is unknown or TBD.
         ``since``          — the raw --since argument.
@@ -225,36 +255,30 @@ def build_cost_report(
     try:
         cutoff = parse_since(since)
     except ValueError as exc:
-        return {
-            "error": str(exc),
-            "rows":  [],
-            "total_input":    0,
-            "total_output":   0,
-            "total_cache_read":  0,
-            "total_cache_write": 0,
-            "total_cost_usd": 0.0,
-            "warning_count":  0,
-            "since":          since,
-            "by":             by,
-            "cutoff_iso":     "invalid",
-            "generated_at":   datetime.now(UTC).isoformat(),
-        }
+        return _invalid_window_report(since, by, str(exc))
 
     path  = db_path or paths.analytics_db_path()
     raw   = load_usage_rows(path, cutoff, by)
 
     rows: list[dict[str, Any]] = [
-        {**r, "status": _pricing_status(r["provider"], r["model"]) if by == "model" else "ok"}
+        {
+            **r,
+            "cache_hit_ratio": cache_hit_ratio(r["cache_read_tokens"], r["input_tokens"]),
+            "status":          _pricing_status(r["provider"], r["model"]) if by == "model" else "ok",
+        }
         for r in raw
     ]
     warning_count = sum(1 for row in rows if row["status"] != "ok")
+    total_input   = sum(r["input_tokens"] for r in rows)
+    total_cached  = sum(r["cache_read_tokens"] for r in rows)
 
     return {
         "rows":           rows,
-        "total_input":    sum(r["input_tokens"] for r in rows),
+        "total_input":    total_input,
         "total_output":   sum(r["output_tokens"] for r in rows),
-        "total_cache_read":  sum(r["cache_read_tokens"] for r in rows),
+        "total_cache_read":  total_cached,
         "total_cache_write": sum(r["cache_write_tokens"] for r in rows),
+        "cache_hit_ratio":   cache_hit_ratio(total_cached, total_input),
         "total_cost_usd": sum(r["cost_usd"] for r in rows),
         "warning_count":  warning_count,
         "since":          since,
@@ -273,6 +297,11 @@ def _fmt_tokens(n: int) -> str:
     return f"{n:,}"
 
 
+def _fmt_ratio(ratio: float | None) -> str:
+    """A share as a percentage, or a dash when it is undefined."""
+    return "-" if ratio is None else f"{ratio * 100:.1f}%"
+
+
 def _fmt_cost(usd: float, status: str) -> str:
     if status == "tbd":
         return "n/a (pricing TBD)"
@@ -282,6 +311,22 @@ def _fmt_cost(usd: float, status: str) -> str:
 
 
 _FIRST_COLUMN = {"agent": "Agent", "category": "Category", "tool": "Tool (ran just before)"}
+
+
+def _add_totals_row(table: Any, report: dict[str, Any]) -> None:
+    """Add the bold TOTAL row of *report* to *table*."""
+    total_cost_str = f"${report['total_cost_usd']:.4g}"
+    table.add_row(
+        "[bold]TOTAL[/bold]",
+        *([""] if report["by"] in ("provider", "model") else []),
+        f"[bold]{_fmt_tokens(report['total_input'])}[/bold]",
+        f"[bold]{_fmt_tokens(report['total_output'])}[/bold]",
+        f"[bold]{_fmt_tokens(report['total_cache_read'])}[/bold]",
+        f"[bold]{_fmt_tokens(report['total_cache_write'])}[/bold]",
+        f"[bold]{_fmt_ratio(report['cache_hit_ratio'])}[/bold]",
+        f"[bold]{total_cost_str}[/bold]",
+        end_section=False,
+    )
 
 
 def render_cost_table(report: dict[str, Any]) -> None:
@@ -308,6 +353,7 @@ def render_cost_table(report: dict[str, Any]) -> None:
     table.add_column("Output",       justify="right")
     table.add_column("Cache read",   justify="right")
     table.add_column("Cache write",  justify="right")
+    table.add_column("Hit %",        justify="right")
     table.add_column("Cost (USD)",   justify="right")
 
     for row in rows:
@@ -319,21 +365,11 @@ def render_cost_table(report: dict[str, Any]) -> None:
             _fmt_tokens(row["output_tokens"]),
             _fmt_tokens(row["cache_read_tokens"]),
             _fmt_tokens(row["cache_write_tokens"]),
+            _fmt_ratio(row["cache_hit_ratio"]),
             cost_str,
         )
 
-    # Totals row
-    total_cost_str = f"${report['total_cost_usd']:.4g}"
-    table.add_row(
-        "[bold]TOTAL[/bold]",
-        *([""] if report["by"] in ("provider", "model") else []),
-        f"[bold]{_fmt_tokens(report['total_input'])}[/bold]",
-        f"[bold]{_fmt_tokens(report['total_output'])}[/bold]",
-        f"[bold]{_fmt_tokens(report['total_cache_read'])}[/bold]",
-        f"[bold]{_fmt_tokens(report['total_cache_write'])}[/bold]",
-        f"[bold]{total_cost_str}[/bold]",
-        end_section=False,
-    )
+    _add_totals_row(table, report)
 
     console.print(table)
 
