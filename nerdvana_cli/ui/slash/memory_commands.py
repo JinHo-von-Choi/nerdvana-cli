@@ -121,7 +121,7 @@ async def handle_memories(app: NerdvanaApp, args: str) -> None:
 
 async def handle_memory(app: NerdvanaApp, args: str) -> None:
     """Handle /memory inbox | approve | reject | forget | stale, see memory_review_text.USAGE."""
-    from nerdvana_cli.commands.memory_review_text import ReviewError, run_slash
+    from nerdvana_cli.cli.commands.memory_review_text import ReviewError, run_slash
 
     try:
         app._add_chat_message(run_slash(app.settings.cwd, args))

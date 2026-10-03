@@ -46,13 +46,13 @@ def db_writer(tmp_path: Path):
 class TestHandleHealth:
     @pytest.mark.asyncio
     async def test_default_output(self, db_writer: Path) -> None:
-        from nerdvana_cli.commands.observability_commands import handle_health
         from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
+        from nerdvana_cli.ui.slash.observability_commands import handle_health
 
         messages: list[str] = []
         app = _make_app(messages)
 
-        with patch("nerdvana_cli.commands.observability_commands.AnalyticsReader") as MockReader:
+        with patch("nerdvana_cli.ui.slash.observability_commands.AnalyticsReader") as MockReader:
             reader = AnalyticsReader(db_path=db_writer)
             MockReader.return_value = reader
             await handle_health(app, "")
@@ -66,14 +66,14 @@ class TestHandleHealth:
 
     @pytest.mark.asyncio
     async def test_json_flag(self, db_writer: Path) -> None:
-        from nerdvana_cli.commands.observability_commands import handle_health
         from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
+        from nerdvana_cli.ui.slash.observability_commands import handle_health
 
         messages:     list[str] = []
         raw_messages: list[str] = []
         app = _make_app(messages, raw_messages)
 
-        with patch("nerdvana_cli.commands.observability_commands.AnalyticsReader") as MockReader:
+        with patch("nerdvana_cli.ui.slash.observability_commands.AnalyticsReader") as MockReader:
             reader = AnalyticsReader(db_path=db_writer)
             MockReader.return_value = reader
             await handle_health(app, "--json")
@@ -86,13 +86,13 @@ class TestHandleHealth:
 
     @pytest.mark.asyncio
     async def test_days_flag(self, db_writer: Path) -> None:
-        from nerdvana_cli.commands.observability_commands import handle_health
         from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
+        from nerdvana_cli.ui.slash.observability_commands import handle_health
 
         messages: list[str] = []
         app = _make_app(messages)
 
-        with patch("nerdvana_cli.commands.observability_commands.AnalyticsReader") as MockReader:
+        with patch("nerdvana_cli.ui.slash.observability_commands.AnalyticsReader") as MockReader:
             reader = AnalyticsReader(db_path=db_writer)
             MockReader.return_value = reader
             await handle_health(app, "--days 30")
@@ -102,7 +102,7 @@ class TestHandleHealth:
 
     @pytest.mark.asyncio
     async def test_no_data(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from nerdvana_cli.commands.observability_commands import handle_health
+        from nerdvana_cli.ui.slash.observability_commands import handle_health
 
         monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path))
         messages: list[str] = []
@@ -115,8 +115,8 @@ class TestHandleHealth:
 class TestHandleDashboard:
     @pytest.mark.asyncio
     async def test_toggle_called(self) -> None:
-        from nerdvana_cli.commands.observability_commands import handle_dashboard
         from nerdvana_cli.ui.dashboard_tab import DashboardTab
+        from nerdvana_cli.ui.slash.observability_commands import handle_dashboard
 
         messages: list[str] = []
         app = _make_app(messages)

@@ -14,6 +14,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
+from nerdvana_cli.cli.commands.review_command import parse_findings, render_findings, should_fail
 from nerdvana_cli.cli.review_context import (
     ChangedSymbol,
     ReviewError,
@@ -23,7 +24,6 @@ from nerdvana_cli.cli.review_context import (
     parse_changes,
     render_prompt,
 )
-from nerdvana_cli.commands.review_command import parse_findings, render_findings, should_fail
 from nerdvana_cli.main import app
 
 LIB = (
@@ -168,7 +168,7 @@ def test_the_command_runs_the_reviewer_and_fails_on_severity(repo: Path) -> None
         return ANSWER
 
     _change(repo)
-    with patch("nerdvana_cli.commands.review_command._run_reviewer", new=fake):
+    with patch("nerdvana_cli.cli.commands.review_command._run_reviewer", new=fake):
         text = runner.invoke(app, ["review"])
         assert text.exit_code == 0 and "[high] use.py:3" in text.stdout
         failed = runner.invoke(app, ["review", "--fail-on", "high", "--output-format", "json"])

@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.commands import doctor_command as dc
-from nerdvana_cli.commands.session_commands import handle_mcp
+from nerdvana_cli.cli.commands import doctor_command as dc
 from nerdvana_cli.core.safety import sandbox
+from nerdvana_cli.ui.slash.session_commands import handle_mcp
 
 
 def _mcp(tmp_path: Path, servers: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:

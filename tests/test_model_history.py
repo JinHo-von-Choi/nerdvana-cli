@@ -80,7 +80,7 @@ def _make_app_mock(model_history: dict, current_provider: str = "anthropic") -> 
 @pytest.mark.asyncio
 async def test_switch_provider_uses_history(tmp_path):
     """switch_provider picks last_model from model_history when entry exists."""
-    from nerdvana_cli.commands.model_commands import switch_provider
+    from nerdvana_cli.ui.slash.model_commands import switch_provider
 
     app = _make_app_mock(model_history={"dashscope": "qwen-plus"}, current_provider="anthropic")
 
@@ -102,8 +102,8 @@ async def test_switch_provider_uses_history(tmp_path):
 @pytest.mark.asyncio
 async def test_switch_provider_falls_back_to_default(tmp_path):
     """switch_provider falls back to DEFAULT_MODELS when history is empty."""
-    from nerdvana_cli.commands.model_commands import switch_provider
     from nerdvana_cli.providers.base import DEFAULT_MODELS, ProviderName
+    from nerdvana_cli.ui.slash.model_commands import switch_provider
 
     app = _make_app_mock(model_history={}, current_provider="anthropic")
 
@@ -129,7 +129,7 @@ async def test_switch_provider_falls_back_to_default(tmp_path):
 @pytest.mark.asyncio
 async def test_handle_model_records_history():
     """/model <name> updates model_history for the active provider."""
-    from nerdvana_cli.commands.model_commands import handle_model
+    from nerdvana_cli.ui.slash.model_commands import handle_model
 
     app = _make_app_mock(model_history={}, current_provider="anthropic")
     app._agent_loop.registry.all_tools.return_value = []
@@ -153,7 +153,7 @@ async def test_handle_model_records_history():
 @pytest.mark.asyncio
 async def test_switch_provider_saves_history_in_config():
     """switch_provider writes model_history to the persisted config."""
-    from nerdvana_cli.commands.model_commands import switch_provider
+    from nerdvana_cli.ui.slash.model_commands import switch_provider
 
     app = _make_app_mock(model_history={}, current_provider="anthropic")
     saved_config: dict = {}

@@ -25,7 +25,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     importlib.reload(paths)
     importlib.reload(user_hooks)
 
-    from nerdvana_cli.commands import hook_command
+    from nerdvana_cli.cli.commands import hook_command
 
     importlib.reload(hook_command)
 

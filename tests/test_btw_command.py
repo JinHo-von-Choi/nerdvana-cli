@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from nerdvana_cli.commands.btw_command import handle_btw
 from nerdvana_cli.providers.base import ProviderEvent
+from nerdvana_cli.ui.slash.btw_command import handle_btw
 
 
 class _Provider:

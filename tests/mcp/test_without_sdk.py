@@ -28,7 +28,7 @@ from nerdvana_cli.mcp.tools import McpToolAdapter
 from nerdvana_cli.mcp.skills import McpSkillFileTool, McpSkillLibrary
 from nerdvana_cli.mcp.input_requests import bind_ask_user
 from nerdvana_cli.mcp.sandbox import plan_server_launch
-from nerdvana_cli.commands.session_commands import show_session_context
+from nerdvana_cli.ui.slash.session_commands import show_session_context
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 settings = NerdvanaSettings()

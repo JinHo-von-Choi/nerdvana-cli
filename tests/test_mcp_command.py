@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.commands.mcp_command.
+"""Tests for nerdvana_cli.cli.commands.mcp_command.
 
 Author: 최진호
 Date:   2026-04-29
@@ -35,7 +35,7 @@ def _read_mcp(data_home: Path) -> dict:
 
 class TestLoadSaveRaw:
     def test_missing_file_returns_empty(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.mcp_command import _load_raw
+        from nerdvana_cli.cli.commands.mcp_command import _load_raw
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("NERDVANA_DATA_HOME", str(tmp_path / "nonexistent"))
             data = _load_raw()
@@ -43,14 +43,14 @@ class TestLoadSaveRaw:
 
     def test_invalid_json_returns_empty(self, tmp_path: Path) -> None:
         (tmp_path / "mcp.json").write_text("NOT JSON", encoding="utf-8")
-        from nerdvana_cli.commands.mcp_command import _load_raw
+        from nerdvana_cli.cli.commands.mcp_command import _load_raw
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("NERDVANA_DATA_HOME", str(tmp_path))
             data = _load_raw()
         assert data["mcpServers"] == {}
 
     def test_roundtrip(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.mcp_command import _load_raw, _save_raw
+        from nerdvana_cli.cli.commands.mcp_command import _load_raw, _save_raw
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("NERDVANA_DATA_HOME", str(tmp_path))
             data = _load_raw()

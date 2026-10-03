@@ -85,7 +85,7 @@ def _make_app_for_provider(current_provider: str) -> MagicMock:
 @pytest.mark.asyncio
 async def test_handle_provider_sets_highlighted():
     """handle_provider must set prov_selector.highlighted = current provider index."""
-    from nerdvana_cli.commands.model_commands import handle_provider
+    from nerdvana_cli.ui.slash.model_commands import handle_provider
 
     app = _make_app_for_provider("openai")
 
@@ -118,7 +118,7 @@ async def test_handle_provider_sets_highlighted():
 @pytest.mark.asyncio
 async def test_handle_models_sets_highlighted():
     """handle_models must set selector.highlighted = current model index."""
-    from nerdvana_cli.commands.model_commands import handle_models
+    from nerdvana_cli.ui.slash.model_commands import handle_models
 
     app = MagicMock()
     app.settings.model.model = "gpt-4.1"
@@ -155,7 +155,7 @@ async def test_handle_models_sets_highlighted():
 @pytest.mark.asyncio
 async def test_handle_models_highlighted_fallback_when_not_in_list():
     """handle_models uses index 0 when current model is absent from list."""
-    from nerdvana_cli.commands.model_commands import handle_models
+    from nerdvana_cli.ui.slash.model_commands import handle_models
 
     app = MagicMock()
     app.settings.model.model = "deprecated-model"

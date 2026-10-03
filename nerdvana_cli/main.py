@@ -13,6 +13,16 @@ from rich.console import Console
 from nerdvana_cli import __version__
 from nerdvana_cli.acp.command import acp_command
 from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
+from nerdvana_cli.cli.commands.admin_command import admin_app
+from nerdvana_cli.cli.commands.agents_command import agents_app
+from nerdvana_cli.cli.commands.history_command import history_app
+from nerdvana_cli.cli.commands.hook_command import hook_app
+from nerdvana_cli.cli.commands.mcp_command import mcp_app
+from nerdvana_cli.cli.commands.memory_command import memory_app
+from nerdvana_cli.cli.commands.schedule_command import schedule_app
+from nerdvana_cli.cli.commands.session_command import session_app
+from nerdvana_cli.cli.commands.skill_command import skill_app
+from nerdvana_cli.cli.commands.workflow_command import workflow_app
 from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
@@ -23,16 +33,6 @@ from nerdvana_cli.cli.runtime import (
     resolve_run_provider,
     run_migration_once,
 )
-from nerdvana_cli.commands.admin_command import admin_app
-from nerdvana_cli.commands.agents_command import agents_app
-from nerdvana_cli.commands.history_command import history_app
-from nerdvana_cli.commands.hook_command import hook_app
-from nerdvana_cli.commands.mcp_command import mcp_app
-from nerdvana_cli.commands.memory_command import memory_app
-from nerdvana_cli.commands.schedule_command import schedule_app
-from nerdvana_cli.commands.session_command import session_app
-from nerdvana_cli.commands.skill_command import skill_app
-from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
@@ -482,7 +482,7 @@ def doctor(
     json_output: bool = typer.Option(False, "--json",   help="Machine-readable JSON output"),
 ) -> None:
     """Diagnose installation, keys, and external dependencies."""
-    from nerdvana_cli.commands.doctor_command import doctor_command
+    from nerdvana_cli.cli.commands.doctor_command import doctor_command
 
     doctor_command(strict=strict, json_output=json_output)
 
@@ -494,7 +494,7 @@ def cost(
     by:          str  = typer.Option("provider", "--by",    help="Group by: provider | model | agent | category | tool"),
 ) -> None:
     """Aggregate token usage and USD cost over a time window."""
-    from nerdvana_cli.commands.cost_command import cost_command
+    from nerdvana_cli.cli.commands.cost_command import cost_command
 
     cost_command(since=since, json_output=json_output, by=by)
 
@@ -506,7 +506,7 @@ def context(
     json_output: bool = typer.Option(False, "--json", help="Machine-readable JSON output"),
 ) -> None:
     """Show where the context window goes in a stored session: system prompt, tool declarations, messages, tool results."""
-    from nerdvana_cli.commands.context_command import context_command
+    from nerdvana_cli.cli.commands.context_command import context_command
 
     code = context_command(session_id, top, json_output)
     if code:
@@ -520,7 +520,7 @@ def approvals(
     json_output: bool = typer.Option(False, "--json", help="Machine-readable JSON output"),
 ) -> None:
     """Suggest always_allow rules for permission questions you keep approving (nothing is written)."""
-    from nerdvana_cli.commands.approvals_command import approvals_command
+    from nerdvana_cli.cli.commands.approvals_command import approvals_command
 
     approvals_command(since=since, min_approvals=min_count, json_output=json_output)
 
@@ -536,7 +536,7 @@ def review(
     provider:      str  = typer.Option("", "--provider", "-p", help="AI provider"),
 ) -> None:
     """Review a change with a read-only agent that starts from the changed code and the places that use it."""
-    from nerdvana_cli.commands.review_command import FAIL_ON, review_command
+    from nerdvana_cli.cli.commands.review_command import FAIL_ON, review_command
 
     if fail_on not in FAIL_ON or output_format not in ("text", "json"):
         console_stderr.print(f"[red]Error: --fail-on must be one of {', '.join(FAIL_ON)} and --output-format text or json.[/red]")
@@ -553,7 +553,7 @@ def import_(
     project: str  = typer.Option(".", "--project", help="The project directory"),
 ) -> None:
     """Bring over slash commands and permission rules from Claude Code or Codex (the rules are printed, not applied)."""
-    from nerdvana_cli.commands.import_command import SOURCES, import_command
+    from nerdvana_cli.cli.commands.import_command import SOURCES, import_command
 
     if source not in SOURCES:
         console_stderr.print(f"[red]Error: source must be one of {', '.join(SOURCES)}.[/red]")

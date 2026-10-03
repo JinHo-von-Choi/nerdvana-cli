@@ -22,9 +22,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nerdvana_cli.commands.model_commands import handle_model
 from nerdvana_cli.core.config.managed_policy import ManagedPolicy
 from nerdvana_cli.providers.base import ProviderName, detect_provider
+from nerdvana_cli.ui.slash.model_commands import handle_model
 
 
 class TestDetectProviderOllama:

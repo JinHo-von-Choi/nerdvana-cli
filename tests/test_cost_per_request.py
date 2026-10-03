@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.commands.cost_command import build_cost_report
+from nerdvana_cli.cli.commands.cost_command import build_cost_report
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter
 
 
@@ -127,7 +127,7 @@ def test_sessions_recorded_before_attribution_count_as_main_and_legacy_rows_are_
 def test_an_unknown_grouping_is_refused() -> None:
     import typer
 
-    from nerdvana_cli.commands.cost_command import cost_command
+    from nerdvana_cli.cli.commands.cost_command import cost_command
 
     with pytest.raises(typer.Exit):
         cost_command("7d", False, "colour")

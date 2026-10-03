@@ -16,12 +16,12 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from nerdvana_cli.commands import memory_commands as mc
 from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
 from nerdvana_cli.core.context.memory_index import INDEX_NAME, MemoryIndex
 from nerdvana_cli.core.context.memory_review import MemoryInbox
 from nerdvana_cli.main import app
+from nerdvana_cli.ui.slash import memory_commands as mc
 
 PK = MemoryScope.PROJECT_KNOWLEDGE
 
@@ -36,7 +36,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _cli(project: Path, *args: str, answer: str | None = None) -> Any:
     runner = CliRunner()
-    with patch("nerdvana_cli.commands.memory_command._cwd", return_value=str(project)):
+    with patch("nerdvana_cli.cli.commands.memory_command._cwd", return_value=str(project)):
         return runner.invoke(app, ["memory", *args], input=answer, catch_exceptions=False)
 
 
@@ -263,7 +263,7 @@ class TestAddSourceAndList:
 
 
 def _memory_commands() -> list[Any]:
-    from nerdvana_cli.commands.memory_command import memory_app
+    from nerdvana_cli.cli.commands.memory_command import memory_app
     return list(memory_app.registered_commands)
 
 

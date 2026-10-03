@@ -28,7 +28,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from nerdvana_cli.commands import memory_review_text as review
+from nerdvana_cli.cli.commands import memory_review_text as review
 from nerdvana_cli.core.context.memories import MemoriesManager, MemoryScope
 from nerdvana_cli.core.context.memory_index import MemorySource
 

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nerdvana_cli.commands.system_commands import handle_thinking
+from nerdvana_cli.ui.slash.system_commands import handle_thinking
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,7 +46,7 @@ class TestHandleThinking:
     @pytest.mark.asyncio
     async def test_on_enables_thinking(self) -> None:
         app = _make_app(show_thinking=False)
-        with patch("nerdvana_cli.commands.system_commands.handle_thinking.__module__"):
+        with patch("nerdvana_cli.ui.slash.system_commands.handle_thinking.__module__"):
             pass
         with (
             patch("nerdvana_cli.cli.setup.load_config", return_value={}),
@@ -107,7 +107,7 @@ class TestHandleThinking:
 async def test_the_toggle_reaches_the_provider_that_requests_summaries(monkeypatch: pytest.MonkeyPatch) -> None:
     from types import SimpleNamespace
 
-    from nerdvana_cli.commands.system_commands import handle_thinking
+    from nerdvana_cli.ui.slash.system_commands import handle_thinking
 
     monkeypatch.setattr("nerdvana_cli.cli.setup.load_config", lambda: {})
     monkeypatch.setattr("nerdvana_cli.cli.setup.save_config", lambda cfg: None)

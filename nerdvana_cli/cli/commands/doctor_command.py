@@ -14,13 +14,13 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from nerdvana_cli.commands.doctor_mcp import (
+from nerdvana_cli.cli.commands.doctor_mcp import (
     _check_mcp_config,
     _check_mcp_sandbox,
     _check_mcp_servers,
 )
-from nerdvana_cli.commands.doctor_policy import check_managed_policy
-from nerdvana_cli.commands.doctor_result import CheckResult
+from nerdvana_cli.cli.commands.doctor_policy import check_managed_policy
+from nerdvana_cli.cli.commands.doctor_result import CheckResult
 
 if TYPE_CHECKING:
     from nerdvana_cli.providers.base import ProviderName
@@ -337,7 +337,7 @@ def _check_sandbox() -> CheckResult:
 
 def _check_pricing_freshness() -> CheckResult:
     """Run check_pricing_freshness.py --report-only to detect stale snapshots."""
-    script = Path(__file__).resolve().parents[2] / "scripts" / "check_pricing_freshness.py"
+    script = Path(__file__).resolve().parents[3] / "scripts" / "check_pricing_freshness.py"
     if not script.exists():
         return CheckResult("pricing_freshness", "skip", f"script not found: {script}")
 
@@ -360,7 +360,7 @@ def _check_pricing_freshness() -> CheckResult:
 
 def _check_collect_baseline() -> CheckResult:
     """Run check_test_collection.py to verify test count has not regressed."""
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     baseline  = repo_root / "tests" / ".collect-baseline"
     script    = repo_root / "scripts" / "check_test_collection.py"
 

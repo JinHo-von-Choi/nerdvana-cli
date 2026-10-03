@@ -1,4 +1,4 @@
-"""Unit and integration tests for nerdvana_cli.commands.cost_command.
+"""Unit and integration tests for nerdvana_cli.cli.commands.cost_command.
 
 작성자: 최진호
 작성일: 2026-04-29
@@ -73,37 +73,37 @@ def _insert_row(
 
 class TestParseSince:
     def test_days(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         cutoff = parse_since("7d")
         assert cutoff is not None
         delta  = datetime.now(UTC) - cutoff
         assert abs(delta.total_seconds() - 7 * 86400) < 5
 
     def test_hours(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         cutoff = parse_since("24h")
         assert cutoff is not None
         delta  = datetime.now(UTC) - cutoff
         assert abs(delta.total_seconds() - 86400) < 5
 
     def test_30d(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         cutoff = parse_since("30d")
         assert cutoff is not None
         delta  = datetime.now(UTC) - cutoff
         assert abs(delta.total_seconds() - 30 * 86400) < 5
 
     def test_all_returns_none(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         assert parse_since("all") is None
 
     def test_invalid_raises(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         with pytest.raises(ValueError, match="Unrecognised"):
             parse_since("1w")
 
     def test_invalid_empty_raises(self) -> None:
-        from nerdvana_cli.commands.cost_command import parse_since
+        from nerdvana_cli.cli.commands.cost_command import parse_since
         with pytest.raises(ValueError):
             parse_since("xyz")
 
@@ -114,12 +114,12 @@ class TestParseSince:
 
 class TestLoadUsageRows:
     def test_missing_db_returns_empty(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows
         result = load_usage_rows(tmp_path / "no.sqlite", cutoff=None, by="model")
         assert result == []
 
     def test_basic_aggregation_by_model(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5)
@@ -134,7 +134,7 @@ class TestLoadUsageRows:
         assert abs(r["cost_usd"] - 13.5) < 0.001
 
     def test_basic_aggregation_by_provider(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6",  1000, 500, 4.5)
@@ -145,7 +145,7 @@ class TestLoadUsageRows:
         assert "openai"    in providers
 
     def test_time_filter_excludes_old_rows(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows, parse_since
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows, parse_since
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         # 1 hour ago — within 24h window
@@ -158,7 +158,7 @@ class TestLoadUsageRows:
         assert rows[0]["provider"] == "anthropic"
 
     def test_time_filter_all_includes_everything(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5, ts_offset_h=1000)
@@ -167,7 +167,7 @@ class TestLoadUsageRows:
         assert len(rows) == 2
 
     def test_multi_provider_by_model(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import load_usage_rows
+        from nerdvana_cli.cli.commands.cost_command import load_usage_rows
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-opus-4-7",   120000, 30000, 4.05)
@@ -184,7 +184,7 @@ class TestLoadUsageRows:
 
 class TestBuildCostReport:
     def test_no_db_returns_empty_report(self, tmp_path: Path, monkeypatch) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "nonexistent"))
         report = build_cost_report(since="7d", by="model")
         assert report["rows"] == []
@@ -193,13 +193,13 @@ class TestBuildCostReport:
         assert report["total_cost_usd"] == 0.0
 
     def test_invalid_since_returns_error(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         report = build_cost_report(since="bad", by="model",
                                    db_path=tmp_path / "a.sqlite")
         assert "error" in report
 
     def test_totals_match_row_sum(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5)
@@ -213,7 +213,7 @@ class TestBuildCostReport:
         assert abs(report["total_cost_usd"] - row_cost_sum) < 0.0001
 
     def test_warning_count_for_unknown_model(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         # "dashscope" / "qwen3-coder-plus" has pricing TBD in pricing.yml
@@ -222,7 +222,7 @@ class TestBuildCostReport:
         assert report["warning_count"] >= 1
 
     def test_known_model_no_warning(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5)
@@ -230,7 +230,7 @@ class TestBuildCostReport:
         assert report["warning_count"] == 0
 
     def test_by_provider_grouping(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5)
@@ -241,7 +241,7 @@ class TestBuildCostReport:
         assert report["rows"][0]["input_tokens"] == 3000
 
     def test_by_model_grouping(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         _insert_row(db, "anthropic", "claude-sonnet-4-6", 1000, 500, 4.5)
@@ -253,7 +253,7 @@ class TestBuildCostReport:
         assert "claude-opus-4-7"   in models
 
     def test_cutoff_iso_matches_since(self, tmp_path: Path) -> None:
-        from nerdvana_cli.commands.cost_command import build_cost_report
+        from nerdvana_cli.cli.commands.cost_command import build_cost_report
         db = tmp_path / "analytics.sqlite"
         _make_db(db)
         report = build_cost_report(since="all", by="model", db_path=db)

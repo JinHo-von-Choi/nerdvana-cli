@@ -74,7 +74,7 @@ def report_json(report: ContextReport) -> dict[str, Any]:
 
 async def handle_context(app: NerdvanaApp, args: str) -> None:
     """Handle /context: the breakdown with no argument or ``usage``, the profile commands otherwise."""
-    from nerdvana_cli.commands import profile_commands
+    from nerdvana_cli.ui.slash import profile_commands
 
     token = args.strip().lower()
     if token not in ("", "usage"):

@@ -26,7 +26,7 @@ KNOWN_LONG: dict[str, int] = {
     "main.py:run": 111,
     "tools/file_tools.py:FileEditTool.call": 116,
     "core/loop/activity_state.py:summarize_tool_call": 108,
-    "commands/model_commands.py:switch_provider": 95,
+    "ui/slash/model_commands.py:switch_provider": 95,
     "core/config/settings.py:NerdvanaSettings.load": 92,
     "cli/updater.py:run_self_update": 91,
     "tools/registry.py:create_tool_registry": 86,

@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nerdvana_cli.commands.profile_commands import handle_context, handle_mode
 from nerdvana_cli.core.safety.profiles import ProfileManager
+from nerdvana_cli.ui.slash.profile_commands import handle_context, handle_mode
 
 # ---------------------------------------------------------------------------
 # Helpers

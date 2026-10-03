@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nerdvana_cli.commands.system_commands import handle_activity
+from nerdvana_cli.ui.slash.system_commands import handle_activity
 
 # ---------------------------------------------------------------------------
 # Helpers

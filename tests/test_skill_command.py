@@ -1,4 +1,4 @@
-"""Tests for nerdvana_cli.commands.skill_command.
+"""Tests for nerdvana_cli.cli.commands.skill_command.
 
 Author: 최진호
 Date:   2026-04-29

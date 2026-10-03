@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from nerdvana_cli.cli.commands import schedule_command
 from nerdvana_cli.cli.scheduler import COMMAND_ENV, JobStore
-from nerdvana_cli.commands import schedule_command
 from nerdvana_cli.core.config import paths as core_paths
 from nerdvana_cli.main import app
 
