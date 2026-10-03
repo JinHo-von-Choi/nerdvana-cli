@@ -41,6 +41,7 @@ OUT_OF_SCOPE        = "out_of_scope"
 SECRET_MASKED       = "secret_masked"
 OUT_OF_GOAL_SCOPE   = "out_of_goal_scope"
 ESCALATED           = "escalated"
+NO_PROGRESS         = "no_progress"
 
 # (text the result starts with or contains, signal), checked in order for error results.
 _ERROR_PREFIXES = (

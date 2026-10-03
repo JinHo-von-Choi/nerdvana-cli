@@ -59,6 +59,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
     """
     child_settings = config.settings.model_copy(deep=True)
     child_settings.session.max_turns = config.max_turns
+    child_settings.goal.auto_verify  = False
 
     origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
     loop   = AgentLoop(settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin)

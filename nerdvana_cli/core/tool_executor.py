@@ -20,9 +20,17 @@ from nerdvana_cli.core import paths
 from nerdvana_cli.core.approvals import normalise
 from nerdvana_cli.core.concurrency import RepeatDetector
 from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
+from nerdvana_cli.core.progress_monitor import (
+    DEFAULT_FAILED_EDITS,
+    DEFAULT_READ_TURNS,
+    EDIT,
+    OTHER,
+    READ,
+    ProgressMonitor,
+)
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
-from nerdvana_cli.core.signals import OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
+from nerdvana_cli.core.signals import NO_PROGRESS, OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
 from nerdvana_cli.types import PermissionBehavior, ToolResult
@@ -86,6 +94,11 @@ class ToolExecutor:
         self._analytics_writer    = analytics_writer
         self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
+        session                   = getattr(settings, "session", None)
+        self._progress            = ProgressMonitor(
+            getattr(session, "no_progress_failed_edits", DEFAULT_FAILED_EDITS),
+            getattr(session, "no_progress_read_turns", DEFAULT_READ_TURNS),
+        )
         self.signals: Counter[str] = Counter()
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
@@ -151,7 +164,12 @@ class ToolExecutor:
                 self._record_reminder(call, result)
                 self._fire_after_tool(call, result)
 
-        return [result for result in slots if result is not None]
+        results = [result for result in slots if result is not None]
+        note    = self._progress.end_turn()
+        if note and results:
+            results[-1].content += f"\n\n{note}"
+            self.signals[NO_PROGRESS] += 1
+        return results
 
     @staticmethod
     def _refusal(tool_id: str, content: str) -> ToolResult:
@@ -169,7 +187,17 @@ class ToolExecutor:
         sandbox   = context.state.get("sandbox")
         confined  = tool_use["name"] == "Bash" and sandbox is not None and getattr(sandbox, "mode", "off") != "off"
         self.signals.update(classify_result(result.content, result.is_error, shell_confined=confined))
+        self._observe_progress(tool_use, tool, result)
         return result
+
+    def _observe_progress(self, tool_use: dict[str, Any], tool: Any, result: ToolResult) -> None:
+        """Tell the progress monitor what kind of call this was and whether it failed."""
+        tool_input = tool_use["input"]
+        if tool_use["name"] in self._EDIT_TOOL_NAMES and tool_input.get("apply", True):
+            path = next((value for attr in self._EDIT_PATH_ATTRS if isinstance(value := tool_input.get(attr), str) and value.strip()), "")
+            self._progress.observe(EDIT, path, result.is_error)
+        else:
+            self._progress.observe(READ if tool.is_read_only else OTHER, "", result.is_error)
 
     async def _run_checked(
         self,
