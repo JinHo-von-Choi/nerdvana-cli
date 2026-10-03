@@ -518,8 +518,8 @@ For creating new files or full replacements, use FileWrite.
 
 Examples:
 - path: "src/main.py", old_string: "def old():", new_string: "def new():"
-- path: "config.py", old_string: "DEBUG = False", new_string: "DEBUG = True", replace_all: false
-- path: "src/main.py", anchor_hash: "12#a1b2c3", new_string: "    return 42\n"
+- path: "config.py", old_string: "DEBUG = False\\nRETRY = 3", new_string: "DEBUG = True\\nRETRY = 5" (old_string may span lines)
+- path: "src/main.py", anchor_hash: "12#a1b2c3", new_string: "    return 42\\n" (anchor copied from FileRead; old_string is not sent)
 
 IMPORTANT: old_string must match exactly (including whitespace)."""
     input_schema = {

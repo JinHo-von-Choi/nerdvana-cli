@@ -76,10 +76,9 @@ the process runs in. Treat every command as if it will run with the caller's
 full privileges, because it will.
 
 Examples:
-- ls -la
-- npm install
-- python script.py
-- git status"""
+- command: "git status --short"
+- command: "pytest tests/test_parser.py -q", timeout: 600, description: "Run the parser tests"
+- command: "cd web && npm run build" (every call starts in the working directory; chain with && to work elsewhere)"""
     input_schema = {
         "type": "object",
         "properties": {

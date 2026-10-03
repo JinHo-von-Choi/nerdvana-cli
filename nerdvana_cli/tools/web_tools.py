@@ -81,7 +81,8 @@ class WebFetchTool(BaseTool[WebFetchArgs]):
     max_result_tokens = 10_000
     description_text = (
         "Fetch a URL and return the response body as text.\n"
-        "HTTP/HTTPS only. Private/loopback IPs are blocked. Default max_bytes 1 MiB."
+        "HTTP/HTTPS only. Private/loopback IPs are blocked. Default max_bytes 1 MiB. "
+        "Use a URL the user gave or WebSearch returned. Example: url: \"https://example.com/docs/setup\", max_bytes: 200000."
     )
     input_schema = {
         "type": "object",

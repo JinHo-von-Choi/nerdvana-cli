@@ -94,7 +94,8 @@ Examples:
 - pattern: "def \\w+\\("
 - pattern: "class \\w+", include: "*.py"
 - pattern: "import.*react", include: "*.tsx"
-- pattern: "TODO|FIXME", include: "*.ts\""""
+- pattern: "TODO|FIXME", include: "*.ts"
+- pattern: "class \\w+Tool\\b", path: "src/tools", include: "*.py", case_sensitive: true (without case_sensitive the match ignores case)"""
     input_schema = {
         "type": "object",
         "properties": {
