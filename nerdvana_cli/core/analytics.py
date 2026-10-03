@@ -512,6 +512,22 @@ class AnalyticsReader:
             logger.debug("analytics: recent_tool_buckets error: %s", exc)
             return []
 
+    def cost_breakdown(self, session_id: str) -> dict[str, dict[str, float]]:
+        """Requests and cost of a session and of the sub-agents it started, per agent type."""
+        if not self._exists():
+            return {}
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(
+                    """SELECT COALESCE(NULLIF(agent_type, ''), 'main') AS agent, COUNT(*) AS requests, SUM(cost_usd) AS cost
+                       FROM api_calls WHERE session_id = ? OR parent_session_id = ? GROUP BY agent""",
+                    (session_id, session_id),
+                ).fetchall()
+            return {r["agent"]: {"requests": int(r["requests"]), "cost_usd": round(float(r["cost"] or 0.0), 6)} for r in rows}
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("analytics: cost_breakdown error: %s", exc)
+            return {}
+
     def approvals(self, days: int = 30) -> list[dict[str, Any]]:
         """Answers to permission questions of the last *days* days, counted per tool and argument."""
         if not self._exists():

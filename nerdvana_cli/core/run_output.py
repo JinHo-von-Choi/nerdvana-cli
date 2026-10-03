@@ -73,6 +73,7 @@ class RunResult:
     usage:       dict[str, int]      = field(default_factory=dict)
     signals:     dict[str, int]      = field(default_factory=dict)
     verification: dict[str, Any] | None = None
+    receipt:     dict[str, Any] | None = None
     error:       str                 = ""
 
     @property
@@ -105,6 +106,8 @@ class RunResult:
         payload["signals"] = dict(self.signals)
         if self.verification is not None:
             payload["verification"] = dict(self.verification)
+        if self.receipt is not None:
+            payload["receipt"] = self.receipt
         if self.error:
             payload["error"] = self.error
         return payload
