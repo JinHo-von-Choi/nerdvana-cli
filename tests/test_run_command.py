@@ -189,3 +189,34 @@ def test_without_verify_the_result_has_no_verification_object(env: Path, monkeyp
     _provider(monkeypatch, ANSWER)
     payload = json.loads(runner.invoke(app, ["run", "go", "--output-format", "json"]).stdout)
     assert "verification" not in payload
+
+
+def test_set_overrides_one_setting_for_the_run_and_validates_it(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+    original = AgentLoop.__init__
+
+    def _spy(self: AgentLoop, *args: Any, **kwargs: Any) -> None:
+        original(self, *args, **kwargs)
+        seen["threshold"] = self.settings.session.compact_threshold
+        seen["fallbacks"] = self.settings.model.fallback_models
+
+    monkeypatch.setattr(AgentLoop, "__init__", _spy)
+    _provider(monkeypatch, ANSWER)
+    result = runner.invoke(app, ["run", "go", "--set", "session.compact_threshold=0.5", "--set", "model.fallback_models=[claude-opus-5-5]"])
+    assert result.exit_code == 0, result.output
+    assert seen == {"threshold": 0.5, "fallbacks": ["claude-opus-5-5"]}
+
+
+@pytest.mark.parametrize("assignment", [
+    "session.compact_threshold",             # no value
+    "compact_threshold=0.5",                 # no section
+    "session.no_such_field=1",
+    "nosuch.field=1",
+    "session.max_turns=many",                # not an integer
+    "permissions.mode=yolo",                 # not overridable this way
+    "sandbox.mode=off",
+])
+def test_a_bad_set_is_refused_with_the_configuration_exit_code(env: Path, monkeypatch: pytest.MonkeyPatch, assignment: str) -> None:
+    _provider(monkeypatch, ANSWER)
+    result = runner.invoke(app, ["run", "go", "--set", assignment])
+    assert result.exit_code == 2, result.output

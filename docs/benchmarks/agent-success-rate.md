@@ -24,6 +24,7 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | Option | Meaning |
 |-|-|
 | `--attempts N` | attempts per task (default 1) |
+| `--set SECTION.FIELD=VALUE` | override a setting in every attempt (repeatable); run the same tasks with different values of `session.compact_threshold`, `session.escalation_model` or `model.fallback_models` and compare |
 | `--gate` | pass each task's verify command to `nerdvana run --verify`, so the agent is told when it fails and keeps working; compare a gated run with an ungated one to see what the check is worth |
 | `--tag TAG` | run only tasks carrying this tag (repeatable); tags in `benchmarks/tasks` include `python`, `node`, `c`, `bugfix`, `feature`, `refactor`, `multi-file`, `tests`, `recovery`, `permission`, `injection`, `preserve` |
 | `--k K` | k for pass@k (default: the number of attempts) |
@@ -65,6 +66,22 @@ For each task: attempts, passes, `pass@1` (share of attempts that passed), `pass
 `pass@1` with a 95% bootstrap interval over tasks, pass rates by tag, total cost and cost per solved task. Costs are the loop's own estimate from
 the usage each request reported and `providers/pricing.yml`; a model without a price
 reports 0 and the cost ceiling does not apply to it.
+
+## Choosing a model per kind of task
+
+Run the tasks once per model with `--model` and `--out`, then let `scripts/bench_recommend.py` compare the runs
+by tag:
+
+```bash
+python scripts/bench_recommend.py benchmarks/tasks \
+    claude-haiku-4-5-20251001=haiku.jsonl claude-sonnet-5-5=sonnet.jsonl
+```
+
+For each tag it prints each run's pass rate with a Wilson interval, its cost per attempt and the runs that
+no other run beats on both counts, then names the cheapest run whose pass rate cannot be told apart from
+the best one and prints an `agents.categories` block to paste into the configuration. With fewer than
+8 attempts per run on a tag it says "not enough data" instead of guessing (`--min-attempts` changes the
+limit). Nothing is written for you.
 
 A handful of tasks says little. Use enough tasks and attempts that a change of a few
 points is larger than the spread between repeated runs of the same build, and compare
