@@ -36,7 +36,6 @@ KNOWN_LONG: dict[str, int] = {
     "providers/gemini_provider.py:GeminiProvider.stream": 81,
     "providers/gemini_provider.py:GeminiProvider._convert_messages": 81,
     "tools/agent_tool.py:AgentTool.call": 76,
-    "ui/app.py:NerdvanaApp.on_mount": 75,
     "main.py:serve": 72,
     "providers/gemini_provider.py:GeminiProvider.send": 71,
     "tools/web_tools.py:WebSearchTool.call": 71,
