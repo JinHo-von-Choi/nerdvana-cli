@@ -118,9 +118,10 @@ checkpoint:
   per_session_max: 50
 
 hooks:
-  # Run <cwd>/.nerdvana/hooks/*.py. Opting in is not sufficient on its own:
-  # each file must also match an approved digest in ~/.nerdvana/trusted_hooks.json.
-  # See docs/hooks.md.
+  # Run <cwd>/.nerdvana/hooks/*.py and load project skills (<cwd>/.agents/skills,
+  # <cwd>/.nerdvana/skills). Opting in is not sufficient on its own: each file must
+  # also match an approved digest in ~/.nerdvana/trusted_hooks.json.
+  # See docs/hooks.md and docs/skills.md.
   allow_project_hooks: false
 
 agents:
