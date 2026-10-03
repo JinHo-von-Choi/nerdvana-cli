@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 from nerdvana_cli.core import changed_files
 from nerdvana_cli.core.sandbox import Launch, plan_launch
 from nerdvana_cli.core.secrets import SENSITIVE_ENV
+from nerdvana_cli.core.telemetry_otel import trace_environment
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import PermissionBehavior, PermissionResult, ToolResult
 
@@ -43,6 +44,7 @@ def _build_env(cwd: str) -> dict[str, str]:
     """
     env = {k: v for k, v in os.environ.items() if not _SENSITIVE_ENV.search(k)}
     env["PWD"] = cwd
+    env.update(trace_environment())
     return env
 
 
