@@ -124,7 +124,7 @@ def test_a_run_that_changed_files_carries_the_receipt_in_its_result(tmp_path: Pa
         reg.register(_Edit())
         return reg
 
-    monkeypatch.setattr("nerdvana_cli.main.create_tool_registry", registry)
+    monkeypatch.setattr("nerdvana_cli.cli.bootstrap.create_tool_registry", registry)
     result = CliRunner().invoke(app, ["run", "go", "--output-format", "json", "--approval-mode", "yolo"])
     assert result.exit_code == 0, result.output
     receipt = json.loads(result.stdout)["receipt"]

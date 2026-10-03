@@ -175,6 +175,13 @@ Or via the MCP-style tool call from the REPL.
 
 ## Agent loop internals
 
+The tool registry and the top-level loop are built in one place,
+`nerdvana_cli/cli/bootstrap.py`: `nerdvana run`, the TUI and `nerdvana review`
+each describe their own session, extra tools and callbacks (or agent
+definition) and call it. The bootstrap also hands the loop the factories it
+cannot import from `core`: the sub-agent runner, the sub-agent registry and the
+ToolSearch tool (`LoopFactories` in `nerdvana_cli/core/subagent_config.py`).
+
 `AgentLoop._loop` (in `nerdvana_cli/core/agent_loop.py`) delegates to four focused helpers:
 
 ```python

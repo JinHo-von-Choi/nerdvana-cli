@@ -12,7 +12,7 @@ from rich.console import Console
 
 from nerdvana_cli import __version__
 from nerdvana_cli.acp.command import acp_command
-from nerdvana_cli.cli.bootstrap import loop_factories
+from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
@@ -30,12 +30,10 @@ from nerdvana_cli.commands.memory_command import memory_app
 from nerdvana_cli.commands.schedule_command import schedule_app
 from nerdvana_cli.commands.session_command import session_app
 from nerdvana_cli.commands.skill_command import skill_app
-from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
-from nerdvana_cli.tools.registry import create_tool_registry
 
 app = typer.Typer(
     name="nerdvana",
@@ -315,16 +313,8 @@ def run(
 
     from nerdvana_cli.core.task_state import TaskRegistry
 
-    task_registry = TaskRegistry()
-    registry      = create_tool_registry(settings=settings, task_registry=task_registry)
     session = SessionStorage(persist=settings.session.persist)
-    loop    = AgentLoop(
-        settings      = settings,
-        registry      = registry,
-        session       = session,
-        task_registry = task_registry,
-        factories     = loop_factories(),
-    )
+    loop    = build_agent_loop(settings, ExecutionProfile(session=session, task_registry=TaskRegistry()))
     outcome.session_id = session.session_id
     started            = time.monotonic()
     images             = _load_run_images(image or [], settings.cwd, reporter, outcome)

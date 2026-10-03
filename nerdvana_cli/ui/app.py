@@ -20,7 +20,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Footer, Header, Input, OptionList, Static
 
-from nerdvana_cli.cli.bootstrap import loop_factories
+from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.session import SessionStorage, resume_session_id
@@ -28,7 +28,6 @@ from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import Skill
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState
 from nerdvana_cli.core.user_commands import UserCommand, UserCommandLoader
-from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.ui.banner import build_banner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.editor_controller import EditorBufferController
@@ -282,13 +281,22 @@ class NerdvanaApp(App[object]):
 
     def on_mount(self) -> None:
         """Initialize agent loop and display welcome."""
-        registry = create_tool_registry(
-            parism_client = self.parism_client,
-            mcp_tools     = self.mcp_manager.get_all_tools() if self.mcp_manager else [],
-            settings      = self.settings,
-            task_registry = self._task_registry,
-        )
-        skills = self._start_agent_loop(registry).skill_loader.list_skills()
+        resume_id = resume_session_id(self._resume_id)
+        self._agent_loop = build_agent_loop(self.settings, ExecutionProfile(
+            session            = SessionStorage(session_id=resume_id, persist=self.settings.session.persist),
+            task_registry      = self._task_registry,
+            parism_client      = self.parism_client,
+            mcp_tools          = self.mcp_manager.get_all_tools() if self.mcp_manager else [],
+            on_activity_change = make_activity_change_callback(self, threading.get_ident()),
+            on_ask_user        = self._ask_user_prompt,
+            on_confirm         = self._confirm_prompt,
+        ))
+        registry = self._agent_loop.registry
+        if resume_id:
+            restored = self._agent_loop.restore_history()
+            self.notify(f"Resumed session {resume_id}: {restored} message(s) restored.")
+
+        skills = self._agent_loop.skill_loader.list_skills()
         self._update_banner()
         self._init_sidebar(registry, skills)
         seed_skill_options(self.query_one("#command-menu", CommandMenu), skills)
@@ -312,26 +320,6 @@ class NerdvanaApp(App[object]):
 
         self._show_load_warnings()
         self._check_update_task = asyncio.create_task(check_for_update(self))
-
-    def _start_agent_loop(self, registry: Any) -> AgentLoop:
-        """Create the agent loop on its session and restore the history of a resumed one."""
-        resume_id = resume_session_id(self._resume_id)
-        session   = SessionStorage(session_id=resume_id, persist=self.settings.session.persist)
-
-        self._agent_loop = AgentLoop(
-            settings           = self.settings,
-            registry           = registry,
-            session            = session,
-            task_registry      = self._task_registry,
-            on_activity_change = make_activity_change_callback(self, threading.get_ident()),
-            on_ask_user        = self._ask_user_prompt,
-            on_confirm         = self._confirm_prompt,
-            factories          = loop_factories(),
-        )
-        if resume_id:
-            restored = self._agent_loop.restore_history()
-            self.notify(f"Resumed session {resume_id}: {restored} message(s) restored.")
-        return self._agent_loop
 
     def _init_sidebar(self, registry: Any, skills: list[Skill]) -> None:
         """Fill the sidebar sections and start the timers that keep them current."""
