@@ -95,7 +95,10 @@ class AgentTool(BaseTool[AgentToolArgs]):
         "Spawn a subagent to handle a complex, multi-step task independently. "
         "The subagent runs in isolation with its own context window and returns "
         "its output when complete. Use run_in_background=true for fire-and-forget "
-        "tasks that you will poll with TaskGet later."
+        "tasks that you will poll with TaskGet later. The subagent does not see this conversation, so the prompt "
+        "must carry every fact it needs. "
+        "Example: description: \"Find token callers\", subagent_type: \"Explore\", "
+        "prompt: \"List every caller of verify_token under src/ with file:line. Do not edit files.\"."
     )
     input_schema = {
         "type": "object",

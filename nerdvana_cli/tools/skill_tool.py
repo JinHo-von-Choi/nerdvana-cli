@@ -49,7 +49,8 @@ class ActivateSkillTool(BaseTool[ActivateSkillArgs]):
     description_text = (
         "Load the full instructions of one skill listed under 'Skills' in the system prompt. The result holds the "
         "skill's instructions and the files it bundles (scripts, references, assets); read those with the file "
-        "tools when the instructions call for them."
+        "tools when the instructions call for them. Example: name: \"<name as listed>\" (a skill "
+        "already loaded in this conversation is not loaded again)."
     )
     args_class                       = ActivateSkillArgs
     category: ClassVar[ToolCategory] = ToolCategory.META

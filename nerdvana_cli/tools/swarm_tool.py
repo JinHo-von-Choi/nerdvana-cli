@@ -28,7 +28,10 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
     description_text = (
         "Dispatch multiple independent subagents in parallel to solve parts of a "
         "complex problem. All agents run concurrently; results are collected and "
-        "returned together. Use this when tasks are fully independent."
+        "returned together. Use this when tasks are fully independent. "
+        "Example: team_name: \"docs-audit\", tasks: [{name: \"api\", prompt: \"Compare docs/api.md with src/server/ "
+        "and list mismatches\", subagent_type: \"Explore\"}, {name: \"cli\", prompt: \"Compare docs/cli.md with "
+        "src/cli/ and list mismatches\", subagent_type: \"Explore\"}]."
     )
     input_schema = {
         "type": "object",
