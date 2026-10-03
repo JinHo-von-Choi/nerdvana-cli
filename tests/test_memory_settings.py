@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.settings import MemoryConfig, NerdvanaSettings, SettingsLoadError, apply_settings_overrides
+from nerdvana_cli.core.settings import NerdvanaSettings, SettingsLoadError, apply_settings_overrides
+from nerdvana_cli.core.settings_sections import MemoryConfig
 
 
 @pytest.fixture(autouse=True)
