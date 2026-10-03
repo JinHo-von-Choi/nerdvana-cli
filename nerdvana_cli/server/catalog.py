@@ -199,20 +199,20 @@ class ToolCatalog:
         dispatch = self._dispatch
         confirm_write = self._confirm_write
 
-        async def WriteMemory(name: str, content: str, scope: str = "local", confirm: bool = False) -> str:  # noqa: N802
-            """Write a memory entry. Requires confirm=true."""
+        async def WriteMemory(name: str, content: str, scope: str, confirm: bool = False) -> str:  # noqa: N802
+            """Write a memory entry. scope is one of project_rule, project_knowledge, user_global, agent_experience. Requires confirm=true."""
             confirm_write(confirm)
             return await dispatch(
                 "WriteMemory",
                 {"name": name, "content": content, "scope": scope, "confirm": confirm},
             )
 
-        async def EditMemory(name: str, new_content: str, confirm: bool = False) -> str:  # noqa: N802
-            """Edit an existing memory entry. Requires confirm=true."""
+        async def EditMemory(name: str, needle: str, repl: str, mode: str = "literal", confirm: bool = False) -> str:  # noqa: N802
+            """Replace every occurrence of needle with repl in an existing memory (mode literal or regex). Requires confirm=true."""
             confirm_write(confirm)
             return await dispatch(
                 "EditMemory",
-                {"name": name, "new_content": new_content, "confirm": confirm},
+                {"name": name, "needle": needle, "repl": repl, "mode": mode, "confirm": confirm},
             )
 
         async def DeleteMemory(name: str, confirm: bool = False) -> str:  # noqa: N802
