@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- `permissions.gate_untrusted_sources` (on by default): a `Bash` command or a state-changing MCP call whose arguments repeat text returned earlier by `WebFetch`, `WebSearch` or an MCP tool asks first, counted as the `untrusted_source` signal.
 - `model.openai_api` (`auto`, `chat`, `responses`): provider `openai` on OpenAI's own endpoint uses the Responses API (stateless, `store: false`, encrypted reasoning items kept in the session); every other OpenAI-compatible endpoint keeps Chat Completions. A warning is logged when tools and a `reasoning_effort` other than `none` go to the Chat Completions endpoint. `docs/providers-compat.md` and adapter contract tests describe and check what each adapter supports.
 - Skills follow the Agent Skills standard: `~/.agents/skills` and `<project>/.agents/skills` are scanned, parsing is lenient, the system prompt carries a skill catalog, and the `ActivateSkill` tool loads a skill as `<skill_content name="...">` plus a listing of its bundled files. `nerdvana skill trust <path>` approves a project skill. See `docs/skills.md`.
 - Opt-in `session.observation_masking` (`mask_keep_last`, `mask_trigger_tokens`) clears old read-type tool output in batches before compaction, counted as the `observations_masked` signal.
