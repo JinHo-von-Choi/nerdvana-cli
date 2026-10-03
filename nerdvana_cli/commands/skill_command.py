@@ -5,6 +5,7 @@ Commands:
   skill show     — print a skill's content to stdout
   skill install  — copy a skill file/directory into ~/.nerdvana/skills/
   skill remove   — delete a skill from ~/.nerdvana/skills/
+  skill trust    - approve a project skill so it may load
 
 Storage backend: paths.user_skills_dir() (~/.nerdvana/skills/).
 The same directory is read by core/skills.py SkillLoader.
@@ -145,3 +146,31 @@ def skill_remove(name: str = typer.Argument(..., help="Skill name (without .md e
 
     console.print(f"[red]Skill '{name}' not found.[/red]")
     raise typer.Exit(1)
+
+
+@skill_app.command("trust")
+def skill_trust(
+    path: Path = typer.Argument(..., help="Path to a project skill: its SKILL.md, a directory holding one, or a .md file."),  # noqa: B008
+) -> None:
+    """Approve a project skill so it may load.
+
+    Approval binds to the file's current bytes; editing it revokes the approval until this is run again.
+    Project skills also need hooks.allow_project_hooks set to true.
+    """
+    from nerdvana_cli.core.skills import SKILL_DIR_FILENAME
+    from nerdvana_cli.core.user_hooks import trust_project_hook
+
+    target = path / SKILL_DIR_FILENAME if path.is_dir() else path
+    if not target.is_file():
+        console.print(f"[red]Not a skill file:[/red] {target}")
+        raise typer.Exit(1)
+
+    try:
+        digest = trust_project_hook(target)
+    except OSError as exc:
+        console.print(f"[red]Could not record approval:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(f"Approved {target.resolve()}")
+    console.print(f"  digest {digest}")
+    console.print("Project skills also need [bold]hooks.allow_project_hooks[/bold] set to true.")

@@ -14,6 +14,19 @@ from nerdvana_cli.tools.todo_tool import TodoWriteTool
 from nerdvana_cli.tools.web_tools import WebFetchTool, WebSearchTool
 
 
+def _register_skill_and_agent_tools(registry: ToolRegistry, settings: Any, task_registry: Any) -> None:
+    """Register ActivateSkill (when some skill can be activated by the model) and the Agent tool."""
+    from nerdvana_cli.core.skills import SkillLoader
+    from nerdvana_cli.tools.agent_tool import AgentTool
+    from nerdvana_cli.tools.skill_tool import ActivateSkillTool
+
+    loader = SkillLoader.from_settings(settings)
+    loader.load_all()
+    if loader.model_skills():
+        registry.register(ActivateSkillTool(loader))
+    registry.register(AgentTool(settings=settings, task_registry=task_registry, parent_registry=registry))
+
+
 def create_tool_registry(
     parism_client:  Any    = None,
     mcp_tools:      Any    = None,
@@ -54,8 +67,7 @@ def create_tool_registry(
     registry.register(WebSearchTool())
 
     if settings is not None:
-        from nerdvana_cli.tools.agent_tool import AgentTool
-        registry.register(AgentTool(settings=settings, task_registry=_task_reg, parent_registry=registry))
+        _register_skill_and_agent_tools(registry, settings, _task_reg)
 
     from nerdvana_cli.tools.team_tools import TaskGetTool, TaskStopTool
     registry.register(TaskGetTool(task_registry=_task_reg))
