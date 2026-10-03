@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- `nerdvana serve` runs on `mcp` 2.x (`pyproject.toml` now asks for `mcp>=2.0.0,<3.0`): the server is an `MCPServer`, the tool list and calls were checked with the mcp 2.x client over stdio and over HTTP with a bearer token. A refused call (access denied, over the quota, malformed) still reaches the client with its reason.
 - The provider SDK ranges now allow anthropic 1.x, openai 3.x and google-genai 2.x (the adapters were exercised against anthropic 1.11, openai 3.24 and google-genai 2.28: their test suites pass and a MiniMax tool loop runs through openai 3.24; the Anthropic and Gemini adapters were not called against their real APIs).
+
+### Fixed
+
+- `nerdvana serve --transport http` answered every MCP request with a 500 ("Task group is not initialized"), because the bearer-auth wrapper did not hand on the lifespan that starts the session manager. A test now completes the handshake through the real app.
 
 ### Added
 

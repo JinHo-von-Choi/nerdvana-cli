@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import functools
 import json
 import logging as _logging
 import ssl
@@ -31,7 +32,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.types import ASGIApp
@@ -96,26 +98,11 @@ _quota_log = _logging.getLogger("nerdvana.quota")
 
 
 class _QuotaErrorMiddleware(BaseHTTPMiddleware):
-    """Convert ``QuotaExceeded`` exceptions into HTTP 429 responses.
+    """Convert a ``QuotaExceeded`` that reaches the HTTP layer into a 429 response.
 
-    Known limitation (mcp==1.27.0): the MCP lowlevel server wraps all tool
-    exceptions inside ``call_tool`` (``server.py`` line ~583:
-    ``except Exception as e: return self._make_error_result(str(e))``).
-    ``QuotaExceeded`` is therefore serialised as ``isError:true`` in a 200 MCP
-    response body before it can reach this ASGI middleware layer.
-    HTTP clients receive a 200 with ``isError:true`` instead of a 429.
-
-    Operators can detect this scenario by searching logs for the structured
-    entry ``event=quota_exceeded_swallowed_by_fastmcp``.
-
-    The ``_dispatch`` method raises ``QuotaExceeded`` before calling FastMCP's
-    tool execution path when the quota check fires.  FastMCP's tool handler
-    wrapper catches it there and emits the structured warning below.
-    See ``docs/mcp-quota.md`` — "Known limitation" section.
-
-    If a future ``mcp`` release exposes ``raise_exceptions=True`` in the
-    Streamable-HTTP path, this middleware will intercept correctly without
-    any code changes.
+    Tool exceptions do not get this far: the tool registration turns ``QuotaExceeded`` into a
+    ``ToolError``, which the MCP server sends as a tool result with ``isError:true`` and the
+    reason inside an HTTP 200 response. See ``docs/mcp-quota.md``.
     """
 
     async def dispatch(self, request: Request, call_next: Any) -> Any:
@@ -124,7 +111,7 @@ class _QuotaErrorMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except QuotaExceeded as exc:
-            # Reached only when mcp stops swallowing tool exceptions.
+            # Reached only by a quota error raised outside a tool call.
             _quota_log.warning(
                 "quota_exceeded",
                 extra={
@@ -192,7 +179,7 @@ class TlsConfigurationError(RuntimeError):
 
 
 class NerdvanaMcpServer:
-    """Thin orchestrator that wires auth/ACL/audit around a FastMCP instance.
+    """Thin orchestrator that wires auth/ACL/audit around an MCPServer instance.
 
     Parameters
     ----------
@@ -266,11 +253,7 @@ class NerdvanaMcpServer:
         self._quota_resolver: QuotaPolicyResolver  = quota_resolver or QuotaPolicyResolver()
         self._quota_store:    QuotaStore           = quota_store    or QuotaStore()
 
-        self._fmcp: FastMCP = FastMCP(
-            name  = "nerdvana",
-            host  = host,
-            port  = port,
-        )
+        self._fmcp: MCPServer = MCPServer(name="nerdvana")
 
         # stdio: resolved once at startup; http: resolved per-request from middleware
         self._stdio_identity: str = "anonymous"
@@ -485,7 +468,24 @@ class NerdvanaMcpServer:
 
         for fn in (symbol_overview, find_symbol, find_referencing_symbols, FileRead,
                    ReadMemory, ListMemories, GetCurrentConfig):
-            self._fmcp.add_tool(fn, name=fn.__name__, description=fn.__doc__ or "")
+            self._add_tool(fn)
+
+    def _add_tool(self, fn: Any) -> None:
+        """Register ``fn`` so a refusal reaches the client with its reason.
+
+        MCPServer reports an exception it does not know as ``Error executing tool <name>``
+        and keeps the text on the server; a ``ToolError`` keeps its message. A denied, rate
+        limited or malformed call is the client's to read and correct, so those become
+        ``ToolError``.
+        """
+        @functools.wraps(fn)
+        async def surfaced(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return await fn(*args, **kwargs)
+            except (PermissionError, QuotaExceeded, ValueError, KeyError) as exc:
+                raise ToolError(str(exc)) from exc
+
+        self._fmcp.add_tool(surfaced, name=fn.__name__, description=fn.__doc__ or "")
 
     def _register_write_tools(self) -> None:
         """Register write tools (requires allow_write=True AND confirm=true in call)."""
@@ -594,7 +594,7 @@ class NerdvanaMcpServer:
         for fn in (replace_symbol_body, insert_before_symbol, insert_after_symbol,
                    RenameSymbol, WriteMemory, EditMemory, DeleteMemory,
                    safe_delete_symbol, restart_language_server):
-            self._fmcp.add_tool(fn, name=fn.__name__, description=fn.__doc__ or "")
+            self._add_tool(fn)
 
     def _register_file_edit(self) -> None:
         """Register FileEdit, the write counterpart of FileRead (requires allow_write=True AND confirm=true in call)."""
@@ -616,7 +616,7 @@ class NerdvanaMcpServer:
                  "old_string": old_string or None, "replace_all": replace_all},
             )
 
-        self._fmcp.add_tool(FileEdit, name="FileEdit", description=FileEdit.__doc__ or "")
+        self._add_tool(FileEdit)
 
     # ------------------------------------------------------------------
     # Dispatch — auth → ACL → audit → actual tool stub
@@ -695,20 +695,16 @@ class NerdvanaMcpServer:
                     duration_ms     = int(time.monotonic() * 1000) - start_ms,
                     error_class     = f"quota_denied:{quota_decision.limit_name}",
                 )
-                # Structured warning so operators can detect swallowed-exception
-                # scenarios (mcp==1.27.0 converts this to isError:true/200 over HTTP).
-                # grep logs for event=quota_exceeded_swallowed_by_fastmcp.
+                # Structured warning for operators: grep logs for event=quota_exceeded.
                 if self.transport == "http":
                     _quota_log.warning(
-                        "quota_exceeded_swallowed_by_fastmcp",
+                        "quota_exceeded",
                         extra={
-                            "event":       "quota_exceeded_swallowed_by_fastmcp",
+                            "event":       "quota_exceeded",
                             "tenant":      client_identity,
                             "tool":        tool_name,
                             "limit":       quota_decision.limit_name,
                             "retry_after": quota_decision.retry_after_seconds,
-                            "note":        "mcp==1.27.0 serialises QuotaExceeded as isError:true/HTTP-200; "
-                                           "see docs/mcp-quota.md#known-limitation",
                         },
                     )
                 raise QuotaExceeded(
@@ -879,6 +875,23 @@ class NerdvanaMcpServer:
     async def _run_stdio(self) -> None:
         await self._fmcp.run_stdio_async()
 
+    def _http_app(self) -> ASGIApp:
+        """The streamable-HTTP app behind the quota-error and bearer-auth middleware."""
+        from starlette.applications import Starlette
+        from starlette.routing import Mount
+
+        starlette_app = self._fmcp.streamable_http_app(host=self.host)
+        # The session manager starts in the inner app's lifespan; without handing it on,
+        # every MCP request fails with "Task group is not initialized".
+        protected = Starlette(
+            routes=[Mount("/", app=starlette_app)],
+            lifespan=starlette_app.router.lifespan_context,
+        )
+        # Inject middlewares (outermost first: quota error -> auth).
+        protected.add_middleware(_QuotaErrorMiddleware)
+        protected.add_middleware(_BearerAuthMiddleware, auth_manager=self._auth)
+        return protected
+
     async def _run_http(self) -> None:
         if self.host == "0.0.0.0":
             print(
@@ -886,20 +899,9 @@ class NerdvanaMcpServer:
                 "Ensure firewall rules are in place.",
                 file=sys.stderr,
             )
-        # Wrap the FastMCP ASGI app with bearer-auth middleware so that every
-        # HTTP request is authenticated before reaching tool handlers.
         import uvicorn
-        starlette_app = self._fmcp.streamable_http_app()
-        from starlette.applications import Starlette
-        from starlette.routing import Mount
-        protected = Starlette(
-            routes=[Mount("/", app=starlette_app)],
-        )
-        # Inject middlewares (outermost first: quota error → auth).
-        protected.add_middleware(_QuotaErrorMiddleware)
-        protected.add_middleware(_BearerAuthMiddleware, auth_manager=self._auth)
         config = uvicorn.Config(
-            app           = protected,
+            app           = self._http_app(),
             host          = self.host,
             port          = self.port,
             log_level     = "warning",
@@ -916,8 +918,8 @@ class NerdvanaMcpServer:
     # ------------------------------------------------------------------
 
     @property
-    def fmcp(self) -> FastMCP:
-        """Underlying FastMCP instance (for introspection / testing)."""
+    def fmcp(self) -> MCPServer:
+        """Underlying MCPServer instance (for introspection / testing)."""
         return self._fmcp
 
     @property

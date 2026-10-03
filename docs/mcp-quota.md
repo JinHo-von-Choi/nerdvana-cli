@@ -76,7 +76,7 @@ Retry-After: 42
 
 ### stdio / JSON-RPC transport
 
-`QuotaExceeded` propagates as a tool error. FastMCP serializes it into a standard
+`QuotaExceeded` propagates as a tool error: the MCP server sends it as a standard
 MCP error response. The `reason` field contains the human-readable explanation.
 
 ## Audit log
@@ -84,44 +84,31 @@ MCP error response. The `reason` field contains the human-readable explanation.
 Quota-denied calls are recorded with `decision="denied"` and
 `error_class="quota_denied:<limit_name>"` (e.g. `quota_denied:rpm`).
 
-## Known limitation — HTTP 200 instead of 429 (mcp 1.27.0)
+## How a refusal reaches the client
 
-The MCP lowlevel server (`mcp.server.lowlevel.server`, line ~583) wraps every
-tool-handler invocation in a broad `except Exception` block and converts any
-exception to an MCP `isError:true` result:
-
-```python
-except Exception as e:
-    return self._make_error_result(str(e))
-```
-
-`QuotaExceeded` is raised inside the FastMCP tool handler that wraps `_dispatch`,
-so it is caught here before it can propagate to the ASGI middleware layer.  HTTP
-clients therefore receive:
+The MCP server reports a tool exception as a tool result with `isError:true` inside an
+HTTP 200 response, not as an HTTP status. A request over its quota is therefore refused as:
 
 ```
 HTTP/1.1 200 OK
 
-{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"<reason>"}],"isError":true}}
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"<reason>"}],"isError":true}}
 ```
 
-instead of the intended `429 Too Many Requests`.
+and not with `429 Too Many Requests`. The reason names the limit that was hit (`rpm`, `rph`,
+`daily_tokens` or `max_concurrent`); it is kept because the tool registration turns a denied,
+rate limited or malformed call into a `ToolError`, the one kind of failure the server sends on
+with its message.
 
-**Detection**: Every quota-exceeded event on the HTTP transport emits a
-structured log entry at `WARNING` level via the `nerdvana.quota` logger:
+**Detection**: Every quota refusal on the HTTP transport emits a structured log entry at
+`WARNING` level via the `nerdvana.quota` logger:
 
 ```
-event=quota_exceeded_swallowed_by_fastmcp tenant=<id> tool=<name>
+event=quota_exceeded tenant=<id> tool=<name>
 limit=<rpm|rph|daily_tokens|max_concurrent> retry_after=<seconds>
-note=mcp==1.27.0 serialises QuotaExceeded as isError:true/HTTP-200
 ```
 
-Grep or filter for `quota_exceeded_swallowed_by_fastmcp` in your log aggregator.
-
-**Resolution path**: When `mcp` exposes `raise_exceptions=True` in the
-Streamable-HTTP session path, `_QuotaErrorMiddleware` will intercept correctly
-without code changes.  Track the upstream issue for that flag; update the
-`StreamableHTTPSessionManager` instantiation in `mcp_server.py` when available.
+The audit record carries `error_class="quota_denied:<limit_name>"`.
 
 ## Concurrency note
 
