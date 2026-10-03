@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
+from nerdvana_cli.core.agent_scope import apply_write_scope
 from nerdvana_cli.core.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import SubagentConfig, label_confirm, run_subagent
@@ -160,6 +161,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
                 is_error=True,
             )
         allowed_tools = agent_defn.allowed_tools
+        apply_write_scope(child_settings, agent_defn, context.cwd)
         apply_model_spec(child_settings, select_model(args.model, args.category, agent_defn.model, agent_defn.category, child_settings.agents.categories))
         child_settings.session.max_turns = agent_defn.max_turns
         child_registry = create_subagent_registry(

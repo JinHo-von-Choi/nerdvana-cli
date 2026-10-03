@@ -225,15 +225,19 @@ def test_the_sandbox_section_loads_and_a_bad_mode_stops_startup(tmp_path: Path, 
         NerdvanaSettings.load(str(bad))
 
 
-def test_the_loop_hands_the_policy_to_every_tool_call(tmp_path: Path) -> None:
+def test_the_loop_hands_the_policy_to_every_tool_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from nerdvana_cli.core.agent_loop import AgentLoop
+    from nerdvana_cli.core.session import SessionStorage
+    from nerdvana_cli.core.tool import ToolRegistry
 
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setattr(AgentLoop, "create_provider_from_settings", lambda self: None)
     settings = NerdvanaSettings()
     settings.cwd = str(tmp_path)
     settings.sandbox.mode        = "require"
     settings.sandbox.write_paths = ["/srv/cache"]
-    holder = type("Loop", (), {"settings": settings, "_task_registry": None, "_on_ask_user": None, "_on_confirm": None,
-                               "session": type("S", (), {"session_id": "s"})(), "budget": None, "_tool_index": None,
-                               "session_cost_usd": lambda self: 0.0})()
-    context = AgentLoop._new_tool_context(holder)  # type: ignore[arg-type]
+    settings.sandbox.edit_scope  = ["tests"]
+    loop    = AgentLoop(settings=settings, registry=ToolRegistry(), session=SessionStorage(session_id="s", storage_dir=str(tmp_path / "s")))
+    context = loop._new_tool_context()
     assert context.state["sandbox"] == SandboxPolicy("require", True, ("/srv/cache",))
+    assert context.state["edit_scope"] == ["tests"]

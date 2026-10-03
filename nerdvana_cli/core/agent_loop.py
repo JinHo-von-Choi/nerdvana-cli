@@ -395,6 +395,11 @@ class AgentLoop:
             return None
         return {"command": goal.verify, "status": goal.status, "attempts": goal.attempts, "last_exit": goal.last_exit}
 
+    def _sandbox_policy(self) -> SandboxPolicy:
+        """The sandbox policy of this loop, from its settings."""
+        sandbox = self.settings.sandbox
+        return SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths), sandbox.project_writable, sandbox.scratch_writable)
+
     async def _verify_goal(self, flow: _Flow) -> AsyncGenerator[str, None]:
         """Run the goal's verification command now that the model says it is done.
 
@@ -407,7 +412,7 @@ class AgentLoop:
         yield f"\n[dim]Verifying: {escape(goal.verify)}[/dim]\n"
         result = await run_verify(
             goal.verify, self.settings.cwd or ".", timeout=config.verify_timeout, tail=config.output_tail_chars,
-            policy=SandboxPolicy(self.settings.sandbox.mode, self.settings.sandbox.network, tuple(self.settings.sandbox.write_paths)),
+            policy=self._sandbox_policy(),
         )
         goal.record_attempt(result.passed, result.exit_code, result.tail)
         save_goal(self.session.session_id, goal)
@@ -909,8 +914,8 @@ class AgentLoop:
         context.state["session_id"] = self.session.session_id
         context.state["budget"]     = (self.budget, self.session_cost_usd)
         context.state["tool_index"] = self._tool_index
-        sandbox = self.settings.sandbox
-        context.state["sandbox"]    = SandboxPolicy(sandbox.mode, sandbox.network, tuple(sandbox.write_paths))
+        context.state["sandbox"]    = self._sandbox_policy()
+        context.state["edit_scope"] = self.settings.sandbox.edit_scope
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:

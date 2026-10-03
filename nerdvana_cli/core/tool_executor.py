@@ -13,6 +13,7 @@ import json
 import logging
 import os
 from collections import Counter
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
@@ -54,10 +55,10 @@ class ToolExecutor:
     _EDIT_TOOL_NAMES: frozenset[str] = frozenset({
         "FileEdit",
         "FileWrite",
-        "ReplaceSymbolBody",
-        "InsertBeforeSymbol",
-        "InsertAfterSymbol",
-        "SafeDeleteSymbol",
+        "replace_symbol_body",
+        "insert_before_symbol",
+        "insert_after_symbol",
+        "safe_delete_symbol",
     })
 
     # Argument attributes that carry the file an edit tool is about to change,
@@ -185,11 +186,13 @@ class ToolExecutor:
         if refusal is not None:
             return refusal
         refusal = self._check_hooks_and_validation(tool_use, tool, parsed_args, context)
+        if refusal is None:
+            refusal = self._check_edit_scope(tool_use, parsed_args, context)
         if refusal is not None:
             return refusal
 
         # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
-        if self._checkpoint_manager is not None and tool_use["name"] in self._EDIT_TOOL_NAMES:
+        if self._checkpoint_manager is not None and tool_use["name"] in self._EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
             self._capture_checkpoint(tool_use["name"], parsed_args)
 
         return await self._execute(tool_use, tool, parsed_args, context, repeats)
@@ -281,6 +284,20 @@ class ToolExecutor:
         validation_error = tool.validate_input(parsed_args, context)
         if validation_error:
             return self._refusal(tool_id, f"Validation error: {validation_error}")
+        return None
+
+    def _check_edit_scope(self, tool_use: dict[str, Any], parsed_args: Any, context: ToolContext) -> ToolResult | None:
+        """Refuse an edit outside ``sandbox.edit_scope``; None means allowed or no scope is set."""
+        scope = context.state.get("edit_scope")
+        if scope is None or tool_use["name"] not in self._EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
+            return None
+        root    = Path(context.cwd).resolve()
+        allowed = [(root / entry).resolve() for entry in scope]
+        for target in self._edit_targets(parsed_args):
+            resolved = (root / target).resolve()
+            if not any(resolved == base or base in resolved.parents for base in allowed):
+                where = ", ".join(scope) if scope else "nowhere"
+                return self._refusal(tool_use["id"], f"Outside this agent's edit scope ({where}): {target}")
         return None
 
     async def _execute(

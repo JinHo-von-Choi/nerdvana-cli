@@ -186,6 +186,9 @@ Schema sections: `default`, `tenants`, `roles`. Dimensions: `rpm` (requests per 
 | `mode` | string | `off` | `off`, `auto` (confine where the system supports it) or `require` (refuse a command that cannot be confined). An invalid value stops startup. See [sandbox.md](sandbox.md). |
 | `network` | bool | `true` | `false` also refuses TCP connections and binds from the confined command; needs Linux 6.7 (Landlock ABI 4). |
 | `write_paths` | list | `[]` | Paths a confined command may write in addition to the project directory and the temporary directories. |
+| `project_writable` | bool | `true` | The project directory is writable to confined commands. Agent definitions with a `write_scope` turn it off; see [agents.md](agents.md). |
+| `scratch_writable` | bool | `true` | `/tmp` and the system temporary directory are writable to confined commands. |
+| `edit_scope` | list | unset | Paths (relative to the project) that `FileWrite`, `FileEdit` and the symbol edit tools may change; an edit elsewhere is refused. Unset means anywhere the permissions allow. These tools run in the application, so Landlock cannot confine them. |
 
 ### `goal` (GoalConfig)
 

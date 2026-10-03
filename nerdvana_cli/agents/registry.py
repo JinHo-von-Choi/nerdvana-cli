@@ -16,6 +16,16 @@ class AgentDefinition:
     system_prompt: str       = ""
     model:         str       = ""
     category:      str       = ""
+    # What the agent may write: "" or "project" (the session's policy), "none", or a list of paths. See core/agent_scope.py.
+    write_scope:   str | list[str] = ""
+    network:       bool | None = None
+
+
+def _read_scope(value: object) -> str | list[str]:
+    """A ``write_scope`` from a definition file: a keyword or a list of paths; anything else means no scope."""
+    if isinstance(value, list):
+        return [str(entry) for entry in value if str(entry).strip()]
+    return value if value in ("none", "project") else ""
 
 
 class AgentTypeRegistry:
@@ -64,6 +74,8 @@ class AgentTypeRegistry:
                     system_prompt = data.get("system_prompt", ""),
                     model         = str(data.get("model", "") or ""),
                     category      = str(data.get("category", "") or ""),
+                    write_scope   = _read_scope(data.get("write_scope")),
+                    network       = data["network"] if isinstance(data.get("network"), bool) else None,
                 )
                 self.register(defn)
             except Exception:  # noqa: BLE001

@@ -141,6 +141,13 @@ class SandboxConfig(BaseModel):
     network: bool = True
     # Writable in addition to the project directory and the temporary directories.
     write_paths: list[str] = Field(default_factory=list)
+    # The project directory and the temporary directories are writable unless these are turned off.
+    # Agent definitions with a write_scope set them; see docs/agents.md.
+    project_writable: bool = True
+    scratch_writable: bool = True
+    # Paths (relative to the project) that FileWrite, FileEdit and the symbol edit tools may change;
+    # None = anywhere the permissions allow. Applies to the tools, which Landlock cannot confine.
+    edit_scope: list[str] | None = None
 
 
 class CheckpointConfig(BaseModel):
