@@ -76,6 +76,63 @@ class TestFirstMessage:
         assert _first_message(path) == "block message"
 
 
+class TestFirstMessageOfRecordedTranscripts:
+    """The transcript writer marks an entry's kind with ``type``; older transcripts used ``role``."""
+
+    def _recorded(self, tmp_path: Path) -> Path:
+        from nerdvana_cli.core.session import SessionStorage
+        storage = SessionStorage(session_id="rec1", storage_dir=str(tmp_path))
+        storage.record_user_message("fix the parser")
+        storage.record_assistant_message("looking at it")
+        storage.record_user_message("and add a test")
+        return Path(storage.file_path)
+
+    def test_current_format_previews_the_first_user_message(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = self._recorded(tmp_path)
+        assert json.loads(path.read_text(encoding="utf-8").splitlines()[0])["subtype"] == "session_start"
+        assert _first_message(path) == "fix the parser"
+
+    def test_older_format_with_role_still_previews(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = _make_session(tmp_path, "old", [
+            {"ts": "2026-01-01T00:00:00", "role": "assistant", "content": "hi"},
+            {"ts": "2026-01-01T00:00:01", "role": "user", "content": "older request"},
+        ])
+        assert _first_message(path) == "older request"
+
+    def test_entries_that_are_not_user_messages_are_skipped(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = _make_session(tmp_path, "mixed", [
+            {"type": "system", "subtype": "session_start", "cwd": "/work"},
+            {"type": "assistant", "content": "not this", "tool_uses": []},
+            {"type": "tool_result", "tool_name": "Bash", "tool_use_id": "t1", "content": "nor this"},
+            {"type": "user", "content": "this one"},
+        ])
+        assert _first_message(path) == "this one"
+
+    def test_blank_user_messages_and_lines_that_are_not_objects_are_skipped(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = tmp_path / "odd.jsonl"
+        path.write_text(
+            'not json\n[1, 2]\n"text"\n' + json.dumps({"type": "user", "content": "  \n "}) + "\n"
+            + json.dumps({"type": "user", "content": [{"type": "text", "text": "from a block"}]}) + "\n",
+            encoding="utf-8",
+        )
+        assert _first_message(path) == "from a block"
+
+    def test_a_multi_line_message_is_one_line_and_cut_at_80_characters(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = _make_session(tmp_path, "long", [{"type": "user", "content": "first line\n" + "word " * 40}])
+        preview = _first_message(path)
+        assert "\n" not in preview and preview.startswith("first line word") and len(preview) == 80
+
+    def test_a_transcript_without_a_user_message_has_no_preview(self, tmp_path: Path) -> None:
+        from nerdvana_cli.commands.session_command import _first_message
+        path = _make_session(tmp_path, "none", [{"type": "system", "subtype": "session_start", "cwd": "/work"}])
+        assert _first_message(path) == "(no preview)"
+
+
 class TestMessageCount:
     def test_counts_lines(self, tmp_path: Path) -> None:
         from nerdvana_cli.commands.session_command import _message_count
@@ -113,6 +170,23 @@ class TestSessionList:
         result = self._run(["session", "list"], str(tmp_path))
         assert result.exit_code == 0
         assert "abc123" in result.output
+
+    def test_list_shows_the_preview_of_a_recorded_session(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.session import SessionStorage
+        storage = SessionStorage(session_id="rec42", storage_dir=str(tmp_path / "sessions"))
+        storage.record_user_message("summarize the build log")
+        result = self._run(["session", "list"], str(tmp_path))
+        assert result.exit_code == 0
+        assert "summarize the build log" in result.output
+        assert "(no preview)" not in result.output
+
+    def test_a_preview_with_brackets_is_printed_as_typed(self, tmp_path: Path) -> None:
+        from nerdvana_cli.core.session import SessionStorage
+        storage = SessionStorage(session_id="rec43", storage_dir=str(tmp_path / "sessions"))
+        storage.record_user_message("why does [/bold] break the list")
+        result = self._run(["session", "list"], str(tmp_path))
+        assert result.exit_code == 0
+        assert "why does [/bold] break the list" in result.output
 
     def test_json_output(self, tmp_path: Path) -> None:
         _make_session(tmp_path / "sessions", "xyz789", [
