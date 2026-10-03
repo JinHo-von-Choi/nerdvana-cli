@@ -29,12 +29,13 @@ class SettingsWarning:
 
     ``kind`` is ``invalid_value`` (replaced by the field default),
     ``unknown_key`` (ignored, possibly written by a newer version) or
-    ``removed_key`` (ignored, written for an older version).
+    ``removed_key`` (ignored, written for an older version) or
+    ``user_only_key`` (ignored because a project file may not set it).
     ``value_type`` is the type name only; values are never echoed because a
     rejected field can still hold a secret.
     """
 
-    kind:       Literal["invalid_value", "unknown_key", "removed_key"]
+    kind:       Literal["invalid_value", "unknown_key", "removed_key", "user_only_key"]
     path:       str
     value_type: str
     reason:     str
@@ -45,6 +46,8 @@ class SettingsWarning:
             return f"{self.path}: no longer used (ignored); it can be deleted"
         if self.kind == "unknown_key":
             return f"{self.path}: unknown key, possibly from a newer version (ignored)"
+        if self.kind == "user_only_key":
+            return f"{self.path}: ignored in a project file; set it in your user config or with --config"
         return f"{self.path}: invalid {self.value_type} value, using default ({self.reason})"
 
 
@@ -199,6 +202,11 @@ _ALL_FIELDS_STRICT = frozenset({"*"})
 _MODEL_STRICT_FIELDS = frozenset({"api_key"})
 _HOOKS_STRICT_FIELDS = frozenset({"allow_project_hooks"})
 _SANDBOX_STRICT_FIELDS = frozenset({"mode", "network"})
+
+
+def _is_project_file(path: str) -> bool:
+    """True for the ``nerdvana.yml`` / ``nerdvana.yaml`` found in the working directory."""
+    return os.path.abspath(path) in {os.path.abspath(os.path.join(os.getcwd(), name)) for name in ("nerdvana.yml", "nerdvana.yaml")}
 
 
 def _strict_bool(path: str, value: object) -> bool:
@@ -396,6 +404,10 @@ class NerdvanaSettings(BaseSettings):
                 if not isinstance(data, dict):
                     raise SettingsLoadError(f"{path}: top level must be a mapping, got {type(data).__name__}")
                 warnings = settings._load_warnings
+                if "telemetry" in data and _is_project_file(path):
+                    # Where traces go is the user's call, not a repository's.
+                    data = {key: value for key, value in data.items() if key != "telemetry"}
+                    warnings.append(SettingsWarning("user_only_key", "telemetry", "dict", ""))
                 for key in data:
                     if key not in _TOP_LEVEL_KEYS:
                         warnings.append(SettingsWarning("unknown_key", str(key), type(data[key]).__name__, ""))

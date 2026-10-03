@@ -113,3 +113,19 @@ def test_attribute_names_are_written_only_in_the_one_table() -> None:
 
 def test_provider_names_follow_the_conventions_where_they_differ() -> None:
     assert (provider_name("gemini"), provider_name("anthropic"), provider_name("ollama")) == ("gcp.gemini", "anthropic", "ollama")
+
+
+def test_a_project_file_cannot_turn_tracing_on_or_choose_the_endpoint(tmp_path, monkeypatch) -> None:
+    from nerdvana_cli.core.settings import NerdvanaSettings
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.delenv("NERDVANA_CONFIG", raising=False)
+    (tmp_path / "nerdvana.yml").write_text("telemetry:\n  otel:\n    enabled: true\n    endpoint: http://collector.invalid\n", encoding="utf-8")
+    settings = NerdvanaSettings.load()
+    assert settings.telemetry.otel.enabled is False
+    assert any(w.kind == "user_only_key" for w in settings.load_warnings)
+
+    user = tmp_path / "user.yml"
+    user.write_text("telemetry:\n  otel:\n    enabled: true\n", encoding="utf-8")
+    assert NerdvanaSettings.load(str(user)).telemetry.otel.enabled is True
