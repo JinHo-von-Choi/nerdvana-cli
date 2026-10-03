@@ -74,7 +74,7 @@ layout as the short tasks, one level down:
 ```
 benchmarks/long/tasks/<id>.yml       task files (id, path, prompt, verify, max_turns 80, max_cost_usd 1.0, tags)
 benchmarks/long/fixtures/<id>/       the starting repository, with the task's check.py or tests
-benchmarks/long/solutions/<id>/      the reference solution, laid over the fixture by tests/test_bench_fixtures.py
+benchmarks/long/solutions/<id>/      the reference solution, laid over the fixture by tests/scripts/test_bench_fixtures.py
 benchmarks/long/generate.py          the generator that writes all of the above from fixed seeds
 ```
 
@@ -102,7 +102,7 @@ generated files.
 
 Characters count the files an agent has to open if it reads each in full; tokens are characters divided by four. An agent that searches
 instead of reading reads less, but each of these tasks needs several passes (find, read, edit, run the check, read the check output), so
-the history of a typical attempt exceeds the figure for the first pass. The verify commands are the checks `tests/test_bench_fixtures.py`
+the history of a typical attempt exceeds the figure for the first pass. The verify commands are the checks `tests/scripts/test_bench_fixtures.py`
 runs without a model (fail on the fixture, pass with the solution overlay), and the same test file checks the contract of the long tasks:
 tag `long`, 80 turns, a cost ceiling of 1.0 and a fixture between 100 KB and 300 KB. The expected answers inside the check scripts of
 `long-log-analysis`, `long-docs-summary-table`, `long-data-consistency-repair` and `long-config-migration` are digests, so the check
@@ -110,7 +110,7 @@ scripts show what is wrong without showing the answer.
 
 ## Reading the result
 
-Each task is checked by `tests/test_bench_fixtures.py` without a model: its verify command must fail on the starting repository and pass once the reference solution in `benchmarks/solutions/<id>/` is laid over it.
+Each task is checked by `tests/scripts/test_bench_fixtures.py` without a model: its verify command must fail on the starting repository and pass once the reference solution in `benchmarks/solutions/<id>/` is laid over it.
 
 For each task: attempts, passes, `pass@1` (share of attempts that passed), `pass@k`
 (chance that at least one of k attempts passes, the unbiased estimator

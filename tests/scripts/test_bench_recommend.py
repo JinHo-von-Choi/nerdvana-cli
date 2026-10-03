@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_recommend.py"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "bench_recommend.py"
 spec   = importlib.util.spec_from_file_location("bench_recommend", SCRIPT)
 assert spec and spec.loader
 rec = importlib.util.module_from_spec(spec)

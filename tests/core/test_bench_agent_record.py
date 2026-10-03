@@ -19,9 +19,9 @@ from types import ModuleType
 import pytest
 import yaml
 
-SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_agent.py"
-TASKS  = Path(__file__).parent.parent / "benchmarks" / "tasks"
-FIXTURE = Path(__file__).parent.parent / "benchmarks" / "fixtures" / "sum-range"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "bench_agent.py"
+TASKS  = Path(__file__).parents[2] / "benchmarks" / "tasks"
+FIXTURE = Path(__file__).parents[2] / "benchmarks" / "fixtures" / "sum-range"
 
 
 def _load() -> ModuleType:

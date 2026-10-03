@@ -90,10 +90,10 @@ uv run pytest -m live
 Follow the procedure template in `docs/plans/2026-04-29-add-providers-kimi-qwen.md`.
 Files that require changes:
 
-- `nerdvana_cli/providers/base.py` — add enum value, update provider dict, update `detect_provider`
-- `nerdvana_cli/providers/factory.py` — wire new provider class
-- `nerdvana_cli/providers/pricing.yml` — add token pricing entry
-- `tests/test_<provider>_provider.py` — unit tests covering detect, build, stream, error paths
+- `nerdvana_cli/providers/base.py`: add enum value, update provider dict, update `detect_provider`
+- `nerdvana_cli/providers/factory.py`: wire new provider class
+- `nerdvana_cli/providers/pricing.yml`: add token pricing entry
+- `tests/providers/test_<provider>_provider.py`: unit tests covering detect, build, stream, error paths
 - `README.md` — add row to the Supported Providers table
 - `CHANGELOG.md` — add entry under Unreleased
 - `docs/configuration.md` — document provider-specific env vars and options

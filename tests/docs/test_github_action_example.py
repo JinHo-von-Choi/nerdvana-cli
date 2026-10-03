@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-EXAMPLE = Path(__file__).parent.parent / "docs" / "examples" / "nerdvana-comment.yml"
+EXAMPLE = Path(__file__).parents[2] / "docs" / "examples" / "nerdvana-comment.yml"
 
 
 def _load() -> dict:

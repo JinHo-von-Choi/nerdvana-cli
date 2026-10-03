@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-REPO_ROOT   = Path(__file__).resolve().parents[1]
+REPO_ROOT   = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "release_notes.py"
 
 

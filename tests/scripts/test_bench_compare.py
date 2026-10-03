@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-SCRIPTS = Path(__file__).parent.parent / "scripts"
+SCRIPTS = Path(__file__).parents[2] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import bench_compare as cmp  # noqa: E402

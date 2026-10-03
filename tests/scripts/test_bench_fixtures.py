@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 import yaml
 
-ROOT       = Path(__file__).parent.parent
+ROOT       = Path(__file__).parents[2]
 BENCH      = ROOT / "benchmarks"
 LONG       = BENCH / "long"
 TASKS_DIR  = BENCH / "tasks"

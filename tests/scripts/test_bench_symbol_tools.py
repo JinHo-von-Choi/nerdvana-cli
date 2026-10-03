@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-SCRIPT = Path(__file__).parent.parent / "scripts" / "bench_symbol_tools.py"
+SCRIPT = Path(__file__).parents[2] / "scripts" / "bench_symbol_tools.py"
 
 
 @pytest.fixture(scope="module")

@@ -1,7 +1,7 @@
 """Confinement of stdio MCP server processes: planning, settings and a real confined server.
 
 The confinement tests start a tiny stdio server that tries to write files and open connections, and are
-skipped on a kernel without Landlock, as in tests/test_sandbox.py. The forbidden directory sits under
+skipped on a kernel without Landlock, as in tests/core/test_sandbox.py. The forbidden directory sits under
 tests/, because /tmp is writable for every confined process.
 
 Author: 최진호

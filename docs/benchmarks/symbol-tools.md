@@ -15,7 +15,7 @@ uv run python scripts/bench_symbol_tools.py --repeat 3 --out symbol-tools.json
 
 Needs `pyright-langserver` on PATH (`pip install pyright` provides it). Without it the report says `skipped`
 and the exit status is 2; the exit status is 1 when a case failed and 0 when every case passed. A unit test
-covers the report logic without a server (`tests/test_bench_symbol_tools.py`).
+covers the report logic without a server (`tests/scripts/test_bench_symbol_tools.py`).
 
 ## Cases
 
