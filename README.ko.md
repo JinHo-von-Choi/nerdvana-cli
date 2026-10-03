@@ -197,6 +197,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
 | `nerdvana import claude\|codex` | 슬래시 명령(`.claude/commands`, `~/.codex/prompts`)을 덮어쓰지 않고 `.nerdvana/commands` 로 가져오고, Claude Code `settings.json` 의 권한 규칙을 이 도구의 문법으로 바꿔 출력합니다. `--write` 전에는 계획만 보여 줍니다 |
 | `nerdvana review` | 작업 트리를 git ref 와 비교해, 바뀐 함수와 그것을 쓰는 줄에서 출발하는 읽기 전용 에이전트로 리뷰합니다(`--base`, `--context-only`, `--fail-on`). [docs/review.md](docs/review.md) |
+| `nerdvana context [id]` | 저장된 세션(기본은 가장 최근)에서 컨텍스트 윈도우가 어디에 쓰이는지 보여 줍니다. 시스템 프롬프트 구성, 도구별 선언, 역할별 메시지, 도구별 결과를 윈도우와 압축 임계값에 견줍니다(`--top`, `--json`). [docs/context-history.md](docs/context-history.md) |
 | `nerdvana approvals` | 계속 승인하는 권한 질문에 대해 `always_allow` 규칙(`Bash(git status)`)을 제안합니다. 설정은 바뀌지 않습니다 |
 | `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
 
@@ -230,6 +231,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana session list` | `~/.nerdvana/sessions/`에 저장된 JSONL 기록 목록 표시 |
 | `nerdvana session resume <id>` | 기존 기록으로 REPL 재개 |
 | `nerdvana session purge` | 저장된 기록 삭제 |
+| `nerdvana history search "<검색어>"` | 저장된 기록의 메시지를 검색해 세션 id, 날짜, 역할, 발췌를 출력합니다(`--since 7d`, `--cwd .`, `--limit`). [docs/context-history.md](docs/context-history.md) |
 
 ### MCP 서버 (`nerdvana mcp ...`)
 
@@ -341,7 +343,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/models` | 사용 가능한 model 목록 (cursor 가 현재 active model 에서 시작) |
 | `/provider` | provider 추가/전환 (선택은 config.yml 에 저장되어 재실행 시 유지) |
 | `/mode` | 모드 프로파일 활성화/비활성화 |
-| `/context` | 컨텍스트 프로파일 설정 |
+| `/context` | 컨텍스트 윈도우가 어디에 쓰이는지(시스템 프롬프트 구성, 도구 선언, 메시지, 도구 결과를 윈도우와 압축 임계값에 견줌) 보여 주고 이어서 컨텍스트 프로파일을 표시합니다. `/context list`, `/context <이름>` 은 프로파일을 설정합니다 |
 | `/mcp` | 연결된 MCP 서버 상태 표시 |
 | `/tokens` | 누적 토큰 사용량 및 컨텍스트 윈도우 사용률 표시 |
 | `/skills` | 등록된 에이전트 스킬 목록 표시 |
@@ -357,6 +359,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/dashboard` | 관찰 가능성 대시보드 토글 |
 | `/health` | 7일간 도구 호출 건강 요약 표시 |
 | `/image` | `/image <경로> [<경로> ...] <질문>` 은 앞쪽의 이미지 파일을 첨부해 질문합니다. 기록에는 그림이 아니라 파일 이름만 남습니다 |
+| `/history` | `/history <검색어> [--since 7d] [--cwd DIR]` 로 과거 세션 기록을 검색합니다 |
 | `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
 | `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/policy` | 적용 중인 관리형 정책 파일과 각 항목이 한 일을 표시합니다 ([docs/managed-policy.md](docs/managed-policy.md)) |

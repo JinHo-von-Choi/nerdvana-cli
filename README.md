@@ -215,6 +215,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |
 | `nerdvana import claude\|codex` | Bring over slash commands (`.claude/commands`, `~/.codex/prompts`) into `.nerdvana/commands`, never overwriting, and print the permission rules of a Claude Code `settings.json` converted to this syntax; shows a plan until `--write` |
 | `nerdvana review` | Review the working tree against a git ref with a read-only agent that starts from the changed functions and the lines that use them (`--base`, `--context-only`, `--fail-on`); see [docs/review.md](docs/review.md) |
+| `nerdvana context [id]` | Show where the context window goes in a stored session (the latest by default): system prompt parts, tool declarations per tool, messages by role, tool results by tool, against the window and the compaction threshold (`--top`, `--json`); see [docs/context-history.md](docs/context-history.md) |
 | `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written |
 | `nerdvana cost` | Aggregate token usage, cached tokens, the cache hit ratio (cache reads over input, `Hit %` and `cache_hit_ratio`) and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
 
@@ -248,6 +249,7 @@ See [docs/workflows.md](docs/workflows.md).
 | `nerdvana session list` | List stored JSONL transcripts under `~/.nerdvana/sessions/` |
 | `nerdvana session resume <id>` | Reopen the REPL on an existing transcript |
 | `nerdvana session purge` | Delete stored transcripts |
+| `nerdvana history search "<query>"` | Search the messages of stored transcripts and print session id, date, role and a snippet (`--since 7d`, `--cwd .`, `--limit`); see [docs/context-history.md](docs/context-history.md) |
 
 ### MCP servers (`nerdvana mcp ...`)
 
@@ -363,7 +365,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/models` | List available models for the current provider; cursor starts on the active model |
 | `/provider` | Add/switch provider (selection persists across restarts) |
 | `/mode` | Activate/deactivate mode profile |
-| `/context` | Set context profile |
+| `/context` | Where the context window goes (system prompt parts, tool declarations, messages, tool results, against the window and the compaction threshold) followed by the context profile; `/context list` and `/context <name>` set the profile |
 | `/mcp` | MCP server status |
 | `/tokens` | Show token usage |
 | `/skills` | List available skills |
@@ -379,6 +381,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 | `/dashboard` | Toggle observability dashboard |
 | `/health` | Show 7-day tool call health summary |
 | `/image` | `/image <path> [<path> ...] <question>` sends a prompt with the image files at the start attached; the transcript keeps the file names, not the pictures |
+| `/history` | `/history <query> [--since 7d] [--cwd DIR]` searches past session transcripts |
 | `/btw` | `/btw <question>` asks a side question with the conversation as context; neither the question nor the answer is added to the history, and the cached start of the request is reused |
 | `/goal` | `/goal <objective> --verify <command>` runs the command whenever the agent says it is done and sends failures back until it exits with status 0; `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
 | `/policy` | Show the managed policy files that apply and what each control did (see [docs/managed-policy.md](docs/managed-policy.md)) |
