@@ -211,6 +211,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana version` | Show version |
 | `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |
+| `nerdvana import claude\|codex` | Bring over slash commands (`.claude/commands`, `~/.codex/prompts`) into `.nerdvana/commands`, never overwriting, and print the permission rules of a Claude Code `settings.json` converted to this syntax; shows a plan until `--write` |
 | `nerdvana review` | Review the working tree against a git ref with a read-only agent that starts from the changed functions and the lines that use them (`--base`, `--context-only`, `--fail-on`); see [docs/review.md](docs/review.md) |
 | `nerdvana approvals` | Suggest `always_allow` rules (`Bash(git status)`) for permission questions you keep approving; nothing is written |
 | `nerdvana cost` | Aggregate token usage, cached tokens and USD cost over a time window, from the usage each request reported. `--by provider\|model\|agent\|category\|tool` says where the money went |
