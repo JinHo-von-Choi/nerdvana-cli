@@ -38,6 +38,7 @@ VERIFY_FAILED       = "verify_failed"
 TOOL_NOT_LOADED     = "tool_not_loaded"
 OUT_OF_SCOPE        = "out_of_scope"
 SECRET_MASKED       = "secret_masked"
+OUT_OF_GOAL_SCOPE   = "out_of_goal_scope"
 ESCALATED           = "escalated"
 
 # (text the result starts with or contains, signal), checked in order for error results.

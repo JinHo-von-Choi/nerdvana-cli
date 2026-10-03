@@ -377,6 +377,7 @@ def run(
     sandbox: str = typer.Option("", "--sandbox", help="Confine shell commands to a write scope: off | auto | require (default: sandbox.mode from the configuration)"),
     verify: str = typer.Option("", "--verify", help="Command that decides whether the task is done: the run goes on until it exits with status 0"),
     verify_attempts: int = typer.Option(0, "--verify-attempts", help="Failed verifications before giving up (0 = goal.max_attempts)"),
+    scope: list[str] | None = typer.Option(None, "--scope", help="With --verify: paths the task is about; an edit elsewhere is refused unless someone approves it"),  # noqa: B008
     set_values: list[str] | None = typer.Option(None, "--set", help="Override one setting for this run: section.field=value (repeatable), e.g. --set session.compact_threshold=0.5"),  # noqa: B008
 ) -> None:
     """Run a single prompt non-interactively.
@@ -450,7 +451,7 @@ def run(
     outcome.session_id = session.session_id
     started            = time.monotonic()
     if verify:
-        loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts))
+        loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts, scope=list(scope or [])))
 
     async def _run() -> None:
         loop.usage_listener = reporter.request

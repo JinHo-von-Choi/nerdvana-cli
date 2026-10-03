@@ -4,8 +4,8 @@ Author: 최진호
 Date:   2026-10-03
 
     /goal                         show the current goal
-    /goal <objective> --verify <command> [--attempts N]
-                                  set a goal and start working on it
+    /goal <objective> --verify <command> [--attempts N] [--scope PATH]...
+                                  set a goal and start working on it; edits outside the scope ask first
     /goal pause | resume | clear  suspend, resume or drop the goal
 """
 
@@ -22,7 +22,7 @@ from nerdvana_cli.core.goal import ACTIVE, PAUSED, Goal, GoalError
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
 
-USAGE = "Usage: /goal <objective> --verify <command> [--attempts N]   |   /goal pause|resume|clear   |   /goal"
+USAGE = "Usage: /goal <objective> --verify <command> [--attempts N] [--scope PATH]   |   /goal pause|resume|clear   |   /goal"
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ class GoalRequest:
     objective: str = ""
     verify:    str = ""
     attempts:  int = 0
+    scope:     tuple[str, ...] = ()
 
 
 class GoalUsageError(ValueError):
@@ -52,15 +53,18 @@ def parse_goal_args(args: str) -> GoalRequest:
         raise GoalUsageError(f"cannot read the arguments: {exc}") from exc
     objective: list[str] = []
     verify, attempts = "", 0
+    scope: list[str] = []
     index = 0
     while index < len(words):
         word = words[index]
-        if word in ("--verify", "--attempts"):
+        if word in ("--verify", "--attempts", "--scope"):
             if index + 1 >= len(words):
                 raise GoalUsageError(f"{word} needs a value")
             value = words[index + 1]
             if word == "--verify":
                 verify = value
+            elif word == "--scope":
+                scope.append(value)
             else:
                 if not value.isdigit() or int(value) < 1:
                     raise GoalUsageError("--attempts must be a positive number")
@@ -73,7 +77,7 @@ def parse_goal_args(args: str) -> GoalRequest:
         raise GoalUsageError("name the objective")
     if not verify:
         raise GoalUsageError("a goal needs --verify <command>: the command that decides whether it is reached")
-    return GoalRequest("set", " ".join(objective), verify, attempts)
+    return GoalRequest("set", " ".join(objective), verify, attempts, tuple(scope))
 
 
 async def handle_goal(app: NerdvanaApp, args: str) -> None:
@@ -94,7 +98,7 @@ async def handle_goal(app: NerdvanaApp, args: str) -> None:
         return
     if request.action == "set":
         try:
-            new = Goal(request.objective, request.verify, max_attempts=request.attempts or app.settings.goal.max_attempts)
+            new = Goal(request.objective, request.verify, max_attempts=request.attempts or app.settings.goal.max_attempts, scope=list(request.scope))
         except GoalError as exc:
             app._add_chat_message(f"[red]{escape(str(exc))}[/red]")
             return

@@ -119,3 +119,17 @@ def test_the_command_is_registered_and_listed() -> None:
 
     assert "/goal" in _build_handler_map()
     assert "/goal" in {name for name, _ in SLASH_COMMANDS}
+
+
+def test_scope_flags_are_collected_and_reach_the_goal() -> None:
+    request = parse_goal_args("fix it --verify true --scope tests --scope docs")
+    assert request.scope == ("tests", "docs")
+    assert parse_goal_args("fix it --verify true").scope == ()
+    with pytest.raises(GoalUsageError):
+        parse_goal_args("fix it --verify true --scope")
+
+
+async def test_the_goal_set_by_the_command_keeps_the_scope() -> None:
+    loop = _Loop()
+    await handle_goal(_App(loop), "fix it --verify true --scope tests")  # type: ignore[arg-type]
+    assert loop.goal is not None and loop.goal.scope == ["tests"]

@@ -27,6 +27,14 @@ The result of a run with a goal has a `verification` object (`command`, `status`
 `last_exit`). Passing ends the run with `success`. When the attempts run out the run ends with
 `error_goal_unmet` and exit code 3.
 
+## Scope
+
+`--scope PATH` (repeatable; `/goal ... --scope tests`, `nerdvana run --verify ... --scope tests`) says what the work is
+about. An edit outside those paths by `FileEdit`, `FileWrite` or the symbol edit tools asks the user first, in the
+terminal interface through the confirmation window. With nobody to ask (a run without a terminal) it is refused.
+The scope does not stop the agent from leaving it, only makes a person decide, and each such edit is counted as
+`out_of_goal_scope` in the run's signals. It applies while the goal is active.
+
 ## What the check does
 
 - It runs in the project directory, through the shell, under the same `sandbox` policy as the `Bash`
