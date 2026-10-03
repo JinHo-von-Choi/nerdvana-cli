@@ -13,7 +13,7 @@ import pytest
 
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.task_state import TaskRegistry
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext
 from nerdvana_cli.tools.agent_tool import AgentToolArgs
 from nerdvana_cli.tools.registry import create_tool_registry

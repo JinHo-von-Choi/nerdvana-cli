@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.workflow_text import WorkflowError
+from nerdvana_cli.core.delegation.workflow_text import WorkflowError
 
 RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 

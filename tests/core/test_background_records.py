@@ -15,10 +15,10 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.state import run_store
 from nerdvana_cli.core.state.run_store import FAILED, RUNNING, STOPPED, SUCCEEDED, RunStore
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 from nerdvana_cli.tools.team_tools import TaskStopArgs, TaskStopTool

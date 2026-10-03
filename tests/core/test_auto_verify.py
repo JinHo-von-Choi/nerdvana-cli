@@ -19,9 +19,9 @@ from nerdvana_cli.core import auto_verify
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import run_subagent
 from nerdvana_cli.core.state.goal import MET, PAUSED, UNMET, Goal
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent

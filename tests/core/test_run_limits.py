@@ -244,7 +244,7 @@ async def test_without_a_wrap_up_turn_nothing_is_added(monkeypatch: pytest.Monke
 async def test_run_subagent_sets_the_wrap_up_turn_from_the_limit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import asyncio
 
-    from nerdvana_cli.core.subagent import run_subagent
+    from nerdvana_cli.core.delegation.subagent import run_subagent
     from nerdvana_cli.core.subagent_config import SubagentConfig
 
     seen: list[int] = []
@@ -271,7 +271,7 @@ async def test_run_subagent_sets_the_wrap_up_turn_from_the_limit(monkeypatch: py
 async def test_a_sub_agent_that_hits_its_share_returns_what_it_had_and_says_so(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import asyncio
 
-    from nerdvana_cli.core.subagent import run_subagent
+    from nerdvana_cli.core.delegation.subagent import run_subagent
     from nerdvana_cli.core.subagent_config import SubagentConfig
 
     provider = _Endless(usage={"input_tokens": 1_000_000, "output_tokens": 0})

@@ -1,4 +1,4 @@
-"""WorkflowTool: lets the model run a declared multi-agent workflow (core/workflow.py).
+"""WorkflowTool: lets the model run a declared multi-agent workflow (core/delegation/workflow.py).
 
 Author: 최진호
 Date:   2026-10-03
@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.workflow import WorkflowError, discover, resolve_inputs
+from nerdvana_cli.core.delegation.workflow_engine import COMPLETED, RunContext, RunReport, WorkflowRun
+from nerdvana_cli.core.delegation.workflow_store import RunStore, new_run_id
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
-from nerdvana_cli.core.workflow import WorkflowError, discover, resolve_inputs
-from nerdvana_cli.core.workflow_engine import COMPLETED, RunContext, RunReport, WorkflowRun
-from nerdvana_cli.core.workflow_store import RunStore, new_run_id
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nerdvana_cli.core.subagent import create_shared_context
+from nerdvana_cli.core.delegation.subagent import create_shared_context
 
 
 def test_empty_messages_returns_empty() -> None:

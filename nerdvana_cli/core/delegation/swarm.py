@@ -10,10 +10,10 @@ from typing import Any
 
 from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import label_confirm, run_subagent
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.state.budget import Budget, Envelope
-from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
 
 

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent import run_subagent
+from nerdvana_cli.core.delegation.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
@@ -28,7 +28,7 @@ async def test_run_subagent_returns_output() -> None:
     abort = asyncio.Event()
 
     with patch(
-        "nerdvana_cli.core.subagent.AgentLoop",
+        "nerdvana_cli.core.delegation.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
         result, _ = await run_subagent(config, abort)
@@ -56,7 +56,7 @@ async def test_run_subagent_filters_protocol_markers() -> None:
     abort = asyncio.Event()
 
     with patch(
-        "nerdvana_cli.core.subagent.AgentLoop",
+        "nerdvana_cli.core.delegation.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
         result, _ = await run_subagent(config, abort)
@@ -86,7 +86,7 @@ async def test_run_subagent_respects_abort() -> None:
     )
 
     with patch(
-        "nerdvana_cli.core.subagent.AgentLoop",
+        "nerdvana_cli.core.delegation.subagent.AgentLoop",
         return_value=MagicMock(run=_fake_run),
     ):
         result, _ = await run_subagent(config, abort)

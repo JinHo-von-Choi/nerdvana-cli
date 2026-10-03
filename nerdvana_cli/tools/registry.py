@@ -48,7 +48,7 @@ def create_tool_registry(
     task_registry:  Any    = None,
 ) -> ToolRegistry:
     """Create and populate the tool registry with all built-in tools."""
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
 
     registry  = ToolRegistry()
     _task_reg = task_registry or TaskRegistry()

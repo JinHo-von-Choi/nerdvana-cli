@@ -7,8 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
-from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.core.delegation.swarm import SwarmConfig, SwarmTask, run_swarm
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskStatus
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 
 
@@ -35,7 +35,7 @@ async def test_swarm_runs_all_tasks_in_parallel() -> None:
         task_registry = task_registry,
     )
 
-    with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_fake_subagent):
+    with patch("nerdvana_cli.core.delegation.swarm.run_subagent", side_effect=_fake_subagent):
         results = await run_swarm(config, create_subagent_registry)
 
     assert len(results) == 3
@@ -60,7 +60,7 @@ async def test_swarm_marks_tasks_completed() -> None:
         task_registry = task_registry,
     )
 
-    with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_fake_subagent):
+    with patch("nerdvana_cli.core.delegation.swarm.run_subagent", side_effect=_fake_subagent):
         await run_swarm(config, create_subagent_registry)
 
     completed = [t for t in task_registry.all() if t.status == TaskStatus.COMPLETED]
@@ -85,7 +85,7 @@ async def test_swarm_handles_partial_failure() -> None:
         task_registry = task_registry,
     )
 
-    with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_failing):
+    with patch("nerdvana_cli.core.delegation.swarm.run_subagent", side_effect=_failing):
         results = await run_swarm(config, create_subagent_registry)
 
     assert any("ok" in v for v in results.values())

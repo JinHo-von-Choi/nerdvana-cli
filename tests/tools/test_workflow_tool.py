@@ -12,11 +12,11 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
+from nerdvana_cli.core.delegation.workflow_store import RunStore
 from nerdvana_cli.core.state.budget import Budget
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolCategory, ToolContext
-from nerdvana_cli.core.workflow_store import RunStore
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.tools.workflow_tool import WorkflowTool, WorkflowToolArgs
@@ -84,7 +84,7 @@ async def test_the_tool_runs_a_named_workflow_and_returns_its_final_output_and_t
         seen.append(config)
         return f"[{config.prompt}]", 3
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     tool, context = _tool_and_context(project)
     result = await tool.call(WorkflowToolArgs(name="pair", inputs={"topic": "dogs"}), context, None)
     assert not result.is_error
@@ -98,7 +98,7 @@ async def test_arguments_are_parsed_from_the_model_call_and_inputs_are_optional(
     async def fake(config: SubagentConfig, abort: object) -> tuple[str, int]:
         return config.prompt, 1
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     tool, context = _tool_and_context(project)
     args = tool.parse_args({"name": "pair"})
     assert (await tool.call(args, context, None)).content.startswith("sum up look at cats")
@@ -118,7 +118,7 @@ async def test_a_run_that_stops_returns_an_error_with_the_run_id_and_the_resume_
     async def fake(config: SubagentConfig, abort: object) -> tuple[str, int]:
         raise RuntimeError("provider down")
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     tool, context = _tool_and_context(project)
     result = await tool.call(WorkflowToolArgs(name="pair"), context, None)
     assert result.is_error and "provider down" in result.content
@@ -133,7 +133,7 @@ async def test_the_run_takes_its_ceiling_from_the_sessions_cost_limit_and_settle
         config.cost_usd = 0.5
         return "x", 1
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     budget = Budget(limit=10.0)
     tool, context = _tool_and_context(project, budget=budget)
     result: Any = await tool.call(WorkflowToolArgs(name="pair"), context, None)

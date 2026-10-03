@@ -6,7 +6,7 @@ from typing import Any
 from textual.reactive import reactive
 from textual.widget import Widget
 
-from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
 
 _POLL_INTERVAL = 0.5  # seconds
 

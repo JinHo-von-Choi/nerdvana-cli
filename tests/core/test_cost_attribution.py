@@ -117,7 +117,7 @@ async def test_the_usage_listener_hears_every_request_with_its_cost(monkeypatch:
 async def test_the_agent_tool_hands_category_and_parent_to_the_child() -> None:
     from unittest.mock import AsyncMock, patch
 
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
     from nerdvana_cli.core.tool import ToolContext
     from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 

@@ -20,9 +20,7 @@ import pytest
 import yaml
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.tool import ToolRegistry
-from nerdvana_cli.core.workflow import (
+from nerdvana_cli.core.delegation.workflow import (
     Workflow,
     WorkflowError,
     bundled_dir,
@@ -30,8 +28,10 @@ from nerdvana_cli.core.workflow import (
     parse_workflow,
     resolve_inputs,
 )
-from nerdvana_cli.core.workflow_engine import RunContext, RunReport, WorkflowRun, effective_scope, tally
-from nerdvana_cli.core.workflow_store import RunStore
+from nerdvana_cli.core.delegation.workflow_engine import RunContext, RunReport, WorkflowRun, effective_scope, tally
+from nerdvana_cli.core.delegation.workflow_store import RunStore
+from nerdvana_cli.core.subagent_config import SubagentConfig
+from nerdvana_cli.core.tool import ToolRegistry
 
 Answer = Callable[[SubagentConfig], str]
 
@@ -65,7 +65,7 @@ class FakeAgents:
 @pytest.fixture()
 def fake(monkeypatch: pytest.MonkeyPatch) -> FakeAgents:
     agents = FakeAgents()
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", agents)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", agents)
     return agents
 
 
@@ -298,7 +298,7 @@ async def test_only_claims_confirmed_by_a_majority_of_independent_reviewers_surv
 
 
 def test_a_claim_needs_a_strict_majority() -> None:
-    from nerdvana_cli.core.workflow_engine import Unit
+    from nerdvana_cli.core.delegation.workflow_engine import Unit
 
     def unit(confirmed: bool) -> Unit:
         return Unit(0, "k", "ok", value={"verdicts": [{"claim": 0, "confirmed": confirmed}]})
@@ -385,7 +385,7 @@ async def test_an_agent_that_used_up_its_share_stops_the_run_as_budget_limited(f
         config.cost_usd, config.stopped_for = 0.5, "max_cost"
         return "partial [Stopped: ...]", 1
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", capped)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", capped)
     report = await _run(_workflow(CHAIN), tmp_path, ceiling=2.0)
     assert report.status == "stopped" and "share of the cost ceiling" in report.error
 

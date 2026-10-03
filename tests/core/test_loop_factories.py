@@ -16,12 +16,12 @@ import pytest
 from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import run_subagent
+from nerdvana_cli.core.delegation.swarm import SwarmConfig, SwarmTask, run_swarm
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.plan_gate import draft_plan, plan_for
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
-from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.tools.tool_search import ToolSearchTool
@@ -130,6 +130,6 @@ async def test_swarm_workers_are_built_with_the_leaders_factories() -> None:
         task_registry = TaskRegistry(),
         factories     = factories,
     )
-    with patch("nerdvana_cli.core.swarm.run_subagent", side_effect=_fake):
+    with patch("nerdvana_cli.core.delegation.swarm.run_subagent", side_effect=_fake):
         await run_swarm(config, create_subagent_registry)
     assert seen == [factories, factories]

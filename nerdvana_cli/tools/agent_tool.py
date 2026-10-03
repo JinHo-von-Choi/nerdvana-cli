@@ -11,13 +11,20 @@ from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import label_confirm, run_subagent
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
+from nerdvana_cli.core.delegation.worktree import (
+    Worktree,
+    WorktreeError,
+    create_worktree,
+    git_dirs,
+    has_changes,
+    remove_worktree,
+)
 from nerdvana_cli.core.safety.agent_scope import apply_write_scope
 from nerdvana_cli.core.state.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
-from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
-from nerdvana_cli.core.worktree import Worktree, WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult
 

@@ -23,7 +23,7 @@ searched, in that order of precedence.
         schema: {type: object, required: [items], properties: {items: {type: array}}}
 
 Step kinds: ``agent`` (default), ``verify`` and ``cross_check``. Which step may run when is the DAG made
-by ``needs`` and by every ``${steps.<id>...}`` a step refers to. Execution is in ``core/workflow_engine.py``.
+by ``needs`` and by every ``${steps.<id>...}`` a step refers to. Execution is in ``core/delegation/workflow_engine.py``.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from nerdvana_cli.core.config import paths as core_paths
-from nerdvana_cli.core.workflow_text import WorkflowError, reference_problem, references, whole_reference
+from nerdvana_cli.core.delegation.workflow_text import WorkflowError, reference_problem, references, whole_reference
 
 __all__ = [
     "Workflow", "WorkflowError", "InputSpec", "Step", "discover", "load_workflow", "parse_workflow", "resolve_inputs",
@@ -296,7 +296,7 @@ def load_workflow(path: Path, origin: str = ORIGIN_PROJECT) -> Workflow:
 
 def bundled_dir() -> Path:
     """The workflows that ship with the package."""
-    return Path(__file__).resolve().parent.parent / "resources" / "workflows"
+    return Path(__file__).resolve().parents[2] / "resources" / "workflows"
 
 
 def discover(cwd: str) -> tuple[dict[str, Workflow], list[str]]:

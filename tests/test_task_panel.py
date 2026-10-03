@@ -1,4 +1,4 @@
-from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
 
 
 def test_task_panel_import() -> None:

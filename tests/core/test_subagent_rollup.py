@@ -14,8 +14,8 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import run_subagent
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.tool import ToolRegistry
 
@@ -67,7 +67,7 @@ async def test_run_subagent_reports_even_when_it_is_aborted(monkeypatch: pytest.
         def signal_summary(self) -> dict[str, int]:
             return {"tool_error": 1}
 
-    monkeypatch.setattr("nerdvana_cli.core.subagent.AgentLoop", _Child)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.subagent.AgentLoop", _Child)
     abort = asyncio.Event()
     abort.set()
     config = SubagentConfig(
