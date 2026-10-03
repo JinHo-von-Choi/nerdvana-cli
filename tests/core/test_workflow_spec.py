@@ -13,7 +13,7 @@ import pytest
 import yaml
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
-from nerdvana_cli.core.workflow import (
+from nerdvana_cli.core.delegation.workflow import (
     ORIGIN_BUNDLED,
     ORIGIN_PROJECT,
     ORIGIN_USER,
@@ -24,7 +24,7 @@ from nerdvana_cli.core.workflow import (
     parse_workflow,
     resolve_inputs,
 )
-from nerdvana_cli.core.workflow_text import Scope, extract_json, items_of, render, resolve, validate_schema
+from nerdvana_cli.core.delegation.workflow_text import Scope, extract_json, items_of, render, resolve, validate_schema
 
 
 def _parse(text: str) -> Any:

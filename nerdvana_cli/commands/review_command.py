@@ -60,7 +60,7 @@ async def _run_reviewer(prompt: str, model: str, provider: str) -> str:
     from nerdvana_cli.core.config.managed_policy import ManagedPolicyError
     from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
     from nerdvana_cli.core.config.settings import NerdvanaSettings
-    from nerdvana_cli.core.subagent import run_subagent
+    from nerdvana_cli.core.delegation.subagent import run_subagent
 
     settings     = NerdvanaSettings.load()
     settings.cwd = os.getcwd()

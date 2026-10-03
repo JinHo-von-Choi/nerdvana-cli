@@ -6,7 +6,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 
-from nerdvana_cli.core.task_state import TaskRegistry
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.ui.sidebar_sections import (
     SidebarContextSection,
     SidebarFilesSection,

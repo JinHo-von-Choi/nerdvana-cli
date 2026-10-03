@@ -19,10 +19,10 @@ from nerdvana_cli.agents.registry import AgentDefinition
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.subagent import run_subagent
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.subagent import run_subagent
 from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry

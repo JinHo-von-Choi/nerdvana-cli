@@ -13,11 +13,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
+from nerdvana_cli.core.delegation.worktree import WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
 from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import ToolContext
-from nerdvana_cli.core.worktree import WorktreeError, create_worktree, git_dirs, has_changes, remove_worktree
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 
 

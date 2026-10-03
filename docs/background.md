@@ -53,7 +53,7 @@ nerdvana agents clean [--days N]
 
 An id can be shortened to any unique prefix.
 
-`start` writes the record, makes a git worktree when `--worktree` is given (core/worktree.py: a new
+`start` writes the record, makes a git worktree when `--worktree` is given (core/delegation/worktree.py: a new
 branch from `HEAD` in a temporary directory), and starts a monitor in a session of its own, so the
 run goes on when the terminal closes. The monitor runs `nerdvana run --output-format stream-json`
 in its own process group, with the log as its standard output. `--max-cost-usd` becomes the run's

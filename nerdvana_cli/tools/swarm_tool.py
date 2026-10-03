@@ -7,8 +7,8 @@ from functools import partial
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.swarm import SwarmConfig, SwarmTask, run_swarm
-from nerdvana_cli.core.task_state import TaskRegistry
+from nerdvana_cli.core.delegation.swarm import SwarmConfig, SwarmTask, run_swarm
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.types import ToolResult

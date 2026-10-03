@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskStatus
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.types import ToolResult
 

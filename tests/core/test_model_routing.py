@@ -90,7 +90,7 @@ def test_the_categories_section_loads_from_the_config_file(tmp_path: Path, monke
 async def _child_model(settings: NerdvanaSettings, args: object) -> str:
     from unittest.mock import AsyncMock, patch
 
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
     from nerdvana_cli.core.tool import ToolContext
     from nerdvana_cli.tools.agent_tool import AgentTool
 

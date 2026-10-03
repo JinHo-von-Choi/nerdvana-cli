@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from nerdvana_cli.core.delegation.workflow_store import RunStore
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.workflow_store import RunStore
 from nerdvana_cli.main import app
 
 WORKFLOW = """
@@ -71,7 +71,7 @@ def test_run_prints_the_final_output_and_the_run_id(project: Path, monkeypatch: 
         config.cost_usd = 0.01
         return f"FINAL<{config.prompt}>", 5
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     result = _invoke("run", "greet", "--input", "who=Ada", "-i", "mood=calm")
     assert result.exit_code == 0, result.output
     assert "FINAL<Say hello to Ada, feeling calm.>" in result.output
@@ -99,7 +99,7 @@ def test_a_failed_run_exits_1_and_says_how_to_resume_and_resume_continues_it(pro
             raise RuntimeError("provider down")
         return f"done({config.prompt})", 1
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     first = _invoke("run", "two")
     assert first.exit_code == 1 and "provider down" in first.output
     assert "nerdvana workflow run two --resume " in first.output
@@ -131,7 +131,7 @@ def test_the_ceiling_stops_the_run_with_exit_code_3(project: Path, monkeypatch: 
         config.cost_usd = 0.7
         return "x", 1
 
-    monkeypatch.setattr("nerdvana_cli.core.workflow_engine.run_subagent", fake)
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", fake)
     result = _invoke("run", "long", "--max-cost-usd", "1.0")
     assert result.exit_code == 3 and "stopped: run " in result.output and "cost ceiling" in result.output
 

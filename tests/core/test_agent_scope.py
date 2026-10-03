@@ -16,12 +16,12 @@ import pytest
 from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
 from nerdvana_cli.agents.registry import AgentDefinition, AgentTypeRegistry
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.hooks.hooks import HookEngine
 from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.core.safety.agent_scope import apply_write_scope
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy, writable_paths
 from nerdvana_cli.core.subagent_config import SubagentConfig
-from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs

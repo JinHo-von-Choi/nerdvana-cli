@@ -187,7 +187,7 @@ class TestUnknownAgentRejection:
     async def test_unknown_agent_type_returns_error(self):
         """Spawning an unknown agent type must return is_error=True."""
         from nerdvana_cli.core.config.settings import NerdvanaSettings
-        from nerdvana_cli.core.task_state import TaskRegistry
+        from nerdvana_cli.core.delegation.task_state import TaskRegistry
         from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 
         settings = NerdvanaSettings()
@@ -209,7 +209,7 @@ class TestUnknownAgentRejection:
     async def test_known_agent_type_not_rejected(self):
         """Known agent types must NOT be rejected."""
         from nerdvana_cli.core.config.settings import NerdvanaSettings
-        from nerdvana_cli.core.task_state import TaskRegistry
+        from nerdvana_cli.core.delegation.task_state import TaskRegistry
         from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
 
         settings = NerdvanaSettings()

@@ -7,7 +7,7 @@ from typing import Any
 from rich.text import Text
 from textual.widget import Widget
 
-from nerdvana_cli.core.task_state import TaskRegistry, TaskStatus
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskStatus
 from nerdvana_cli.ui.git_status import fetch_porcelain, parse_porcelain
 from nerdvana_cli.ui.task_panel import render_task_row
 

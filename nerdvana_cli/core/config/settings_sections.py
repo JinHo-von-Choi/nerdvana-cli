@@ -29,7 +29,7 @@ class GoalConfig(BaseModel):
 
 
 class WorkflowConfig(BaseModel):
-    # Declarative multi-agent workflows (core/workflow.py); see docs/workflows.md.
+    # Declarative multi-agent workflows (core/delegation/workflow.py); see docs/workflows.md.
     enabled:      bool = False   # offer the Workflow tool to the model (`nerdvana workflow run` always works)
     max_parallel: int  = 4       # agents of one run working at once; never above session.max_parallel_agents
     max_agents:   int  = 50      # most agent runs one `foreach` fan-out may start; a longer list stops the run

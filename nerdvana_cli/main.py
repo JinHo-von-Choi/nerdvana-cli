@@ -241,7 +241,7 @@ def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
 def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outcome: Any) -> tuple[SessionStorage, AgentLoop]:
     """The session and agent loop of a run: a new session, or with ``--resume`` the recorded one with its conversation restored."""
     from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
 
     resumed = resume_session_id(resume) if resume else None
     session = SessionStorage(session_id=resumed, persist=settings.session.persist)

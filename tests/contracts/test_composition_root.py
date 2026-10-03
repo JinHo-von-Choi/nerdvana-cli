@@ -1,6 +1,6 @@
 """The agent loop and the tool registry are built in one place.
 
-``cli/bootstrap.py`` is the composition root; ``core/subagent.py`` builds the
+``cli/bootstrap.py`` is the composition root; ``core/delegation/subagent.py`` builds the
 isolated loop each sub-agent runs in. A call of ``AgentLoop(`` or
 ``create_tool_registry(`` anywhere else in the package must be listed in
 ``ALLOWED``, which may only shrink.
@@ -16,7 +16,7 @@ import ast
 from tests.contracts.import_graph import parsed_sources
 
 BUILDERS: frozenset[str] = frozenset({"AgentLoop", "create_tool_registry"})
-ROOTS:    frozenset[str] = frozenset({"cli/bootstrap.py", "core/subagent.py"})
+ROOTS:    frozenset[str] = frozenset({"cli/bootstrap.py", "core/delegation/subagent.py"})
 
 # (source file relative to the package root, builder name)
 ALLOWED: frozenset[tuple[str, str]] = frozenset()

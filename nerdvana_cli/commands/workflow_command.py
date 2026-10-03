@@ -8,7 +8,7 @@ Date:   2026-10-03
     nerdvana workflow run NAME [--input k=v]... [--max-cost-usd X] [--resume RUN_ID] [--approval-mode MODE]
 
 Exit codes of ``run``: 0 completed, 1 failed, 2 invalid workflow, inputs or configuration, 3 stopped by the
-cost ceiling. The behavior is in ``core/workflow_engine.py``; see docs/workflows.md.
+cost ceiling. The behavior is in ``core/delegation/workflow_engine.py``; see docs/workflows.md.
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from nerdvana_cli.core.workflow import Workflow, WorkflowError, discover, resolve_inputs
-from nerdvana_cli.core.workflow_engine import COMPLETED, STOPPED, RunContext, RunReport, WorkflowRun
-from nerdvana_cli.core.workflow_store import RunStore, new_run_id
+from nerdvana_cli.core.delegation.workflow import Workflow, WorkflowError, discover, resolve_inputs
+from nerdvana_cli.core.delegation.workflow_engine import COMPLETED, STOPPED, RunContext, RunReport, WorkflowRun
+from nerdvana_cli.core.delegation.workflow_store import RunStore, new_run_id
 
 console     = Console()
 err_console = Console(stderr=True)

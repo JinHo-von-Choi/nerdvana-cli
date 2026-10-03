@@ -30,7 +30,7 @@ def _make_registry() -> ToolRegistry:
 
 def _make_meta_registry() -> ToolRegistry:
     """Extend the standard registry with task tools."""
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
     from nerdvana_cli.tools.team_tools import TaskGetTool, TaskStopTool
 
     registry = _make_registry()
@@ -141,7 +141,7 @@ def test_filter_requires_confirmation_includes_taskstop_and_lsp_rename() -> None
     """TaskStop and lsp_rename both set requires_confirmation=True."""
     from unittest.mock import MagicMock
 
-    from nerdvana_cli.core.task_state import TaskRegistry
+    from nerdvana_cli.core.delegation.task_state import TaskRegistry
     from nerdvana_cli.tools.lsp import LspRenameTool
     from nerdvana_cli.tools.team_tools import TaskStopTool
 

@@ -16,8 +16,8 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
 from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.tools.agent_tool import AgentTool, AgentToolArgs
