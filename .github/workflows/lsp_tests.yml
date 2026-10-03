@@ -50,7 +50,7 @@ jobs:
           npm install -g typescript-language-server typescript
 
       - name: Install nerdvana-cli dev deps
-        run: pip install -e ".[dev,mcp]"
+        run: pip install -e ".[dev,mcp,acp,otel,all]"
 
       - name: Run base tests (excluding LSP integration)
         run: pytest tests/ -q -m "not lsp_integration"

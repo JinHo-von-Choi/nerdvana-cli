@@ -402,7 +402,7 @@ class TestEntryPoints:
         assert "10-a.yml" in app._add_chat_message.call_args[0][0]
 
     def test_run_overrides_cannot_loosen_the_policy_and_a_refused_model_ends_the_command(self, managed: Path, tmp_path: Path) -> None:
-        import click
+        import typer
 
         from nerdvana_cli.main import _apply_run_overrides
 
@@ -410,7 +410,7 @@ class TestEntryPoints:
         settings = _settings_with(tmp_path)
         _apply_run_overrides(settings, {"sandbox.mode": "off", "session.max_cost_usd": 0.0}, [])
         assert settings.sandbox.mode == "require"
-        with pytest.raises(click.exceptions.Exit) as caught:
+        with pytest.raises(typer.Exit) as caught:
             _apply_run_overrides(settings, {"model.model": "gpt-4o"}, [])
         assert caught.value.exit_code == 2
 

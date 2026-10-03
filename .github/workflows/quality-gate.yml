@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Resolve dependencies
-        run: uv sync --locked --extra dev --extra mcp
+        run: uv sync --locked --all-extras
 
       - name: Ruff
         run: uv run ruff check nerdvana_cli/ tests/

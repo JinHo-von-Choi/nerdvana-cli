@@ -30,7 +30,7 @@ _ARGUMENT_HINT = "arguments"
 def _block_text(block: Any) -> str:
     """The text a block contributes to the prompt; an image or audio block contributes none."""
     if isinstance(block, TextContentBlock):
-        return block.text
+        return str(block.text)
     if isinstance(block, ResourceContentBlock):
         return f"[{block.name}]({block.uri})"
     if isinstance(block, EmbeddedResourceContentBlock):
