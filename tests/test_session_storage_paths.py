@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 
 
 def test_session_writes_under_nerdvana_not_install_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

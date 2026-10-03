@@ -18,7 +18,7 @@ LIMIT = 600
 KNOWN_LARGE: dict[str, int] = {
     "core/agent_loop.py": 836,
     "tools/file_tools.py": 706,
-    "core/checkpoint.py": 642,
+    "core/state/checkpoint.py": 642,
 }
 
 

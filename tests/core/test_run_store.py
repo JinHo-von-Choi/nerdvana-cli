@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core import run_store
-from nerdvana_cli.core.run_store import (
+from nerdvana_cli.core.state import run_store
+from nerdvana_cli.core.state.run_store import (
     FAILED,
     ORPHANED,
     RUNNING,

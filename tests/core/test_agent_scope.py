@@ -185,7 +185,7 @@ async def test_symbol_edit_tools_are_covered_and_a_preview_is_not_an_edit(tmp_pa
 
 
 def test_the_signals_name_a_refusal_by_scope() -> None:
-    from nerdvana_cli.core.signals import OUT_OF_SCOPE, classify_result
+    from nerdvana_cli.core.state.signals import OUT_OF_SCOPE, classify_result
 
     assert classify_result("Outside this agent's edit scope (tests): src/a.py", True) == [OUT_OF_SCOPE]
 

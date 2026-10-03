@@ -22,7 +22,7 @@ from openai.types.responses import FunctionToolParam, ResponseFunctionToolCall, 
 from openai.types.responses.response_reasoning_item import ResponseReasoningItem, Summary
 from pydantic import TypeAdapter
 
-from nerdvana_cli.core.session import SessionStorage, messages_from_transcript
+from nerdvana_cli.core.state.session import SessionStorage, messages_from_transcript
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
 from nerdvana_cli.providers.errors import RETRYABLE
 from nerdvana_cli.providers.factory import create_provider

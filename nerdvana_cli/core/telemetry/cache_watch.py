@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-from nerdvana_cli.core import signals
+from nerdvana_cli.core.state import signals
 
 logger = logging.getLogger(__name__)
 

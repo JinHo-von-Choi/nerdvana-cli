@@ -24,7 +24,7 @@ from nerdvana_cli.core.provider_recovery import (
     RETRY,
     RecoveryPlanner,
 )
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.providers.errors import (

@@ -158,7 +158,7 @@ class SessionConfig(BaseModel):
     mask_extra_patterns: list[str] = Field(default_factory=list)
     # Model to switch to, once per session, when the run shows trouble ("model" or "provider:model"); empty = never.
     escalation_model: str = ""
-    # Signal name -> how many occurrences trigger the switch (see core/signals.py).
+    # Signal name -> how many occurrences trigger the switch (see core/state/signals.py).
     escalation_signals: dict[str, int] = Field(default_factory=lambda: {"verify_failed": 1, "repeat_refused": 1, "cas_rejected": 3, "new_diagnostics": 4})
     # Tell the model once when it has made this many edits in a row to one file that all failed, or has
     # spent this many turns in a row only reading and searching; 0 turns a check off. Counted as `no_progress`.

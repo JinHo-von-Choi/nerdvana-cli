@@ -35,7 +35,7 @@ from nerdvana_cli.commands.skill_command import skill_app
 from nerdvana_cli.commands.workflow_command import workflow_app
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.session import SessionStorage, resume_session_id
+from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 
@@ -291,7 +291,7 @@ def run(
 
     from nerdvana_cli.cli.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
-    from nerdvana_cli.core.goal import Goal
+    from nerdvana_cli.core.state.goal import Goal
 
     resolved_approval = approval_mode.strip().lower()
     for flag, value, allowed in (

@@ -33,7 +33,7 @@ from acp.schema import (
 from nerdvana_cli import __version__
 from nerdvana_cli.acp.launch import LaunchError, LaunchOptions, settings_for
 from nerdvana_cli.acp.session import AcpSession
-from nerdvana_cli.core.session import SessionStorage, resume_session_id
+from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 
 logger = logging.getLogger(__name__)
 

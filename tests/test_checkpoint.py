@@ -12,7 +12,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from nerdvana_cli.core.checkpoint import (
+from nerdvana_cli.core.state.checkpoint import (
     CheckpointManager,
     StashEntry,
     _is_git_repo,

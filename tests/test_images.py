@@ -25,7 +25,7 @@ from nerdvana_cli.core.images import (
     prompt_content,
     transcript_text,
 )
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.main import app
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider

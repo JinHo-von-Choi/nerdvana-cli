@@ -119,7 +119,7 @@ async def test_agent_tool_passes_definition_prompt_and_turn_limit() -> None:
 @pytest.mark.asyncio
 async def test_role_prompt_reaches_the_child_system_prompt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from nerdvana_cli.core.agent_loop import AgentLoop
-    from nerdvana_cli.core.session import SessionStorage
+    from nerdvana_cli.core.state.session import SessionStorage
     from nerdvana_cli.core.tool import ToolRegistry
 
     seen: list[str] = []

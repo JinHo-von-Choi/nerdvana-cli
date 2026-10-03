@@ -17,10 +17,10 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import ModelConfig, NerdvanaSettings
-from nerdvana_cli.core.goal import Goal
 from nerdvana_cli.core.phase_effort import IMPLEMENTATION, PLANNING, VERIFICATION, phase_level, phases_configured
 from nerdvana_cli.core.plan_gate import draft_plan
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.goal import Goal
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.subagent_config import LoopFactories
 from nerdvana_cli.core.tool import ToolRegistry
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider

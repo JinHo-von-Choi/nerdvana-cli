@@ -23,7 +23,7 @@ import pytest
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context import prompts
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider, with_cache_breakpoints
 from nerdvana_cli.providers.base import ProviderConfig, ProviderName
 from nerdvana_cli.providers.openai_provider import OpenAIProvider
@@ -43,7 +43,7 @@ _VOLATILE = {
 _DIGEST_SCRIPT = """
 import hashlib, json, sys
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.tools.registry import create_tool_registry
 

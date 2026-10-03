@@ -15,7 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nerdvana_cli.core.agent_loop import AgentLoop
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.main import app
 from nerdvana_cli.providers.base import ProviderEvent
 

@@ -11,8 +11,8 @@ from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.model_routing import apply_model_spec, select_model
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
 from nerdvana_cli.core.safety.agent_scope import apply_write_scope
+from nerdvana_cli.core.state.run_store import FAILED, STOPPED, SUCCEEDED, TaskRecorder
 from nerdvana_cli.core.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.task_state import TaskRegistry, TaskState, TaskStatus
@@ -248,7 +248,7 @@ class AgentTool(BaseTool[AgentToolArgs]):
         settle:   Callable[[float], None] | None,
         worktree: Worktree | None,
     ) -> ToolResult:
-        """Run the agent as a task of its own, with a durable record (core/run_store.py) that outlives this process."""
+        """Run the agent as a task of its own, with a durable record (core/state/run_store.py) that outlives this process."""
         task.background = True
         recorder        = TaskRecorder.start(task.id, args.prompt, context.cwd, worktree)
         task.bg_task    = asyncio.get_event_loop().create_task(

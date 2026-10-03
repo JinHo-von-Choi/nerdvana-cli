@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from nerdvana_cli.core.goal import ACTIVE, MET, PAUSED, UNMET, Goal, GoalError, load_goal, save_goal
 from nerdvana_cli.core.safety import sandbox
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
+from nerdvana_cli.core.state.goal import ACTIVE, MET, PAUSED, UNMET, Goal, GoalError, load_goal, save_goal
 from nerdvana_cli.core.verify import run_verify
 
 # ---------------------------------------------------------------------------

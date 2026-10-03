@@ -14,7 +14,7 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, PricingTable
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
@@ -200,7 +200,7 @@ def test_the_new_stop_reasons_map_to_exit_codes() -> None:
 
 
 async def test_the_loop_counts_a_todo_nudge_and_a_provider_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from nerdvana_cli.core import signals
+    from nerdvana_cli.core.state import signals
 
     loop = _loop(monkeypatch, tmp_path, _Once([ProviderEvent(type="done", stop_reason="end_turn")]))
     loop._signals[signals.PROVIDER_RETRY] += 2

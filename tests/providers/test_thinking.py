@@ -17,7 +17,7 @@ import pytest
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.context_budget import message_tokens
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import BaseTool, ToolRegistry
 from nerdvana_cli.providers.anthropic_provider import AnthropicProvider, request_options
 from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
@@ -234,7 +234,7 @@ async def test_ultrawork_rebuilds_the_provider_and_restores_it_afterwards(monkey
 
 
 async def test_a_tool_turn_without_text_is_recorded_with_its_thinking_blocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from nerdvana_cli.core.session import messages_from_transcript
+    from nerdvana_cli.core.state.session import messages_from_transcript
 
     provider = _Script([
         [

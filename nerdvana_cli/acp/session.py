@@ -47,7 +47,7 @@ from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.user_commands import UserCommandLoader
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEvent
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.task_state import TaskRegistry
 from nerdvana_cli.mcp.config import McpServerConfig
 from nerdvana_cli.mcp.manager import McpManager

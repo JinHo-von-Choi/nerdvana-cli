@@ -14,8 +14,8 @@ import pytest
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.goal import ACTIVE, MET, PAUSED, UNMET, Goal, load_goal
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.goal import ACTIVE, MET, PAUSED, UNMET, Goal, load_goal
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.providers.base import ProviderEvent
 from nerdvana_cli.types import ToolResult
@@ -137,7 +137,7 @@ async def test_the_goal_is_saved_and_a_later_loop_for_the_same_session_finds_it(
 async def test_the_todo_guard_comes_before_the_verification(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import json
 
-    from nerdvana_cli.core.todos import todos_dir
+    from nerdvana_cli.core.state.todos import todos_dir
 
     provider = _Script([_say("done"), _say("done again")])
     loop     = _loop(monkeypatch, tmp_path, provider, session_id="todo-first")

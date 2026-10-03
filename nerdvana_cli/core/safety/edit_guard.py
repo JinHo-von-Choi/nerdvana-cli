@@ -13,7 +13,7 @@ from typing import Any
 
 from nerdvana_cli.core.safety.edit_tools import EDIT_PATH_ATTRS, EDIT_TOOL_NAMES
 from nerdvana_cli.core.safety.tool_permission import ask_user_permission, refusal
-from nerdvana_cli.core.signals import OUT_OF_GOAL_SCOPE
+from nerdvana_cli.core.state.signals import OUT_OF_GOAL_SCOPE
 from nerdvana_cli.core.tool import ToolContext
 from nerdvana_cli.types import ToolResult
 

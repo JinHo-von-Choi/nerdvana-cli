@@ -6,8 +6,8 @@ import asyncio
 
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.cancellation import race_abort
-from nerdvana_cli.core.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
-from nerdvana_cli.core.session import SessionStorage
+from nerdvana_cli.core.state.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
+from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.subagent_config import SubagentConfig
 from nerdvana_cli.core.telemetry.analytics import CallOrigin
 from nerdvana_cli.core.tool import ConfirmCallback

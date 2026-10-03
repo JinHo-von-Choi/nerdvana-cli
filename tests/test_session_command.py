@@ -80,7 +80,7 @@ class TestFirstMessageOfRecordedTranscripts:
     """The transcript writer marks an entry's kind with ``type``; older transcripts used ``role``."""
 
     def _recorded(self, tmp_path: Path) -> Path:
-        from nerdvana_cli.core.session import SessionStorage
+        from nerdvana_cli.core.state.session import SessionStorage
         storage = SessionStorage(session_id="rec1", storage_dir=str(tmp_path))
         storage.record_user_message("fix the parser")
         storage.record_assistant_message("looking at it")
@@ -172,7 +172,7 @@ class TestSessionList:
         assert "abc123" in result.output
 
     def test_list_shows_the_preview_of_a_recorded_session(self, tmp_path: Path) -> None:
-        from nerdvana_cli.core.session import SessionStorage
+        from nerdvana_cli.core.state.session import SessionStorage
         storage = SessionStorage(session_id="rec42", storage_dir=str(tmp_path / "sessions"))
         storage.record_user_message("summarize the build log")
         result = self._run(["session", "list"], str(tmp_path))
@@ -181,7 +181,7 @@ class TestSessionList:
         assert "(no preview)" not in result.output
 
     def test_a_preview_with_brackets_is_printed_as_typed(self, tmp_path: Path) -> None:
-        from nerdvana_cli.core.session import SessionStorage
+        from nerdvana_cli.core.state.session import SessionStorage
         storage = SessionStorage(session_id="rec43", storage_dir=str(tmp_path / "sessions"))
         storage.record_user_message("why does [/bold] break the list")
         result = self._run(["session", "list"], str(tmp_path))

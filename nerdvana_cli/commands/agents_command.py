@@ -6,7 +6,7 @@ Date:   2026-10-03
     nerdvana agents start "<prompt>" [--worktree] [--max-cost-usd X] [--key K] [--cwd DIR] [--approval-mode M]
     nerdvana agents list | show ID | attach ID | stop ID | resume ID | clean [--days N]
 
-The behavior behind these commands is in ``cli.supervisor`` and ``core.run_store``; see docs/background.md.
+The behavior behind these commands is in ``cli.supervisor`` and ``core.state.run_store``; see docs/background.md.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from nerdvana_cli.cli.supervisor import SupervisorError, clean_runs, resume_run, start_run, stop_run
-from nerdvana_cli.core.run_store import FINISHED, ORPHANED, RUNNING, RunRecord, RunStore, read_lines
+from nerdvana_cli.core.state.run_store import FINISHED, ORPHANED, RUNNING, RunRecord, RunStore, read_lines
 
 console     = Console()
 err_console = Console(stderr=True)

@@ -105,7 +105,7 @@ A step that fails (an agent error, a failing check, an answer that never validat
 
 ### Cost
 
-The run has one ceiling: `--max-cost-usd`, or `session.max_cost_usd` when that is not given, or the share a session reserves for it when the model calls the tool (`session.subagent_budget_fraction` of what is left). It is tracked with the same envelopes as sub-agents (`core/budget.py`): an agent starts with `1 / max_parallel` of what is left of the ceiling, stops when it has used that, and its actual spend is charged when it finishes, the unused part going back. When nothing is left, or an agent used up its share, no further agent starts and the run ends as `stopped` (exit code 3). Without a ceiling there is no limit.
+The run has one ceiling: `--max-cost-usd`, or `session.max_cost_usd` when that is not given, or the share a session reserves for it when the model calls the tool (`session.subagent_budget_fraction` of what is left). It is tracked with the same envelopes as sub-agents (`core/state/budget.py`): an agent starts with `1 / max_parallel` of what is left of the ceiling, stops when it has used that, and its actual spend is charged when it finishes, the unused part going back. When nothing is left, or an agent used up its share, no further agent starts and the run ends as `stopped` (exit code 3). Without a ceiling there is no limit.
 
 ### Results and resume
 
