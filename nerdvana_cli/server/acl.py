@@ -1,6 +1,6 @@
-"""Role-based ACL for NerdVana MCP server — Phase G1.
+"""Role-based ACL for NerdVana MCP server.
 
-Loads ``~/.nerdvana/mcp_acl.yml`` and enforces per-tool permission checks.
+Loads ``mcp_acl.yml`` from the user data root (``~/.nerdvana`` by default) and enforces per-tool permission checks.
 
 YAML schema:
   roles:
@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
+
+from nerdvana_cli.core import paths
 
 # ---------------------------------------------------------------------------
 # Built-in defaults (v3 §7.2)
@@ -106,11 +108,11 @@ class ACLManager:
     Parameters
     ----------
     acl_path:
-        Path to ``mcp_acl.yml``.  Defaults to ``~/.nerdvana/mcp_acl.yml``.
+        Path to ``mcp_acl.yml``.  Defaults to ``mcp_acl.yml`` in the user data root.
     """
 
     def __init__(self, acl_path: Path | None = None) -> None:
-        self._acl_path: Path = acl_path or Path.home() / ".nerdvana" / "mcp_acl.yml"
+        self._acl_path: Path = acl_path or paths.server_store_path("mcp_acl.yml")
         # role → frozenset of allowed tool names
         self._role_tools: dict[str, frozenset[str]] = {
             k: frozenset(v) for k, v in _DEFAULT_ROLE_TOOLS.items()

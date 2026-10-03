@@ -23,6 +23,9 @@ _USER_SUBDIRS = ("sessions", "skills", "hooks", "agents", "teams", "cache", "log
 # One-shot deprecation flag — emits at most once per process.
 _nerdvana_home_warned: bool = False
 
+# Server store files already reported by server_store_path(), so each warns once.
+_legacy_store_warned: set[Path] = set()
+
 
 def user_data_home() -> Path:
     """Root for all user data.
@@ -116,6 +119,37 @@ def user_cache_dir() -> Path:
     return user_data_home() / "cache"
 
 
+def analytics_db_path() -> Path:
+    """Analytics database path."""
+    return user_data_home() / "analytics.sqlite"
+
+
+def server_store_path(filename: str) -> Path:
+    """Path of a server store file (``mcp_keys.yml``, ``mcp_acl.yml``, ``audit.sqlite``).
+
+    These files used to be created under ``~/.nerdvana`` whatever
+    $NERDVANA_DATA_HOME said. When the file is absent from the data root but
+    present in ``~/.nerdvana``, the existing file is returned and one warning
+    names both locations. Nothing is copied or deleted. Without
+    $NERDVANA_DATA_HOME both locations are the same file, so the data root path
+    is always returned.
+    """
+    current = user_data_home() / filename
+    legacy  = Path.home() / ".nerdvana" / filename
+    if current.exists() or not legacy.exists():
+        return current
+    if legacy not in _legacy_store_warned:
+        _legacy_store_warned.add(legacy)
+        logger.warning(
+            "%s not found in the data root %s; using the existing %s. "
+            "Move it into the data root to stop this warning.",
+            filename,
+            current.parent,
+            legacy,
+        )
+    return legacy
+
+
 def ensure_user_dirs() -> None:
     """Create all user subdirectories if they do not exist. Idempotent."""
     root = user_data_home()
@@ -150,7 +184,7 @@ def legacy_sessions_dir() -> Path:
     """Old install-dir-leaking sessions location.
 
     Legacy: ~/.nerdvana-cli/sessions/
-    This is the source path for the one-shot migration (Task E1).
+    This is the source path for the one-shot migration.
     Writing here corrupts git pull --ff-only.
     """
     return Path.home() / ".nerdvana-cli" / "sessions"
@@ -172,7 +206,7 @@ def project_nirnamd_path(cwd: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Memory helpers (Phase E)
+# Memory helpers
 # ---------------------------------------------------------------------------
 
 def project_memories_dir(cwd: str) -> Path:
@@ -191,7 +225,7 @@ def global_memories_dir() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Phase F: runtime profile paths
+# Runtime profile paths
 # ---------------------------------------------------------------------------
 
 def user_contexts_dir() -> Path:

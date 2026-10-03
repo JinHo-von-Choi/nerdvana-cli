@@ -1,4 +1,4 @@
-"""SQLite audit logger for NerdVana MCP server — Phase G1.
+"""SQLite audit logger for NerdVana MCP server.
 
 Schema:
   CREATE TABLE audit (
@@ -33,6 +33,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+
+from nerdvana_cli.core import paths
 
 Decision = Literal["allowed", "denied", "error"]
 
@@ -90,11 +92,11 @@ class AuditLogger:
     Parameters
     ----------
     db_path:
-        Path to ``audit.sqlite``.  Defaults to ``~/.nerdvana/audit.sqlite``.
+        Path to ``audit.sqlite``.  Defaults to ``audit.sqlite`` in the user data root.
     """
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self._db_path:    Path            = db_path or Path.home() / ".nerdvana" / "audit.sqlite"
+        self._db_path:    Path            = db_path or paths.server_store_path("audit.sqlite")
         self._conn:       sqlite3.Connection | None = None
         self._lock:       threading.Lock  = threading.Lock()
         self._write_count: int            = 0

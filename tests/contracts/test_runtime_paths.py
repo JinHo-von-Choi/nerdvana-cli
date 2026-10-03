@@ -28,17 +28,7 @@ ENV_READ  = "env-read"
 ENV_NAMES = frozenset({"NERDVANA_DATA_HOME", "NERDVANA_HOME", "NERDVANA_CONFIG"})
 
 # (source file relative to the package root, kind)
-ALLOWED: frozenset[tuple[str, str]] = frozenset({
-    ("server/acl.py", HOME_ROOT),
-    ("server/auth.py", HOME_ROOT),
-    ("server/audit.py", HOME_ROOT),
-    ("server/hook_bridge.py", HOME_ROOT),
-    ("server/sanitizer.py", HOME_ROOT),
-    ("core/analytics.py", HOME_ROOT),
-    ("core/analytics.py", ENV_READ),
-    ("commands/cost_command.py", HOME_ROOT),
-    ("commands/cost_command.py", ENV_READ),
-})
+ALLOWED: frozenset[tuple[str, str]] = frozenset()
 
 
 def _is_home_call(node: ast.AST) -> bool:

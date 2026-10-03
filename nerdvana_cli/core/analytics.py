@@ -17,7 +17,6 @@ Classes:
 from __future__ import annotations
 
 import logging
-import os
 import sqlite3
 import threading
 from collections.abc import Generator
@@ -26,6 +25,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from nerdvana_cli.core import paths
 
 logger = logging.getLogger(__name__)
 
@@ -222,10 +223,9 @@ def _connect(db_path: Path) -> Generator[sqlite3.Connection, None, None]:
 
 
 def _default_db_path() -> Path:
-    nerdvana_home = os.environ.get("NERDVANA_DATA_HOME", "").strip()
-    base = Path(nerdvana_home).expanduser() if nerdvana_home else Path.home() / ".nerdvana"
-    base.mkdir(parents=True, exist_ok=True)
-    return base / "analytics.sqlite"
+    path = paths.analytics_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 # ---------------------------------------------------------------------------

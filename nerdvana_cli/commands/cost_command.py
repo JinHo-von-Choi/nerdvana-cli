@@ -13,6 +13,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from nerdvana_cli.core import paths
+
 # ---------------------------------------------------------------------------
 # Time-window parsing
 # ---------------------------------------------------------------------------
@@ -44,14 +46,6 @@ def parse_since(since: str) -> datetime | None:
 # ---------------------------------------------------------------------------
 # Data loading from analytics.sqlite
 # ---------------------------------------------------------------------------
-
-def _analytics_db_path() -> Path:
-    """Mirror the path logic from analytics.py without importing the module."""
-    import os
-    nerdvana_home = os.environ.get("NERDVANA_DATA_HOME", "").strip()
-    base = Path(nerdvana_home).expanduser() if nerdvana_home else Path.home() / ".nerdvana"
-    return base / "analytics.sqlite"
-
 
 def load_usage_rows(
     db_path: Path,
@@ -246,7 +240,7 @@ def build_cost_report(
             "generated_at":   datetime.now(UTC).isoformat(),
         }
 
-    path  = db_path or _analytics_db_path()
+    path  = db_path or paths.analytics_db_path()
     raw   = load_usage_rows(path, cutoff, by)
 
     rows: list[dict[str, Any]] = [

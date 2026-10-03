@@ -1,4 +1,4 @@
-"""Dual-gate sanitizer for hook-injected context — Phase G2 (v3.1 §3.3).
+"""Dual-gate sanitizer for hook-injected context (v3.1 §3.3).
 
 Gate 1 — Blacklist tag: known prompt-injection patterns are wrapped with
     ``<!-- SANITIZED:<pattern_id> -->…<!-- /SANITIZED -->`` (warn, not block).
@@ -37,6 +37,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from nerdvana_cli.core import paths
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -215,11 +217,11 @@ class SanitizerAudit:
     Parameters
     ----------
     db_path:
-        Path to ``audit.sqlite``.  Defaults to ``~/.nerdvana/audit.sqlite``.
+        Path to ``audit.sqlite``.  Defaults to ``audit.sqlite`` in the user data root.
     """
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self._db_path : Path                     = db_path or Path.home() / ".nerdvana" / "audit.sqlite"
+        self._db_path : Path                     = db_path or paths.server_store_path("audit.sqlite")
         self._conn    : sqlite3.Connection | None = None
         self._lock    : threading.Lock            = threading.Lock()
 
