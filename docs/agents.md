@@ -182,6 +182,23 @@ definition) and call it. The bootstrap also hands the loop the factories it
 cannot import from `core`: the sub-agent runner, the sub-agent registry and the
 ToolSearch tool (`LoopFactories` in `nerdvana_cli/core/subagent_config.py`).
 
+The loop keeps the request cycle and hands its other concerns to collaborators
+in `nerdvana_cli/core/`:
+
+| Module | Class or functions | Concern |
+|-|-|-|
+| `run_limits.py` | `RunLimits` | token and cost totals, sub-agent roll-up, the cost and token limits |
+| `model_failover.py` | `ModelFailover` | escalation, retry, fallback, the non-streaming resend, the way back to the prompt's model |
+| `goal_gate.py` | `GoalGate` | the session goal and the verification that decides whether the run may end |
+| `input_queue.py` | `InputQueue` | text typed while the agent works |
+| `rewind.py` | `Rewinder` | prompt marks and `/rewind` |
+| `plan_gate.py` | `plan_for`, `draft_plan` | the planning gate's plan sub-agent |
+| `loop_context.py` | `provider_messages`, `background_reports`, `open_todos_note`, `session_start_context` | messages and prompt text the loop adds around the history |
+
+`ToolExecutor` (`tool_executor.py`) likewise leaves the permission check to
+`PermissionGate` and `ask_user_permission` (`tool_permission.py`) and the edit
+scope, goal scope and pre-edit checkpoint to `edit_guard.py`.
+
 `AgentLoop._loop` (in `nerdvana_cli/core/agent_loop.py`) delegates to four focused helpers:
 
 ```python

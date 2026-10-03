@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from nerdvana_cli.core import agent_loop as agent_loop_module
+from nerdvana_cli.core import model_failover
 from nerdvana_cli.core.agent_loop import AgentLoop
 from nerdvana_cli.core.provider_recovery import (
     COMPACT,
@@ -178,7 +178,7 @@ def _loop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: _Scripted) 
 
     monkeypatch.setattr(AgentLoop, "create_provider_from_settings", _create)
     monkeypatch.setattr(AgentLoop, "build_system_prompt", lambda self: "system")
-    monkeypatch.setattr(agent_loop_module.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(model_failover.asyncio, "sleep", _no_sleep)
     settings                = NerdvanaSettings()
     settings.cwd            = str(tmp_path)
     settings.model.provider = "anthropic"

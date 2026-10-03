@@ -70,7 +70,7 @@ def _loop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **session: Any) -> tu
         switched.append((provider, model))
         settings.model.model = model
 
-    monkeypatch.setattr(loop, "_switch_model", record)
+    monkeypatch.setattr(loop.failover, "switch_model", record)
     return loop, switched
 
 

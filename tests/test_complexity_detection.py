@@ -1,5 +1,5 @@
 """Tests for planning gate complexity detection."""
-from nerdvana_cli.core.agent_loop import _needs_planning
+from nerdvana_cli.core.plan_gate import _needs_planning
 
 
 def test_single_signal_not_complex() -> None:

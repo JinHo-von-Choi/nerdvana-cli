@@ -15,6 +15,7 @@ import pytest
 
 from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.agent_loop import AgentLoop
+from nerdvana_cli.core.plan_gate import draft_plan, plan_for
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.subagent import run_subagent
@@ -73,9 +74,7 @@ def test_a_loop_without_a_tool_search_factory_never_defers(monkeypatch: pytest.M
     assert loop._declared(tools) == tools
 
 
-async def test_the_plan_agent_runs_through_the_injected_runner_with_a_read_only_registry(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
-) -> None:
+async def test_the_plan_agent_runs_through_the_injected_runner_with_a_read_only_registry() -> None:
     seen: list[SubagentConfig] = []
 
     async def _runner(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
@@ -83,17 +82,31 @@ async def test_the_plan_agent_runs_through_the_injected_runner_with_a_read_only_
         return "1. read\n2. change", 0
 
     factories = LoopFactories(run_subagent=_runner, subagent_registry=create_subagent_registry)
-    loop      = _loop(monkeypatch, tmp_path, factories)
-    assert await loop._run_plan_agent("refactor the parser") == "1. read\n2. change"
+    settings  = NerdvanaSettings()
+    settings.session.planning_gate = True
+    assert await draft_plan("refactor the parser", settings, factories) == "1. read\n2. change"
     (config,) = seen
     assert config.name == "Plan" and config.factories is factories
-    assert config.settings.session.planning_gate is False
+    assert config.settings.session.planning_gate is False and settings.session.planning_gate is True
     assert sorted(tool.name for tool in config.registry.all_tools()) == ["Bash", "FileRead", "Glob", "Grep"]
 
 
-async def test_without_a_runner_there_is_no_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    loop = _loop(monkeypatch, tmp_path, None)
-    assert await loop._run_plan_agent("refactor the parser") == ""
+async def test_without_a_runner_there_is_no_plan() -> None:
+    assert await draft_plan("refactor the parser", NerdvanaSettings(), LoopFactories()) == ""
+
+
+async def test_the_gate_drafts_a_plan_only_for_a_complex_prompt_when_it_is_on() -> None:
+    async def _runner(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
+        return "plan", 0
+
+    factories = LoopFactories(run_subagent=_runner, subagent_registry=create_subagent_registry)
+    settings  = NerdvanaSettings()
+    complex_  = "refactor the architecture from scratch"
+    settings.session.planning_gate = False
+    assert await plan_for(complex_, settings, factories) == ""
+    settings.session.planning_gate = True
+    assert await plan_for("rename this function", settings, factories) == ""
+    assert await plan_for(complex_, settings, factories) == "plan"
 
 
 def test_the_tool_context_carries_the_factories_to_agent_and_swarm_tools(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

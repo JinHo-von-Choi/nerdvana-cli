@@ -98,10 +98,10 @@ def test_the_run_result_carries_the_signals() -> None:
 def test_the_phrases_the_classifier_looks_for_still_exist_in_the_code_that_writes_them() -> None:
     import inspect
 
-    from nerdvana_cli.core import tool_executor
+    from nerdvana_cli.core import edit_guard, tool_executor, tool_permission
     from nerdvana_cli.tools import file_tools
 
-    written = inspect.getsource(tool_executor) + inspect.getsource(file_tools)
+    written = "".join(inspect.getsource(module) for module in (tool_executor, tool_permission, edit_guard, file_tools))
     for prefix, _signal in signals._ERROR_PREFIXES:
         assert prefix.rstrip(": ") in written, prefix
     for phrase in (*signals._STALE_PHRASES, "[Note: this exact call has now been made", "New errors reported by the language server after this edit"):

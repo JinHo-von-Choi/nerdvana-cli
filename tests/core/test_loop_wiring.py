@@ -322,7 +322,7 @@ async def test_checkpoint_survives_unreadable_edit_arguments(
     manager  = CheckpointManager(cwd=str(repo), session_id="wiring-hostile")
     executor = _executor([_HostileArgsWriteTool()], checkpoint_manager=manager, cwd=str(repo))
 
-    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.tool_executor"):
+    with caplog.at_level(logging.WARNING, logger="nerdvana_cli.core.edit_guard"):
         results = await executor.run_batch(
             [_call("FileWrite", path="target.py")],
             ToolContext(cwd=str(repo)),

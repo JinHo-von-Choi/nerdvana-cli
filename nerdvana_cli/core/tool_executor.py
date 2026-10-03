@@ -1,8 +1,8 @@
 """Tool batch executor extracted from AgentLoop.
 
-Handles scheduling (parallel read / serial write), permission checking,
-input validation, hook firing, and result serialisation.
-Extracted as part of Phase 0A (T-0A-04).
+Handles scheduling (parallel read / serial write), input validation, hook
+firing, and result serialisation. Permission checks live in tool_permission,
+the edit and goal scopes and the pre-edit checkpoint in edit_guard.
 """
 
 from __future__ import annotations
@@ -13,22 +13,28 @@ import json
 import logging
 import os
 from collections import Counter
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core import paths
-from nerdvana_cli.core.approvals import normalise
 from nerdvana_cli.core.concurrency import RepeatDetector
-from nerdvana_cli.core.edit_tools import EDIT_PATH_ATTRS, EDIT_TOOL_NAMES
-from nerdvana_cli.core.policy import PermissionPolicy, primary_argument
+from nerdvana_cli.core.edit_guard import (
+    applies_edit,
+    capture_checkpoint,
+    check_edit_scope,
+    check_goal_scope,
+    edit_targets,
+)
+from nerdvana_cli.core.edit_tools import EDIT_TOOL_NAMES
+from nerdvana_cli.core.policy import PermissionPolicy
 from nerdvana_cli.core.progress_monitor import ProgressMonitor
 from nerdvana_cli.core.schema_check import validate_arguments
 from nerdvana_cli.core.secrets import MARKER, SecretMasker
-from nerdvana_cli.core.signals import NO_PROGRESS, OUT_OF_GOAL_SCOPE, SECRET_MASKED, classify_result
+from nerdvana_cli.core.signals import NO_PROGRESS, SECRET_MASKED, classify_result
 from nerdvana_cli.core.token_estimator import estimate_tokens
 from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool_permission import PermissionGate, refusal
 from nerdvana_cli.core.untrusted import UntrustedTracker
-from nerdvana_cli.types import PermissionBehavior, ToolResult
+from nerdvana_cli.types import ToolResult
 
 if TYPE_CHECKING:
     from nerdvana_cli.core.analytics import AnalyticsWriter
@@ -72,11 +78,11 @@ class ToolExecutor:
         self._reminder            = reminder
         self._checkpoint_manager  = checkpoint_manager
         self._analytics_writer    = analytics_writer
-        self._policy              = policy or PermissionPolicy()
         self._repeats             = RepeatDetector(exempt=_POLLING_TOOLS)
         self._progress            = ProgressMonitor.from_settings(settings)
         self.signals: Counter[str] = Counter()
         self._untrusted           = UntrustedTracker.from_settings(settings, self.signals)
+        self._permission          = PermissionGate(policy or PermissionPolicy(), self._untrusted, analytics_writer)
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []
@@ -148,11 +154,6 @@ class ToolExecutor:
             self.signals[NO_PROGRESS] += 1
         return results
 
-    @staticmethod
-    def _refusal(tool_id: str, content: str) -> ToolResult:
-        """An error result that tells the model a call was not run, and why."""
-        return ToolResult(tool_use_id=tool_id, content=content, is_error=True)
-
     async def _run_single(
         self,
         tool_use: dict[str, Any],
@@ -178,23 +179,23 @@ class ToolExecutor:
         index = context.state.get("tool_index")
         if index is not None and index.is_unloaded(tool_use["name"]):
             name = tool_use["name"]
-            return self._refusal(tool_use["id"], f"Tool {name} is not loaded yet. Call ToolSearch with query 'select:{name}' first.")
+            return refusal(tool_use["id"], f"Tool {name} is not loaded yet. Call ToolSearch with query 'select:{name}' first.")
         repeats = self._repeats.observe(tool_use["name"], tool_use["input"])
-        parsed_args, refusal = self._check_input(tool_use, tool, repeats)
-        if refusal is not None:
-            return refusal
-        refusal = await self._check_permission(tool_use, tool, parsed_args, context)
-        if refusal is not None:
-            return refusal
-        refusal = self._check_hooks_and_validation(tool_use, tool, parsed_args, context)
-        if refusal is None:
-            refusal = self._check_edit_scope(tool_use, parsed_args, context) or await self._check_goal_scope(tool_use, parsed_args, context)
-        if refusal is not None:
-            return refusal
+        parsed_args, refused = self._check_input(tool_use, tool, repeats)
+        if refused is not None:
+            return refused
+        refused = await self._permission.check(tool_use, tool, parsed_args, context)
+        if refused is not None:
+            return refused
+        refused = self._check_hooks_and_validation(tool_use, tool, parsed_args, context)
+        if refused is None:
+            refused = check_edit_scope(tool_use, parsed_args, context) or await check_goal_scope(tool_use, parsed_args, context, self.signals)
+        if refused is not None:
+            return refused
 
         # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
-        if self._checkpoint_manager is not None and tool_use["name"] in EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
-            self._capture_checkpoint(tool_use["name"], parsed_args)
+        if self._checkpoint_manager is not None and applies_edit(tool_use["name"], parsed_args):
+            capture_checkpoint(self._checkpoint_manager, tool_use["name"], parsed_args)
 
         return await self._execute(tool_use, tool, parsed_args, context, repeats)
 
@@ -206,7 +207,7 @@ class ToolExecutor:
         tool_input = tool_use["input"]
         tool_id    = tool_use["id"]
         if repeats >= _REPEAT_BLOCK:
-            return None, self._refusal(
+            return None, refusal(
                 tool_id,
                 f"Refused: {tool_use['name']} was called {repeats} times in a row with identical "
                 "arguments. Repeating it will not change the outcome; change the approach, or ask "
@@ -218,58 +219,11 @@ class ToolExecutor:
             reject_unknown = getattr(tool, "reject_unknown_args", True),
         )
         if problems:
-            return None, self._refusal(tool_id, f"Invalid tool input: {'; '.join(problems)}")
+            return None, refusal(tool_id, f"Invalid tool input: {'; '.join(problems)}")
         try:
             return tool.parse_args(tool_input), None
         except (TypeError, ValueError) as exc:
-            return None, self._refusal(tool_id, f"Invalid tool input: {exc}")
-
-    async def _check_permission(
-        self,
-        tool_use:    dict[str, Any],
-        tool:        Any,
-        parsed_args: Any,
-        context:     ToolContext,
-    ) -> ToolResult | None:
-        """Apply the permission policy; ask the user when it says so. None means allowed."""
-        tool_id     = tool_use["id"]
-        perm_result = self._policy.decide(tool, tool.check_permissions(parsed_args, context), tool_use["input"])
-        perm_result = self._untrusted.gate(tool, tool_use["input"], perm_result, self._policy.trust_level)
-        if perm_result.behavior == PermissionBehavior.DENY:
-            return self._refusal(tool_id, f"Permission denied: {perm_result.message}")
-        if perm_result.behavior == PermissionBehavior.ASK:
-            granted = await self._ask_user_permission(
-                context   = context,
-                tool_name = tool_use["name"],
-                message   = self._with_preview(tool, parsed_args, context, perm_result.message),
-            )
-            self._record_answer(tool_use, granted)
-            if not granted:
-                return self._refusal(tool_id, f"Permission denied by user: {perm_result.message}")
-        return None
-
-    def _record_answer(self, tool_use: dict[str, Any], granted: bool) -> None:
-        """Keep the user's answer so repeated approvals can be offered as rules (``nerdvana approvals``)."""
-        if self._analytics_writer is None:
-            return
-        with contextlib.suppress(Exception):
-            self._analytics_writer.record_approval(tool_use["name"], normalise(primary_argument(tool_use["name"], tool_use["input"])), granted)
-
-    @staticmethod
-    def _with_preview(tool: Any, parsed_args: Any, context: ToolContext, message: str) -> str:
-        """Append the change a tool would make to *message*, when the tool can compute it.
-
-        Any failure just means no preview: the question is still asked.
-        """
-        preview = getattr(tool, "preview_change", None)
-        if preview is None:
-            return message
-        try:
-            detail = preview(parsed_args, context)
-        except Exception:  # noqa: BLE001
-            logger.debug("no preview for %s", getattr(tool, "name", "?"), exc_info=True)
-            return message
-        return f"{message}\n\n{detail}" if detail else message
+            return None, refusal(tool_id, f"Invalid tool input: {exc}")
 
     def _check_hooks_and_validation(
         self,
@@ -290,24 +244,10 @@ class ToolExecutor:
         )
         for hr in self._hooks.fire(hook_ctx):
             if not hr.allow:
-                return self._refusal(tool_id, f"Blocked by hook: {hr.message}")
+                return refusal(tool_id, f"Blocked by hook: {hr.message}")
         validation_error = tool.validate_input(parsed_args, context)
         if validation_error:
-            return self._refusal(tool_id, f"Validation error: {validation_error}")
-        return None
-
-    def _check_edit_scope(self, tool_use: dict[str, Any], parsed_args: Any, context: ToolContext) -> ToolResult | None:
-        """Refuse an edit outside ``sandbox.edit_scope``; None means allowed or no scope is set."""
-        scope = context.state.get("edit_scope")
-        if scope is None or tool_use["name"] not in EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
-            return None
-        root    = Path(context.cwd).resolve()
-        allowed = [(root / entry).resolve() for entry in scope]
-        for target in self._edit_targets(parsed_args):
-            resolved = (root / target).resolve()
-            if not any(resolved == base or base in resolved.parents for base in allowed):
-                where = ", ".join(scope) if scope else "nowhere"
-                return self._refusal(tool_use["id"], f"Outside this agent's edit scope ({where}): {target}")
+            return refusal(tool_id, f"Validation error: {validation_error}")
         return None
 
     # Tools whose output is not the user's own files: commands and external services. File tools are not
@@ -339,25 +279,6 @@ class ToolExecutor:
             return content
         self.signals[SECRET_MASKED] += masked.count
         return f"{masked.text}\n\n[{masked.count} secret-like value(s) in this output were replaced with {MARKER}]"
-
-    async def _check_goal_scope(self, tool_use: dict[str, Any], parsed_args: Any, context: ToolContext) -> ToolResult | None:
-        """Ask before an edit outside the goal's scope; refuse it when nobody can be asked. None means go ahead.
-
-        A goal's scope says what the work is about. Leaving it is allowed, but a person decides.
-        """
-        scope = context.state.get("goal_scope")
-        if not scope or tool_use["name"] not in EDIT_TOOL_NAMES or not getattr(parsed_args, "apply", True):
-            return None
-        root    = Path(context.cwd).resolve()
-        allowed = [(root / entry).resolve() for entry in scope]
-        outside = [t for t in self._edit_targets(parsed_args) if not any((root / t).resolve() == b or b in (root / t).resolve().parents for b in allowed)]
-        if not outside:
-            return None
-        self.signals[OUT_OF_GOAL_SCOPE] += 1
-        message = f"This edit is outside the goal's scope ({', '.join(scope)}): {', '.join(outside)}"
-        if await self._ask_user_permission(context=context, tool_name=tool_use["name"], message=message):
-            return None
-        return self._refusal(tool_use["id"], f"Permission denied by user: {message}")
 
     async def _execute(
         self,
@@ -404,7 +325,7 @@ class ToolExecutor:
             success     = False
             exc_class   = type(exc).__name__
             result_text = f"Tool execution error: {exc}"
-            return self._refusal(tool_id, result_text)
+            return refusal(tool_id, result_text)
         finally:
             TOOL_OUTPUT_DIR.reset(dir_token)
             self._record_call(tool_use, start_ts, time.perf_counter() - t0, success, exc_class, result_text)
@@ -454,67 +375,6 @@ class ToolExecutor:
             model    if isinstance(model,    str) and model    else None,
         )
 
-    async def _ask_user_permission(
-        self,
-        tool_name: str,
-        message:   str,
-        context:   ToolContext | None = None,
-    ) -> bool:
-        """Prompt the user for explicit confirmation when a tool returns ASK.
-
-        Behaviour:
-        - A front end that supplied ``context.confirm`` (the TUI) decides; the
-          terminal is never touched, because a full-screen app owns it.
-        - Interactive TTY: prints a y/N prompt and reads a single line.
-          Accepts "y" or "yes" (case-insensitive); everything else is DENY.
-          An empty reply defaults to N (fail-safe).
-        - Non-interactive (piped stdin / CI / batch): immediately returns False
-          (DENY) without blocking — safe default prevents unattended approval.
-
-        Returns True only when the user explicitly confirms with y/yes.
-        """
-        import sys
-
-        confirm = getattr(context, "confirm", None)
-        if confirm is not None:
-            try:
-                granted = bool(await confirm(tool_name, message))
-            except Exception:  # noqa: BLE001
-                logger.exception("confirmation front end failed for %s; denying", tool_name)
-                granted = False
-            logger.info("ASK permission for %s via front end: %s", tool_name, "ALLOW" if granted else "DENY")
-            return granted
-
-        prompt_text = (
-            f"\n[permission] {tool_name}: {message}\n"
-            "Allow this action? [y/N] "
-        )
-
-        if not sys.stdin.isatty():
-            # Non-interactive session — fail-safe DENY, never block.
-            logger.info(
-                "ASK permission for %s auto-denied: non-interactive session (no TTY)",
-                tool_name,
-            )
-            return False
-
-        try:
-            # Run blocking input() in a thread so we don't stall the event loop.
-            loop    = asyncio.get_running_loop()
-            reply   = await loop.run_in_executor(None, lambda: input(prompt_text))
-            granted = reply.strip().lower() in {"y", "yes"}
-        except (EOFError, OSError):
-            # stdin closed unexpectedly — treat as DENY.
-            granted = False
-
-        logger.info(
-            "ASK permission for %s: user replied %r → %s",
-            tool_name,
-            reply if "reply" in dir() else "<eof>",
-            "ALLOW" if granted else "DENY",
-        )
-        return granted
-
     def _fire_after_tool(self, call: dict[str, Any], result: ToolResult) -> None:
         """Fire AFTER_TOOL hooks for a completed tool call.
 
@@ -532,43 +392,6 @@ class ToolExecutor:
         for hr in self._hooks.fire(hook_ctx):
             self._pending_injections.extend(hr.inject_messages)
 
-    def _capture_checkpoint(self, tool_name: str, parsed_args: Any) -> None:
-        """Snapshot the files *tool_name* is about to change.
-
-        Passing the edit targets is what arms undo: ``before_edit`` copies
-        nothing when it receives no path. Every failure below is logged instead
-        of suppressed, because an undo facility that captures nothing while
-        appearing armed is the data-loss risk it exists to remove.
-        """
-        if self._checkpoint_manager is None:
-            return
-
-        try:
-            if not getattr(parsed_args, "apply", True):
-                # Preview-only symbol edit: nothing on disk changes.
-                return
-            targets = self._edit_targets(parsed_args)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "checkpoint: could not read the edit targets of %s (%s); "
-                "undo will not cover this edit",
-                tool_name,
-                exc,
-            )
-            return
-
-        if not targets:
-            logger.warning(
-                "checkpoint: %s exposed no edit target; undo will not cover this edit",
-                tool_name,
-            )
-            return
-
-        try:
-            self._checkpoint_manager.before_edit(tool_name, targets)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("checkpoint: capture failed before %s: %s", tool_name, exc)
-
     def _diagnosable_edit(self, tool_name: str, parsed_args: Any, context: ToolContext) -> str | None:
         """Absolute path of the file an edit will change, when diagnostics can check it."""
         if tool_name not in EDIT_TOOL_NAMES or self._lsp_client() is None:
@@ -578,7 +401,7 @@ class ToolExecutor:
             return None
         if not getattr(parsed_args, "apply", True):
             return None
-        targets = self._edit_targets(parsed_args)
+        targets = edit_targets(parsed_args)
         return os.path.join(context.cwd, targets[0]) if targets else None
 
     def _lsp_client(self) -> Any | None:
@@ -620,17 +443,9 @@ class ToolExecutor:
 
     def _note_edit(self, tool_name: str, parsed_args: Any) -> None:
         """Count an applied edit per file (a symbol edit that is only a preview is not one)."""
-        if tool_name in EDIT_TOOL_NAMES and getattr(parsed_args, "apply", True):
+        if applies_edit(tool_name, parsed_args):
             with contextlib.suppress(Exception):  # a counter must never fail the edit it describes
-                self.edited.update(self._edit_targets(parsed_args))
-
-    def _edit_targets(self, parsed_args: Any) -> list[str]:
-        """Return the file paths carried by a parsed edit-tool argument object."""
-        for attr in EDIT_PATH_ATTRS:
-            value = getattr(parsed_args, attr, None)
-            if isinstance(value, str) and value.strip():
-                return [value]
-        return []
+                self.edited.update(edit_targets(parsed_args))
 
     def _record_reminder(self, call: dict[str, Any], result: ToolResult) -> None:
         """Record a completed tool call into the context reminder, if present."""

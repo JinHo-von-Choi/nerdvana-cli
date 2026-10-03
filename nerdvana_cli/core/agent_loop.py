@@ -1,12 +1,13 @@
-"""Core agent loop — the heart of NerdVana CLI.
+"""Core agent loop: the heart of NerdVana CLI.
 
-Orchestrator only (Phase 0A, T-0A-06): delegates tool execution to
-ToolExecutor, recovery hooks to LoopHookEngine, iteration state to LoopState.
+Orchestrator only: tool execution goes to ToolExecutor, recovery hooks to
+LoopHookEngine, iteration state to LoopState, token and cost accounting to
+RunLimits, model switching to ModelFailover, the goal check to GoalGate,
+typed-ahead text to InputQueue and rewinding to Rewinder.
 """
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import json
 import logging
@@ -20,11 +21,20 @@ from rich.console import Console
 from rich.markup import escape
 
 from nerdvana_cli.core import signals
+from nerdvana_cli.core.activity_hooks import register_activity_hooks
 from nerdvana_cli.core.activity_state import ActivityState
 from nerdvana_cli.core.analytics import AnalyticsWriter, CallOrigin, PricingTable
-from nerdvana_cli.core.auto_verify import detect_test_command
 from nerdvana_cli.core.budget import Budget
-from nerdvana_cli.core.cache_watch import CacheWatch
+from nerdvana_cli.core.builtin_hooks import (
+    DirectoryRuleInjector,
+    context_limit_recovery,
+    json_parse_recovery,
+    ralph_loop_check,
+    session_start_context_injection,
+    session_start_memory_hint,
+)
+from nerdvana_cli.core.checkpoint import CheckpointManager
+from nerdvana_cli.core.command_hooks import load_command_hooks
 from nerdvana_cli.core.compact import (
     FALLBACK_PROMPT,
     CompactionState,
@@ -33,35 +43,36 @@ from nerdvana_cli.core.compact import (
     drop_orphan_tool_results,
 )
 from nerdvana_cli.core.context_budget import ContextBudget
-from nerdvana_cli.core.goal import MET, UNMET, Goal, load_goal, save_goal
+from nerdvana_cli.core.context_reminder import ContextReminder
+from nerdvana_cli.core.goal import Goal
+from nerdvana_cli.core.goal_gate import GoalGate
+from nerdvana_cli.core.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.images import prompt_content, transcript_text
+from nerdvana_cli.core.input_queue import InputQueue
+from nerdvana_cli.core.loop_context import background_reports, open_todos_note, provider_messages, session_start_context
 from nerdvana_cli.core.loop_hooks import LoopHookEngine, hook_injection_messages
 from nerdvana_cli.core.loop_state import LoopFlow, LoopState, LoopTurn
+from nerdvana_cli.core.model_failover import ModelFailover
 from nerdvana_cli.core.observation_mask import mask_observations
+from nerdvana_cli.core.plan_gate import plan_for
 from nerdvana_cli.core.policy import PermissionPolicy
-from nerdvana_cli.core.provider_recovery import (
-    COMPACT,
-    FALLBACK,
-    RESEND,
-    RETRY,
-    ProviderCallError,
-    RecoveryPlanner,
-    parse_fallback,
-)
+from nerdvana_cli.core.provider_recovery import ProviderCallError, RecoveryPlanner
+from nerdvana_cli.core.rewind import Rewinder
+from nerdvana_cli.core.run_limits import RunLimits
 from nerdvana_cli.core.sandbox import SandboxPolicy
 from nerdvana_cli.core.session import SessionStorage
 from nerdvana_cli.core.settings import NerdvanaSettings
 from nerdvana_cli.core.skills import SkillLoader
 from nerdvana_cli.core.stream_guard import guarded_stream
-from nerdvana_cli.core.subagent_config import LoopFactories, SubagentConfig
-from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard, describe, load_todos, open_items
+from nerdvana_cli.core.subagent_config import LoopFactories
+from nerdvana_cli.core.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
 from nerdvana_cli.core.tool_executor import ToolExecutor
 from nerdvana_cli.core.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.tool_index import ToolIndex
-from nerdvana_cli.core.verify import run_verify
+from nerdvana_cli.core.user_hooks import load_user_hooks
 from nerdvana_cli.providers.base import ProviderName
-from nerdvana_cli.providers.errors import OTHER, ProviderFailure, classify_exception
+from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.providers.factory import create_provider
 from nerdvana_cli.types import Message, Role, SessionState
 
@@ -86,32 +97,14 @@ CONTEXT_USAGE_PREFIX  = "\x00CTX_USAGE:"
 # going at most this many times per user prompt.
 _MAX_END_TURN_NUDGES = 3
 
-# Longest background task output quoted in a completion notice.
-_BACKGROUND_REPORT_CHARS = 4_000
 COMPACT_STATUS_PREFIX = "\x00COMPACT:"
 
-_COMPLEXITY_SIGNALS: list[str] = [
-    r"리팩터링|refactor", r"새로운\s+(기능|모듈|서비스|시스템)|new\s+(feature|module|service|system)",
-    r"마이그레이션|migration", r"\d+개\s+(파일|클래스|모듈)|\d+\s+(files?|classes?|modules?)",
-    r"아키텍처|architecture|전면\s+개편", r"처음부터|from\s+scratch",
-]
 _ULTRAWORK_PATTERN = re.compile(r"\b(ultrawork|ulw)\b", re.IGNORECASE)
-
-
-def _needs_planning(prompt: str) -> bool:
-    return sum(1 for p in _COMPLEXITY_SIGNALS if re.search(p, prompt, re.IGNORECASE)) >= 2
 
 
 def _is_ultrawork(prompt: str) -> bool:
     return bool(_ULTRAWORK_PATTERN.search(prompt))
 
-
-_VERIFY_FAILED = (
-    "[Verification] `{command}` did not pass ({summary}, attempt {attempt} of {limit}). The end of its output:\n\n"
-    "{tail}\n\n"
-    "The objective is not met until that command exits with status 0. Find the cause and fix it. "
-    "Do not change the verification command or weaken the checks it runs to make it pass."
-)
 
 _WRAP_UP = (
     "[Turn budget] {used} of {limit} turns are used. Stop exploring now and answer with what you have found; "
@@ -122,22 +115,9 @@ _WRAP_UP = (
 class AgentLoop:
     """Orchestrates provider calls, tool execution, and session recording."""
 
-    _queued_input:            list[str]
-    _goal:                    Goal | None
-    _goal_loaded:             bool
-    _auto_goal:               Goal | None
-    _auto_edit_mark:          int
-    _budget:                  Budget | None
-    _tool_index:              ToolIndex | None
-    _escalated:               bool
-    _escalated_to:            tuple[str, str, str, str] | None
-    last_stop:                str
-    turns_used:               int
-    _cost_limit_warned:       bool
-    _usage_input_total:       int
-    _usage_output_total:      int
-    _usage_cache_read_total:  int
-    _usage_cache_write_total: int
+    _tool_index: ToolIndex | None
+    last_stop:   str
+    turns_used:  int
 
     def __init__(
         self,
@@ -169,19 +149,31 @@ class AgentLoop:
         self._on_ask_user         = on_ask_user
         self._on_confirm          = on_confirm
         self.last_thinking:  str  = ""
-        from nerdvana_cli.core.builtin_hooks import (
-            DirectoryRuleInjector,
-            context_limit_recovery,
-            json_parse_recovery,
-            ralph_loop_check,
-            session_start_context_injection,
-            session_start_memory_hint,
-        )
-        from nerdvana_cli.core.checkpoint import CheckpointManager
-        from nerdvana_cli.core.command_hooks import load_command_hooks
-        from nerdvana_cli.core.context_reminder import ContextReminder
-        from nerdvana_cli.core.hooks import HookEngine, HookEvent
-        from nerdvana_cli.core.user_hooks import load_user_hooks
+        self._init_hooks(settings)
+        self._init_history(settings, registry, role_prompt)
+        self.provider             = self.create_provider_from_settings()
+        self._init_execution(settings, pricing_table, analytics_writer)
+        self.input_queue          = InputQueue()
+        self.last_stop            = "completed"
+        self.turns_used           = 0
+        self.goal_gate            = GoalGate(self)
+        self.failover             = ModelFailover(self)
+        self.rewinder             = Rewinder(self)
+        self.loop_hook_engine     = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
+        register_activity_hooks(self)
+
+    def _init_telemetry(self, origin: CallOrigin | None) -> None:
+        """State for attributing requests and counting trouble: who this loop is and what it has seen."""
+        self.origin                = origin or CallOrigin()
+        self.usage_listener:       Callable[[dict[str, Any]], None] | None = None
+        self._last_tool            = ""
+        self._signals: Counter[str] = Counter()
+        # Turn at which the model is told to stop exploring and answer; 0 = never. Sub-agents set it.
+        self.wrap_up_at            = 0
+        self._tool_index           = None
+
+    def _init_hooks(self, settings: NerdvanaSettings) -> None:
+        """The hook bus with the built-in recovery hooks, then the user's and the project's own."""
         self.hooks = HookEngine()
         self.hooks.register(HookEvent.SESSION_START, session_start_context_injection)
         self.hooks.register(HookEvent.SESSION_START, session_start_memory_hint)
@@ -192,6 +184,9 @@ class AgentLoop:
         self.hooks.register(HookEvent.AFTER_TOOL, self._dir_rules.handle)
         self._user_hook_paths = load_user_hooks(self.hooks, settings)
         self._command_hooks   = load_command_hooks(self.hooks, settings)
+
+    def _init_history(self, settings: NerdvanaSettings, registry: ToolRegistry, role_prompt: str) -> None:
+        """Skills, reminders, compaction and the per-session context the history is built with."""
         self.skill_loader = self._skill_loader_for(registry, settings)
         self._active_skill: str | None = None
         self._role_prompt = role_prompt
@@ -206,37 +201,33 @@ class AgentLoop:
         self._session_started = False; self._sticky_session_context = ""  # noqa: E702
         self._git_snapshot: dict[str, str] | None = None
         self._session_ended   = False
-        self.provider         = self.create_provider_from_settings()
+
+    def _init_execution(self, settings: NerdvanaSettings, pricing_table: PricingTable | None, analytics_writer: AnalyticsWriter | None) -> None:
+        """Checkpoints, accounting, the permission policy and the tool executor."""
         _cp_cfg = getattr(settings, "checkpoint", None)
-        _cp_enabled = _cp_cfg.enabled if _cp_cfg is not None else True
-        _cp_max     = _cp_cfg.per_session_max if _cp_cfg is not None else 50
         self._checkpoint_manager = CheckpointManager(
             cwd             = settings.cwd or ".",
             session_id      = getattr(self.session, "session_id", "default"),
-            per_session_max = _cp_max,
-            enabled         = _cp_enabled,
+            per_session_max = _cp_cfg.per_session_max if _cp_cfg is not None else 50,
+            enabled         = _cp_cfg.enabled if _cp_cfg is not None else True,
         )
-        self._pricing_table     = pricing_table or PricingTable()
-        self._analytics_writer  = analytics_writer or AnalyticsWriter(pricing_table=self._pricing_table)
+        self.limits            = RunLimits(settings, self._signals, pricing_table, analytics_writer)
+        self._analytics_writer = self.limits.analytics_writer
         self._analytics_writer.start_session(
             session_id = self.session.session_id,
-            mode       = self.settings.model.provider or None,
-            context    = self.settings.cwd or None,
+            mode       = settings.model.provider or None,
+            context    = settings.cwd or None,
         )
-        self._reset_run_counters()
-        self.policy        = PermissionPolicy.from_settings(self.settings)
+        self.policy        = PermissionPolicy.from_settings(settings)
         self.tool_executor = ToolExecutor(
             registry            = self.registry,
             hooks               = self.hooks,
-            settings            = self.settings,
+            settings            = settings,
             reminder            = self._reminder,
             checkpoint_manager  = self._checkpoint_manager,
             analytics_writer    = self._analytics_writer,
             policy              = self.policy,
         )
-        self.loop_hook_engine = LoopHookEngine(hooks=self.hooks, settings=self.settings, registry=self.registry)
-        from nerdvana_cli.core.activity_hooks import register_activity_hooks
-        register_activity_hooks(self)
 
     def _set_activity(self, **kwargs: Any) -> None:
         """Mutate self.activity_state and notify subscribers."""
@@ -263,15 +254,8 @@ class AgentLoop:
         current.output_tokens         = usage.get("output_tokens", 0)
         current.cache_read_tokens     = usage.get("cache_read_tokens", 0)
         current.cache_creation_tokens = usage.get("cache_write_tokens", 0)
-        self._usage_input_total       += current.input_tokens
-        self._usage_output_total      += current.output_tokens
-        self._usage_cache_read_total  += current.cache_read_tokens
-        self._usage_cache_write_total += current.cache_creation_tokens
         origin = replace(self.origin, turn=self.turns_used, last_tool=self._last_tool)
-        cost   = self._analytics_writer.record_api_call(self.settings.model.provider, self.settings.model.model, usage, origin)
-        self._cost_total += cost
-        if self._cache_watch.observe(self.settings.model.model, usage, self.signal_summary()):
-            self._signals[signals.CACHE_MISS] += 1
+        cost   = self.limits.record(usage, origin, self.signal_summary)
         if self.usage_listener is not None:
             self.usage_listener({
                 **usage, "provider": self.settings.model.provider, "model": self.settings.model.model,
@@ -283,89 +267,24 @@ class AgentLoop:
     @property
     def budget(self) -> Budget:
         """The session's cost limit as shared with its sub-agents (rebuilt when the limit changes)."""
-        limit = self.settings.session.max_cost_usd
-        if self._budget is None or self._budget.limit != limit:
-            self._budget = Budget(limit=limit)
-        return self._budget
+        return self.limits.budget
 
     @property
     def goal(self) -> Goal | None:
         """The goal this session is held to, loaded from its file the first time it is asked for."""
-        if not self._goal_loaded:
-            self._goal        = load_goal(self.session.session_id)
-            self._goal_loaded = True
-        return self._goal
+        return self.goal_gate.goal
 
     def set_goal(self, goal: Goal | None) -> None:
         """Hold the session to *goal* (None drops it) and save the change."""
-        self._goal        = goal
-        self._goal_loaded = True
-        save_goal(self.session.session_id, goal)
+        self.goal_gate.set_goal(goal)
 
     def verification_summary(self) -> dict[str, Any] | None:
         """How the goal stands, for the run result; None when the session has no goal."""
-        goal = self.goal or self._auto_goal
-        if goal is None:
-            return None
-        return {"command": goal.verify, "status": goal.status, "attempts": goal.attempts, "last_exit": goal.last_exit}
+        return self.goal_gate.summary()
 
     def _sandbox_policy(self) -> SandboxPolicy:
         """The sandbox policy of this loop, from its settings."""
         return SandboxPolicy.from_config(self.settings.sandbox, self.settings.secrets.proxy_credentials)
-
-    def _edit_count(self) -> int:
-        """How many edits the edit tools have applied in this session so far."""
-        return sum(self.tool_executor.edited.values())
-
-    def _completion_goal(self) -> Goal | None:
-        """The goal that must be met before the run may end: the session's own, else the detected-test check.
-
-        Without a goal and with ``goal.auto_verify`` on, a run that has changed files since the last
-        passing check is held to the project's test command; none detected means no check.
-        """
-        if self.goal is not None:
-            return self.goal if self.goal.enforced else None
-        if not self.settings.goal.auto_verify or self._edit_count() <= self._auto_edit_mark:
-            return None
-        if self._auto_goal is not None and self._auto_goal.enforced:
-            return self._auto_goal
-        command = detect_test_command(self.settings.cwd or ".")
-        if not command:
-            return None
-        self._auto_goal = Goal("Keep the project's tests passing", command, max_attempts=self.settings.goal.max_attempts)
-        return self._auto_goal
-
-    async def _verify_goal(self, flow: LoopFlow, goal: Goal) -> AsyncGenerator[str, None]:
-        """Run the verification command of *goal* now that the model says it is done.
-
-        A pass ends the run; running out of attempts ends it as unmet; otherwise the failure is put in
-        front of the model and the run goes on (``flow.finished`` stays False).
-        """
-        config = self.settings.goal
-        yield f"\n[dim]Verifying: {escape(goal.verify)}[/dim]\n"
-        result = await run_verify(
-            goal.verify, self.settings.cwd or ".", timeout=config.verify_timeout, tail=config.output_tail_chars,
-            policy=self._sandbox_policy(),
-        )
-        result = replace(result, tail=self.tool_executor.mask_text(result.tail))
-        goal.record_attempt(result.passed, result.exit_code, result.tail)
-        if goal is self.goal:
-            save_goal(self.session.session_id, goal)
-        if goal.status == MET:
-            self._auto_edit_mark = self._edit_count()
-            yield f"[green]Goal met: {escape(goal.verify)} passed ({result.summary()}).[/green]\n"
-            flow.finished = True
-            return
-        self._signals[signals.VERIFY_FAILED] += 1
-        if goal.status == UNMET:
-            self.last_stop = "goal_unmet"
-            flow.finished  = True
-            yield f"[bold yellow]Goal not met after {goal.attempts} verification attempts ({result.summary()}). Stopping.[/bold yellow]\n"
-            return
-        yield f"[yellow]Verification failed ({result.summary()}); the agent continues.[/yellow]\n"
-        self.state.messages.append(Message(role=Role.USER, content=_VERIFY_FAILED.format(
-            command=goal.verify, summary=result.summary(), attempt=goal.attempts, limit=goal.max_attempts, tail=result.tail.strip(),
-        )))
 
     def signal_summary(self) -> dict[str, int]:
         """How often each kind of trouble came up in this session (see ``core/signals.py``)."""
@@ -373,151 +292,30 @@ class AgentLoop:
 
     def usage_summary(self) -> dict[str, int]:
         """Token totals for every provider request made so far in this session."""
-        return {
-            "input_tokens":       self._usage_input_total,
-            "output_tokens":      self._usage_output_total,
-            "cache_read_tokens":  self._usage_cache_read_total,
-            "cache_write_tokens": self._usage_cache_write_total,
-        }
-
-    def _over_cost_limit(self) -> str:
-        """The stop notice when ``session.max_cost_usd`` is spent, else an empty string."""
-        limit = self.settings.session.max_cost_usd
-        if limit <= 0:
-            return ""
-        spent = self.total_cost_usd()
-        if spent < limit:
-            return ""
-        return f"\n[bold yellow]Cost limit reached (${spent:.4f} of ${limit:.2f}). Stopping.[/bold yellow]"
-
-    async def _plan_first(self, prompt: str) -> AsyncGenerator[str, None]:
-        """When the planning gate asks for it, have a plan drafted and put in front of the model."""
-        if self.settings.session.planning_gate and _needs_planning(prompt):
-            plan = await self._run_plan_agent(prompt)
-            if plan:
-                yield f"\n[Plan]\n{plan}\n[/Plan]\n"
-                self.state.messages.append(Message(role=Role.USER, content=f"[Auto-generated plan]\n{plan}"))
-
-    def _checkpoint_depth(self) -> int:
-        """How many file checkpoints this session has (0 where there is no git repository)."""
-        with contextlib.suppress(Exception):
-            return sum(1 for c in self._checkpoint_manager.list_checkpoints() if c.kind == "snapshot")
-        return 0
-
-    def rewind(self, prompts: int = 1) -> str:
-        """Go back before the last *prompts* prompts: drop their messages and undo the edits they made.
-
-        Files come back through the checkpoints taken before each edit, so only edits made by the edit
-        tools are undone (not what a shell command changed). A compaction since a prompt ends how far back
-        this can go. The session transcript records the rewind so a resumed session agrees.
-        """
-        if not self._turn_marks:
-            return "Nothing to rewind: no earlier prompt is available (compaction or a reset ends how far back it goes)."
-        prompts = min(max(prompts, 1), len(self._turn_marks))
-        index, depth = self._turn_marks[-prompts]
-        del self._turn_marks[-prompts:]
-        undone = 0
-        while self._checkpoint_depth() > depth and "Undone" in self._checkpoint_manager.undo():
-            undone += 1
-        removed = len(self.state.messages) - index
-        del self.state.messages[index:]
-        self.session.record_system("rewind", {"prompts": prompts})
-        self._context_budget.reset()
-        return f"Rewound {prompts} prompt(s): {removed} message(s) removed, {undone} edit(s) undone."
-
-    def _maybe_escalate(self) -> str:
-        """Switch to ``session.escalation_model`` once, when the run's signals reach their thresholds.
-
-        Returns the notice to show, or an empty string when nothing changed. The thinking blocks kept on
-        earlier assistant messages belong to the model that wrote them, so they are dropped on a switch.
-        """
-        session = self.settings.session
-        if self._escalated or not session.escalation_model:
-            return ""
-        reason = signals.escalation_reason(self.signal_summary(), session.escalation_signals)
-        if not reason:
-            return ""
-        self._escalated = True
-        from nerdvana_cli.providers.factory import resolve_api_key
-
-        provider, model = parse_fallback(session.escalation_model)
-        if provider and provider != self.settings.model.provider and not resolve_api_key(ProviderName(provider)):
-            logger.warning("escalation to %s skipped: no credential for provider %s", session.escalation_model, provider)
-            return ""
-        self._signals[signals.ESCALATED] += 1
-        self._switch_model(provider, model)
-        self._escalated_to = self._model_state()
-        for message in self.state.messages:
-            message.provider_blocks = []
-        return f"\n[bold yellow][Escalating to {self.settings.model.provider}:{model}: {reason}][/bold yellow]\n"
-
-    def _init_telemetry(self, origin: CallOrigin | None) -> None:
-        """State for attributing requests and counting trouble: who this loop is and what it has seen."""
-        self.origin                = origin or CallOrigin()
-        self.usage_listener:       Callable[[dict[str, Any]], None] | None = None
-        self._last_tool            = ""
-        self._signals: Counter[str] = Counter()
-        self._cache_watch          = CacheWatch()
-        # Turn at which the model is told to stop exploring and answer; 0 = never. Sub-agents set it.
-        self.wrap_up_at            = 0
-        self._goal                 = None
-        self._goal_loaded          = False
-        self._auto_goal            = None
-        self._auto_edit_mark       = 0
-        self._budget               = None
-        self._tool_index           = None
-        self._escalated            = False
-        self._escalated_to         = None
-        self._turn_marks: list[tuple[int, int]] = []   # per prompt: (messages before it, checkpoints before it)
-
-    def _over_token_limit(self) -> str:
-        """The stop notice when ``session.max_total_tokens`` is used up, else an empty string."""
-        limit = self.settings.session.max_total_tokens
-        used  = self._usage_input_total + self._usage_output_total
-        if limit <= 0 or used < limit:
-            return ""
-        return f"\n[bold yellow]Token limit reached ({used:,} of {limit:,}). Stopping.[/bold yellow]"
-
-    def _cost_limit_unenforceable(self) -> bool:
-        """True once per loop when a cost limit is set but the model has no known price."""
-        if self._cost_limit_warned or self.settings.session.max_cost_usd <= 0:
-            return False
-        provider = self.settings.model.provider or ""
-        model    = self.settings.model.model or ""
-        if self._pricing_table.has_price(provider, model):
-            return False
-        self._cost_limit_warned = True
-        logger.warning("cost limit set but %s/%s has no price; only the turn limit applies", provider, model)
-        return True
+        return self.limits.usage_summary()
 
     def session_cost_usd(self) -> float:
         """Estimated USD cost of every provider request this session made itself, each priced for the model that served it."""
-        return self._cost_total
-
-    def absorb_subagent(self, usage: dict[str, int], signal_counts: dict[str, int]) -> None:
-        """Add a finished sub-agent's token totals and signal counts to this session's own."""
-        self._usage_input_total       += usage.get("input_tokens", 0)
-        self._usage_output_total      += usage.get("output_tokens", 0)
-        self._usage_cache_read_total  += usage.get("cache_read_tokens", 0)
-        self._usage_cache_write_total += usage.get("cache_write_tokens", 0)
-        self._signals.update(signal_counts)
+        return self.limits.cost_usd
 
     def total_cost_usd(self) -> float:
         """What the session spent: its own requests plus what its finished sub-agents spent."""
-        return self._cost_total + self.budget.spent
+        return self.limits.total_cost_usd()
 
-    def _record_session_totals(self) -> None:
-        """Refresh the analytics session row with cumulative tokens and cost.
+    def absorb_subagent(self, usage: dict[str, int], signal_counts: dict[str, int]) -> None:
+        """Add a finished sub-agent's token totals and signal counts to this session's own."""
+        self.limits.absorb_subagent(usage, signal_counts)
 
-        Called at the end of every turn: the loop has no shutdown of its own,
-        so the row is kept current rather than written once at exit.
-        """
-        self._analytics_writer.end_session(
-            token_total        = self._usage_input_total + self._usage_output_total,
-            cost_total         = self.session_cost_usd(),
-            cache_read_tokens  = self._usage_cache_read_total,
-            cache_write_tokens = self._usage_cache_write_total,
-        )
+    async def _plan_first(self, prompt: str) -> AsyncGenerator[str, None]:
+        """When the planning gate asks for it, have a plan drafted and put in front of the model."""
+        plan = await plan_for(prompt, self.settings, self._factories)
+        if plan:
+            yield f"\n[Plan]\n{plan}\n[/Plan]\n"
+            self.state.messages.append(Message(role=Role.USER, content=f"[Auto-generated plan]\n{plan}"))
+
+    def rewind(self, prompts: int = 1) -> str:
+        """Go back before the last *prompts* prompts: drop their messages and undo the edits they made."""
+        return self.rewinder.rewind(prompts)
 
     def _fire_before_api_call(self, tools: list[Any]) -> bool:
         """Run BEFORE_API_CALL handlers just before a provider request goes out.
@@ -525,7 +323,6 @@ class AgentLoop:
         Returns True when a handler injected messages, in which case the caller
         rebuilds the provider payload so the injection reaches this same call.
         """
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
         ctx = HookContext(
             event    = HookEvent.BEFORE_API_CALL,
             settings = self.settings,
@@ -552,39 +349,25 @@ class AgentLoop:
             thinking_budget=self.settings.model.thinking_budget, show_thinking=self.settings.model.show_thinking,
             reasoning_effort=self.settings.model.reasoning_effort, openai_api=self.settings.model.openai_api, gemini_api=self.settings.model.gemini_api)
 
-    def _reset_run_counters(self) -> None:
-        """Zero the stop status, the typed-ahead queue and the session's usage totals."""
-        self._queued_input            = []
-        self.last_stop                = "completed"
-        self.turns_used               = 0
-        self._cost_limit_warned       = False
-        self._usage_input_total       = 0
-        self._usage_output_total      = 0
-        self._usage_cache_read_total  = 0
-        self._usage_cache_write_total = 0
-        self._cost_total              = 0.0
-
     def queue_input(self, text: str) -> None:
         """Hold text the user typed while the agent was working.
 
         It reaches the model at the start of the next step, after any tool results
         already in the history, or becomes the next prompt when the run ends first.
         """
-        if text.strip():
-            self._queued_input.append(text)
+        self.input_queue.put(text)
 
     def has_queued_input(self) -> bool:
         """True when typed-ahead text is waiting for the model."""
-        return bool(self._queued_input)
+        return self.input_queue.pending()
 
     def take_queued_input(self) -> list[str]:
         """Return and clear the typed-ahead text."""
-        taken, self._queued_input = self._queued_input, []
-        return taken
+        return self.input_queue.take()
 
     def _inject_queued_input(self) -> None:
         """Put typed-ahead text into the history as user messages, in the order typed."""
-        for text in self.take_queued_input():
+        for text in self.input_queue.take():
             self.state.messages.append(Message(role=Role.USER, content=text))
             self.session.record_user_message(text)
 
@@ -602,7 +385,6 @@ class AgentLoop:
         if not self._session_started or self._session_ended:
             return
         self._session_ended = True
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
         self.hooks.fire(HookContext(
             event    = HookEvent.SESSION_END,
             settings = self.settings,
@@ -611,11 +393,11 @@ class AgentLoop:
         ))
 
     def reset_session(self) -> None:
-        self._queued_input = []
+        self.input_queue.take()
         self.close_session("reset")
         self._session_started = False; self._sticky_session_context = ""; self.state.messages.clear()  # noqa: E702
         self._git_snapshot = None
-        self._turn_marks.clear()
+        self.rewinder.marks.clear()
         self._dir_rules.reset()
         self._context_budget.reset()
         self.skill_loader.reset_activations()
@@ -659,22 +441,12 @@ class AgentLoop:
     def deactivate_skill(self) -> None: self._active_skill = None  # noqa: E704
 
     def _to_provider_messages(self) -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
-        for msg in self.state.messages:
-            if msg.role == Role.USER:
-                out.append({"role": "user", "content": msg.content})
-            elif msg.role == Role.ASSISTANT:
-                d = {"role": "assistant", "content": msg.content, **({"tool_uses": msg.tool_uses} if msg.tool_uses else {})}
-                if msg.provider_blocks:
-                    d["provider_blocks"] = msg.provider_blocks
-                out.append(d)
-            elif msg.role == Role.TOOL:
-                out.append({"role": "tool", "content": msg.content, "tool_use_id": msg.tool_use_id or "", "is_error": msg.is_error})
-        return out
+        """The history in the form the provider takes."""
+        return provider_messages(self.state.messages)
 
     async def run(self, prompt: str, images: list[dict[str, Any]] | None = None) -> AsyncGenerator[str, None]:
         """Submit a prompt (with image blocks, see core/images.py) and run the agent loop until completion."""
-        self._turn_marks.append((len(self.state.messages), self._checkpoint_depth()))
+        self.rewinder.mark()
         async for note in self._plan_first(prompt):
             yield note
 
@@ -699,23 +471,7 @@ class AgentLoop:
         if not self._session_started:
             self._session_started = True
             self._session_ended   = False
-            from nerdvana_cli.core.context_snapshot import collect_snapshot, format_snapshot
-            from nerdvana_cli.core.hooks import HookContext, HookEvent
-            _p: list[str] = []
-            try:
-                _s = format_snapshot(await collect_snapshot(self.settings.cwd or "."))
-                if _s.strip():
-                    _p.append(_s)
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("context snapshot skipped: %s", exc)
-            for _hr in self.hooks.fire(HookContext(event=HookEvent.SESSION_START, settings=self.settings, tools=tools)):
-                if _hr.system_prompt_append:
-                    _p.append(_hr.system_prompt_append)
-                for _m in _hr.inject_messages:
-                    if _m.get("content"):
-                        _p.append(str(_m["content"]))
-            if _p:
-                self._sticky_session_context = "\n\n".join(_p)
+            self._sticky_session_context = await session_start_context(self.settings, self.hooks, tools)
         if self._sticky_session_context:
             system_prompt += f"\n\n{self._sticky_session_context}"
         if self._role_prompt:
@@ -729,24 +485,7 @@ class AgentLoop:
             if self.settings.model.extended_thinking != original_et:
                 self.settings.model.extended_thinking = original_et
                 self.provider = self.create_provider_from_settings()
-            self._record_session_totals()
-
-    async def _run_plan_agent(self, prompt: str) -> str:
-        """The plan a read-only sub-agent drafts for *prompt*; empty when the loop cannot start sub-agents."""
-        run_subagent, registry_for = self._factories.run_subagent, self._factories.subagent_registry
-        if run_subagent is None or registry_for is None:
-            return ""
-        child = self.settings.model_copy(deep=True)
-        child.session.planning_gate = False
-        reg = registry_for(settings=child, allowed_tools=["Glob", "Grep", "FileRead", "Bash"])
-        cfg = SubagentConfig(agent_id="plan_agent", name="Plan", max_turns=20,
-                             prompt=f"Create an implementation plan for the following task:\n\n{prompt}",
-                             settings=child, registry=reg, factories=self._factories)
-        try:
-            output, _ = await run_subagent(cfg, asyncio.Event())
-            return output
-        except Exception as exc:  # noqa: BLE001
-            return f"[plan agent error] {exc}"
+            self.limits.record_session_totals()
 
     async def _maybe_compact_messages(self, cur_toks: int, thr: int) -> AsyncGenerator[str, None]:
         """Compress message history when the token threshold is exceeded.
@@ -756,7 +495,7 @@ class AgentLoop:
         AI compaction returns None or the circuit breaker is open.
         """
         before = len(self.state.messages)
-        self._turn_marks.clear()   # compaction rewrites the history the marks point into
+        self.rewinder.marks.clear()   # compaction rewrites the history the marks point into
         self._signals[signals.COMPACTION] += 1
         if not self._compaction_state.is_circuit_open:
             yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."
@@ -770,36 +509,30 @@ class AgentLoop:
                 self.state.messages = [summary] + recent
                 self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
                 self._context_budget.reset()
-                self._keep_todos_in_view()
+                self.state.messages.extend(open_todos_note(self.session.session_id))
                 yield f"{COMPACT_STATUS_PREFIX}done"
                 return
         self.state.messages = drop_orphan_tool_results(compact_messages(self.state.messages, thr))
         self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
         self._context_budget.reset()
-        self._keep_todos_in_view()
+        self.state.messages.extend(open_todos_note(self.session.session_id))
 
-    def _report_background_tasks(self) -> None:
-        """Tell the model about background tasks that finished since it last looked."""
-        registry = self._task_registry
-        if registry is None or not hasattr(registry, "drain_unreported"):
-            return
-        for task in registry.drain_unreported():
-            body = task.output if task.output else (task.error or "")
-            if len(body) > _BACKGROUND_REPORT_CHARS:
-                body = body[:_BACKGROUND_REPORT_CHARS] + f"\n... [cut; TaskGet {task.id} returns the full output]"
-            self.state.messages.append(Message(
-                role    = Role.USER,
-                content = f"[Background task {task.id} {task.status}] {task.description}\n{body}",
-            ))
-
-    def _keep_todos_in_view(self) -> None:
-        """After compaction, restate the open todo items the summary may have lost."""
-        pending = open_items(load_todos(self.session.session_id))
-        if pending:
-            self.state.messages.append(Message(
-                role    = Role.USER,
-                content = f"Open todo items (kept across compaction):\n{describe(pending)}",
-            ))
+    def _fire_after_api_call(self, stop_reason: str, extra: dict[str, Any]) -> bool:
+        """Run AFTER_API_CALL hooks for *stop_reason*; True when one of them injected messages."""
+        ctx = HookContext(
+            event       = HookEvent.AFTER_API_CALL,
+            settings    = self.settings,
+            tools       = self.registry.all_tools(),
+            messages    = self.state.messages,
+            stop_reason = stop_reason,
+            extra       = {"agent_loop": self, **extra},
+        )
+        injected = False
+        for hr in self.hooks.fire(ctx):
+            for msg in hr.inject_messages:
+                self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
+                injected = True
+        return injected
 
     def _handle_max_tokens_stop(self) -> bool:
         """Run AFTER_API_CALL hooks with stop_reason='max_tokens'.
@@ -808,21 +541,7 @@ class AgentLoop:
         continue the loop); False if no recovery is available (caller should
         terminate).
         """
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
-        ctx = HookContext(
-            event       = HookEvent.AFTER_API_CALL,
-            settings    = self.settings,
-            tools       = self.registry.all_tools(),
-            messages    = self.state.messages,
-            stop_reason = "max_tokens",
-            extra       = {"agent_loop": self},
-        )
-        recovered = False
-        for hr in self.hooks.fire(ctx):
-            for msg in hr.inject_messages:
-                self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
-                recovered = True
-        return recovered
+        return self._fire_after_api_call("max_tokens", {})
 
     def _handle_end_turn_stop(self, asst_text: str, thinking_buffer: str, provider_blocks: list[dict[str, Any]] | None = None) -> bool:
         """Finalize the assistant turn and run AFTER_API_CALL hooks.
@@ -835,21 +554,7 @@ class AgentLoop:
         if asst_text:
             self.state.messages.append(Message(role=Role.ASSISTANT, content=asst_text, provider_blocks=list(provider_blocks or [])))
             self.session.record_assistant_message(asst_text, provider_blocks=provider_blocks)
-        from nerdvana_cli.core.hooks import HookContext, HookEvent
-        ctx = HookContext(
-            event       = HookEvent.AFTER_API_CALL,
-            settings    = self.settings,
-            tools       = self.registry.all_tools(),
-            messages    = self.state.messages,
-            stop_reason = "end_turn",
-            extra       = {"agent_loop": self, "asst_text": asst_text},
-        )
-        injected = False
-        for hr in self.hooks.fire(ctx):
-            for msg in hr.inject_messages:
-                self.state.messages.append(Message(role=Role.USER, content=msg["content"]))
-                injected = True
-        return injected
+        return self._fire_after_api_call("end_turn", {"asst_text": asst_text})
 
     async def _handle_tool_use_stop(
         self,
@@ -910,16 +615,15 @@ class AgentLoop:
         context.state["tool_index"] = self._tool_index
         context.state["sandbox"]    = self._sandbox_policy()
         context.state["edit_scope"] = self.settings.sandbox.edit_scope
-        context.state["goal_scope"] = self.goal.scope if self.goal is not None and self.goal.enforced and self.goal.scope else None
+        context.state["goal_scope"] = self.goal_gate.scope()
         return context
 
     async def _loop(self, system_prompt: str, tools: list[Any]) -> AsyncGenerator[str, None]:
         """Request, execute tools and repeat until the model is done or a limit stops it."""
         tool_ctx = self._new_tool_context()
-        self._auto_goal      = None
-        self._auto_edit_mark = self._edit_count()
+        self.goal_gate.start_run()
         state    = LoopState(iteration=0, stop_reason="continue", continuation_hint=None, token_budget_used=0, session_id=self.session.session_id)
-        saved    = self._model_state()
+        saved    = self.failover.model_state()
         self._context_budget.set_overhead(system_prompt, tools)
         recovery = RecoveryPlanner(
             fallbacks   = list(self.settings.model.fallback_models),
@@ -945,21 +649,21 @@ class AgentLoop:
                 except UnicodeDecodeError:
                     yield "\n[dim yellow]Encoding error, retrying without streaming...[/dim yellow]\n"
                     try:
-                        async for c in self._fallback_to_send(system_prompt, turn.messages, tools, tool_ctx):
+                        async for c in self.failover.send_without_streaming(system_prompt, tools, tool_ctx):
                             yield c
                     except Exception as fe:
                         yield f"\n[bold red]Fallback also failed: {fe}[/bold red]"
                     return
                 except Exception as exc:
-                    async for chunk in self._recover_from_failure(exc, recovery, turn, flow, system_prompt, tools, tool_ctx):
+                    async for chunk in self.failover.recover(exc, recovery, turn, flow, system_prompt, tools, tool_ctx):
                         yield chunk
                 if flow.finished:
                     return
         finally:
-            self._restore_model(saved)
+            self.failover.restore_model(saved)
 
     async def _check_run_limits(self, iteration: int, flow: LoopFlow) -> AsyncGenerator[str, None]:
-        """Stop the run when the turn or cost limit is reached, and warn about an unenforceable one."""
+        """Stop the run when the turn, cost or token limit is reached, and warn about an unenforceable one."""
         if iteration > self.settings.session.max_turns:
             self.last_stop = "max_turns"
             flow.finished  = True
@@ -969,33 +673,26 @@ class AgentLoop:
         if self.wrap_up_at and iteration == self.wrap_up_at:
             self._signals[signals.WRAP_UP] += 1
             self.state.messages.append(Message(role=Role.USER, content=_WRAP_UP.format(used=iteration - 1, limit=self.settings.session.max_turns)))
-        for stop, notice in (("max_cost", self._over_cost_limit()), ("max_total_tokens", self._over_token_limit())):
-            if notice:
-                self.last_stop = stop
-                flow.finished  = True
-                yield notice
-                return
-        escalated = self._maybe_escalate()
+        stop, notice = self.limits.exhausted()
+        if notice:
+            self.last_stop = stop
+            flow.finished  = True
+            yield notice
+            return
+        escalated = self.failover.maybe_escalate()
         if escalated:
             yield escalated
-        if self._cost_limit_unenforceable():
-            if self.settings.session.require_price:
-                self.last_stop = "unpriced"
-                flow.finished  = True
-                yield (
-                    f"\n[bold red]Cost limit ${self.settings.session.max_cost_usd:.2f} cannot be enforced: no price is known for "
-                    f"{self.settings.model.provider}/{self.settings.model.model}. Refusing to run (session.require_price).[/bold red]"
-                )
-                return
-            yield (
-                f"\n[yellow]Cost limit ${self.settings.session.max_cost_usd:.2f} is not enforced: "
-                f"no price is known for {self.settings.model.provider}/{self.settings.model.model}.[/yellow]\n"
-            )
+        stop, notice = self.limits.unpriced()
+        if stop:
+            self.last_stop = stop
+            flow.finished  = True
+        if notice:
+            yield notice
 
     async def _prepare_context(self, iteration: int, flow: LoopFlow) -> AsyncGenerator[str, None]:
         """Report finished background work, compact when the window is nearly full, and show usage."""
         self._inject_queued_input()
-        self._report_background_tasks()
+        self.state.messages.extend(background_reports(self._task_registry))
         self._mask_old_observations()
         max_ctx  = self.settings.session.max_context_tokens
         thr      = int(max_ctx * self.settings.session.compact_threshold)
@@ -1108,9 +805,9 @@ class AgentLoop:
                 return
             if decision.kind == STALLED:
                 yield f"\n[yellow]{escape(decision.message)}[/yellow]\n"
-            gate = self._completion_goal()
+            gate = self.goal_gate.completion_goal()
             if gate is not None:
-                async for note in self._verify_goal(flow, gate):
+                async for note in self.goal_gate.verify(flow, gate):
                     yield note
                 if not flow.finished:
                     return  # the check failed: the model has been told and takes another step
@@ -1127,65 +824,6 @@ class AgentLoop:
             self.session.record_assistant_message(turn.asst_text)
         flow.finished = True
 
-    async def _recover_from_failure(
-        self,
-        exc:           Exception,
-        recovery:      RecoveryPlanner,
-        turn:          LoopTurn,
-        flow:          LoopFlow,
-        system_prompt: str,
-        tools:         list[Any],
-        tool_ctx:      ToolContext,
-    ) -> AsyncGenerator[str, None]:
-        """Retry, compact, fall back, resend without streaming, or end the run after a failed request."""
-        from_event = isinstance(exc, ProviderCallError)
-        failure    = exc.failure if isinstance(exc, ProviderCallError) else classify_exception(exc)
-        action     = recovery.plan(
-            failure,
-            current          = self.settings.model.model,
-            current_provider = self.settings.model.provider or "",
-            streamed         = bool(turn.asst_text or turn.tool_uses),
-        )
-        if action.kind == RESEND:
-            flow.finished = True
-            yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
-            async for c in self._fallback_to_send(system_prompt, turn.messages, tools, tool_ctx):
-                yield c
-            return
-        if action.kind == RETRY:
-            self._signals[signals.PROVIDER_RETRY] += 1
-            yield f"\n[dim yellow][Retrying in {action.delay:.1f}s: {failure.kind}][/dim yellow]\n"
-            await asyncio.sleep(action.delay)
-            return
-        if action.kind == COMPACT:
-            cur_toks = flow.context_tokens
-            async for status in self._maybe_compact_messages(cur_toks, int(cur_toks * 0.6)):
-                yield status
-            return
-        if action.kind == FALLBACK:
-            self._signals[signals.PROVIDER_FALLBACK] += 1
-            self._switch_model(action.provider, action.model)
-            yield f"\n[dim yellow][Fallback: {self.settings.model.provider}:{action.model}][/dim yellow]\n"
-            return
-        self.last_stop = "provider_error"
-        flow.finished  = True
-        if from_event:
-            yield f"\n[bold red]Provider error: {exc}[/bold red]"
-            return
-        yield f"\n[bold red]Error: {exc}[/bold red]"
-        self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {exc}"))
-
-    def _restore_model(self, saved: tuple[str, str, str, str]) -> None:
-        """After a prompt, go back to the model it started on; an escalation lasts for the session, a fallback only for the prompt it served."""
-        (
-            self.settings.model.provider,
-            self.settings.model.model,
-            self.settings.model.api_key,
-            self.settings.model.base_url,
-        ) = self._escalated_to or saved
-        self._escalated_to = None
-        self.provider      = self.create_provider_from_settings()
-
     @staticmethod
     def _skill_loader_for(registry: ToolRegistry, settings: NerdvanaSettings) -> SkillLoader:
         """The loader the ActivateSkill tool uses, so ``/clear`` resets its activations; a fresh one without the tool."""
@@ -1195,52 +833,3 @@ class AgentLoop:
         loader = SkillLoader.from_settings(settings)
         loader.load_all()
         return loader
-
-    def _model_state(self) -> tuple[str, str, str, str]:
-        """The settings that name the model in use: provider, model, API key and base URL."""
-        return (self.settings.model.provider, self.settings.model.model, self.settings.model.api_key, self.settings.model.base_url)
-
-    def _switch_model(self, provider: str | None, model: str) -> None:
-        """Point the loop at *model*, on *provider* when one is given."""
-        if provider and provider != self.settings.model.provider:
-            from nerdvana_cli.providers.factory import resolve_api_key
-            self.settings.model.provider = provider
-            self.settings.model.api_key  = resolve_api_key(ProviderName(provider))
-            self.settings.model.base_url = ""
-        self.settings.model.model = model
-        self.provider             = self.create_provider_from_settings()
-
-    async def _fallback_to_send(
-        self, system_prompt: str, messages: list[dict[str, Any]], tools: list[Any], context: ToolContext,
-    ) -> AsyncGenerator[str, None]:
-        """Non-streaming fallback when provider streaming fails."""
-        for _ in range(10):
-            self._fire_before_api_call(tools)
-            repair_tool_ids(self.state.messages)
-            try:
-                result = await self.provider.send(system_prompt, self._to_provider_messages(), self._declared(tools))
-            except Exception as e:
-                yield f"\n[bold red]Fallback error: {e}[/bold red]"
-                return
-
-            content   = result.get("content", "")
-            tool_uses = result.get("tool_uses", [])
-            usage     = result.get("usage", {})
-            if content:
-                yield content
-            if usage:
-                self._apply_usage(usage, None)
-            if tool_uses:
-                self.state.messages.append(Message(
-                    role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses,
-                    provider_blocks=list(result.get("provider_blocks") or []),
-                ))
-                self.session.record_assistant_message(content, tool_uses, result.get("provider_blocks"))
-                for tr in await self.tool_executor.run_batch(tool_uses, context):
-                    self.state.messages.append(Message(role=Role.TOOL, content=tr.content, tool_use_id=tr.tool_use_id, is_error=tr.is_error))
-                self.state.messages.extend(hook_injection_messages(self.tool_executor))
-                continue
-            if content:
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=content, provider_blocks=list(result.get("provider_blocks") or [])))
-                self.session.record_assistant_message(content, provider_blocks=result.get("provider_blocks"))
-            return
