@@ -56,6 +56,10 @@ def apply_model_spec(settings: NerdvanaSettings, spec: str) -> bool:
     if not spec:
         return False
     provider, model = parse_fallback(spec)
+    refusal = settings.managed_policy.model_refusal(model, provider or settings.model.provider)
+    if refusal:
+        logger.warning("%s; the parent's model is used", refusal)
+        return False
     if point_settings_at(settings, provider, model):
         return True
     logger.warning("model %r skipped: no credential for provider %r, the parent's model is used", spec, provider)

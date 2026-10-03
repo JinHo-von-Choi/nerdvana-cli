@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
+
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
 
@@ -12,6 +14,11 @@ async def handle_model(app: NerdvanaApp, args: str) -> None:
     """Handle /model command — show or switch the current model."""
     if args:
         from nerdvana_cli.ui.widgets import StatusBar
+
+        refusal = app.settings.managed_policy.model_refusal(args, app.settings.model.provider)
+        if refusal:
+            app._add_chat_message(f"[red]{escape(refusal)}[/red]")
+            return
 
         # Invariant: /model is a model-only operation. Provider and base_url
         # are owned by /provider; re-detecting here would corrupt state when
@@ -129,6 +136,10 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
     default_model = DEFAULT_MODELS.get(prov, "")
     _mh = getattr(app.settings, "model_history", None)
     last_model = (_mh.get(provider_name) if isinstance(_mh, dict) else None) or default_model
+    refusal = app.settings.managed_policy.model_refusal(last_model, provider_name)
+    if refusal:
+        app._add_chat_message(f"[red]{escape(refusal)}[/red]")
+        return
 
     # Apply settings unconditionally — key verification is the caller's job.
     app.settings.model.provider = provider_name
@@ -179,7 +190,11 @@ async def switch_provider(app: NerdvanaApp, provider_name: str, api_key: str) ->
         parism=app.parism_client is not None,
     )
 
-    # Save config + API key per provider
+    _save_provider_config(app, provider_name, api_key)
+
+
+def _save_provider_config(app: NerdvanaApp, provider_name: str, api_key: str) -> None:
+    """Write the active model and the provider's API key to the config file."""
     from nerdvana_cli.core.setup import load_config, save_config
     existing = load_config()
     existing["model"] = {

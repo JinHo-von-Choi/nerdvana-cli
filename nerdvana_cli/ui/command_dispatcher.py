@@ -50,6 +50,7 @@ def _build_handler_map() -> dict[str, CommandHandler]:
         "/mcp":             session_commands.handle_mcp,
         "/skills":          session_commands.handle_skills,
         "/help":            system_commands.handle_help,
+        "/policy":          system_commands.handle_policy,
         "/update":          system_commands.handle_update,
         "/init":            system_commands.handle_init,
         "/setup":           system_commands.handle_init,

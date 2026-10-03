@@ -14,6 +14,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.prompt import Prompt
 
 from nerdvana_cli.core.migrate import run_if_needed as _migrate_run
@@ -37,7 +38,18 @@ def load_settings(config_path: str | None = None) -> NerdvanaSettings:
     try:
         return NerdvanaSettings.load(config_path)
     except SettingsLoadError as exc:
-        console_stderr.print(f"[bold red]Invalid configuration:[/bold red] {exc}")
+        console_stderr.print(f"[bold red]Invalid configuration:[/bold red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(2) from None
+
+
+def enforce_managed_policy(settings: NerdvanaSettings) -> None:
+    """Apply the managed policy once every command line option is in; a model it refuses ends the command."""
+    from nerdvana_cli.core.managed_policy import ManagedPolicyError
+
+    try:
+        settings.managed_policy.enforce(settings)
+    except ManagedPolicyError as exc:
+        console_stderr.print(f"[bold red]Managed policy:[/bold red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(2) from None
 
 
@@ -137,6 +149,7 @@ async def repl_loop(
             console.print("Set the API key via environment variable or config file.")
             raise typer.Exit(1)
 
+    enforce_managed_policy(settings)
     parism_client = await _connect_parism(settings, cwd)
     mcp_manager   = await _connect_mcp(cwd)
 

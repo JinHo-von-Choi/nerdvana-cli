@@ -336,6 +336,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `/image` | `/image <경로> [<경로> ...] <질문>` 은 앞쪽의 이미지 파일을 첨부해 질문합니다. 기록에는 그림이 아니라 파일 이름만 남습니다 |
 | `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
 | `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
+| `/policy` | 적용 중인 관리형 정책 파일과 각 항목이 한 일을 표시합니다 ([docs/managed-policy.md](docs/managed-policy.md)) |
 | `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |
 | `/activity` | 활동 표시기 위젯 토글 (on/off, config.yml 에 저장) |
 | `/quit` | REPL 종료 (별칭: `/exit`, `/q`) |
@@ -625,6 +626,7 @@ mypy nerdvana_cli/
 |-|-|
 | [docs/configuration.md](docs/configuration.md) | 설정 전체 레퍼런스 |
 | [docs/hooks.md](docs/hooks.md) | 훅 이벤트 체계와 브리지 규약 |
+| [docs/managed-policy.md](docs/managed-policy.md) | 관리자가 모든 사용자·프로젝트 설정 위에 두는 기기 단위 설정 |
 | [docs/agents.md](docs/agents.md) | 에이전트 타입, 도구 예산, 스웜 패턴 |
 | [docs/mcp-quota.md](docs/mcp-quota.md) | MCP 서버 테넌트별 쿼터 스키마 |
 | [docs/testing-live.md](docs/testing-live.md) | 실 제공자 시험 행렬과 비밀값 설정 |

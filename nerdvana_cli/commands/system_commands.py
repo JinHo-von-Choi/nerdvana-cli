@@ -32,6 +32,13 @@ async def handle_help(app: NerdvanaApp, args: str) -> None:
     app._add_chat_message("\n".join(lines))
 
 
+async def handle_policy(app: NerdvanaApp, args: str) -> None:
+    """Handle /policy command: show the managed settings files that applied and what each control did."""
+    from rich.markup import escape
+
+    app._add_chat_message("\n".join(escape(line) for line in app.settings.managed_policy.describe()))
+
+
 async def _refresh_parism(app: NerdvanaApp) -> None:
     if shutil.which("npx") is None:
         app._add_chat_message("[red]npx not found. Install Node.js to refresh Parism.[/red]")

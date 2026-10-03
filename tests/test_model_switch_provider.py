@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from nerdvana_cli.commands.model_commands import handle_model
+from nerdvana_cli.core.managed_policy import ManagedPolicy
 from nerdvana_cli.providers.base import ProviderName, detect_provider
 
 
@@ -75,7 +76,7 @@ def _make_mock_app(provider: str, model: str, base_url: str) -> MagicMock:
         base_url=base_url,
         api_key="test-key",
     )
-    settings = SimpleNamespace(model=model_cfg)
+    settings = SimpleNamespace(model=model_cfg, managed_policy=ManagedPolicy())
 
     agent_loop = MagicMock()
     agent_loop.create_provider_from_settings = MagicMock(return_value=MagicMock())

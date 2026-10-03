@@ -16,6 +16,7 @@ from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
     console_stderr,
+    enforce_managed_policy,
     load_settings,
     repl_loop,
     resolve_run_provider,
@@ -191,6 +192,7 @@ def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], 
     except ValueError as exc:
         console_stderr.print(f"[red]Error: {exc}[/red]")
         raise typer.Exit(EXIT_CONFIG) from exc
+    enforce_managed_policy(settings)
 
 
 def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any] | None:
