@@ -45,7 +45,7 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 | **Xiaomi MiMo** | mimo-v2.5-pro | `MIMO_API_KEY` |
 | **Moonshot AI (Kimi)** | kimi-k2-instruct | `MOONSHOT_API_KEY` |
 | **Alibaba DashScope (Qwen)** | qwen3-coder-plus | `DASHSCOPE_API_KEY` |
-| **MiniMax** | MiniMax-M2 | `MINIMAX_API_KEY` |
+| **MiniMax** | MiniMax-M3.1-Flash-Preview | `MINIMAX_API_KEY` |
 | **Perplexity** | sonar-pro | `PERPLEXITY_API_KEY` |
 | **Fireworks AI** | accounts/fireworks/models/llama-v3p3-70b-instruct | `FIREWORKS_API_KEY` |
 | **Cerebras** | llama-3.3-70b | `CEREBRAS_API_KEY` |

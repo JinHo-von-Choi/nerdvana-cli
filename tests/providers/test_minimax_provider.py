@@ -43,7 +43,7 @@ class TestMiniMaxProvider:
         assert "minimaxi" in url
 
     def test_minimax_default_model(self) -> None:
-        assert DEFAULT_MODELS[ProviderName.MINIMAX] == "MiniMax-M2"
+        assert DEFAULT_MODELS[ProviderName.MINIMAX] == "MiniMax-M3.1-Flash-Preview"
 
     def test_minimax_default_model_not_empty(self) -> None:
         model = DEFAULT_MODELS[ProviderName.MINIMAX]

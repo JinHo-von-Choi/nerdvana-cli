@@ -201,7 +201,7 @@ dashscope:
 
 minimax:
   base_url:      "https://api.minimaxi.chat/v1"
-  default_model: "MiniMax-M2"
+  default_model: "MiniMax-M3.1-Flash-Preview"
   env_vars:      ["MINIMAX_API_KEY"]
   capabilities:
     supports_tools:     true
