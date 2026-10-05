@@ -211,6 +211,7 @@ The result object (`schema_version` 1; fields are only ever added):
 | `nerdvana setup` | Interactive setup wizard — choose provider, enter API key, select model |
 | `nerdvana providers` | List all supported AI providers |
 | `nerdvana version` | Show version |
+| `nerdvana update` | Pull the latest release and reinstall the CLI (a clean git checkout that fails to fast-forward is reset to `origin/main`; user data is never touched) |
 | `nerdvana serve` | Start NerdVana as an MCP 1.0 server (stdio or HTTP transport) |
 | `nerdvana acp` | Run as an Agent Client Protocol agent on stdio for editors such as Zed (needs the `acp` extra); see [docs/acp.md](docs/acp.md) |
 | `nerdvana doctor` | Diagnose installation, keys, and external dependencies (`--strict`, `--json`) |

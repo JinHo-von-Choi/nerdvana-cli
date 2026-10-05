@@ -31,6 +31,11 @@ _EFFORT_WITH_TOOLS_NOTE = (
 )
 
 
+# MiniMax models the CLI ships so the model picker still lists them when the
+# MiniMax API is unreachable or its response omits the current models.
+_MINIMAX_KNOWN_MODELS = ("MiniMax-M3.1-Flash-Preview", "MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2")
+
+
 def is_official_openai(config: ProviderConfig) -> bool:
     """Report whether *config* addresses OpenAI itself rather than another OpenAI-compatible server."""
     if config.provider != ProviderName.OPENAI:
@@ -204,25 +209,36 @@ class OpenAIProvider:
         return self._client
 
     async def list_models(self) -> list[Any]:
-        """Fetch available models from the API."""
+        """Fetch available models from the API.
+
+        For MiniMax the response is merged with the models the CLI ships, so
+        an unreachable API or a response that omits the current models still
+        yields ``MiniMax-M3.1-Flash-Preview`` in the picker.
+        """
         from nerdvana_cli.providers.base import ModelInfo
 
         try:
             client = self._get_client()
             response = await client.models.list()
-            models = []
-            for m in response.data:
-                models.append(
-                    ModelInfo(
-                        id=m.id,
-                        provider=self.config.provider.value,
-                        created=str(getattr(m, "created", "")),
-                    )
+            models = [
+                ModelInfo(
+                    id=m.id,
+                    provider=self.config.provider.value,
+                    created=str(getattr(m, "created", "")),
                 )
-            models.sort(key=lambda x: x.id)
-            return models
+                for m in response.data
+            ]
         except Exception:
-            return []
+            models = []
+        if self.config.provider == ProviderName.MINIMAX:
+            seen = {model.id.lower() for model in models}
+            models += [
+                ModelInfo(id=mid, provider=self.config.provider.value)
+                for mid in _MINIMAX_KNOWN_MODELS
+                if mid.lower() not in seen
+            ]
+        models.sort(key=lambda x: x.id)
+        return models
 
     async def stream(
         self,

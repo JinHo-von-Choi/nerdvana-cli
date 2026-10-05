@@ -193,6 +193,7 @@ nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns
 | `nerdvana setup` | 대화형 설정 마법사 — 제공자 선택, API 키 입력, 모델 선택 |
 | `nerdvana providers` | 지원하는 모든 AI 제공자 목록 표시 |
 | `nerdvana version` | 버전 표시 |
+| `nerdvana update` | 최신 릴리스를 내려받아 CLI 를 다시 설치합니다 (fast-forward 가 실패한 깨끗한 git 체크아웃은 `origin/main` 로 재설정합니다. 사용자 데이터는 건드리지 않습니다) |
 | `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
 | `nerdvana acp` | Zed 같은 편집기를 위해 Agent Client Protocol 에이전트로 stdio 에서 실행 (`acp` extra 필요). [docs/acp.md](docs/acp.md) |
 | `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |

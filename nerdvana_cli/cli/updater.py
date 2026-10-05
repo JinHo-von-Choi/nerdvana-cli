@@ -352,6 +352,61 @@ def _run_post_update_migrate() -> None:
 
 
 # ---------------------------------------------------------------------------
+# git pull with self-heal
+# ---------------------------------------------------------------------------
+
+def _heal_after_failed_pull(install_dir: Path, pull_error: str) -> tuple[str, str]:
+    """Reset a clean install to ``origin/main`` after ``git pull`` failed.
+
+    Only a clean worktree is reset. A dirty install, an unreachable remote or
+    a failed reset keeps the original ``git pull`` failure as an ``"error"``
+    state so the caller aborts instead of forcing a rewrite.
+    """
+    failed = f"git pull failed: {pull_error}"
+    clean, _ = _check_install_dir_clean(install_dir)
+    if not clean:
+        return "error", failed
+
+    for cmd in (["git", "fetch", "origin", "main"], ["git", "reset", "--hard", "origin/main"]):
+        try:
+            result = subprocess.run(cmd, cwd=install_dir, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            return "error", f"{failed}; recovery timed out"
+        except Exception as exc:  # noqa: BLE001 — recovery must report, never raise
+            return "error", f"{failed}; recovery failed: {exc}"
+        if result.returncode != 0:
+            return "error", f"{failed}; {' '.join(cmd)} failed: {result.stderr.strip()}"
+    return "updated", "git pull failed; install recovered with git reset --hard origin/main."
+
+
+def _git_pull(install_dir: Path) -> tuple[str, str]:
+    """Fast-forward pull ``main``, self-healing a clean install when it fails.
+
+    Returns ``(state, message)``: state is ``"uptodate"``, ``"updated"``
+    (message holds the recovery note when a heal ran) or ``"error"``
+    (message holds the failure detail).
+    """
+    try:
+        pull = subprocess.run(
+            ["git", "pull", "--ff-only", "origin", "main"],
+            cwd=install_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return "error", "Update timed out."
+    except Exception as exc:  # noqa: BLE001
+        return "error", f"Update failed: {exc}"
+
+    if pull.returncode != 0:
+        return _heal_after_failed_pull(install_dir, pull.stderr.strip())
+    if "Already up to date" in pull.stdout:
+        return "uptodate", "Already up to date."
+    return "updated", ""
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -391,19 +446,12 @@ def run_self_update(install_dir: Path | None = None) -> tuple[bool, str]:
     pre_hashes = _hash_user_data(data_home) if data_home.is_dir() else {}
 
     try:
-        pull = subprocess.run(
-            ["git", "pull", "--ff-only", "origin", "main"],
-            cwd=install_dir,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if pull.returncode != 0:
-            return False, f"git pull failed: {pull.stderr.strip()}"
-
-        if "Already up to date" in pull.stdout:
+        state, state_msg = _git_pull(install_dir)
+        if state == "error":
+            return False, state_msg
+        if state == "uptodate":
             _prune_snapshots(data_home)
-            return True, "Already up to date."
+            return True, state_msg
 
         pip = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--quiet", "-e", ".[all]"],
@@ -441,6 +489,8 @@ def run_self_update(install_dir: Path | None = None) -> tuple[bool, str]:
 
     removed = _prune_snapshots(data_home)
     msg = "Updated successfully. Restart to apply changes."
+    if state_msg:
+        msg = f"{state_msg} {msg}"
     if snapshot:
         msg += f" Backup: {snapshot}"
         if removed:

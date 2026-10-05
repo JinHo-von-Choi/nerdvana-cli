@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- CLI command `nerdvana update` to update the installation directly from the terminal without entering an interactive session.
+- Self-heal recovery in the updater: automatically recovers clean installations that fail fast-forward due to diverged remote branches.
+- Model discovery and rate card support for MiniMax 3.1 models (`MiniMax-M3.1-Flash-Preview`, `MiniMax-M3.1`) with 1,000,000 token context window.
+
 ## [1.9.0] - 2026-10-05
 
 ### Added

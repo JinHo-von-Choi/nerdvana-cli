@@ -391,6 +391,19 @@ def version() -> None:
     console.print(f"NerdVana CLI v{__version__}")
 
 
+@app.command(name="update")
+def update() -> None:
+    """Update the NerdVana CLI install tree (user data is never touched)."""
+    from nerdvana_cli.cli.updater import run_self_update
+
+    ok, message = run_self_update()
+    if ok:
+        console.print(f"[green]{message}[/green]")
+        return
+    console_stderr.print(f"[red]{message}[/red]")
+    raise typer.Exit(1)
+
+
 # ---------------------------------------------------------------------------
 # nerdvana serve
 # ---------------------------------------------------------------------------

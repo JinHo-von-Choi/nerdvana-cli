@@ -1,4 +1,4 @@
 # Test collection baseline for nerdvana-cli
 # Updated: 2026-10-05
 # Source: uv run pytest --collect-only -m "not lsp_integration and not live" -q
-total: 5016
+total: 5031
