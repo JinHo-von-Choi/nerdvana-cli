@@ -58,6 +58,13 @@ VERIFY_TAIL = 20_000     # characters of a verify step's output that are kept (t
 ERROR       = "error"
 BUDGET      = "budget"
 
+# A sub-agent that ended on one of these produced no usable answer: its unit fails with this message instead of
+# being kept, so a resume never takes it for a result that succeeded.
+REFUSED: dict[str, str] = {
+    "unpriced":          "the model has no known price, so the cost ceiling cannot be enforced (session.require_price)",
+    "permission_denied": "the agent was denied the permission it asked for",
+}
+
 RUNNING     = "running"
 COMPLETED   = "completed"
 FAILED      = "failed"
@@ -106,14 +113,20 @@ class RunReport:
 
 @dataclass(frozen=True)
 class Call:
-    """One agent run: who, with what prompt, under which limits."""
+    """One agent run: who, with what prompt, under which limits.
+
+    ``category``, ``model`` and ``write_scope`` hold what the call resolves to against its agent type: the
+    category it reports, the model spec it runs on (``""`` inherits the parent's) and the write policy it is
+    actually given. A fingerprint of the resolved values means a change to the agent type or to the model
+    routing changes a unit's key instead of reusing a result that was produced under the old ones.
+    """
 
     agent:       str
     prompt:      str
     max_turns:   int
     category:    str
     model:       str
-    write_scope: str | tuple[str, ...]
+    write_scope: str | list[str]
     schema:      Mapping[str, Any] | None                           = None
     check:       Callable[[Any], list[str]] | None                  = None
 
@@ -356,8 +369,15 @@ class WorkflowRun:
         return value
 
     def _call(self, step: Step, prompt: str, schema: Mapping[str, Any] | None = None, check: Any = None) -> Call:
-        scope = step.write_scope if step.kind == "agent" else "none"
-        return Call(step.agent, prompt, step.max_turns, step.category, step.model, scope, schema, check)
+        """The agent run of *step*, with the model, the category and the write policy resolved to what will really run."""
+        definition = self.types.get(step.agent)
+        assert definition is not None
+        scope      = step.write_scope if step.kind == "agent" else "none"
+        return Call(
+            step.agent, prompt, step.max_turns, step.category or definition.category,
+            select_model(step.model, step.category, definition.model, definition.category, self.context.settings.agents.categories),
+            effective_scope(definition.write_scope, scope), schema, check,
+        )
 
     def _plan(self, step: Step) -> list[Job]:
         """The jobs of *step*, with every template rendered."""
@@ -441,6 +461,8 @@ class WorkflowRun:
             cost, tokens = cost + spent, tokens + used
             if stopped == "max_cost":
                 return Unit(job.index, key, BUDGET, text, cost_usd=cost, tokens=tokens, error="an agent used up its share of the cost ceiling")
+            if stopped in REFUSED:
+                return Unit(job.index, key, ERROR, text, cost_usd=cost, tokens=tokens, error=f"the agent stopped ({stopped}): {REFUSED[stopped]}")
             if call.schema is None:
                 return Unit(job.index, key, OK, text, cost_usd=cost, tokens=tokens)
             value, problems = self._parse(text, call)
@@ -466,25 +488,29 @@ class WorkflowRun:
         definition = self.types.get(call.agent)
         assert definition is not None
         child = copy.deepcopy(context.settings)
-        apply_write_scope(child, replace(definition, write_scope=effective_scope(definition.write_scope, call.write_scope)), context.cwd)
-        apply_model_spec(child, select_model(call.model, call.category, definition.model, definition.category, child.agents.categories))
+        apply_write_scope(child, replace(definition, write_scope=call.write_scope), context.cwd)
+        apply_model_spec(child, call.model)
         child.session.max_turns = call.max_turns or definition.max_turns
         settle   = self._reserve(child)
         agent_id = f"wf-{context.store.run_id}-{label}"
-        config   = SubagentConfig(
-            agent_id=agent_id, name=call.agent, prompt=prompt, settings=child,
-            registry=context.registry_factory(settings=child, allowed_tools=definition.allowed_tools, parent_tools=context.parent_tools),
-            max_turns=child.session.max_turns, system_prompt=definition.system_prompt, confirm=label_confirm(context.confirm, agent_id),
-            category=call.category or definition.category, parent_session_id=context.parent_session_id, absorb=context.absorb,
-            factories=context.factories,
-        )
+        config: SubagentConfig | None = None
         try:
+            config = SubagentConfig(
+                agent_id=agent_id, name=call.agent, prompt=prompt, settings=child,
+                registry=context.registry_factory(settings=child, allowed_tools=definition.allowed_tools, parent_tools=context.parent_tools),
+                max_turns=child.session.max_turns, system_prompt=definition.system_prompt, confirm=label_confirm(context.confirm, agent_id),
+                category=call.category, parent_session_id=context.parent_session_id, absorb=context.absorb,
+                factories=context.factories,
+            )
             text, tokens = await run_subagent(config, asyncio.Event())
+            return text, config.cost_usd, tokens, config.stopped_for
         finally:
-            self.spent += config.cost_usd
+            # Settled however the child ended: 0 when it never started (nothing was spent, nothing stays promised)
+            # and what it had spent by the time a cancellation or an interrupt took it, so no reservation leaks.
+            spent = config.cost_usd if config is not None else 0.0
+            self.spent += spent
             if settle is not None:
-                settle(config.cost_usd)
-        return text, config.cost_usd, tokens, config.stopped_for
+                settle(spent)
 
     def _reserve(self, child: NerdvanaSettings) -> Callable[[float], None] | None:
         """Give an agent its share of what is left of the ceiling; the call that settles it afterwards."""

@@ -39,7 +39,7 @@ class RunLimits:
         self.analytics_writer   = analytics_writer or AnalyticsWriter(pricing_table=self.pricing_table)
         self._cache_watch       = CacheWatch()
         self._budget: Budget | None = None
-        self._cost_limit_warned = False
+        self._warned: set[tuple[str, str]] = set()   # the (provider, model) pairs that already got the no-price warning
         self.input_tokens       = 0
         self.output_tokens      = 0
         self.cache_read_tokens  = 0
@@ -138,10 +138,12 @@ class RunLimits:
         return "", ""
 
     def unpriced(self) -> tuple[str, str]:
-        """(stop reason, notice) once per session when a cost limit is set but the model has no known price.
+        """(stop reason, notice) when a cost limit is set but the model currently in use has no known price.
 
-        With ``session.require_price`` the run is refused (stop reason ``unpriced``); otherwise the stop
-        reason is empty and the notice only warns. Both are empty when nothing is to be said.
+        With ``session.require_price`` every call refuses (stop reason ``unpriced``): a run must not slip
+        through on the model a fallback landed on. Without it the warning is issued once per
+        ``(provider, model)``, so a fallback to another unpriced model is warned about too. Both are
+        empty when nothing is to be said.
         """
         session, model = self._settings.session, self._settings.model
         if not self._cost_limit_unenforceable():
@@ -151,22 +153,28 @@ class RunLimits:
                 f"\n[bold red]Cost limit ${session.max_cost_usd:.2f} cannot be enforced: no price is known for "
                 f"{model.provider}/{model.model}. Refusing to run (session.require_price).[/bold red]"
             )
+        provider = model.provider or ""
+        name     = model.model or ""
+        if (provider, name) in self._warned:
+            return "", ""
+        self._warned.add((provider, name))
+        logger.warning("cost limit set but %s/%s has no price; only the turn limit applies", provider, name)
         return "", (
             f"\n[yellow]Cost limit ${session.max_cost_usd:.2f} is not enforced: "
             f"no price is known for {model.provider}/{model.model}.[/yellow]\n"
         )
 
     def _cost_limit_unenforceable(self) -> bool:
-        """True once per session when a cost limit is set but the model has no known price."""
-        if self._cost_limit_warned or self._settings.session.max_cost_usd <= 0:
+        """True when a cost limit is set but the model in use has no known price.
+
+        Read from the settings on every call: a fallback or a settings change to another model is priced
+        again rather than judged by whichever model was in use before.
+        """
+        if self._settings.session.max_cost_usd <= 0:
             return False
         provider = self._settings.model.provider or ""
         model    = self._settings.model.model or ""
-        if self.pricing_table.has_price(provider, model):
-            return False
-        self._cost_limit_warned = True
-        logger.warning("cost limit set but %s/%s has no price; only the turn limit applies", provider, model)
-        return True
+        return not self.pricing_table.has_price(provider, model)
 
     def record_session_totals(self) -> None:
         """Refresh the analytics session row with cumulative tokens and cost.

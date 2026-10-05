@@ -10,6 +10,7 @@ import contextlib
 from dataclasses import dataclass, field
 
 from nerdvana_cli.cli.runtime import APPROVAL_MODE_MAP, resolve_run_provider
+from nerdvana_cli.core.config.managed_policy import ManagedPolicyError
 from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError, apply_settings_overrides
 
 
@@ -36,7 +37,10 @@ def settings_for(options: LaunchOptions, cwd: str) -> NerdvanaSettings:
     """The settings of a session that works in *cwd*.
 
     The project's ``nerdvana.yml`` is the one in *cwd*, not in the directory the agent was started from.
-    Raises LaunchError when the configuration is invalid or the provider has no API key.
+    Every option is applied first, then the managed policy is enforced over the result, so a model or
+    override the administrator refuses never starts a session.
+    Raises LaunchError when the configuration is invalid, the managed policy refuses the result or the
+    provider has no API key.
     """
     try:
         with contextlib.chdir(cwd):
@@ -54,6 +58,10 @@ def settings_for(options: LaunchOptions, cwd: str) -> NerdvanaSettings:
         apply_settings_overrides(settings, options.set_values)
     except ValueError as exc:
         raise LaunchError(str(exc)) from exc
+    try:
+        settings.managed_policy.enforce(settings)
+    except ManagedPolicyError as exc:
+        raise LaunchError(f"Managed policy: {exc}") from exc
     provider, key_missing = resolve_run_provider(settings)
     if key_missing:
         raise LaunchError(f"No API key found for {provider}.", auth_required=True)

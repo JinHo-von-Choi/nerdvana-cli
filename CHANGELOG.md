@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- Multi-repository API migration and campaign orchestration (`nerdvana_cli.core.campaign`):
+  - Isolated Git worktrees for safe, out-of-tree execution with automatic rollback on verification failure.
+  - Idempotent checkpointing and resumption across multi-repository migration campaigns.
+- TaskContract and tamper-evident verification engine (`nerdvana_cli.core.contract`):
+  - Deterministic digest-verified task specifications binding repositories, tests, and policy limits.
+  - Tamper detection that halts execution and marks tasks as rejected if test files are modified or weakened.
+- Two-Pass hybrid AST and LLM codemod engine:
+  - Zero-cost deterministic AST transformation (`nerdvana_cli.codeintel.ast_transformer`) for symbol, keyword, and import rewrites.
+  - Surgical LLM repair targeting residual diagnostics without injecting full-file context.
+- Evidence receipt bundles and migration model router (`nerdvana_cli.core.evidence`, `nerdvana_cli.core.recommend`):
+  - SHA-256 integrity-verified receipt bundles packaging diffs, analysis logs, and execution transcripts.
+  - Weighted model routing between deterministic codemods, lightweight repair models, and high-reasoning tiers.
+
+### Fixed
+
+- Hardened model failover and recovery handling to prevent infinite retry loops on non-streaming errors.
+- Prevented tool execution on truncated model outputs when token limits are reached.
+- Ensured deterministic workflow engine reservation settlement in try-finally blocks to eliminate budget leakage.
+- Enforced managed policy settings prior to ACP launch initialization.
+- Preserved timestamped backups during automated installation updates instead of destructive removal on failure.
+
 ## [1.8.1] - 2026-10-05
 
 ### Changed

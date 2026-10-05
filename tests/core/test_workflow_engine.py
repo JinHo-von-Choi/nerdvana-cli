@@ -397,6 +397,38 @@ async def test_without_a_ceiling_no_share_is_set_and_the_settings_limit_stays(fa
     assert fake.calls[0].settings.session.max_cost_usd == 7.0
 
 
+async def test_a_child_that_never_starts_settles_its_reservation_at_zero(fake: FakeAgents, tmp_path: Path) -> None:
+    def no_registry(**kwargs: Any) -> ToolRegistry:
+        raise RuntimeError("registry unavailable")
+
+    settings          = NerdvanaSettings()
+    settings.cwd      = str(tmp_path)
+    context           = RunContext(
+        settings=settings, registry_factory=no_registry, cwd=str(tmp_path),
+        store=RunStore("run-1", tmp_path / "runs"), ceiling=4.0,
+    )
+    run               = WorkflowRun(_workflow("name: x\nsteps:\n  - id: a\n    prompt: p\n"), {}, context)
+    report            = await run.run()
+    assert report.status == "failed" and "registry unavailable" in report.error and fake.calls == []
+    assert run.budget is not None
+    assert run.budget.promised == 0.0 and run.budget.spent == 0.0          # the envelope came straight back
+    assert run.spent == 0.0 and report.cost_usd == 0.0
+
+
+async def test_a_child_cancelled_while_running_is_settled_with_what_it_spent(fake: FakeAgents, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def cancelled(config: SubagentConfig, abort: asyncio.Event) -> tuple[str, int]:
+        config.cost_usd = 0.25
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr("nerdvana_cli.core.delegation.workflow_engine.run_subagent", cancelled)
+    run = WorkflowRun(_workflow("name: x\nsteps:\n  - id: a\n    prompt: p\n"), {}, _context(tmp_path, ceiling=4.0))
+    with pytest.raises(asyncio.CancelledError):
+        await run.run()
+    assert run.spent == pytest.approx(0.25)
+    assert run.budget is not None
+    assert run.budget.spent == pytest.approx(0.25) and run.budget.promised == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Stored units and resume
 # ---------------------------------------------------------------------------

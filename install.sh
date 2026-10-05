@@ -56,13 +56,20 @@ command_exists git || fail "git is required. Install it first."
 if [ -d "$INSTALL_DIR" ]; then
     info "Updating existing installation at $INSTALL_DIR..."
     cd "$INSTALL_DIR"
-    git pull --ff-only origin main 2>/dev/null || {
-        warn "Pull failed, re-cloning..."
+    if ! git pull --ff-only origin main 2>/dev/null; then
         cd ..
-        rm -rf "$INSTALL_DIR"
-        git clone --depth 1 "https://github.com/$REPO.git" "$INSTALL_DIR"
-        cd "$INSTALL_DIR"
-    }
+        BACKUP_DIR="$INSTALL_DIR.backup_$(date +%s)"
+        warn "Pull failed; the existing installation is preserved at $BACKUP_DIR while re-cloning..."
+        if ! mv "$INSTALL_DIR" "$BACKUP_DIR"; then
+            fail "Pull failed and $INSTALL_DIR could not be moved aside. Your installation is untouched; fix the local changes and re-run."
+        fi
+        if git clone --depth 1 "https://github.com/$REPO.git" "$INSTALL_DIR"; then
+            cd "$INSTALL_DIR"
+            warn "The previous installation is kept at $BACKUP_DIR; remove it when you no longer need it."
+        else
+            fail "Update failed. Your previous installation is preserved at $BACKUP_DIR; restore it with: mv \"$BACKUP_DIR\" \"$INSTALL_DIR\""
+        fi
+    fi
 else
     info "Installing to $INSTALL_DIR..."
     git clone --depth 1 "https://github.com/$REPO.git" "$INSTALL_DIR"

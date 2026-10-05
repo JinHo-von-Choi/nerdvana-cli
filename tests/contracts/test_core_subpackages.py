@@ -22,7 +22,21 @@ from tests.contracts.test_import_cycles import _strongly_connected
 CORE = f"{PREFIX}.core"
 
 SUBPACKAGES: frozenset[str] = frozenset(
-    {"config", "telemetry", "hooks", "safety", "context", "state", "delegation", "execution", "loop"},
+    {
+        "config",
+        "telemetry",
+        "hooks",
+        "safety",
+        "context",
+        "state",
+        "delegation",
+        "execution",
+        "loop",
+        "contract",
+        "campaign",
+        "evidence",
+        "recommend",
+    },
 )
 
 NO_LOOP: frozenset[str] = frozenset({"context", "safety", "telemetry"})

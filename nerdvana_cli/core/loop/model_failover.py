@@ -43,6 +43,15 @@ ModelState = tuple[str, str, str, str]
 # Requests a non-streaming resend may make before it gives up, tool rounds included.
 _MAX_RESEND_ROUNDS = 10
 
+# Why a response ended when it was cut by a length limit, in the two spellings the providers use.
+_LENGTH_STOPS = frozenset({"max_tokens", "length"})
+
+
+def _cut_short(result: dict[str, Any]) -> bool:
+    """True when *result* ended on a length limit, so a tool call in it may be missing its arguments."""
+    stop = str(result.get("stop_reason") or result.get("finish_reason") or "")
+    return stop in _LENGTH_STOPS
+
 
 class ModelFailover:
     """Switches the model of *loop*: once to ``session.escalation_model``, and per prompt after a failure.
@@ -222,16 +231,41 @@ class ModelFailover:
         yield f"\n[bold red]Error: {exc}[/bold red]"
         loop.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {exc}"))
 
+    def _resend_limit(self, base: int, rounds: int) -> tuple[str, str]:
+        """(stop reason, notice) before the *rounds*-th request of a non-streaming resend; empty when it may go out.
+
+        The first request repeats the turn that failed and needs no budget of its own; every request
+        after it is a new turn, held to ``session.max_turns`` the way ``_check_run_limits`` holds the
+        streaming loop. The cost and token limits come from ``loop.limits``.
+        """
+        limit = self._loop.settings.session.max_turns
+        if rounds and base + rounds > limit:
+            return "max_turns", f"\n[bold yellow]Max turns ({limit}) reached.[/bold yellow]"
+        return self._loop.limits.exhausted()
+
     async def send_without_streaming(self, system_prompt: str, tools: list[Any], context: ToolContext) -> AsyncGenerator[str, None]:
-        """Finish the prompt with plain requests when the provider's stream fails, running tool calls in between."""
+        """Finish the prompt with plain requests when the provider's stream fails, running tool calls in between.
+
+        Every request is held to the turn, cost and token limits, and neither a spent limit nor running
+        out of ``_MAX_RESEND_ROUNDS`` may end the run looking like a finished answer.
+        """
         loop = self._loop
-        for _ in range(_MAX_RESEND_ROUNDS):
+        base = loop.turns_used
+        for rounds in range(_MAX_RESEND_ROUNDS):
+            stop, notice = self._resend_limit(base, rounds)
+            if stop:
+                loop.last_stop = stop
+                yield notice
+                return
+            loop.turns_used = base + rounds
             loop._fire_before_api_call(tools)
             repair_tool_ids(loop.state.messages)
             try:
                 result = await loop.provider.send(system_prompt, loop._to_provider_messages(), loop._declared(tools))
             except Exception as e:
+                loop.last_stop = "provider_error"
                 yield f"\n[bold red]Fallback error: {e}[/bold red]"
+                loop.state.messages.append(Message(role=Role.ASSISTANT, content=f"Error occurred: {e}"))
                 return
 
             content   = result.get("content", "")
@@ -242,6 +276,12 @@ class ModelFailover:
                 yield content
             if usage:
                 loop._apply_usage(usage, None)
+            if _cut_short(result):
+                # The text that arrived is kept and recorded; a tool call cut off by the length limit is not run.
+                if content:
+                    loop.state.messages.append(Message(role=Role.ASSISTANT, content=content, provider_blocks=list(blocks or [])))
+                    loop.session.record_assistant_message(content, provider_blocks=blocks)
+                return
             if tool_uses:
                 loop.state.messages.append(Message(
                     role=Role.ASSISTANT, content=content if content else "[tool execution]", tool_uses=tool_uses,
@@ -256,3 +296,6 @@ class ModelFailover:
                 loop.state.messages.append(Message(role=Role.ASSISTANT, content=content, provider_blocks=list(blocks or [])))
                 loop.session.record_assistant_message(content, provider_blocks=blocks)
             return
+        loop.last_stop = "recovery_exhausted"
+        yield f"\n[bold red]Recovery exhausted: no final answer after {_MAX_RESEND_ROUNDS} requests without streaming.[/bold red]\n"
+        loop.state.messages.append(Message(role=Role.ASSISTANT, content="Error occurred: recovery exhausted without a final answer."))
