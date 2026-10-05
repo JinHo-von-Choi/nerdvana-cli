@@ -171,7 +171,7 @@ def memory_purge(
         return
 
     count = sum(1 for _ in target_dir.rglob("*.md"))
-    shutil.rmtree(target_dir)
+    shutil.rmtree(target_dir, ignore_errors=True)
     target_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"Purged {count} memor{'y' if count == 1 else 'ies'} from scope '{scope}'.")
 

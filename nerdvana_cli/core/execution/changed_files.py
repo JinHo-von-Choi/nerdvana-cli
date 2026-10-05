@@ -38,7 +38,7 @@ async def snapshot(cwd: str) -> dict[str, str] | None:
     for relative in entries[:MAX_TRACKED]:
         path = Path(cwd) / relative
         try:
-            state[relative] = hashlib.sha1(path.read_bytes()[:MAX_BYTES]).hexdigest() if path.is_file() else "gone"
+            state[relative] = hashlib.sha256(path.read_bytes()[:MAX_BYTES]).hexdigest() if path.is_file() else "gone"
         except OSError:
             state[relative] = "unreadable"
     return state

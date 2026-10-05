@@ -146,6 +146,7 @@ def _aggregate(
         clauses.append(f"({_LEGACY_ONLY})")
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     try:
+        # iron-laws: ignore[IL-501] 내부 고정 템플릿과 화이트리스트 컬럼 결합이며 파라미터는 ? 바인딩 사용
         rows = conn.execute(template.format(select_cols=select_cols, where=where, group_by=group_by), params).fetchall()
     except sqlite3.OperationalError:
         return []

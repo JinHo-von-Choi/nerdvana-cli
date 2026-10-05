@@ -47,10 +47,11 @@ def has_config_file() -> bool:
 def load_config() -> dict[str, Any]:
     """Load existing config or return empty dict."""
     path = get_config_path()
-    if os.path.exists(path):
+    try:
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
-    return {}
+    except FileNotFoundError:
+        return {}
 
 
 def save_config(config: dict[str, Any], path: str = "") -> str:
@@ -209,7 +210,7 @@ def run_setup(force: bool = False) -> dict[str, Any] | None:
             provider_label = "Ollama (Self-hosted)"
             base_url_override = Prompt.ask(
                 "Ollama server URL",
-                default="http://192.168.1.100:11434/v1",
+                default="http://localhost:11434/v1",
             )
             use_key = Confirm.ask("Requires API key?", default=False)
             if use_key:

@@ -113,9 +113,9 @@ def skill_install(
 
     if dest.exists() and force:
         if dest.is_dir():
-            shutil.rmtree(dest)
+            shutil.rmtree(dest, ignore_errors=True)
         else:
-            dest.unlink()
+            dest.unlink(missing_ok=True)
 
     if path.is_dir():
         shutil.copytree(path, dest)
@@ -138,9 +138,9 @@ def skill_remove(name: str = typer.Argument(..., help="Skill name (without .md e
     for candidate in candidates:
         if candidate.exists():
             if candidate.is_dir():
-                shutil.rmtree(candidate)
+                shutil.rmtree(candidate, ignore_errors=True)
             else:
-                candidate.unlink()
+                candidate.unlink(missing_ok=True)
             console.print(f"Removed skill '[cyan]{name}[/cyan]'.")
             return
 

@@ -160,6 +160,12 @@ class HistoryIndex:
     def close(self) -> None:
         self._db.close()
 
+    def __enter__(self) -> HistoryIndex:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
     def sync(self, sessions_dir: Path, masker: SecretMasker) -> None:
         """Bring the index up to date with the transcripts in *sessions_dir*."""
         files = {p.stem: p for p in sessions_dir.glob("*.jsonl")} if sessions_dir.is_dir() else {}

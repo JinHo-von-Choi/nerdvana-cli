@@ -1,0 +1,9 @@
+respect_gitignore: true
+excludes:
+  - ".git"
+  - ".venv"
+  - "benchmarks"
+  - "__pycache__"
+  - ".pytest_cache"
+  - ".ruff_cache"
+fail_on: HIGH
