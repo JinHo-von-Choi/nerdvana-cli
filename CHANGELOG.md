@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-05
+
 ### Added
 
 - Multi-repository API migration and campaign orchestration (`nerdvana_cli.core.campaign`):
