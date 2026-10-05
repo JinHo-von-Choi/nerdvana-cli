@@ -73,6 +73,7 @@ if [ "$mode" = "release" ]; then
     fi
 
     step "wheel build and clean install"
+    rm -rf .venv312 .venvfresh
     uv build -q
     smoke="$work/smoke"
     uv venv -q "$smoke" --python 3.11
