@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-10-05
+
 ### Changed
 
 - The `minimax` provider's default model is now `MiniMax-M3.1-Flash-Preview` (was `MiniMax-M2`).
