@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-06
+
 ### Added
 
 - CLI command `nerdvana update` to update the installation directly from the terminal without entering an interactive session.
