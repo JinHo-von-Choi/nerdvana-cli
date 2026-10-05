@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - The `minimax` provider's default model is now `MiniMax-M3.1-Flash-Preview` (was `MiniMax-M2`).
 
+### Fixed
+
+- Replaced SHA-1 with SHA-256 for internal file change snapshots in `changed_files.py` to comply with current cryptographic guidelines.
+- Hardened `setup.py` against TOCTOU race conditions using EAFP file loading and set the default self-hosted Ollama server URL to `http://localhost:11434/v1`.
+- Made directory and file cleanup in `memory` and `skill` commands idempotent with `ignore_errors` and `missing_ok`.
+- Added context manager support (`__enter__` and `__exit__`) to `HistoryIndex` for deterministic resource release.
+
 ## [1.8.0] - 2026-10-04
 
 ### Added

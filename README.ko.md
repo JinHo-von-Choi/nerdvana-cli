@@ -18,7 +18,7 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 - **사용자 명령과 훅**: 마크다운 명령 템플릿과 셸 명령 훅. [사용자 명령과 명령 훅](#사용자-명령과-명령-훅) 참고.
 - **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 Agent Skills 표준을 따릅니다. `.agents/skills`, `.nerdvana/skills`, `.claude/skills`의 `SKILL.md` 디렉터리를 모델에게 목록으로 보여 주고 필요할 때 불러옵니다([docs/skills.md](docs/skills.md)).
 - **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
-- **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알린다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끈다.
+- **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알려줍니다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끌 수 있습니다.
 - **세션 지속성**: JSONL 트랜스크립트를 저장하고 `nerdvana session resume <id>`로 대화를 복원합니다
 - **자동 제공자 감지** — 모델 이름에서 적절한 제공자 자동 선택
 - **MCP 통합** — 외부 MCP 서버를 연결하여 도구 시스템 확장
@@ -633,14 +633,59 @@ external_projects_enabled: false
 
 ## 로컬 모델 (Ollama / vLLM)
 
+로컬 서빙 도구를 OpenAI 호환 엔드포인트로 연결합니다. 모델은 미리 내려받아 둡니다.
+
+### Ollama
+
+Ollama는 세 가지 방식으로 연결합니다.
+
+**로컬 (기본값)** — `http://localhost:11434/v1`. API 키와 별도 설정이 필요 없습니다.
+
 ```bash
-# Ollama — 먼저 모델 다운로드
 ollama pull qwen3
 nerdvana --provider ollama --model qwen3
+```
 
-# vLLM — 먼저 서버 시작
+**자체 호스팅** — 다른 호스트의 Ollama 주소를 지정합니다. 대화형 REPL은 `nerdvana.yml`, 단발 실행은 `--set`으로 지정합니다.
+
+```yaml
+# nerdvana.yml
+model:
+  provider: ollama
+  model: qwen3
+  base_url: http://ollama.example.com:11434/v1
+```
+
+```bash
+nerdvana run --provider ollama --model qwen3 \
+  --set model.base_url=http://ollama.example.com:11434/v1 \
+  "이 프로젝트의 구조를 설명해 줘"
+```
+
+**Ollama Cloud** — `https://ollama.com/v1`. `OLLAMA_API_KEY`가 필요합니다.
+
+```bash
+export OLLAMA_API_KEY="your-key"
+nerdvana run --provider ollama --model gpt-oss:120b \
+  --set model.base_url=https://ollama.com/v1 \
+  "최신 로컬 모델의 차이를 정리해 줘"
+```
+
+### vLLM
+
+OpenAI 호환 서버를 띄운 뒤 기본 주소 `http://localhost:8000/v1`로 연결합니다.
+
+```bash
 vllm serve Qwen/Qwen3-32B
 nerdvana --provider vllm --model Qwen/Qwen3-32B
+```
+
+원격 vLLM 서버도 `model.base_url`로 같은 방식으로 지정합니다.
+
+```bash
+nerdvana run --provider vllm --model Qwen/Qwen3-32B \
+  --set model.base_url=http://vllm.example.com:8000/v1 \
+  "이 프로젝트의 테스트를 실행해 줘"
 ```
 
 ## 개발

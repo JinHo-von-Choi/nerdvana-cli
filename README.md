@@ -654,14 +654,59 @@ Config search order. The first file that exists wins:
 
 ## Local Models (Ollama / vLLM)
 
+Connect a local serving tool through its OpenAI-compatible endpoint. Pull or serve the model first.
+
+### Ollama
+
+Ollama connects in three ways.
+
+**Local (default)** — `http://localhost:11434/v1`. No API key or extra configuration.
+
 ```bash
-# Ollama — pull a model first
 ollama pull qwen3
 nerdvana --provider ollama --model qwen3
+```
 
-# vLLM — start server first
+**Self-hosted** — point at an Ollama server on another host. Set it in `nerdvana.yml` for the REPL, or with `--set` for a single run.
+
+```yaml
+# nerdvana.yml
+model:
+  provider: ollama
+  model: qwen3
+  base_url: http://ollama.example.com:11434/v1
+```
+
+```bash
+nerdvana run --provider ollama --model qwen3 \
+  --set model.base_url=http://ollama.example.com:11434/v1 \
+  "Explain the structure of this project"
+```
+
+**Ollama Cloud** — `https://ollama.com/v1`. Requires `OLLAMA_API_KEY`.
+
+```bash
+export OLLAMA_API_KEY="your-key"
+nerdvana run --provider ollama --model gpt-oss:120b \
+  --set model.base_url=https://ollama.com/v1 \
+  "Summarize the differences between the recent local models"
+```
+
+### vLLM
+
+Start an OpenAI-compatible server and connect to its default address `http://localhost:8000/v1`.
+
+```bash
 vllm serve Qwen/Qwen3-32B
 nerdvana --provider vllm --model Qwen/Qwen3-32B
+```
+
+A remote vLLM server is set the same way through `model.base_url`.
+
+```bash
+nerdvana run --provider vllm --model Qwen/Qwen3-32B \
+  --set model.base_url=http://vllm.example.com:8000/v1 \
+  "Run the tests of this project"
 ```
 
 ## Development
