@@ -40,12 +40,13 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 | `campaign` | multi-repository campaigns: the manifest of repository tasks, the checkpoint written as work moves on, the isolated worktrees each task runs in and the rollback of a task whose verification failed |
 | `evidence` | the self-contained evidence bundle an auditor reads without the repository: the contract and receipt digests, the diff, the static analysis and test output, the verdict and the checksum that pins them (`core/evidence/receipt_bundle.py`) |
 | `recommend` | routing one migration task: the deterministic AST pass, or a surgical LLM pass on the high-reasoning tier for critical or wide-context work and the fast standard tier otherwise, each with its estimated cost (`core/recommend/migration_router.py`) |
+| `harness` | the surface of a run: the eight components around the model (c1 system prompt, c2 guardrails, c3 memory, c4 tool guidance, c5 subagents, c6 skills, c7 scripts, c8 hooks) as one tree, the omitted-is-inherited merge and the validator that refuses a changed guardrail (`core/harness/surface.py`) |
 
 `core.evidence` and `core.recommend` import nothing else from `core`, so they are placed last in the direction
 below, where they break no rule of it.
 
 Allowed direction, lowest first: `contract`, `config`, `hooks`, `state`, `context`, `tool`, `safety`, `telemetry`,
-`execution`, `loop`, `delegation`, `campaign`, `evidence`, `recommend`. A subpackage imports only those before it.
+`execution`, `loop`, `delegation`, `campaign`, `evidence`, `recommend`, `harness`. A subpackage imports only those before it.
 Four rules are tested
 (`tests/contracts/test_core_subpackages.py`): `config` imports nothing else from `core`; `context`,
 `safety` and `telemetry` never import `loop`; only `loop` and the `tools` package import `execution`;

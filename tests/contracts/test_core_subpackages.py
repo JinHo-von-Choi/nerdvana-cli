@@ -36,6 +36,7 @@ SUBPACKAGES: frozenset[str] = frozenset(
         "campaign",
         "evidence",
         "recommend",
+        "harness",
     },
 )
 
