@@ -655,6 +655,38 @@ Config search order. The first file that exists wins:
 5. `~/.nerdvana/config.yml`
 6. `~/.config/nerdvana-cli/config.yml` (legacy location, read for backwards compatibility)
 
+### Settings layers (`--profile`, `--patch`, `--dump-config`)
+
+A run's settings are not one file. They are applied in this order, and the
+later layer overrides the earlier one:
+
+1. the base configuration (the config file above)
+2. the profile of the front end — `--profile tui | headless | acp | serve | bench-strict`
+3. the patch of your home — `~/.nerdvana/nerdvana.patch.yml`
+4. the patch of the project — `<cwd>/.nerdvana/nerdvana.patch.yml`
+5. the command line — `--patch section.field=value` (repeatable)
+
+A patch file holds one key per line:
+
+```yaml
+session:
+  max_turns: 50
+```
+
+A profile never changes the permission mode: that is your decision, not the
+front end's. A project patch and the command line may not change the
+`permissions`, `hooks`, `sandbox` or `secrets` sections at all — a repository
+and a command line do not loosen the rules of the run they start.
+
+`--dump-config` prints the settings the run would use and the layer every key
+came from, so a surprising setting is a lookup away:
+
+```bash
+nerdvana --profile bench-strict --dump-config
+```
+
+Credentials are never printed: a field that holds one reads `[set]`.
+
 ## Local Models (Ollama / vLLM)
 
 Connect a local serving tool through its OpenAI-compatible endpoint. Pull or serve the model first.

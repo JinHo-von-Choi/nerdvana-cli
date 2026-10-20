@@ -27,7 +27,7 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 
 | Subpackage | Owns |
 |-|-|
-| `config` | the settings model and its sources, runtime paths, data migration, managed policy, model choice for a spec |
+| `config` | the settings model and its sources, the layers a run composes them in (base, profile, home patch, project patch, command line) with the provenance of every key, runtime paths, data migration, managed policy, model choice for a spec |
 | `hooks` | the lifecycle event engine, shell command hooks, user hook modules |
 | `state` | sessions, checkpoints, todos, goals, rewind marks, the run store, shared cost budgets, concurrency slots, the run signal counters, the session projections |
 | `context` | the system prompt, NIRNA.md, skills, memories, user slash commands, the tool index, token estimation, compaction (client-side and provider-side) and observation masking |

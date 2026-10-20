@@ -634,6 +634,36 @@ external_projects_enabled: false
 5. `~/.nerdvana/config.yml`
 6. `~/.config/nerdvana-cli/config.yml` (마이그레이션 이전 위치, 하위 호환을 위해 계속 읽음)
 
+### 설정 계층 (`--profile`, `--patch`, `--dump-config`)
+
+실행의 설정은 파일 하나가 아닙니다. 아래 순서로 겹쳐서 적용되고, 뒤에 오는 층이 앞의 층을 덮습니다:
+
+1. 기본 설정 (위의 설정 파일)
+2. 프런트엔드 프로필 — `--profile tui | headless | acp | serve | bench-strict`
+3. 홈 패치 — `~/.nerdvana/nerdvana.patch.yml`
+4. 프로젝트 패치 — `<cwd>/.nerdvana/nerdvana.patch.yml`
+5. 커맨드 라인 — `--patch section.field=value` (반복 가능)
+
+패치 파일은 줄마다 키 하나씩을 담습니다:
+
+```yaml
+session:
+  max_turns: 50
+```
+
+프로필은 권한 모드를 절대 바꾸지 않습니다. 권한 모드는 사용자의 결정이지 프런트엔드의 결정이 아닙니다.
+프로젝트 패치와 커맨드 라인은 `permissions`, `hooks`, `sandbox`, `secrets` 섹션을 바꿀 수 없습니다.
+저장소와 커맨드 라인이 자신이 시작한 실행의 규칙을 느슨하게 만들 수는 없습니다.
+
+`--dump-config`는 실행이 쓰게 될 설정과 각 키가 어느 층에서 왔는지까지 출력합니다.
+의아한 설정은 한 번의 조회로 답을 얻습니다:
+
+```bash
+nerdvana --profile bench-strict --dump-config
+```
+
+자격 증명은 절대 출력하지 않습니다. 값을 담는 필드는 `[set]`으로 표시됩니다.
+
 ## 로컬 모델 (Ollama / vLLM)
 
 로컬 서빙 도구를 OpenAI 호환 엔드포인트로 연결합니다. 모델은 미리 내려받아 둡니다.

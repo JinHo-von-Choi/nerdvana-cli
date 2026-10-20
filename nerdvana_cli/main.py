@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from typing import Any
+from collections.abc import Sequence
 
 import typer
 from rich.console import Console
 
 from nerdvana_cli import __version__
 from nerdvana_cli.acp.command import acp_command
-from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.cli.commands.admin_command import admin_app
 from nerdvana_cli.cli.commands.agents_command import agents_app
 from nerdvana_cli.cli.commands.history_command import history_app
@@ -23,19 +22,23 @@ from nerdvana_cli.cli.commands.schedule_command import schedule_app
 from nerdvana_cli.cli.commands.session_command import session_app
 from nerdvana_cli.cli.commands.skill_command import skill_app
 from nerdvana_cli.cli.commands.workflow_command import workflow_app
+from nerdvana_cli.cli.run_helpers import (
+    _apply_run_overrides,
+    _fill_outcome,
+    _load_run_images,
+    _start_run_loop,
+    _validate_run_flags,
+)
 from nerdvana_cli.cli.runtime import (
     APPROVAL_MODE_MAP,
     console,
     console_stderr,
-    enforce_managed_policy,
-    load_settings,
+    load_layered_settings,
     repl_loop,
     resolve_run_provider,
     run_migration_once,
+    show_layered_settings,
 )
-from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.loop.agent_loop import AgentLoop
-from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 
@@ -112,6 +115,45 @@ _MAIN_HELP: str = (
 )
 
 
+def _start_repl(
+    config:        str,
+    cwd:           str,
+    verbose:       bool,
+    model:         str,
+    provider:      str,
+    max_tokens:    int,
+    approval_mode: str,
+    profile:       str,
+    patches:       Sequence[str],
+) -> None:
+    """Start the interactive terminal with the settings layers of this run."""
+    # Suppress "Event loop is closed" warnings from subprocess GC
+    original_unraisablehook = sys.unraisablehook
+
+    def _quiet_unraisable(unraisable: sys.UnraisableHookArgs) -> None:
+        if unraisable.exc_type is RuntimeError and "Event loop is closed" in str(unraisable.exc_value):
+            return
+        original_unraisablehook(unraisable)
+
+    sys.unraisablehook = _quiet_unraisable
+
+    # --approval-mode shorthand → default_mode override applied in repl_loop
+    resolved_approval = approval_mode.strip().lower() if approval_mode else ""
+    asyncio.run(
+        repl_loop(
+            config_path    = config or None,
+            cwd            = cwd or os.getcwd(),
+            verbose        = verbose,
+            model          = model or None,
+            provider       = provider or None,
+            max_tokens     = max_tokens or None,
+            approval_mode  = resolved_approval or None,
+            profile        = profile,
+            patches        = patches,
+        )
+    )
+
+
 @app.callback(invoke_without_command=True, help=_MAIN_HELP)
 def main(
     ctx: typer.Context,
@@ -132,6 +174,9 @@ def main(
         "--no-update-check",
         help="Skip the startup new-version check for this run.",
     ),
+    profile: str = typer.Option("", "--profile", help="Settings profile: tui | headless | acp | serve | bench-strict"),
+    patch: list[str] | None = typer.Option(None, "--patch", help="Override one setting for this run: section.field=value (repeatable)"),  # noqa: B008
+    dump_config: bool = typer.Option(False, "--dump-config", help="Print the settings this run would use and where every key came from"),
 ) -> None:
     """Root callback.
 
@@ -146,6 +191,10 @@ def main(
         _maybe_show_update_notice()
         raise typer.Exit()
 
+    if dump_config:
+        show_layered_settings(config, profile, patch or (), cwd)
+        raise typer.Exit()
+
     if ctx.invoked_subcommand is not None:
         # A subcommand owns stdout from here on, and `serve --transport stdio`
         # speaks JSON-RPC there: a notice printed on stdout would corrupt the
@@ -154,108 +203,7 @@ def main(
         return
 
     _maybe_show_update_notice()
-
-    if ctx.invoked_subcommand is None:
-        # Suppress "Event loop is closed" warnings from subprocess GC
-        _original_unraisablehook = sys.unraisablehook
-
-        def _quiet_unraisable(unraisable: sys.UnraisableHookArgs) -> None:
-            if unraisable.exc_type is RuntimeError and "Event loop is closed" in str(unraisable.exc_value):
-                return
-            _original_unraisablehook(unraisable)
-
-        sys.unraisablehook = _quiet_unraisable
-
-        # --approval-mode shorthand → default_mode override applied in repl_loop
-        resolved_approval = approval_mode.strip().lower() if approval_mode else ""
-
-        asyncio.run(
-            repl_loop(
-                config_path    = config or None,
-                cwd            = cwd or os.getcwd(),
-                verbose        = verbose,
-                model          = model or None,
-                provider       = provider or None,
-                max_tokens     = max_tokens or None,
-                approval_mode  = resolved_approval or None,
-            )
-        )
-
-
-def _apply_run_overrides(settings: NerdvanaSettings, overrides: dict[str, Any], assignments: list[str]) -> None:
-    """Set each ``section.field`` of *settings* from a command-line value, skipping the unset ones.
-
-    Unset means empty, zero or False, the options' defaults. *assignments* are the ``--set`` strings;
-    one that cannot be applied ends the command with the configuration exit code.
-    """
-    from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.config.settings import apply_settings_overrides
-
-    for dotted, value in overrides.items():
-        if value:
-            section, field = dotted.split(".")
-            setattr(getattr(settings, section), field, value)
-    try:
-        apply_settings_overrides(settings, assignments)
-    except ValueError as exc:
-        console_stderr.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(EXIT_CONFIG) from exc
-    enforce_managed_policy(settings)
-
-
-def _receipt_of(loop: Any, verification: dict[str, Any] | None) -> dict[str, Any] | None:
-    """The receipt of a run, or None when it changed nothing and checked nothing."""
-    from nerdvana_cli.cli.receipt import build_receipt
-    from nerdvana_cli.core.telemetry.analytics import AnalyticsReader
-
-    receipt = build_receipt(loop, verification, AnalyticsReader().cost_breakdown(loop.session.session_id))
-    return receipt if receipt["files_changed"] or verification else None
-
-
-def _load_run_images(paths: list[str], cwd: str, reporter: Any, outcome: Any) -> list[dict[str, Any]]:
-    """The image blocks named by ``--image``; a file that cannot be sent ends the command with the configuration exit code."""
-    from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.loop.images import ImageError, load_images
-
-    try:
-        return load_images(paths, cwd)
-    except ImageError as exc:
-        outcome.stop = "config"
-        reporter.failure(outcome, str(exc))
-        raise typer.Exit(EXIT_CONFIG) from exc
-
-
-def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
-    """Copy what the finished loop measured into the run result."""
-    outcome.provider     = loop.settings.model.provider
-    outcome.model        = loop.settings.model.model
-    outcome.turns        = loop.turns_used
-    outcome.cost_usd     = loop.total_cost_usd()
-    outcome.usage        = loop.usage_summary()
-    outcome.signals      = loop.signal_summary()
-    outcome.verification = loop.verification_summary()
-    outcome.receipt      = _receipt_of(loop, outcome.verification)
-    outcome.duration_ms  = duration_ms
-
-
-def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outcome: Any) -> tuple[SessionStorage, AgentLoop]:
-    """The session and agent loop of a run: a new session, or with ``--resume`` the recorded one with its conversation restored."""
-    from nerdvana_cli.cli.run_output import EXIT_CONFIG
-    from nerdvana_cli.core.delegation.task_state import TaskRegistry
-
-    resumed = resume_session_id(resume) if resume else None
-    session = SessionStorage(session_id=resumed, persist=settings.session.persist)
-    if resume and not (resumed and session.load_messages()):
-        outcome.stop = "config"
-        reporter.failure(outcome, f"Cannot resume session '{resume}': no recorded conversation.")
-        raise typer.Exit(EXIT_CONFIG)
-    if resumed and session.orphaned_compaction_lock():
-        # A compaction that never finished: the history it was rewriting is still in the transcript.
-        console.print(f"[yellow]Warning: session '{resumed}' was interrupted during a compaction; its history may be half rewritten.[/yellow]")
-    loop = build_agent_loop(settings, ExecutionProfile(session=session, task_registry=TaskRegistry()))
-    if resumed:
-        loop.restore_history()
-    return session, loop
+    _start_repl(config, cwd, verbose, model, provider, max_tokens, approval_mode, profile, patch or ())
 
 
 @app.command()
@@ -283,6 +231,8 @@ def run(
     image: list[str] | None = typer.Option(None, "--image", help="Attach an image (PNG, JPEG, GIF or WebP) to the prompt (repeatable)"),  # noqa: B008
     scope: list[str] | None = typer.Option(None, "--scope", help="With --verify: paths the task is about; an edit elsewhere is refused unless someone approves it"),  # noqa: B008
     set_values: list[str] | None = typer.Option(None, "--set", help="Override one setting for this run: section.field=value (repeatable), e.g. --set session.compact_threshold=0.5"),  # noqa: B008
+    profile: str = typer.Option("", "--profile", help="Settings profile: tui | headless | acp | serve | bench-strict"),
+    patch: list[str] | None = typer.Option(None, "--patch", help="Override one setting for this run: section.field=value (repeatable)", ),  # noqa: B008
     resume: str = typer.Option("", "--resume", help="Continue the recorded conversation of this session id; the prompt is the next message"),
 ) -> None:
     """Run a single prompt non-interactively.
@@ -297,14 +247,11 @@ def run(
     from nerdvana_cli.core.state.goal import Goal
 
     resolved_approval = approval_mode.strip().lower()
-    for flag, value, allowed in (
+    _validate_run_flags((
         ("--output-format", output_format,     FORMATS),
         ("--sandbox",       sandbox,           SANDBOX_MODES),
         ("--approval-mode", resolved_approval, tuple(APPROVAL_MODE_MAP)),
-    ):
-        if value and value not in allowed:
-            console_stderr.print(f"[red]Error: {flag} must be one of {', '.join(allowed)}.[/red]")
-            raise typer.Exit(EXIT_CONFIG)
+    ))
 
     def _write(text: str) -> None:
         sys.stdout.write(text)
@@ -313,7 +260,7 @@ def run(
     reporter = RunReporter(output_format, _write, console)
     outcome  = RunResult()
 
-    settings = load_settings(config or None)
+    settings, _composed = load_layered_settings(config, profile, patch or (), cwd)
     for warning in settings.load_warnings:
         console_stderr.print(f"[dim yellow]Config: {warning.format()}[/dim yellow]")
     run_migration_once(console_stderr if reporter.machine_readable else None)

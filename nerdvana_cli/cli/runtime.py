@@ -10,6 +10,7 @@ Date:   2026-10-03
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import typer
@@ -18,6 +19,7 @@ from rich.markup import escape
 from rich.prompt import Prompt
 
 from nerdvana_cli.core.config.migrate import run_if_needed as _migrate_run
+from nerdvana_cli.core.config.profile_layers import ComposedSettings, dump_config
 from nerdvana_cli.core.config.settings import NerdvanaSettings, SettingsLoadError
 from nerdvana_cli.core.telemetry.telemetry_otel import setup as setup_tracing
 
@@ -40,6 +42,39 @@ def load_settings(config_path: str | None = None) -> NerdvanaSettings:
     except SettingsLoadError as exc:
         console_stderr.print(f"[bold red]Invalid configuration:[/bold red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(2) from None
+
+
+def load_layered_settings(
+    config_path: str = "",
+    profile:     str = "",
+    patches:     Sequence[str] = (),
+    cwd:         str = "",
+) -> tuple[NerdvanaSettings, ComposedSettings]:
+    """The settings of a run with every layer applied, and where every key came from.
+
+    The layers are the base configuration, the profile of the front end, the patch
+    of the user's home, the patch of the project and the command line overlay. A
+    rejected configuration ends the command with the configuration exit code.
+    """
+    from nerdvana_cli.core.config.profile_layers import load_settings_with_layers
+
+    try:
+        return load_settings_with_layers(config_path, profile, patches, cwd)
+    except (SettingsLoadError, ValueError) as exc:
+        console_stderr.print(f"[bold red]Invalid configuration:[/bold red] {escape(str(exc))}", soft_wrap=True)
+        raise typer.Exit(2) from None
+
+
+def show_layered_settings(
+    config_path: str = "",
+    profile:     str = "",
+    patches:     Sequence[str] = (),
+    cwd:         str = "",
+) -> None:
+    """Print the settings this run would use, and the layer every key came from."""
+    settings, composed = load_layered_settings(config_path, profile, patches, cwd)
+    # The dump is YAML, not markup: a value like "[set]" must reach the screen as it is.
+    console.print(dump_config(settings, composed), soft_wrap=True, markup=False)
 
 
 def enforce_managed_policy(settings: NerdvanaSettings) -> None:
@@ -116,13 +151,15 @@ async def repl_loop(
     max_tokens:    int | None = None,
     approval_mode: str | None = None,
     resume_id:     str | None = None,
+    profile:       str        = "",
+    patches:       Sequence[str] = (),
 ) -> None:
     """Interactive REPL loop.
 
     ``resume_id`` names a session transcript to continue; without it the
-    ``NERDVANA_RESUME`` environment variable is still honoured.
-    """
-    settings = load_settings(config_path)
+    ``NERDVANA_RESUME`` environment variable is still honoured. ``profile`` and
+    ``patches`` are the settings layers of this run."""
+    settings, _composed = load_layered_settings(config_path or "", profile, patches, cwd)
     run_migration_once()
     settings.cwd     = cwd
     settings.verbose = verbose
