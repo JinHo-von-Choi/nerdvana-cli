@@ -472,7 +472,7 @@ Sub-agents share the session's language server and MCP connections, follow the s
 | `json_parse_recovery` | When a tool result fails JSON parsing, asks for valid JSON. |
 | `ralph_loop_check` | On `end_turn`, asks the agent to finish `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요` or `# 미구현` markers. End-of-turn hooks may continue a turn at most three times per prompt. |
 | Repeat guard | The same tool call with identical arguments draws a warning at the third consecutive repeat and is refused at the fifth (`TaskGet` polling excepted). |
-| Output bounds | Tool results are capped at about 30,000 tokens (10,000 for `WebFetch`), keeping head and tail; the full output is saved under `~/.nerdvana/tool-output/`. |
+| Output bounds | A tool result is kept inline up to 12,000 characters (and up to about 30,000 tokens — 10,000 for `WebFetch`); a longer result keeps its head and its tail, and its full text is written to `~/.nerdvana/tool-output/session-<digest>/`, which the note names so the model can read it back with FileRead or Grep. `tools.max_result_chars` overrides the limit per tool. |
 
 ## Permissions and Approval Modes
 

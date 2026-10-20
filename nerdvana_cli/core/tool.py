@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import os
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from nerdvana_cli.core.context.token_estimator import approx_tokens
@@ -25,33 +22,37 @@ AskUserCallback = Callable[[str, list[str]], Awaitable[str | None]]
 # approval, and resolves to True only when the user allowed the call.
 ConfirmCallback = Callable[[str, str], Awaitable[bool]]
 
-# Directory where full outputs are kept when a result is truncated. Set by the
-# tool executor for the duration of one call; unset means no copy is kept.
-TOOL_OUTPUT_DIR: ContextVar[str | None] = ContextVar("tool_output_dir", default=None)
+# Share of a truncated result kept from the start; the rest comes from the end.
+_HEAD_SHARE = 0.6
+# Characters a character-limited result leaves for the note that says it was cut.
+_NOTE_RESERVE = 400
+
+
+@dataclass(frozen=True)
+class SpillTarget:
+    """How a cut result is spilled during one tool call.
+
+    The seam is a plain function so that this module stays independent of the
+    store that keeps the copy; the tool executor supplies it.
+    """
+
+    session_id: str
+    call_id:    str
+    spill:      Callable[[str, str, int], str]   # (tool name, content, limit) -> the preview
+
+
+# The spill seam of the current tool call. Set by the tool executor for the
+# duration of one call; unset means the result is cut inline and no copy is kept.
+TOOL_SPILL: ContextVar[SpillTarget | None] = ContextVar("tool_spill", default=None)
 
 # Most characters of a result to keep (``tools.max_result_chars``). Set by the tool executor for the duration
 # of one call; unset means the tool's own ``max_result_tokens`` applies.
 TOOL_RESULT_CAP: ContextVar[int | None] = ContextVar("tool_result_cap", default=None)
 
-# Share of a truncated result kept from the start; the rest comes from the end.
-_HEAD_SHARE = 0.6
-# Characters a character-limited result leaves for the note that says it was cut (it also names the saved file).
-_NOTE_RESERVE = 400
-
-
-def _save_full_output(tool_name: str, content: str) -> str | None:
-    """Write *content* under ``TOOL_OUTPUT_DIR``; return the path, or None."""
-    directory = TOOL_OUTPUT_DIR.get()
-    if not directory:
-        return None
-    try:
-        os.makedirs(directory, mode=0o700, exist_ok=True)
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in tool_name) or "tool"
-        path = Path(directory) / f"{safe}-{uuid.uuid4().hex[:8]}.txt"
-        path.write_text(content, encoding="utf-8")
-        return str(path)
-    except OSError:
-        return None
+# Most characters of a result kept inline when the tool states no limit of its
+# own. Set by the tool executor for the duration of one call; unset means the
+# tool's own ``max_result_tokens`` applies.
+TOOL_INLINE_LIMIT: ContextVar[int | None] = ContextVar("tool_inline_limit", default=None)
 
 
 class ToolCategory(StrEnum):
@@ -152,39 +153,58 @@ class BaseTool(ABC, Generic[T]):
         return None
 
     def truncate_result(self, content: str) -> str:
-        """Bound *content* to ``max_result_tokens``, or to the character limit of ``TOOL_RESULT_CAP``, keeping its head and tail.
+        """Bound *content* to the inline limit, keeping its head and tail.
 
-        When the executor has set ``TOOL_OUTPUT_DIR`` the full output is saved
-        there first and the note names the file.
+        The tool executor states the limit (``tools.max_result_chars`` or the
+        default inline limit) and the spill seam; a result that does not fit is
+        written to the spill store whole and replaced by a head+tail preview
+        that names the file. Outside an executor call the tool's own
+        ``max_result_tokens`` applies and the text is cut inline.
         """
+        limit = self._inline_limit(content)
+        if limit is None:
+            return self._cut_to_tokens(content)
+        target = TOOL_SPILL.get()
+        if target is None:
+            return self._cut_to_chars(content, limit)
+        return target.spill(self.name, content, limit)
+
+    def _inline_limit(self, content: str) -> int | None:
+        """The most characters of *content* kept inline, or None when no limit is stated."""
         cap = TOOL_RESULT_CAP.get()
         if cap is not None:
-            return self._truncate_to_chars(content, cap)
+            return cap  # the configured cap overrides the tool's own limit
+        limit = TOOL_INLINE_LIMIT.get()
+        if limit is None:
+            return None
+        total = approx_tokens(content)
+        if total > self.max_result_tokens:
+            # the tool's own token budget still bounds the result
+            limit = min(limit, int(len(content) * self.max_result_tokens / total * 0.9))
+        return limit
+
+    def _cut_to_tokens(self, content: str) -> str:
+        """*content* cut to the tool's own token budget; no copy is kept outside an executor call."""
         total = approx_tokens(content)
         if total <= self.max_result_tokens:
             return content
         keep = int(len(content) * self.max_result_tokens / total * 0.9)
         return self._cut(content, keep, f"about {total - self.max_result_tokens} of {total} estimated tokens omitted.")
 
-    def _truncate_to_chars(self, content: str, cap: int) -> str:
-        """*content* cut to about *cap* characters; the note is part of the budget, so a cut result is not cut again."""
-        if len(content) <= cap:
+    def _cut_to_chars(self, content: str, limit: int) -> str:
+        """*content* cut to about *limit* characters; the note is part of the budget, so a cut result is not cut again."""
+        if len(content) <= limit:
             return content
-        keep = max(cap - _NOTE_RESERVE, cap // 2)
+        keep = max(limit - _NOTE_RESERVE, limit // 2)
         return self._cut(content, keep, f"{len(content) - keep} of {len(content)} characters omitted.")
 
     def _cut(self, content: str, keep: int, omitted: str) -> str:
-        """Keep *keep* characters of *content*, head and tail, and say what was left out and where the whole is."""
-        saved = _save_full_output(self.name, content)
-        head  = int(keep * _HEAD_SHARE)
-        tail  = keep - head
-        where = (
-            f" Full output saved to {saved}; read parts of it with Bash (for example sed -n '1,200p')."
-            if saved else ""
-        )
+        """Keep *keep* characters of *content*, head and tail, and say what was left out."""
+        head = int(keep * _HEAD_SHARE)
+        tail = keep - head
         note = (
             f"\n\n... [truncated: {omitted}"
-            f"{where} Prefer narrowing the request (offset/limit, a more specific pattern).] ...\n\n"
+            f" Prefer narrowing the request (offset/limit, a more specific pattern).] ...\n\n"
         )
         return content[:head] + note + (content[-tail:] if tail > 0 else "")
 

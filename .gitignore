@@ -71,6 +71,9 @@ retrospectives/
 docs/retrospectives/
 docs/adr/
 
+# Local tool artifacts
+.samcheonpo/
+
 # LSP benchmark fixtures fetched on demand (see scripts/fetch_lsp_bench_fixtures.sh)
 tests/lsp/fixtures-medium/
 tests/contracts/.internal_terms

@@ -15,7 +15,7 @@ from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.config.settings_sections import MIN_RESULT_CHARS, ToolsConfig
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
-from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, TOOL_RESULT_CAP, BaseTool, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import TOOL_RESULT_CAP, BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.types import ToolResult
 
 
@@ -75,33 +75,27 @@ def test_the_setting_is_read_from_the_config_file_and_a_bad_entry_falls_back_wit
 # ---------------------------------------------------------------------------
 
 
-def test_a_result_over_the_cap_keeps_head_and_tail_and_names_the_saved_file(tmp_path: Path) -> None:
+def test_a_result_over_the_cap_keeps_head_and_tail(tmp_path: Path) -> None:
     tool, body = _Big("Big", _body(50_000)), _body(50_000)
-    dir_token  = TOOL_OUTPUT_DIR.set(str(tmp_path))
     cap_token  = TOOL_RESULT_CAP.set(5_000)
     try:
         cut = tool.truncate_result(body)
     finally:
         TOOL_RESULT_CAP.reset(cap_token)
-        TOOL_OUTPUT_DIR.reset(dir_token)
     assert len(cut) <= 5_000
     assert cut.startswith(body[:100]) and cut.endswith(body[-100:])
     assert "45400 of 50000 characters omitted" in cut                 # 4,600 kept: the cap less the room for this note
-    (saved,) = list(tmp_path.glob("Big-*.txt"))
-    assert saved.read_text(encoding="utf-8") == body and str(saved) in cut
 
 
 def test_a_result_within_the_cap_is_untouched_and_a_cut_one_is_not_cut_again(tmp_path: Path) -> None:
     tool = _Big("Big", "")
     token = TOOL_RESULT_CAP.set(MIN_RESULT_CHARS)
-    dir_token = TOOL_OUTPUT_DIR.set(str(tmp_path))
     try:
         assert tool.truncate_result("short") == "short"
         once = tool.truncate_result(_body(20_000))
         assert len(once) <= MIN_RESULT_CHARS
         assert tool.truncate_result(once) == once
     finally:
-        TOOL_OUTPUT_DIR.reset(dir_token)
         TOOL_RESULT_CAP.reset(token)
 
 
@@ -132,11 +126,15 @@ async def _run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caps: dict[str, 
 
 async def test_the_executor_applies_the_cap_of_the_tool_called(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     body = _body(40_000)
-    assert await _run(tmp_path, monkeypatch, {}, "Big", body) == body                       # under the tool's own 30,000 tokens
+    default = await _run(tmp_path, monkeypatch, {}, "Big", body)              # no cap: the default inline limit applies
+    assert default != body
+    assert "Full result spilled to" in default
+    assert default.startswith(body[:50]) and default.endswith(body[-50:])
+    (spilled,) = list((tmp_path / "data" / "tool-output").glob("session-*/*.txt"))
+    assert spilled.read_text(encoding="utf-8") == body                      # the whole output was saved
     capped = await _run(tmp_path, monkeypatch, {"Big": 4_000}, "Big", body)
     assert len(capped) <= 4_000 and capped.startswith(body[:50]) and capped.endswith(body[-50:])
-    assert list((tmp_path / "data" / "tool-output" / "caps").glob("Big-*.txt"))               # the whole output was saved
-    assert await _run(tmp_path, monkeypatch, {"Other": 4_000}, "Big", body) == body        # another tool's cap does not apply
+    assert "Full result spilled to" in capped
 
 
 async def test_an_mcp_tool_is_capped_by_its_full_name_or_a_server_glob(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,7 +142,8 @@ async def test_an_mcp_tool_is_capped_by_its_full_name_or_a_server_glob(tmp_path:
     by_glob = await _run(tmp_path, monkeypatch, {"mcp__github__*": 3_000}, "mcp__github__search", body)
     by_name = await _run(tmp_path, monkeypatch, {"mcp__github__search": 2_000}, "mcp__github__search", body)
     other   = await _run(tmp_path, monkeypatch, {"mcp__github__*": 3_000}, "mcp__jira__search", body)
-    assert len(by_glob) <= 3_000 and len(by_name) <= 2_000 and other == body
+    assert len(by_glob) <= 3_000 and len(by_name) <= 2_000
+    assert other != body and "Full result spilled to" in other                # no cap of its own: the default limit applies
 
 
 async def test_a_cap_above_the_tools_own_limit_lets_more_through(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

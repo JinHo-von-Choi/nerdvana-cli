@@ -299,7 +299,7 @@ A consultation is a request on the advisor's model: it is recorded in the ledger
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_result_chars` | map | `{}` | Tool name to the most characters of its result kept in the conversation, overriding the tool's own limit. A key is a tool name (`Bash`, `mcp__github__search_code`) or a glob (`mcp__github__*`); an exact name beats a glob and a longer glob beats a shorter one. A longer result keeps its head and its tail, the full text is saved under `~/.nerdvana/tool-output/<session>/` and the note names the file. The smallest value is 1000. Example: `{Grep: 8000, "mcp__*": 4000}`. |
+| `max_result_chars` | map | `{}` | Tool name to the most characters of its result kept in the conversation, overriding the tool's own limit and the default inline limit of 12,000 characters. A key is a tool name (`Bash`, `mcp__github__search_code`) or a glob (`mcp__github__*`); an exact name beats a glob and a longer glob beats a shorter one. A longer result keeps its head and its tail, the full text is written to `~/.nerdvana/tool-output/session-<digest>/` and the note names the file so the model can read it back with FileRead or Grep. The smallest value is 1000. Example: `{Grep: 8000, "mcp__*": 4000}`. |
 
 ### `checkpoint` (CheckpointConfig)
 

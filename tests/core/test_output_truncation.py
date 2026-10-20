@@ -15,7 +15,7 @@ from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.core.execution.tool_executor import ToolExecutor
 from nerdvana_cli.core.hooks.hooks import HookEngine
-from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, BaseTool, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import TOOL_SPILL, BaseTool, ToolContext, ToolRegistry
 from nerdvana_cli.tools.web_tools import WebFetchTool
 from nerdvana_cli.types import ToolResult
 
@@ -62,17 +62,10 @@ def test_non_latin_output_is_bounded_too() -> None:
     assert approx_tokens(result) <= 1_000
 
 
-def test_full_output_is_saved_when_a_directory_is_set(tmp_path: Path) -> None:
-    body  = "z" * 20_000
-    token = TOOL_OUTPUT_DIR.set(str(tmp_path / "out"))
-    try:
-        result = _Big().truncate_result(body)
-    finally:
-        TOOL_OUTPUT_DIR.reset(token)
-    saved = list((tmp_path / "out").iterdir())
-    assert len(saved) == 1
-    assert saved[0].read_text(encoding="utf-8") == body
-    assert str(saved[0]) in result
+def test_a_result_cut_outside_an_executor_call_keeps_no_copy() -> None:
+    result = _Big().truncate_result("z" * 20_000)
+    assert "truncated" in result
+    assert "spilled" not in result
 
 
 def test_no_copy_is_written_outside_an_executor_call(tmp_path: Path) -> None:
@@ -84,17 +77,19 @@ def test_web_fetch_has_a_tighter_cap() -> None:
     assert WebFetchTool.max_result_tokens < BaseTool.max_result_tokens
 
 
-async def test_executor_saves_into_the_session_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+async def test_executor_spills_the_full_output_into_the_session_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     registry = ToolRegistry()
-    registry.register(_Big("w" * 20_000))
+    body     = "w" * 40_000
+    registry.register(_Big(body))
     executor = ToolExecutor(registry=registry, hooks=HookEngine(), settings=NerdvanaSettings())
     context  = ToolContext(cwd=str(tmp_path))
     context.state["session_id"] = "s-77"
 
     results = await executor.run_batch([{"id": "c1", "name": "Big", "input": {}}], context)
 
-    saved = list((tmp_path / "data" / "tool-output" / "s-77").iterdir())
+    saved = list((tmp_path / "data" / "tool-output").glob("session-*/*.txt"))
     assert len(saved) == 1
+    assert saved[0].read_text(encoding="utf-8") == body
     assert str(saved[0]) in results[0].content
-    assert TOOL_OUTPUT_DIR.get() is None
+    assert TOOL_SPILL.get() is None

@@ -19,6 +19,7 @@ from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.config.settings_sections import ToolsConfig
 from nerdvana_cli.core.context.token_estimator import estimate_tokens
 from nerdvana_cli.core.execution.progress_monitor import ProgressMonitor
+from nerdvana_cli.core.execution.spill_store import LocalSpillStore, SpillPolicy
 from nerdvana_cli.core.safety.classifier import ActionClassifier
 from nerdvana_cli.core.safety.edit_guard import (
     applies_edit,
@@ -34,7 +35,14 @@ from nerdvana_cli.core.safety.tool_permission import PermissionGate, refusal
 from nerdvana_cli.core.safety.untrusted import UntrustedTracker
 from nerdvana_cli.core.state.concurrency import RepeatDetector
 from nerdvana_cli.core.state.signals import NO_PROGRESS, SECRET_MASKED, classify_result
-from nerdvana_cli.core.tool import TOOL_OUTPUT_DIR, TOOL_RESULT_CAP, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import (
+    TOOL_INLINE_LIMIT,
+    TOOL_RESULT_CAP,
+    TOOL_SPILL,
+    SpillTarget,
+    ToolContext,
+    ToolRegistry,
+)
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.schema_check import validate_arguments
 
@@ -91,6 +99,9 @@ class ToolExecutor:
         self.edited:  Counter[str] = Counter()   # file path -> applied edits by edit tools, for the receipt of a run
         self._masker              = self._build_masker(settings)
         self._pending_injections: list[dict[str, Any]] = []
+        # Large tool outputs spill to a session-owned file instead of flooding the context.
+        self._spill_store  = LocalSpillStore(root_dir=paths.user_data_home() / "tool-output")
+        self._spill_policy = SpillPolicy(store=self._spill_store)
 
     def drain_injections(self) -> list[dict[str, Any]]:
         """Return and clear the messages AFTER_TOOL hooks asked to inject.
@@ -305,9 +316,10 @@ class ToolExecutor:
 
         result_text = ""
 
-        output_dir = paths.user_data_home() / "tool-output" / str(context.state.get("session_id") or "default")
-        dir_token  = TOOL_OUTPUT_DIR.set(str(output_dir))
-        cap_token  = TOOL_RESULT_CAP.set(self._result_cap(tool.name))
+        session_id   = str(context.state.get("session_id") or "default")
+        cap_token    = TOOL_RESULT_CAP.set(self._result_cap(tool.name))
+        limit_token  = TOOL_INLINE_LIMIT.set(self._spill_policy.max_inline_chars)
+        spill_token  = TOOL_SPILL.set(self._spill_target(session_id, tool_id))
         edited     = self._diagnosable_edit(tool_use["name"], parsed_args, context)
         baseline   = await self._error_messages(edited) if edited else None
         try:
@@ -333,7 +345,8 @@ class ToolExecutor:
             result_text = f"Tool execution error: {exc}"
             return refusal(tool_id, result_text)
         finally:
-            TOOL_OUTPUT_DIR.reset(dir_token)
+            TOOL_SPILL.reset(spill_token)
+            TOOL_INLINE_LIMIT.reset(limit_token)
             TOOL_RESULT_CAP.reset(cap_token)
             self._record_call(tool_use, start_ts, time.perf_counter() - t0, success, exc_class, result_text)
 
@@ -341,6 +354,18 @@ class ToolExecutor:
         """The ``tools.max_result_chars`` limit that applies to *tool_name*, if any."""
         tools = getattr(self._settings, "tools", None)
         return tools.result_cap(tool_name) if isinstance(tools, ToolsConfig) else None
+
+    def _spill_target(self, session_id: str, call_id: str) -> SpillTarget:
+        """The seam a cut result of this call is spilled through."""
+        def spill(tool_name: str, content: str, limit: int) -> str:
+            return self._spill_policy.apply(
+                session_id       = session_id,
+                tool_name        = tool_name,
+                call_id          = call_id,
+                content          = content,
+                max_inline_chars = limit,
+            )
+        return SpillTarget(session_id=session_id, call_id=call_id, spill=spill)
 
     def _record_call(
         self,

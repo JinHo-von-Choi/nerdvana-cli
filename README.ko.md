@@ -448,7 +448,7 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 | `json_parse_recovery` | 도구 결과의 JSON 파싱이 실패하면 올바른 JSON을 요청합니다. |
 | `ralph_loop_check` | `end_turn`에 `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, `# 미구현` 표시가 남아 있으면 마무리를 요청합니다. 턴 종료 훅으로 이어지는 진행은 프롬프트당 세 번까지입니다. |
 | 반복 호출 차단 | 같은 인자의 같은 도구 호출이 연속 세 번째면 경고하고, 다섯 번째면 거부합니다(`TaskGet` 폴링 제외). |
-| 출력 상한 | 도구 결과는 약 30,000토큰(`WebFetch`는 10,000)으로 앞뒤를 남겨 자르고, 전문은 `~/.nerdvana/tool-output/`에 저장합니다. |
+| 출력 상한 | 도구 결과는 기본적으로 12,000자까지 인라인에 남기고(도구 자체 한도인 약 30,000토큰, `WebFetch`는 10,000토큰도 함께 적용), 더 긴 결과는 앞뒤를 남겨 자릅니다. 전문은 `~/.nerdvana/tool-output/session-<digest>/`에 저장되고, 안내 문구가 파일 경로를 알려 주므로 모델이 FileRead나 Grep로 다시 읽을 수 있습니다. `tools.max_result_chars`로 도구별 한도를 바꿀 수 있습니다. |
 
 ## 권한과 승인 모드
 
