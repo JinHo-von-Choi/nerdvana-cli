@@ -38,10 +38,56 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | `--approval-mode` | `default`, `auto_edit`, `yolo` (default) or `plan` |
 | `--sandbox` | `off`, `auto` or `require` (default); use `off` where Landlock is unavailable |
 | `--isolate` | before the agent runs, turn the working directory into a fresh repository with one commit and no upstream history; see "Limiting what the agent can look up" |
-| `--no-network` | refuse TCP connections from the agent's shell commands and deny the `WebFetch` and `WebSearch` tools; needs `--sandbox require` and Linux 6.7 or later |
-| `--out FILE` | JSONL file each attempt is appended to (default `bench-results.jsonl`) |
+| `--no-network` | let the agent's shell commands reach the package registries only -- the hosts that hold the answers (`github.com`, `huggingface.co`, `raw.githubusercontent.com`) are unreachable -- and deny the `WebFetch` and `WebSearch` tools; needs `--sandbox require` and Linux 6.7 or later |
+| `--method METHOD` | how the agent answers a task: `single` (one run) or `ppc` / `ppc:K` (the propose-probe-compose run with K candidates; every candidate is run and the best of them is kept) |
+| `--substrate SUBSTRATE` | what answers the task: `loop` (the default loop of the CLI) or `subagent:PRESET` (a sub-agent preset, run in this process) |
+| `--benchmark NAME` | the benchmark to run: `short-20`, `long-8`, `migration-campaign`, or an external one (`workbuddy`, `jobbench`) with `--source`; the task path is used when it is not given |
+| `--results-dir DIR` | the directory the results are kept in; it carries the mark of the run that made it, and a directory made with another configuration is not continued |
+| `--out FILE` | JSONL file each attempt is appended to (default `bench-results.jsonl`, or `results.jsonl` in `--results-dir`) |
 | `--keep-workdirs` | keep each attempt's working directory |
 | `--yes` | actually run the agent and spend money |
+
+## The three axes of a run
+
+A run is one cell of an experiment, and it says so: the method that answers a
+task, the substrate that answers it, and the benchmark it is measured on. The
+run prints the cell and the mark that belongs to it:
+
+```
+method: ppc:2 | substrate: loop | benchmark: short-20 | runmark: e869519fd0936921
+```
+
+The mark is a hash of the cell and of the settings that decide the run. A
+results directory carries the mark of the run that made it, and one made with
+another configuration is refused rather than continued -- two experiments
+must never be counted as one. The same guard holds for the tasks themselves:
+the ad-hoc task path is part of the mark, so the same options over different
+tasks are two different runs.
+
+## Keeping the experiment honest
+
+The hosts that hold the answers are unreachable while a task runs. With
+`--no-network` the agent's shell commands reach the package registries through
+the egress proxy and nothing else, so `github.com`, `huggingface.co` and
+`raw.githubusercontent.com` are refused at the source; a download from a
+registry is not looking up an answer. The `WebFetch` and `WebSearch` tools are
+denied as well.
+
+## Learning from one part and measuring on another
+
+The domain library is only worth something if what it learned carries over. The
+benchmark is therefore split into the tasks a library may learn from and the
+tasks it may not, stratified by the domain a task belongs to (the language it
+is about), so a domain that was learned from is measured on tasks of its own:
+
+```bash
+python scripts/split_tasks.py benchmarks/tasks --out benchmarks/split
+python scripts/split_tasks.py benchmarks/tasks --test-ratio 0.4 --seed 7
+```
+
+The split is written as `train.json` and `test.json`, and it is reproducible:
+the same tasks and the same seed always give the same split. A domain with a
+single task goes to the train side, since it cannot be split.
 
 ## Task files
 

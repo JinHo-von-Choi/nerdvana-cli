@@ -133,7 +133,11 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="", isolate=False, no_network=False)
+    return argparse.Namespace(
+        approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="",
+        isolate=False, no_network=False,
+        method=bench.BenchMethod.parse("single"), substrate=bench.BenchSubstrate.parse("loop"),
+    )
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, script: str) -> object:
@@ -265,3 +269,221 @@ def test_set_overrides_are_passed_to_every_attempt() -> None:
     command = bench.agent_command(task, argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=["session.compact_threshold=0.5", "session.max_turns=9"], model="", provider=""))
     pairs   = [command[i + 1] for i, word in enumerate(command) if word == "--set"]
     assert pairs == ["session.compact_threshold=0.5", "session.max_turns=9"]
+
+
+# ---------------------------------------------------------------------------
+# The three axes of a run
+# ---------------------------------------------------------------------------
+
+
+def test_the_method_decides_how_many_candidates_an_attempt_produces(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[int] = []
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", IDLER])
+    monkeypatch.setattr(bench, "run_candidate", lambda task, number, index, candidates, *a, **k: seen.append(index) or bench.Attempt(task.id, number, False))
+    options = _options()
+    options.method = bench.BenchMethod.parse("ppc:3")
+
+    attempt = bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    assert seen == [1, 2, 3]
+    assert attempt.candidates == 3  # type: ignore[attr-defined]
+
+
+def test_the_attempt_is_judged_by_the_best_of_its_candidates(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake(task, number, index, candidates, *a, **k):
+        return bench.Attempt(task.id, number, passed=index == 2)
+
+    monkeypatch.setattr(bench, "run_candidate", fake)
+    options = _options()
+    options.method = bench.BenchMethod.parse("ppc:3")
+
+    attempt = bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    assert attempt.passed is True  # type: ignore[attr-defined]
+
+
+def test_the_cost_of_an_attempt_is_what_all_of_its_candidates_spent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake(task, number, index, candidates, *a, **k):
+        return bench.Attempt(task.id, number, passed=False, cost_usd=0.5)
+
+    monkeypatch.setattr(bench, "run_candidate", fake)
+    options = _options()
+    options.method = bench.BenchMethod.parse("ppc:2")
+
+    attempt = bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    assert attempt.cost_usd == 1.0  # type: ignore[attr-defined]
+
+
+def test_the_run_reports_the_cell_of_the_experiment_it_is(capsys: pytest.CaptureFixture[str]) -> None:
+    assert bench.main([str(TASKS), "--method", "ppc:2", "--substrate", "subagent:code-reviewer"]) == 0
+
+    out = capsys.readouterr().out
+    assert "method: ppc:2" in out
+    assert "substrate: subagent:code-reviewer" in out
+    assert "runmark:" in out
+
+
+def test_a_results_directory_made_with_another_configuration_is_not_continued(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    results = tmp_path / "results"
+    results.mkdir()
+    (results / "runmark").write_text("something-else\n", encoding="utf-8")
+
+    assert bench.main([str(TASKS), "--results-dir", str(results)]) == 2
+    assert "not continued with another configuration" in capsys.readouterr().err
+
+
+def test_the_same_configuration_continues_its_results_directory(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    results = tmp_path / "results"
+    results.mkdir()
+
+    assert bench.main([str(TASKS), "--results-dir", str(results)]) == 0
+    assert "dry run" in capsys.readouterr().out
+
+
+def test_the_network_of_an_evaluation_refuses_the_hosts_that_hold_the_answers(tmp_path: Path) -> None:
+    config = bench.network_off_config(tmp_path)
+
+    import yaml
+
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert data["sandbox"]["network"] == "allowlist"
+    assert "github.com" not in data["sandbox"]["allowed_domains"]
+    assert "pypi.org" in data["sandbox"]["allowed_domains"]
+
+
+# ---------------------------------------------------------------------------
+# Where the results go
+# ---------------------------------------------------------------------------
+
+
+def _no_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Answer every task without a model, so a run may be exercised for its plumbing."""
+    monkeypatch.setattr(bench, "run_attempt", lambda task, number, options, root, **k: bench.Attempt(task.id, number, True))
+    monkeypatch.setattr(bench, "run_environment", lambda options: {})
+
+
+def test_the_results_of_a_run_land_inside_its_results_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _no_model(monkeypatch)
+    results = tmp_path / "results"
+
+    assert bench.main([str(TASKS), "--results-dir", str(results), "--yes"]) == 0
+
+    assert (results / "results.jsonl").is_file()
+    assert (results / "runmark").is_file()
+
+
+def test_a_run_without_a_results_directory_writes_no_mark_into_the_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _no_model(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+
+    assert bench.main([str(TASKS), "--yes"]) == 0
+
+    assert not (tmp_path / "runmark").exists()
+    assert (tmp_path / "bench-results.jsonl").is_file()
+
+
+def test_the_results_directory_is_not_contaminated_by_a_run_of_another_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _no_model(monkeypatch)
+    results = tmp_path / "results"
+
+    assert bench.main([str(TASKS), "--results-dir", str(results), "--yes"]) == 0
+    assert bench.main([str(TASKS), "--results-dir", str(results), "--method", "ppc:2", "--yes"]) == 2
+
+
+def _runmark_of(output: str) -> str:
+    """The mark the run printed."""
+    for line in output.splitlines():
+        if "runmark:" in line:
+            return line.split("runmark:")[1].strip()
+    return ""
+
+
+def test_the_same_tasks_read_from_two_places_are_two_different_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    first  = tmp_path / "a"
+    second = tmp_path / "b"
+    for directory in (first, second):
+        directory.mkdir()
+        for task in sorted(TASKS.glob("*.yml")):
+            (directory / task.name).write_text(task.read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert bench.main([str(first)]) == 0
+    one = _runmark_of(capsys.readouterr().out)
+    assert bench.main([str(second)]) == 0
+    two = _runmark_of(capsys.readouterr().out)
+
+    assert one and two
+    assert one != two
+
+
+# ---------------------------------------------------------------------------
+# The sub-agent substrate
+# ---------------------------------------------------------------------------
+
+
+def _fake_subagent(monkeypatch: pytest.MonkeyPatch, seen: dict[str, object]) -> None:
+    """Answer with a preset without calling a model."""
+    import nerdvana_cli.cli.bootstrap as bootstrap
+    import nerdvana_cli.core.delegation.subagent as subagent_module
+
+    class FakeSub:
+        cost_usd    = 0.25
+        stopped_for = "completed"
+
+    def fake_build(settings, definition, prompt, agent_id, category):
+        seen["settings"]    = settings
+        seen["definition"] = definition
+        seen["prompt"]     = prompt
+        seen["agent_id"]   = agent_id
+        return FakeSub()
+
+    async def fake_run(config, abort):
+        return "the answer", 0
+
+    monkeypatch.setattr(bootstrap, "build_subagent", fake_build)
+    monkeypatch.setattr(subagent_module, "run_subagent", fake_run)
+
+
+def test_a_sub_agent_preset_answers_the_task(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: dict[str, object] = {}
+    _fake_subagent(monkeypatch, seen)
+    options = _options()
+    options.substrate = bench.BenchSubstrate.parse("subagent:code-reviewer")
+    task = bench.load_tasks(TASKS)[0]
+
+    attempt = bench.run_subagent_candidate(task, 1, 1, options, tmp_path)
+
+    assert seen["definition"].agent_type == "code-reviewer"  # type: ignore[union-attr]
+    assert seen["prompt"] == task.prompt
+    assert seen["settings"].cwd == str(tmp_path / f"{task.id}-1-c1")  # type: ignore[union-attr]
+    assert attempt.cost_usd == 0.25
+    assert attempt.error == ""
+
+
+def test_the_provider_of_the_run_reaches_the_sub_agent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: dict[str, object] = {}
+    _fake_subagent(monkeypatch, seen)
+    options = _options()
+    options.substrate = bench.BenchSubstrate.parse("subagent:code-reviewer")
+    options.provider   = "anthropic"
+    options.model      = "claude-sonnet-4"
+    task = bench.load_tasks(TASKS)[0]
+
+    bench.run_subagent_candidate(task, 1, 1, options, tmp_path)
+
+    settings = seen["settings"]
+    assert settings.model.provider == "anthropic"  # type: ignore[union-attr]
+    assert settings.model.model == "claude-sonnet-4"  # type: ignore[union-attr]
+
+
+def test_a_preset_that_does_not_exist_is_reported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: dict[str, object] = {}
+    _fake_subagent(monkeypatch, seen)
+    options = _options()
+    options.substrate = bench.BenchSubstrate.parse("subagent:no-such-preset")
+    task = bench.load_tasks(TASKS)[0]
+
+    attempt = bench.run_subagent_candidate(task, 1, 1, options, tmp_path)
+
+    assert "no sub-agent preset named 'no-such-preset'" in attempt.error
+    assert "settings" not in seen

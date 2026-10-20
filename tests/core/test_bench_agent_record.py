@@ -37,7 +37,11 @@ bench = _load()
 
 
 def _options(**changes: object) -> argparse.Namespace:
-    base = {"approval_mode": "yolo", "sandbox": "require", "gate": False, "set": [], "model": "", "provider": "", "isolate": False, "no_network": False}
+    base = {
+        "approval_mode": "yolo", "sandbox": "require", "gate": False, "set": [], "model": "", "provider": "",
+        "isolate": False, "no_network": False,
+        "method": bench.BenchMethod.parse("single"), "substrate": bench.BenchSubstrate.parse("loop"),
+    }
     return argparse.Namespace(**{**base, **changes})
 
 
@@ -192,10 +196,23 @@ def test_the_no_network_config_cuts_the_network_and_keeps_what_the_user_configur
     root.mkdir()
     path = bench.network_off_config(root)
     data = yaml.safe_load(path.read_text())
-    assert data["sandbox"] == {"write_paths": ["/data"], "network": False, "mode": "require"}
+    assert data["sandbox"]["mode"] == "require"
+    assert data["sandbox"]["network"] == "allowlist"
+    assert data["sandbox"]["write_paths"] == ["/data"]
     assert data["model"] == {"model": "m9"}
     assert data["permissions"]["always_deny"] == ["Bash(rm *)", "WebFetch", "WebSearch"]
     assert (path.stat().st_mode & 0o777) == 0o600
+
+
+def test_the_no_network_config_leaves_the_hosts_that_hold_the_answers_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _user_config(tmp_path, monkeypatch, "")
+    data = yaml.safe_load(bench.network_off_config(tmp_path).read_text())
+
+    allowed = data["sandbox"]["allowed_domains"]
+    assert "github.com" not in allowed
+    assert "huggingface.co" not in allowed
+    assert "raw.githubusercontent.com" not in allowed
+    assert "pypi.org" in allowed
 
 
 def test_the_generated_config_is_accepted_by_the_settings_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -203,7 +220,8 @@ def test_the_generated_config_is_accepted_by_the_settings_loader(tmp_path: Path,
 
     _user_config(tmp_path, monkeypatch, "")
     settings = NerdvanaSettings.load(str(bench.network_off_config(tmp_path)))
-    assert (settings.sandbox.mode, settings.sandbox.network) == ("require", False)
+    assert (settings.sandbox.mode, settings.sandbox.network) == ("require", "allowlist")
+    assert "github.com" not in settings.sandbox.allowed_domains
     assert "WebFetch" in settings.permissions.always_deny
 
 
@@ -211,7 +229,7 @@ def test_a_run_without_a_user_config_still_gets_the_no_network_file(tmp_path: Pa
     monkeypatch.delenv("NERDVANA_CONFIG", raising=False)
     monkeypatch.setattr(bench.core_paths, "user_config_path", lambda: tmp_path / "absent.yml")
     monkeypatch.setattr(bench.core_paths, "legacy_config_path", lambda: tmp_path / "absent-too.yml")
-    assert "network: false" in bench.network_off_config(tmp_path).read_text()
+    assert "network: allowlist" in bench.network_off_config(tmp_path).read_text()
 
 
 def test_the_config_is_handed_to_the_agent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

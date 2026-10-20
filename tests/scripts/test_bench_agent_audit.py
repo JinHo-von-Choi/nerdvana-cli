@@ -34,7 +34,11 @@ bench = _load()
 
 
 def _options() -> argparse.Namespace:
-    return argparse.Namespace(approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="", isolate=False, no_network=False)
+    return argparse.Namespace(
+        approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="",
+        isolate=False, no_network=False,
+        method=bench.BenchMethod.parse("single"), substrate=bench.BenchSubstrate.parse("loop"),
+    )
 
 
 def _call(name: str, summary: str) -> dict[str, str]:

@@ -55,6 +55,19 @@ import yaml
 
 from nerdvana_cli import __version__
 from nerdvana_cli.core.config import paths as core_paths
+from nerdvana_cli.core.harness.bench_spec import (
+    BenchBenchmark,
+    BenchError,
+    BenchMethod,
+    BenchSpec,
+    BenchSubstrate,
+    BenchTask,
+    RunmarkMismatchError,
+    check_runmark,
+    evaluation_network,
+    load_benchmark,
+    write_runmark,
+)
 from nerdvana_cli.core.safety.sandbox import landlock_abi
 
 DEFAULT_MAX_TURNS    = 30
@@ -101,6 +114,7 @@ class Task:
     max_cost_usd: float = DEFAULT_MAX_COST
     timeout:      int   = DEFAULT_TIMEOUT
     tags:         tuple[str, ...] = ()
+    domain:       str   = ""
 
 
 @dataclass
@@ -120,6 +134,7 @@ class Attempt:
     usage:        dict[str, int] = field(default_factory=dict)
     environment:  dict[str, Any] = field(default_factory=dict)
     audit:        list[dict[str, str]] = field(default_factory=list)
+    candidates:   int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +166,7 @@ def parse_task(data: Any, base: Path) -> Task:
         max_cost_usd = float(data.get("max_cost_usd", DEFAULT_MAX_COST)),
         timeout      = int(data.get("timeout", DEFAULT_TIMEOUT)),
         tags         = tuple(str(tag) for tag in data.get("tags") or ()),
+        domain       = str(data.get("domain", "") or ""),
     )
 
 
@@ -537,9 +553,11 @@ def network_off_config(root: Path) -> Path:
     """Write the configuration file that cuts the agent's network access; returns its path.
 
     ``--set`` cannot change the ``sandbox`` or ``permissions`` sections, so the file is the user's own
-    configuration (the first of ``NERDVANA_CONFIG`` and the user and legacy config files) with
-    ``sandbox.network`` off, the sandbox required, and the in-process web tools denied. A config file
-    named with ``--config`` replaces the search, so what the user configured is carried over by copy.
+    configuration (the first of ``NERDVANA_CONFIG`` and the user and legacy config files) with the
+    sandbox required, the network limited to the package registries, and the in-process web tools
+    denied. The hosts that hold the answers are not among the registries, so they are unreachable while
+    a task runs. A config file named with ``--config`` replaces the search, so what the user configured
+    is carried over by copy.
     """
     sources = [os.environ.get("NERDVANA_CONFIG", ""), str(core_paths.user_config_path()), str(core_paths.legacy_config_path())]
     base    = next((Path(source) for source in sources if source and os.path.exists(source)), None)
@@ -551,7 +569,7 @@ def network_off_config(root: Path) -> Path:
     deny        = [str(rule) for rule in permissions.get("always_deny") or []]
     permissions["always_deny"] = deny + [tool for tool in sorted(_WEB_TOOLS) if tool not in deny]
     data["permissions"] = permissions
-    data["sandbox"]     = {**(data.get("sandbox") or {}), "mode": "require", "network": False}
+    data["sandbox"]     = {**(data.get("sandbox") or {}), **evaluation_network()}
     target = root / "no-network.yml"
     target.write_text(yaml.safe_dump(data), encoding="utf-8")
     target.chmod(0o600)
@@ -612,8 +630,36 @@ def run_attempt(
     task: Task, number: int, options: argparse.Namespace, root: Path,
     *, run_env: dict[str, Any] | None = None, config: Path | None = None,
 ) -> Attempt:
-    """One attempt in a fresh working directory."""
-    workdir = root / f"{task.id}-{number}"
+    """One attempt: the candidates the method produces, and the best of them.
+
+    Every candidate is run, so the method spends the same on every task; the
+    attempt is judged by the best of them, and the cost it reports is what all
+    of them spent together.
+    """
+    candidates = options.method.candidates
+    best: Attempt | None = None
+    spent = 0.0
+    for index in range(1, candidates + 1):
+        result = run_candidate(task, number, index, candidates, options, root, run_env=run_env, config=config)
+        spent += result.cost_usd
+        if best is None or (result.passed and not best.passed):
+            best = result
+    if best is None:
+        raise TaskError(f"{task.id}: the method produced no candidate")
+    best.cost_usd   = spent
+    best.candidates = candidates
+    return best
+
+
+def run_candidate(
+    task: Task, number: int, index: int, candidates: int, options: argparse.Namespace, root: Path,
+    *, run_env: dict[str, Any] | None = None, config: Path | None = None,
+) -> Attempt:
+    """One candidate of an attempt, in a working directory of its own."""
+    if options.substrate.name == "subagent":
+        return run_subagent_candidate(task, number, index, options, root, config=config)
+    suffix = "" if candidates == 1 else f"-c{index}"
+    workdir = root / f"{task.id}-{number}{suffix}"
     result  = Attempt(task_id=task.id, attempt=number, passed=False)
     report: dict[str, Any] = {}
     problem = prepare(task, workdir, options.isolate)
@@ -639,6 +685,67 @@ def run_attempt(
     return result
 
 
+def run_subagent_candidate(
+    task: Task, number: int, index: int, options: argparse.Namespace, root: Path,
+    *, config: Path | None = None,
+) -> Attempt:
+    """The task answered by a sub-agent preset, in this process.
+
+    The preset decides the system prompt, the tools and the turn limit; the
+    verify command still decides whether the task was done. The transcript
+    audit is empty here: the preset's transcript is not the event stream the
+    top-level run writes.
+    """
+    import asyncio
+
+    from nerdvana_cli.agents.builtin import BUILTIN_AGENTS
+    from nerdvana_cli.cli.bootstrap import build_subagent
+    from nerdvana_cli.cli.runtime import resolve_run_provider
+    from nerdvana_cli.core.config.model_routing import select_model
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
+    from nerdvana_cli.core.delegation.subagent import run_subagent
+
+    result  = Attempt(task_id=task.id, attempt=number, passed=False)
+    workdir = root / f"{task.id}-{number}-c{index}"
+    problem = prepare(task, workdir, options.isolate)
+    if problem:
+        result.error = problem
+        return result
+    preset = next((a for a in BUILTIN_AGENTS if a.agent_type == options.substrate.preset), None)
+    if preset is None:
+        result.error = f"no sub-agent preset named '{options.substrate.preset}'"
+        return result
+    settings = NerdvanaSettings.load(str(config) if config else None)
+    settings.cwd             = str(workdir)
+    settings.session.persist = False
+    # The preset may name a model of its own; the model the run was told to
+    # use wins over it, so a cell of the experiment stays comparable.
+    model = select_model(options.model, "", preset.model, preset.category, settings.agents.categories)
+    if model:
+        settings.model.model = model
+    if options.provider:
+        settings.model.provider = options.provider
+    # The provider is filled in from the model when it was not named, and the
+    # key is taken from the environment; without this the sub-agent has none.
+    resolve_run_provider(settings)
+    started = time.monotonic()
+    try:
+        sub = build_subagent(settings, preset, task.prompt, f"{task.id}-{number}", preset.category)
+        output, _tokens = asyncio.run(run_subagent(sub, asyncio.Event()))
+        result.cost_usd = sub.cost_usd
+        result.stop     = sub.stopped_for
+        if not output.strip():
+            result.error = f"the sub-agent said nothing (stop: {sub.stopped_for or 'unknown'})"
+        elif sub.stopped_for not in ("", "completed"):
+            result.error = output.strip()[-300:]
+    except Exception as exc:  # noqa: BLE001 - the attempt has to say what happened
+        result.error = f"{type(exc).__name__}: {exc}"[-300:]
+    result.duration_s = time.monotonic() - started
+    verdict       = _shell(task.verify, workdir, VERIFY_TIMEOUT)
+    result.passed = verdict is not None and verdict.returncode == 0
+    return result
+
+
 def worst_case_cost(tasks: list[Task], attempts: int) -> float:
     """Most the run can spend if every attempt reaches its cost ceiling."""
     return sum(t.max_cost_usd for t in tasks) * attempts
@@ -646,7 +753,12 @@ def worst_case_cost(tasks: list[Task], attempts: int) -> float:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Measure the agent's success rate on fixed repository tasks.")
-    parser.add_argument("tasks", type=Path, help="a task file or a directory of *.yml task files")
+    parser.add_argument("tasks", type=Path, nargs="?", help="a task file or a directory of *.yml task files")
+    parser.add_argument("--method", default="single", help="how the agent answers a task: single | ppc | ppc:K (the propose-probe-compose run with K candidates)")
+    parser.add_argument("--substrate", default="loop", help="what answers the task: loop | subagent | subagent:PRESET")
+    parser.add_argument("--benchmark", default="", help="the name of a known benchmark (short-20, long-8, ...); the tasks path is used when it is not given")
+    parser.add_argument("--source", default="", help="where the tasks of an external benchmark are")
+    parser.add_argument("--results-dir", type=Path, default=None, help="the directory the results are kept in; one made with another configuration is not continued")
     parser.add_argument("--set", action="append", default=[], metavar="SECTION.FIELD=VALUE", help="override a setting in every attempt (nerdvana run --set), e.g. to compare compaction thresholds")
     parser.add_argument("--gate", action="store_true", help="hold the agent to each task's verify command (nerdvana run --verify) instead of checking only afterwards")
     parser.add_argument("--tag", action="append", default=[], help="run only tasks carrying this tag (repeatable)")
@@ -658,8 +770,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sandbox", default="require", choices=["off", "auto", "require"],
                         help="confine each attempt's shell commands to its working directory (default require; off on systems without Landlock)")
     parser.add_argument("--isolate", action="store_true", help="turn each working directory into a fresh repository with one commit, so the agent finds no upstream history")
-    parser.add_argument("--no-network", action="store_true", help="refuse TCP connections from the agent's shell commands and deny WebFetch and WebSearch; needs --sandbox require and Linux 6.7 (UDP and DNS stay open)")
-    parser.add_argument("--out", type=Path, default=Path("bench-results.jsonl"), help="JSONL file the attempts are appended to")
+    parser.add_argument("--no-network", action="store_true", help="let the agent's shell commands reach the package registries only -- the hosts that hold the answers (github.com, huggingface.co, raw.githubusercontent.com) are unreachable -- and deny WebFetch and WebSearch; needs --sandbox require and Linux 6.7 (UDP and DNS stay open)")
+    parser.add_argument("--out", type=Path, default=None, help="JSONL file the attempts are appended to (default: bench-results.jsonl, or results.jsonl in --results-dir)")
     parser.add_argument("--keep-workdirs", action="store_true", help="keep each attempt's working directory for inspection")
     parser.add_argument("--yes", action="store_true", help="spend money: run the agent (without it only the plan is printed)")
     return parser.parse_args(argv)
@@ -669,6 +781,10 @@ def option_problem(options: argparse.Namespace) -> str:
     """Why the options cannot be run, empty when they can."""
     if options.attempts < 1:
         return "--attempts must be at least 1"
+    if not options.tasks and not options.benchmark:
+        return "a task file or a --benchmark is needed"
+    if options.substrate.startswith("subagent") and ":" not in options.substrate:
+        return "--substrate subagent needs the preset: --substrate subagent:code-reviewer"
     if options.no_network and options.sandbox != "require":
         return "--no-network needs --sandbox require"
     if options.no_network and landlock_abi() < NO_NETWORK_ABI:
@@ -676,8 +792,29 @@ def option_problem(options: argparse.Namespace) -> str:
     return ""
 
 
+def runmark_settings(options: argparse.Namespace) -> dict[str, Any]:
+    """The settings that decide the run; the mark of the run is computed over them."""
+    return {
+        "attempts": options.attempts,
+        "gate":     options.gate,
+        "isolate":  options.isolate,
+        "k":        options.k,
+        "model":    options.model,
+        "network":  not options.no_network,
+        "provider": options.provider,
+        "sandbox":  options.sandbox,
+        "set":      list(options.set),
+    }
+
+
+def build_spec(method: BenchMethod, substrate: BenchSubstrate, benchmark: BenchBenchmark) -> BenchSpec:
+    """The cell of the experiment this run is."""
+    return BenchSpec(method=method, substrate=substrate, benchmark=benchmark)
+
+
 def _print_plan(tasks: list[Task], options: argparse.Namespace) -> None:
-    print(f"{len(tasks)} task(s) x {options.attempts} attempt(s); worst-case spend ${worst_case_cost(tasks, options.attempts):.2f}")
+    candidates = getattr(options.method, "candidates", 1)
+    print(f"{len(tasks)} task(s) x {options.attempts} attempt(s) x {candidates} candidate(s); worst-case spend ${worst_case_cost(tasks, options.attempts) * candidates:.2f}")
     if options.attempts < RECOMMENDED_ATTEMPTS:
         print(f"recommended: --attempts {RECOMMENDED_ATTEMPTS} or more; one attempt per task cannot tell a change from noise, and pass^k needs repeats")
 
@@ -704,8 +841,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {problem}", file=sys.stderr)
         return 2
     try:
-        tasks = load_tasks(options.tasks)
-    except TaskError as exc:
+        method    = BenchMethod.parse(options.method)
+        substrate = BenchSubstrate.parse(options.substrate)
+    except BenchError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    options.method    = method
+    options.substrate = substrate
+    try:
+        tasks, benchmark = _tasks_of(options)
+    except (TaskError, BenchError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -715,11 +860,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: no task carries any of the tags {options.tag}", file=sys.stderr)
             return 2
 
+    spec = build_spec(method, substrate, benchmark)
+    mark = spec.runmark(runmark_settings(options))
+    if options.results_dir:
+        try:
+            check_runmark(options.results_dir, mark)
+        except RunmarkMismatchError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+    options.out = options.out or (options.results_dir / "results.jsonl" if options.results_dir else Path("bench-results.jsonl"))
+
     _print_plan(tasks, options)
+    print(f"method: {method.name}{'' if method.name == 'single' else f':{method.k}'} | substrate: {substrate.name}{':' + substrate.preset if substrate.preset else ''} | benchmark: {benchmark.name} | runmark: {mark}")
     if not options.yes:
         print("dry run: pass --yes to run the agent against the real API")
         return 0
 
+    if options.results_dir:
+        # The mark is written before the run: the directory belongs to this
+        # configuration from the first attempt on.
+        write_runmark(options.results_dir, mark)
     root = Path(tempfile.mkdtemp(prefix="nerdvana-bench-"))
     try:
         attempts = _run_all(tasks, options, root)
@@ -734,6 +894,25 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(render(summarize(attempts, options.k or options.attempts, {t.id: t.tags for t in tasks})))
     return 0
+
+
+def _tasks_of(options: argparse.Namespace) -> tuple[list[Task], BenchBenchmark]:
+    """The tasks of the run, and the benchmark they belong to."""
+    if options.benchmark:
+        loaded = load_benchmark(options.benchmark, REPO_ROOT, options.source)
+        tasks  = [
+            Task(id=task.id, prompt=task.prompt, verify=task.verify, path=task.path, tags=task.tags)
+            for task in loaded.tasks
+        ]
+        return tasks, loaded
+    tasks = load_tasks(options.tasks)
+    benchmark = BenchBenchmark(
+        name    = options.tasks.stem,
+        tasks   = tuple(BenchTask(id=task.id, tags=task.tags, domain=task.domain) for task in tasks),
+        adapter = "nerdvana",
+        source  = str(options.tasks.resolve()),
+    )
+    return tasks, benchmark
 
 
 if __name__ == "__main__":
