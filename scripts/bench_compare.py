@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ SEED   = 0
 ALPHA  = 0.05
 
 Outcomes = dict[str, list[int]]
+Grouped  = dict[str, list[dict[str, Any]]]
 
 
 def group_by_task(attempts: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -48,14 +50,14 @@ def outcomes(attempts: list[dict[str, Any]]) -> Outcomes:
     return {task: [int(bool(a["passed"])) for a in rows] for task, rows in group_by_task(attempts).items()}
 
 
-def mean(values: list[float]) -> float:
+def mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
 def rate_difference(first: Outcomes, second: Outcomes) -> float:
     """Mean over the tasks both runs contain of the second run's pass rate minus the first's."""
     common = [task for task in first if task in second]
-    return mean([mean(second[task]) - mean(first[task]) for task in common])
+    return mean([float(mean(second[task]) - mean(first[task])) for task in common])
 
 
 def bootstrap_difference_ci(first: Outcomes, second: Outcomes, rounds: int = ROUNDS, seed: int = SEED, alpha: float = ALPHA) -> tuple[float, float]:
@@ -104,6 +106,22 @@ def default_k(*runs: list[dict[str, Any]]) -> int:
     return max(1, min((len(rows) for run in runs for rows in group_by_task(run).values()), default=1))
 
 
+def common_figures(first_by: Grouped, second_by: Grouped, k: int) -> dict[str, Any]:
+    """The figures of the tasks both runs have.
+
+    A run that went further over the tasks would otherwise be compared on more
+    of them, and the tasks it went further on may be the harder ones. The
+    figures of the tasks the two runs share are the ones that answer the
+    question the comparison asks.
+    """
+    common = [task for task in first_by if task in second_by]
+    return {
+        "tasks":  common,
+        "first":  figures([a for task in common for a in first_by[task]], k),
+        "second": figures([a for task in common for a in second_by[task]], k),
+    }
+
+
 def compare(first: list[dict[str, Any]], second: list[dict[str, Any]], k: int = 0) -> dict[str, Any]:
     """Every figure the report shows."""
     k          = k or default_k(first, second)
@@ -119,6 +137,7 @@ def compare(first: list[dict[str, Any]], second: list[dict[str, Any]], k: int = 
         "difference":  rate_difference(first_out, second_out),
         "interval":    bootstrap_difference_ci(first_out, second_out),
         "common":      sum(1 for task in first_by if task in second_by),
+        "common_figures": common_figures(first_by, second_by, k),
         "only_first":  [task for task in first_by if task not in second_by],
         "only_second": [task for task in second_by if task not in first_by],
         "environment": environment_differences(merge_environments([a["environment"] for a in first if a.get("environment")]), merge_environments([a["environment"] for a in second if a.get("environment")])),
@@ -150,6 +169,16 @@ def render(result: dict[str, Any], names: tuple[str, str]) -> str:
     for label, tasks in (("only in the first run", result["only_first"]), ("only in the second run", result["only_second"])):
         if tasks:
             lines.append(f"tasks {label} (left out of the difference): {', '.join(tasks)}")
+    common = result["common_figures"]
+    if common["tasks"] and len(common["tasks"]) < len(result["tasks"]):
+        one, two = common["first"], common["second"]
+        lines.append(
+            f"over the {len(common['tasks'])} task(s) both runs have: mean input tokens per attempt "
+            f"{one['mean_input_tokens']:,.0f} against {two['mean_input_tokens']:,.0f} "
+            f"({two['mean_input_tokens'] / one['mean_input_tokens'] - 1:+.1%})"
+            if one["mean_input_tokens"] else
+            f"over the {len(common['tasks'])} task(s) both runs have: mean input tokens per attempt (none recorded)"
+        )
     if result["environment"]:
         lines += ["", "WARNING: the recorded environments differ; a score difference may come from the setup:", *(f"  {line}" for line in result["environment"])]
     return "\n".join(lines)

@@ -150,3 +150,39 @@ def test_main_reads_two_files_and_rejects_missing_or_empty_ones(tmp_path: Path, 
     capsys.readouterr()
     assert cmp.main([str(before), str(after)]) == 0
     assert capsys.readouterr().out == out
+
+
+# ---------------------------------------------------------------------------
+# The figures of the tasks the two runs share
+# ---------------------------------------------------------------------------
+
+
+def test_the_figures_of_the_tasks_both_runs_have_are_given_on_their_own() -> None:
+    first  = [attempt("a", True, tokens=100), attempt("b", True, tokens=900)]
+    second = [attempt("a", True, tokens=200)]
+
+    result = cmp.compare(first, second)
+
+    assert result["common_figures"]["first"]["mean_input_tokens"] == pytest.approx(100)
+    assert result["common_figures"]["second"]["mean_input_tokens"] == pytest.approx(200)
+
+
+def test_a_run_that_went_further_is_not_compared_on_more_tasks() -> None:
+    first  = [attempt("a", True, tokens=100)]
+    second = [attempt("a", True, tokens=200), attempt("b", True, tokens=5000)]
+
+    result = cmp.compare(first, second)
+
+    assert result["first"]["mean_input_tokens"] == pytest.approx(100)
+    assert result["second"]["mean_input_tokens"] == pytest.approx(2600)
+    assert result["common_figures"]["second"]["mean_input_tokens"] == pytest.approx(200)
+
+
+def test_the_report_says_what_the_tasks_both_runs_have_were_worth() -> None:
+    first  = [attempt("a", True, tokens=100)]
+    second = [attempt("a", True, tokens=200), attempt("b", True, tokens=5000)]
+
+    text = cmp.render(cmp.compare(first, second), ("first", "second"))
+
+    assert "over the 1 task(s) both runs have" in text
+    assert "100 against 200" in text
