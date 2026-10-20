@@ -13,6 +13,7 @@ import json
 import logging
 import os
 from collections import Counter
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nerdvana_cli.core.config import paths
@@ -29,6 +30,7 @@ from nerdvana_cli.core.safety.edit_guard import (
     edit_targets,
 )
 from nerdvana_cli.core.safety.edit_tools import EDIT_TOOL_NAMES
+from nerdvana_cli.core.safety.monotonic_guard import default_guard_chain
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.secrets import MARKER, SecretMasker
 from nerdvana_cli.core.safety.tool_permission import PermissionGate, refusal
@@ -191,7 +193,12 @@ class ToolExecutor:
         tool:     Any,
         context:  ToolContext,
     ) -> ToolResult:
-        """Run one call: refuse it when a check fails, otherwise execute and record it."""
+        """Run one call through the waterfall.
+
+        The order is the point. Every check a hook or a permission rule could
+        influence comes first, and the monotonic guards have the last word, so
+        neither of them can switch an owner invariant off.
+        """
         index = context.state.get("tool_index")
         if index is not None and index.is_unloaded(tool_use["name"]):
             name = tool_use["name"]
@@ -208,12 +215,24 @@ class ToolExecutor:
             refused = check_edit_scope(tool_use, parsed_args, context) or await check_goal_scope(tool_use, parsed_args, context, self.signals)
         if refused is not None:
             return refused
+        refused = self._check_monotonic_guards(tool_use, context)
+        if refused is not None:
+            return refused
 
         # Pre-edit checkpoint (opt-in, skipped when no manager is configured)
         if self._checkpoint_manager is not None and applies_edit(tool_use["name"], parsed_args):
             capture_checkpoint(self._checkpoint_manager, tool_use["name"], parsed_args)
 
         return await self._execute(tool_use, tool, parsed_args, context, repeats)
+
+    def _check_monotonic_guards(self, tool_use: dict[str, Any], context: ToolContext) -> ToolResult | None:
+        """Refuse a call that breaks an invariant no hook and no permission rule may switch off."""
+        protected = context.state.get("protected_tests") or ()
+        chain    = default_guard_chain(Path(context.cwd), frozenset(str(path) for path in protected))
+        verdict  = chain.evaluate(tool_use["name"], tool_use["input"])
+        if not verdict.denied:
+            return None
+        return refusal(tool_use["id"], f"Refused by the {verdict.guard_name} guard: {verdict.reason}")
 
     def _check_input(self, tool_use: dict[str, Any], tool: Any, repeats: int) -> tuple[Any, ToolResult | None]:
         """Refuse a call that repeats too often or whose arguments are malformed.

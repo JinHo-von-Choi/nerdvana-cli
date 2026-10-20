@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Added
 
 - Spill storage seam for oversized tool results (`nerdvana_cli.core.execution.spill_store`): a result longer than the inline limit is written whole to `~/.nerdvana/tool-output/session-<digest>/` — a 0700 directory holding 0600 files written with an exclusive `O_CREAT | O_EXCL` open — while the conversation keeps a head-and-tail preview whose note names the file, so the model can read the rest back with FileRead or Grep. A disk that refuses the write degrades to the inline cut instead of losing the result.
+- Monotonic security guards (`nerdvana_cli.core.safety.monotonic_guard`): the guards run in the tool waterfall after the hooks and the permission gate, so neither a hook nor a permission rule nor `--approval-mode yolo` can switch an owner invariant off. They refuse a write to an invariant file (`.iron-laws.yml`, `.env`), a write to a test file a task contract protects, and a command that hands a secret file to a network sink.
 
 ### Changed
 
 - Tool results now stay inline up to 12,000 characters by default; the tool's own token budget still applies on top, and `tools.max_result_chars` overrides both. A longer result is spilled to disk instead of filling the context, and the full text now lives in `~/.nerdvana/tool-output/session-<digest>/` rather than `~/.nerdvana/tool-output/<session>/`.
+- The model can no longer write `.env` or `.iron-laws.yml`; the user edits those files. The refusal says which file and why.
 
 ## [1.9.1] - 2026-10-06
 

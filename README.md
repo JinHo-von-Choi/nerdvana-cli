@@ -484,6 +484,8 @@ Every tool call, in the main loop, sub-agents and background agents alike, is de
 4. `permissions.always_allow`: allowed without asking.
 5. The mode's trust level: `strict` asks before every write, `balanced` asks before destructive tools and tools that require confirmation, `yolo` asks nothing.
 
+After all of those, the monotonic guards have the last word. They can only refuse, and no hook, permission rule or approval mode switches them off: a write to an invariant file (`.iron-laws.yml`, `.env`), a write to a test file a task contract protects, and a command that hands a secret file to a network sink are refused even in `yolo` mode.
+
 | `--approval-mode` | Mode profile | Trust | Effect |
 |-|-|-|-|
 | `default` | `interactive` | balanced | Normal interactive use |

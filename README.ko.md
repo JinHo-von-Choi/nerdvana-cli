@@ -460,6 +460,8 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 4. `permissions.always_allow`: 묻지 않고 허용
 5. 모드의 신뢰 수준: `strict`는 모든 쓰기 전에, `balanced`는 파괴적 도구와 확인이 필요한 도구 전에 묻고, `yolo`는 묻지 않음
 
+그 다음에 단조 가드(monotonic guard)가 마지막 권한을 갖습니다. 가드는 거절만 할 수 있고, 훅·권한 규칙·승인 모드가 이를 끌 수는 없습니다. 불변 파일(`.iron-laws.yml`, `.env`) 쓰기, 태스크 계약이 보호하는 테스트 파일 쓰기, 비밀 파일을 네트워크 싱크로 보내는 명령은 `yolo` 모드에서도 거부됩니다.
+
 | `--approval-mode` | 모드 프로필 | 신뢰 수준 | 효과 |
 |-|-|-|-|
 | `default` | `interactive` | balanced | 일반 대화형 사용 |
