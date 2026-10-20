@@ -68,22 +68,26 @@ class ServerCompaction:
         loop     = self._loop
         provider: Any = loop.provider   # only a provider with supports_server_compaction gets here
         before   = len(loop.state.messages)
+        loop.session.begin_compaction(tokens, before)
         try:
-            result = await provider.compact(system_prompt, loop._to_provider_messages(), loop._declared(tools))
-        except Exception as exc:  # noqa: BLE001 - any failure falls back to the client-side compaction
-            return self._failed(str(exc))
-        blocks = result.get("provider_blocks")
-        if result.get("is_error") or not blocks:
-            return self._failed(str(result.get("content") or "no summary in the reply"))
-        self._failures = 0
-        loop._signals[signals.COMPACTION] += 1   # before the usage is recorded: the cache watch must not take the new start for a miss
-        loop._apply_usage(result.get("usage") or {}, None)
-        loop.state.messages.append(Message(role=Role.ASSISTANT, content="", provider_blocks=list(blocks)))
-        loop.session.record_assistant_message("", provider_blocks=blocks)
-        loop.session.record_compaction(tokens_before=tokens, messages_before=before, strategy="server")
-        loop._context_budget.reset()
-        loop.state.messages.extend(open_todos_note(loop.session.session_id) or [Message(role=Role.USER, content=_CONTINUE)])
-        return True
+            try:
+                result = await provider.compact(system_prompt, loop._to_provider_messages(), loop._declared(tools))
+            except Exception as exc:  # noqa: BLE001 - any failure falls back to the client-side compaction
+                return self._failed(str(exc))
+            blocks = result.get("provider_blocks")
+            if result.get("is_error") or not blocks:
+                return self._failed(str(result.get("content") or "no summary in the reply"))
+            self._failures = 0
+            loop._signals[signals.COMPACTION] += 1   # before the usage is recorded: the cache watch must not take the new start for a miss
+            loop._apply_usage(result.get("usage") or {}, None)
+            loop.state.messages.append(Message(role=Role.ASSISTANT, content="", provider_blocks=list(blocks)))
+            loop.session.record_assistant_message("", provider_blocks=blocks)
+            loop.session.record_compaction(tokens_before=tokens, messages_before=before, strategy="server")
+            loop._context_budget.reset()
+            loop.state.messages.extend(open_todos_note(loop.session.session_id) or [Message(role=Role.USER, content=_CONTINUE)])
+            return True
+        finally:
+            loop.session.end_compaction()
 
     def _failed(self, reason: str) -> bool:
         self._failures += 1

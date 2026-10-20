@@ -29,8 +29,8 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 |-|-|
 | `config` | the settings model and its sources, runtime paths, data migration, managed policy, model choice for a spec |
 | `hooks` | the lifecycle event engine, shell command hooks, user hook modules |
-| `state` | sessions, checkpoints, todos, goals, rewind marks, the run store, shared cost budgets, concurrency slots, the run signal counters |
-| `context` | the system prompt, NIRNA.md, skills, memories, user slash commands, the tool index, token estimation, compaction and observation masking |
+| `state` | sessions, checkpoints, todos, goals, rewind marks, the run store, shared cost budgets, concurrency slots, the run signal counters, the session projections |
+| `context` | the system prompt, NIRNA.md, skills, memories, user slash commands, the tool index, token estimation, compaction (client-side and provider-side) and observation masking |
 | `safety` | the permission policy and approvals, the action classifier, the sandbox and egress proxy, secret masking, profiles, edit guards, the monotonic guards that no hook or permission rule can switch off |
 | `telemetry` | the usage and cost ledger (`analytics`), OpenTelemetry traces, the prompt cache watch |
 | `execution` | running a batch of tool calls and the checks around it, the spill store that keeps an oversized result on disk instead of in the context |

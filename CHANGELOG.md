@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - Spill storage seam for oversized tool results (`nerdvana_cli.core.execution.spill_store`): a result longer than the inline limit is written whole to `~/.nerdvana/tool-output/session-<digest>/` — a 0700 directory holding 0600 files written with an exclusive `O_CREAT | O_EXCL` open — while the conversation keeps a head-and-tail preview whose note names the file, so the model can read the rest back with FileRead or Grep. A disk that refuses the write degrades to the inline cut instead of losing the result.
 - Monotonic security guards (`nerdvana_cli.core.safety.monotonic_guard`): the guards run in the tool waterfall after the hooks and the permission gate, so neither a hook nor a permission rule nor `--approval-mode yolo` can switch an owner invariant off. They refuse a write to an invariant file (`.iron-laws.yml`, `.env`), a write to a test file a task contract protects, and a command that hands a secret file to a network sink.
+- Event-sourced session log with pure projections (`nerdvana_cli.core.state.projections`): the transcript is an append-only event log, and the open turn, the failed attempts and the compaction lock are projections of it, read at one watermark so that every projection of a snapshot agrees on how far the log was read.
+- The compaction bracket in the session transcript: `compaction/start` opens it before the work begins, `compaction/summary` records what the summary replaced, and `compaction/end` closes it. A run that dies in between leaves the bracket open, and `nerdvana --resume` says so instead of restoring a history that was half rewritten.
 
 ### Changed
 
 - Tool results now stay inline up to 12,000 characters by default; the tool's own token budget still applies on top, and `tools.max_result_chars` overrides both. A longer result is spilled to disk instead of filling the context, and the full text now lives in `~/.nerdvana/tool-output/session-<digest>/` rather than `~/.nerdvana/tool-output/<session>/`.
 - The model can no longer write `.env` or `.iron-laws.yml`; the user edits those files. The refusal says which file and why.
+- A stream attempt that failed, was cancelled or was retried is now recorded in the transcript as an `assistant_attempt` entry. It belongs to the audit trail and never reaches the model context.
+- The client-side compaction moved to `nerdvana_cli.core.context.client_compaction`, mirroring the provider-side one.
 
 ## [1.9.1] - 2026-10-06
 

@@ -21,19 +21,15 @@ from rich.console import Console
 from rich.markup import escape
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
+from nerdvana_cli.core.context.client_compaction import ClientCompaction
 from nerdvana_cli.core.context.compact import (
     FALLBACK_PROMPT,
     CompactionState,
-    ai_compact,
-    compact_messages,
-    drop_orphan_tool_results,
 )
 from nerdvana_cli.core.context.context_budget import ContextBudget
 from nerdvana_cli.core.context.loop_context import (
-    COMPACT_STATUS_PREFIX,
     background_reports,
     new_provider,
-    open_todos_note,
     prepare_tools,
     provider_messages,
     session_start_context,
@@ -480,28 +476,8 @@ class AgentLoop:
 
         Yields ``COMPACT_STATUS_PREFIX`` status strings for the UI and mutates ``self.state.messages`` in place; falls back to naive truncation when AI compaction fails or the circuit is open.
         """
-        before = len(self.state.messages)
-        self.rewinder.marks.clear()   # compaction rewrites the history the marks point into
-        self._signals[signals.COMPACTION] += 1
-        if not self._compaction_state.is_circuit_open:
-            yield f"{COMPACT_STATUS_PREFIX}compressing ({cur_toks} tokens)..."
-            summary = await ai_compact(
-                self.state.messages, self.provider, self._compaction_state, prompt=self._compact_prompt
-            )
-            if summary is not None:
-                recent = self.state.messages[-4:]
-                while recent and recent[0].role == Role.TOOL:
-                    recent = recent[1:]
-                self.state.messages = [summary] + recent
-                self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="ai")
-                self._context_budget.reset()
-                self.state.messages.extend(open_todos_note(self.session.session_id))
-                yield f"{COMPACT_STATUS_PREFIX}done"
-                return
-        self.state.messages = drop_orphan_tool_results(compact_messages(self.state.messages, thr, self._context_budget.estimator))
-        self.session.record_compaction(tokens_before=cur_toks, messages_before=before, strategy="naive")
-        self._context_budget.reset()
-        self.state.messages.extend(open_todos_note(self.session.session_id))
+        async for status in ClientCompaction(self).run(cur_toks, thr):
+            yield status
 
     def _fire_after_api_call(self, stop_reason: str, extra: dict[str, Any]) -> bool:
         """Run AFTER_API_CALL hooks for *stop_reason*; True when one of them injected messages."""

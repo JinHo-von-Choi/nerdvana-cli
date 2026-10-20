@@ -183,7 +183,7 @@ async def test_a_model_summary_is_reported_as_the_ai_strategy(monkeypatch: pytes
         state.record_success()
         return Message(role=Role.USER, content="[summary]")
 
-    monkeypatch.setattr("nerdvana_cli.core.loop.agent_loop.ai_compact", summarise)
+    monkeypatch.setattr("nerdvana_cli.core.context.client_compaction.ai_compact", summarise)
     statuses = [status async for status in loop._maybe_compact_messages(800, 200)]
     assert statuses[-1].endswith("done")
     assert seen[-1].event == HookEvent.POST_COMPACT and seen[-1].extra["strategy"] == "ai"

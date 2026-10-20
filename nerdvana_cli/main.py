@@ -249,6 +249,9 @@ def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outc
         outcome.stop = "config"
         reporter.failure(outcome, f"Cannot resume session '{resume}': no recorded conversation.")
         raise typer.Exit(EXIT_CONFIG)
+    if resumed and session.orphaned_compaction_lock():
+        # A compaction that never finished: the history it was rewriting is still in the transcript.
+        console.print(f"[yellow]Warning: session '{resumed}' was interrupted during a compaction; its history may be half rewritten.[/yellow]")
     loop = build_agent_loop(settings, ExecutionProfile(session=session, task_registry=TaskRegistry()))
     if resumed:
         loop.restore_history()

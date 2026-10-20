@@ -314,7 +314,7 @@ async def test_ai_compaction_still_replaces_history_with_a_summary(
     async def _fake_ai_compact(messages: Any, provider: Any, state: Any, *, prompt: str) -> Message:
         return summary
 
-    monkeypatch.setattr("nerdvana_cli.core.loop.agent_loop.ai_compact", _fake_ai_compact)
+    monkeypatch.setattr("nerdvana_cli.core.context.client_compaction.ai_compact", _fake_ai_compact)
 
     writer = _writer(tmp_path, pricing)
     loop   = _build_loop(monkeypatch, tmp_path, _RecordingProvider([[]]), writer, pricing)

@@ -15,7 +15,8 @@ import pytest
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.context_budget import ContextBudget
-from nerdvana_cli.core.loop.agent_loop import COMPACT_STATUS_PREFIX, AgentLoop
+from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX
+from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.loop.loop_state import LoopFlow, LoopTurn
 from nerdvana_cli.core.loop.provider_recovery import ProviderCallError, RecoveryPlanner
 from nerdvana_cli.core.state.compaction_block import carries_compaction, last_compaction_index
@@ -149,7 +150,9 @@ async def test_the_block_is_recorded_in_the_session_and_restored_with_it(monkeyp
     await _drain(loop)
     entries = loop.session.replay()
     assert any(e["type"] == "assistant" and e.get("provider_blocks") == [BLOCK] and e["content"] == "" for e in entries)
-    assert [e["strategy"] for e in entries if e["type"] == "compaction"] == ["server"]
+    compactions = [e for e in entries if e["type"] == "compaction"]
+    assert [e["phase"] for e in compactions] == ["start", "summary", "end"]   # the bracket opens and closes
+    assert compactions[1]["strategy"] == "server"
     restored = loop.session.load_messages()
     assert any(m.provider_blocks == [BLOCK] for m in restored)
 

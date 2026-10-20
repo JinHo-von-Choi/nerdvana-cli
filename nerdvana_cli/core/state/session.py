@@ -6,17 +6,27 @@ import json
 import os
 import re
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.state.compaction_block import carries_compaction
+from nerdvana_cli.core.state.projections import (
+    ProjectionRegistry,
+    SessionEventRecord,
+    default_registry,
+)
 from nerdvana_cli.types import Message, Role
 
 # Transcript tool results are capped at this many characters when recorded.
 _TRANSCRIPT_RESULT_CAP = 500
 _SESSION_ID_RE         = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+# The compaction bracket: the lock is taken, the summary is written, the lock is released.
+_COMPACTION_PHASES = ("start", "summary", "end")
 
 
 def resume_session_id(requested: str | None = None) -> str | None:
@@ -82,6 +92,9 @@ def messages_from_transcript(entries: list[dict[str, Any]]) -> list[Message]:
                 tool_use_id = tool_use_id,
                 is_error    = bool(entry.get("is_error", False)),
             ))
+        elif kind == "assistant_attempt":
+            # A stream attempt that never became history: kept for the audit trail, never for the model.
+            continue
     return messages
 
 
@@ -93,6 +106,9 @@ class SessionStorage:
         self.persist    = persist
         # What the user typed in this session, in order: the one record that holds no model or tool text.
         self.user_prompts: list[str] = []
+        # The projections of this session's own log, kept in step with every entry.
+        self.projections: ProjectionRegistry = default_registry()
+        self._seq:       int                 = 0
         base_dir = storage_dir or str(paths.user_sessions_dir())
         if persist:
             os.makedirs(base_dir, exist_ok=True)
@@ -113,6 +129,32 @@ class SessionStorage:
         }
         with open(self.file_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        self._commit(entry)
+
+    def _commit(self, entry: dict[str, Any]) -> None:
+        """Fold a transcript entry into the projections, if it stands for an event."""
+        event = self._event_for(entry, len(self.user_prompts))
+        if event is None:
+            return
+        self.projections.commit(event)
+        self._seq = event.seq
+
+    def _event_for(self, entry: dict[str, Any], turn: int) -> SessionEventRecord | None:
+        """The projection event a transcript entry stands for, or None when it stands for none."""
+        kind = entry.get("type")
+        turn_payload = {"turn": turn}
+        if kind == "user":
+            return SessionEventRecord(self._seq + 1, "turn/start", turn_payload)
+        if kind == "assistant":
+            # An assistant that called tools is not the end of its turn: the tools run first.
+            return None if entry.get("tool_uses") else SessionEventRecord(self._seq + 1, "turn/end", turn_payload)
+        if kind == "assistant_attempt":
+            return SessionEventRecord(self._seq + 1, "assistant/attempt", dict(entry))
+        if kind == "compaction":
+            phase = str(entry.get("phase", ""))
+            if phase in _COMPACTION_PHASES:
+                return SessionEventRecord(self._seq + 1, f"compaction/{phase}", dict(entry))
+        return None
 
     def record_user_message(self, content: str) -> None:
         self.user_prompts.append(content)
@@ -140,20 +182,75 @@ class SessionStorage:
             },
         )
 
+    def record_assistant_attempt(
+        self,
+        error:    str,
+        kind:     str = "",
+        action:   str = "",
+        provider: str = "",
+        model:    str = "",
+    ) -> None:
+        """Record a stream attempt that never became history.
+
+        A failed, cancelled or retried attempt belongs to the audit trail and
+        to reproducibility, not to the conversation: it never reaches the
+        model context.
+        """
+        self.record(
+            "assistant_attempt",
+            {
+                "error":    error,
+                "kind":     kind,
+                "action":   action,
+                "provider": provider,
+                "model":    model,
+            },
+        )
+
+    def begin_compaction(self, tokens_before: int, messages_before: int) -> None:
+        """Take the compaction lock: the bracket opens here, and a crash leaves it open."""
+        self.record(
+            "compaction",
+            {
+                "phase":           "start",
+                "tokens_before":   tokens_before,
+                "messages_before": messages_before,
+                "turn":            len(self.user_prompts),
+            },
+        )
+
     def record_compaction(
         self,
         tokens_before: int,
         messages_before: int,
         strategy: str,  # "ai" | "naive"
+        shadowed:    int = 0,
     ) -> None:
+        """Record the summary of a compaction, the middle of the bracket."""
         self.record(
             "compaction",
             {
-                "tokens_before":    tokens_before,
-                "messages_before":  messages_before,
-                "strategy":         strategy,
+                "phase":           "summary",
+                "tokens_before":   tokens_before,
+                "messages_before": messages_before,
+                "strategy":        strategy,
+                "shadowed_seqs":   shadowed,
+                "turn":            len(self.user_prompts),
             },
         )
+
+    def end_compaction(self, error: str = "") -> None:
+        """Release the compaction lock: the bracket closes here."""
+        self.record("compaction", {"phase": "end", "error": error, "turn": len(self.user_prompts)})
+
+    @contextmanager
+    def compaction(self, tokens_before: int, messages_before: int) -> Iterator[None]:
+        """The compaction bracket: the lock is taken and released around the work."""
+        self.begin_compaction(tokens_before, messages_before)
+        try:
+            yield
+        finally:
+            self.end_compaction()
 
     def record_system(self, subtype: str, data: dict[str, Any]) -> None:
         if subtype == "rewind":
@@ -176,6 +273,30 @@ class SessionStorage:
         entries = self.replay()
         self.user_prompts = [str(e.get("content", "")) for e in _after_rewinds(entries) if e.get("type") == "user"]
         return messages_from_transcript(entries)
+
+    def replay_projections(self) -> ProjectionRegistry:
+        """Fold the transcript into a fresh set of projections.
+
+        This is how a session that was interrupted is read: the log holds the
+        compaction bracket, so a lock that was never released is visible.
+        """
+        registry = default_registry()
+        seq     = 0
+        turns   = 0
+        for entry in self.replay():
+            if entry.get("type") == "user":
+                turns += 1
+            event = self._event_for(entry, turns)
+            if event is None:
+                continue
+            seq += 1
+            registry.commit(SessionEventRecord(seq, event.kind, event.payload))
+        return registry
+
+    def orphaned_compaction_lock(self) -> bool:
+        """True when a compaction started and never finished."""
+        lock = self.replay_projections().state_of("compaction_lock")
+        return bool(lock.get("orphaned"))
 
     @classmethod
     def get_last_session(cls, storage_dir: str = "") -> str | None:

@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
+from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX
 from nerdvana_cli.core.loop.agent_loop import (
-    COMPACT_STATUS_PREFIX,
     CONTEXT_USAGE_PREFIX,
     TOOL_DONE_PREFIX,
     TOOL_STATUS_PREFIX,

@@ -201,6 +201,13 @@ class ModelFailover:
             current_provider = loop.settings.model.provider or "",
             streamed         = bool(turn.asst_text or turn.tool_uses),
         )
+        loop.session.record_assistant_attempt(
+            error    = str(exc),
+            kind     = failure.kind,
+            action   = action.kind,
+            provider = loop.settings.model.provider or "",
+            model    = loop.settings.model.model,
+        )
         if action.kind == RESEND:
             flow.finished = True
             yield "\n[dim yellow]Streaming error, retrying without streaming...[/dim yellow]\n"
