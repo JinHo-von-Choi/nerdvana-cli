@@ -7,7 +7,7 @@ from functools import partial
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
-from nerdvana_cli.core.delegation.swarm import SwarmConfig, SwarmTask, run_swarm
+from nerdvana_cli.core.delegation.swarm import SwarmConfig, SwarmTask, run_swarm, swarm_warnings
 from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolRegistry, ToolSideEffect
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
@@ -51,6 +51,16 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
                         "subagent_type": {"type": "string"},
                         "model":         {"type": "string"},
                         "category":      {"type": "string"},
+                        "blocked_by": {
+                            "type":        "array",
+                            "items":       {"type": "string"},
+                            "description": "The names of the tasks this one waits for; they run first.",
+                        },
+                        "write_scopes": {
+                            "type":        "array",
+                            "items":       {"type": "string"},
+                            "description": "The paths this task may write, e.g. 'src/server'. Two tasks that write the same path are warned about.",
+                        },
                     },
                     "required": ["name", "prompt"],
                 },
@@ -95,6 +105,8 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
                 subagent_type = t.get("subagent_type", "general-purpose"),
                 model         = t.get("model", ""),
                 category      = t.get("category", ""),
+                blocked_by    = tuple(t.get("blocked_by") or ()),
+                write_scopes  = tuple(t.get("write_scopes") or ()),
             )
             for t in args.tasks
         ]
@@ -114,6 +126,9 @@ class SwarmTool(BaseTool[SwarmToolArgs]):
         results      = await run_swarm(config, partial(create_subagent_registry, parent_tools=parent_tools))
 
         lines = [f"Swarm '{args.team_name}' completed. {len(results)} agents ran.\n"]
+        warnings = swarm_warnings(swarm_tasks)
+        if warnings:
+            lines.append("### Write-scope warnings\n" + "\n".join(f"- {warning}" for warning in warnings) + "\n")
         for agent_id, output in results.items():
             lines.append(f"### {agent_id}\n{output}\n")
 

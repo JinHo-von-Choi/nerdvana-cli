@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +12,7 @@ from nerdvana_cli.core.config.model_routing import apply_model_spec, select_mode
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.delegation.subagent import label_confirm, run_subagent
 from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState, TaskStatus
+from nerdvana_cli.core.delegation.team_dag import TeamTaskDAG
 from nerdvana_cli.core.loop.subagent_config import LoopFactories, SubagentConfig
 from nerdvana_cli.core.state.budget import Budget, Envelope
 from nerdvana_cli.core.tool import ConfirmCallback, ToolRegistry
@@ -26,6 +27,10 @@ class SwarmTask:
     subagent_type: str = "general-purpose"
     model:         str = ""
     category:      str = ""
+    # The tasks this one waits for, by name.
+    blocked_by:    tuple[str, ...] = ()
+    # The paths this task may write. Two tasks that write the same path step on each other.
+    write_scopes:  tuple[str, ...] = ()
 
 
 @dataclass
@@ -47,6 +52,53 @@ class SwarmConfig:
     factories:     LoopFactories | None = None
 
 
+async def _run_one(
+    config:          SwarmConfig,
+    task:            SwarmTask,
+    share:           tuple[Envelope, Budget] | None,
+    registry_factory: Callable[[NerdvanaSettings], ToolRegistry],
+    spent:           list[float],
+) -> tuple[str, str]:
+    """One worker of the swarm: it runs the task and records what it did."""
+    agent_id   = f"{task.name}@{config.team_name}"
+    abort      = asyncio.Event()
+    task_state = TaskState(
+        id          = agent_id,
+        description = task.prompt[:80],
+        status      = TaskStatus.RUNNING,
+        abort       = abort,
+    )
+    config.task_registry.register(task_state)
+
+    child_settings = _child_settings(config, task, share)
+
+    child_registry = registry_factory(child_settings)
+    sub_config     = SubagentConfig(
+        agent_id  = agent_id,
+        name      = task.subagent_type,
+        prompt    = task.prompt,
+        settings  = child_settings,
+        registry  = child_registry,
+        max_turns = config.max_turns,
+        confirm   = label_confirm(config.confirm, agent_id),
+        category  = task.category,
+        parent_session_id = config.parent_session_id,
+        absorb    = config.absorb,
+        factories = config.factories,
+    )
+
+    try:
+        output, _          = await run_subagent(sub_config, abort)
+        spent.append(sub_config.cost_usd)
+        task_state.status  = TaskStatus.COMPLETED
+        task_state.output  = output
+        return agent_id, output
+    except Exception as exc:
+        task_state.status = TaskStatus.FAILED
+        task_state.error  = str(exc)
+        return agent_id, f"[swarm error] {exc}"
+
+
 async def run_swarm(
     config:           SwarmConfig,
     registry_factory: Callable[[NerdvanaSettings], ToolRegistry],
@@ -55,57 +107,55 @@ async def run_swarm(
 
     *registry_factory* builds each worker's tool registry from its settings.
 
+    The tasks run in waves: a task that waits for another runs after it, and the
+    tasks of one wave run together because none of them waits for another.
+
     Partial failures are captured and returned as "[swarm error] ..." strings
     so the leader can inspect them without crashing.
     """
-    spent: list[float] = []
-    share  = _reserve_share(config)
-
-    async def _run_one(task: SwarmTask) -> tuple[str, str]:
-        agent_id   = f"{task.name}@{config.team_name}"
-        abort      = asyncio.Event()
-        task_state = TaskState(
-            id          = agent_id,
-            description = task.prompt[:80],
-            status      = TaskStatus.RUNNING,
-            abort       = abort,
-        )
-        config.task_registry.register(task_state)
-
-        child_settings = _child_settings(config, task, share)
-
-        child_registry = registry_factory(child_settings)
-        sub_config     = SubagentConfig(
-            agent_id  = agent_id,
-            name      = task.subagent_type,
-            prompt    = task.prompt,
-            settings  = child_settings,
-            registry  = child_registry,
-            max_turns = config.max_turns,
-            confirm   = label_confirm(config.confirm, agent_id),
-            category  = task.category,
-            parent_session_id = config.parent_session_id,
-            absorb    = config.absorb,
-            factories = config.factories,
-        )
-
-        try:
-            output, _          = await run_subagent(sub_config, abort)
-            spent.append(sub_config.cost_usd)
-            task_state.status  = TaskStatus.COMPLETED
-            task_state.output  = output
-            return agent_id, output
-        except Exception as exc:
-            task_state.status = TaskStatus.FAILED
-            task_state.error  = str(exc)
-            return agent_id, f"[swarm error] {exc}"
-
+    spent:  list[float] = []
+    share   = _reserve_share(config)
+    results: dict[str, str] = {}
     try:
-        results_list = await asyncio.gather(*[_run_one(t) for t in config.tasks])
+        for wave in _waves(config.tasks):
+            wave_results = await asyncio.gather(
+                *[_run_one(config, task, share, registry_factory, spent) for task in wave]
+            )
+            results.update(dict(wave_results))
     finally:
         if share is not None:
             share[1].settle(share[0], sum(spent))
-    return dict(results_list)
+    return results
+
+
+def _dag(tasks: Sequence[SwarmTask]) -> TeamTaskDAG:
+    """The graph of the swarm's tasks: who waits for whom, and what each may write."""
+    dag = TeamTaskDAG()
+    for task in tasks:
+        dag.create_task(
+            subject      = task.prompt[:80],
+            blocked_by   = task.blocked_by,
+            write_scopes = task.write_scopes,
+            task_id      = task.name,
+        )
+    return dag
+
+
+def _waves(tasks: Sequence[SwarmTask]) -> list[list[SwarmTask]]:
+    """The tasks in the order they may run, one wave of independent tasks at a time."""
+    by_name = {task.name: task for task in tasks}
+    waves: list[list[SwarmTask]] = []
+    for wave in _dag(tasks).waves():
+        waves.append([by_name[task.task_id] for task in wave if task.task_id in by_name])
+    return [wave for wave in waves if wave]
+
+
+def swarm_warnings(tasks: Sequence[SwarmTask]) -> list[str]:
+    """The write paths of the tasks that meet another task's, and who they meet."""
+    warnings: list[str] = []
+    for task_id, found in _dag(tasks).write_scope_warnings().items():
+        warnings.extend(f"{task_id}: {warning}" for warning in found)
+    return warnings
 
 
 def _child_settings(config: SwarmConfig, task: SwarmTask, share: tuple[Envelope, Budget] | None) -> NerdvanaSettings:

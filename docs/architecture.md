@@ -35,7 +35,7 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 | `telemetry` | the usage and cost ledger (`analytics`), OpenTelemetry traces, the prompt cache watch |
 | `execution` | running a batch of tool calls and the checks around it, the spill store that keeps an oversized result on disk instead of in the context |
 | `loop` | the agent loop and what drives it: run limits, model failover and provider recovery, recovery and activity hooks, the goal and plan gates, the advisor, cancellation, sub-agent loop settings |
-| `delegation` | sub-agents, swarms, declared workflows, task tracking, worktrees |
+| `delegation` | sub-agents, swarms, declared workflows, task tracking, worktrees, the shared task graph of a team (who waits for whom, which paths each may write) |
 | `contract` | the task contract: what a task claims, the digest that pins it, the test manifest it is judged by and the verification receipts |
 | `campaign` | multi-repository campaigns: the manifest of repository tasks, the checkpoint written as work moves on, the isolated worktrees each task runs in and the rollback of a task whose verification failed |
 | `evidence` | the self-contained evidence bundle an auditor reads without the repository: the contract and receipt digests, the diff, the static analysis and test output, the verdict and the checksum that pins them (`core/evidence/receipt_bundle.py`) |
