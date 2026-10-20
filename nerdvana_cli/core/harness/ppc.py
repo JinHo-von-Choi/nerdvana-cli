@@ -118,6 +118,68 @@ def assign_anonymous_ids(labels: Sequence[str], task_id: str, k: int, mode: str)
     return {label: _anonymous_id(index) for index, label in enumerate(shuffled)}
 
 
+@dataclass(frozen=True)
+class AnonymousCandidate:
+    """One candidate as the judge sees it: its content, and nothing else.
+
+    The real label is not in here, so a judge cannot prefer the first, the
+    last, or the one whose name it recognises.
+    """
+
+    anonymous_id: str
+    kind:         str
+    deliverable:  str = ""
+    rollout:      str = ""
+
+
+# The judge: it reads the candidates as they are presented and names the winner.
+JudgeFn = Callable[[Sequence[AnonymousCandidate]], str]
+
+
+class AnonymizedSelector:
+    """Picks the winner among the candidates without letting the judge know which is which.
+
+    The candidates are presented in the order of their anonymous ids, and that
+    order comes from the task and the mode, so the judge reads them in an order
+    no one chose. The winner it names is the one that earned it.
+    """
+
+    def __init__(self, task_id: str, mode: str = "ppc") -> None:
+        self._task_id = task_id
+        self._mode    = mode
+
+    def present(self, candidates: Sequence[Candidate]) -> list[AnonymousCandidate]:
+        """The candidates as the judge sees them, in the order of their ids."""
+        entries, _ = self._presented(candidates)
+        return entries
+
+    def select(self, candidates: Sequence[Candidate], judge: JudgeFn) -> Candidate | None:
+        """The candidate the judge named; None when it named one that is not there."""
+        if not candidates:
+            return None
+        entries, ids = self._presented(candidates)
+        chosen       = str(judge(entries)).strip()
+        for candidate in candidates:
+            if ids[candidate.label] == chosen:
+                return candidate
+        return None
+
+    def _presented(self, candidates: Sequence[Candidate]) -> tuple[list[AnonymousCandidate], dict[str, str]]:
+        """The candidates as the judge sees them, and the ids their labels carry."""
+        ids = assign_anonymous_ids([c.label for c in candidates], self._task_id, len(candidates), self._mode)
+        entries = [
+            AnonymousCandidate(
+                anonymous_id = ids[c.label],
+                kind         = c.kind,
+                deliverable  = c.deliverable,
+                rollout      = c.rollout,
+            )
+            for c in candidates
+        ]
+        entries.sort(key=lambda entry: entry.anonymous_id)
+        return entries, ids
+
+
 class PPCTaskRunner:
     """Runs one task through propose, probe and compose, and accounts for every step.
 

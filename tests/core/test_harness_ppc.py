@@ -12,6 +12,8 @@ from nerdvana_cli.core.harness.ledger import HarnessLedger
 from nerdvana_cli.core.harness.ppc import (
     ANSWER_FREE,
     EVIDENCE_BOUNDARY,
+    AnonymizedSelector,
+    AnonymousCandidate,
     Candidate,
     ContextTreeBuilder,
     PPCTaskRunner,
@@ -124,3 +126,70 @@ def test_the_synthesis_is_given_the_candidates_that_made_it() -> None:
     runner.compose(0, [inv, dom], lambda candidates: seen.append(candidates) or "synthesis")
 
     assert list(seen[0]) == [inv, dom]
+
+
+# ---------------------------------------------------------------------------
+# The anonymous selection
+# ---------------------------------------------------------------------------
+
+
+def test_the_judge_does_not_see_the_label_of_a_candidate() -> None:
+    selector   = AnonymizedSelector("task-1", mode="ppc")
+    candidates = [Candidate(label="inv0", kind="inv", deliverable="d1"), Candidate(label="dom0", kind="dom", deliverable="d2")]
+
+    presented = selector.present(candidates)
+
+    assert all(not hasattr(entry, "label") for entry in presented)
+    assert {entry.deliverable for entry in presented} == {"d1", "d2"}
+
+
+def test_the_candidates_are_presented_in_the_order_of_their_ids() -> None:
+    selector   = AnonymizedSelector("task-1", mode="ppc")
+    candidates = [Candidate(label=f"c{index}", kind="c") for index in range(5)]
+
+    presented = selector.present(candidates)
+
+    assert [entry.anonymous_id for entry in presented] == sorted(entry.anonymous_id for entry in presented)
+
+
+def test_the_winner_is_the_candidate_that_carries_the_id_the_judge_named() -> None:
+    selector   = AnonymizedSelector("task-1", mode="ppc")
+    candidates = [Candidate(label=f"c{index}", kind="c") for index in range(4)]
+    ids        = assign_anonymous_ids([c.label for c in candidates], "task-1", len(candidates), "ppc")
+    target     = selector.present(candidates)[2].anonymous_id
+
+    winner = selector.select(candidates, lambda shown: target)
+
+    assert winner is not None
+    assert ids[winner.label] == target
+
+
+def test_a_judge_that_names_nothing_gives_no_winner() -> None:
+    selector = AnonymizedSelector("task-1", mode="ppc")
+
+    assert selector.select([Candidate(label="c0", kind="c")], lambda shown: "ZZZ") is None
+
+
+def test_the_selection_does_not_depend_on_the_order_the_labels_came_in() -> None:
+    selector = AnonymizedSelector("task-1", mode="ppc")
+    first    = [Candidate(label="inv0", kind="inv"), Candidate(label="dom0", kind="dom")]
+    second   = [Candidate(label="dom0", kind="dom"), Candidate(label="inv0", kind="inv")]
+
+    def judge(shown: Sequence[AnonymousCandidate]) -> str:
+        return shown[0].anonymous_id
+
+    one = selector.select(first, judge)
+    two = selector.select(second, judge)
+
+    assert one is not None and two is not None
+    assert one.label == two.label
+
+
+def test_the_selection_is_the_same_for_the_same_task_and_the_same_labels() -> None:
+    selector   = AnonymizedSelector("task-1", mode="ppc")
+    candidates = [Candidate(label="inv0", kind="inv"), Candidate(label="dom0", kind="dom")]
+
+    presented = selector.present(candidates)
+
+    assert [entry.anonymous_id for entry in presented] == \
+        [entry.anonymous_id for entry in AnonymizedSelector("task-1", mode="ppc").present(candidates)]

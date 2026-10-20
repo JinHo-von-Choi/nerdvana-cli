@@ -143,3 +143,54 @@ def test_a_note_that_leaks_the_grader_is_refused(tmp_path: Path) -> None:
 
     assert lib.add(task_id="mig-03", harness={"NIRNA.md": "# Rules\n"}, experience=note) is None
     assert not lib.index_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# What the next task of a domain starts from
+# ---------------------------------------------------------------------------
+
+
+def _note() -> ExperienceNote:
+    return ExperienceNote(cue="cue", lesson="lesson", evidence="evidence")
+
+
+def test_the_next_task_of_a_domain_starts_from_what_the_domain_learned(tmp_path: Path) -> None:
+    lib = DomainLibrary(root=tmp_path, domain="python", surface=NERDVANA_SURFACE)
+    lib.add(task_id="t1", harness={"scripts/a.py": "one\n"}, experience=_note())
+
+    assert lib.inherited_tree() == {"scripts/a.py": "one\n"}
+    assert lib.retained_ids() == ["t1"]
+
+
+def test_a_forgotten_experience_is_not_inherited(tmp_path: Path) -> None:
+    lib = DomainLibrary(root=tmp_path, domain="python", surface=NERDVANA_SURFACE)
+    lib.add(task_id="t1", harness={"scripts/a.py": "one\n"}, experience=_note())
+
+    lib.forget("t1")
+
+    assert lib.inherited_tree() == {}
+    assert lib.notes() == []
+    assert lib.retained_ids() == []
+
+
+def test_a_later_experience_may_correct_an_earlier_one(tmp_path: Path) -> None:
+    lib = DomainLibrary(root=tmp_path, domain="python", surface=NERDVANA_SURFACE)
+    lib.add(task_id="t1", harness={"scripts/a.py": "one\n"}, experience=_note())
+    lib.add(task_id="t2", harness={"scripts/a.py": "two\n"}, experience=_note())
+
+    assert lib.inherited_tree() == {"scripts/a.py": "two\n"}
+
+
+def test_the_notes_are_the_kept_experiences_with_the_task_they_came_from(tmp_path: Path) -> None:
+    lib = DomainLibrary(root=tmp_path, domain="python", surface=NERDVANA_SURFACE)
+    lib.add(task_id="t1", harness={"scripts/a.py": "one\n"}, experience=ExperienceNote(cue="c1", lesson="l1", evidence="e1"))
+
+    assert [(task_id, note.cue) for task_id, note in lib.notes()] == [("t1", "c1")]
+
+
+def test_a_library_that_holds_nothing_teaches_nothing(tmp_path: Path) -> None:
+    lib = DomainLibrary(root=tmp_path, domain="python", surface=NERDVANA_SURFACE)
+
+    assert lib.inherited_tree() == {}
+    assert lib.retained_ids() == []
+    assert lib.domain == "python"

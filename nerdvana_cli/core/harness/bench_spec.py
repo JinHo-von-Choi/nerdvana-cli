@@ -141,6 +141,8 @@ class BenchTask:
     path:   str = ""
     tags:   tuple[str, ...] = ()
     domain: str = ""
+    # The file the task was read from, when it was read from one.
+    file:   str = ""
 
     @property
     def stratum(self) -> str:
@@ -268,6 +270,7 @@ def read_task_file(file: Path) -> BenchTask:
         path   = str(data.get("path", "") or ""),
         tags   = tuple(str(tag) for tag in data.get("tags") or ()),
         domain = str(data.get("domain", "") or ""),
+        file   = str(file),
     )
 
 

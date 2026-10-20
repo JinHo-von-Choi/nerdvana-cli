@@ -29,6 +29,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 for _root in (REPO_ROOT, REPO_ROOT / "scripts"):
     if str(_root) not in sys.path:
@@ -67,7 +69,25 @@ def _as_bench_task(task: Any) -> BenchTask:
         path   = str(task.path),
         tags   = tuple(task.tags),
         domain = str(getattr(task, "domain", "") or ""),
+        file   = str(getattr(task, "file", "") or ""),
     )
+
+
+def _write_task(task: BenchTask, directory: Path) -> None:
+    """Write the task as a file a run can read, with its path resolved.
+
+    The path of a task file is relative to the file itself, so a copy that
+    lives somewhere else would point at nothing; it is made absolute here.
+    """
+    if not task.file:
+        return
+    source = Path(task.file)
+    data   = yaml.safe_load(source.read_text(encoding="utf-8"))
+    if isinstance(data, dict):
+        raw = str(data.get("path", "") or "")
+        if raw and not Path(raw).is_absolute():
+            data["path"] = str((source.parent / raw).resolve())
+    (directory / source.name).write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 
 def load(tasks: Path | None, benchmark: str, source: str) -> list[BenchTask]:
@@ -83,7 +103,12 @@ def load(tasks: Path | None, benchmark: str, source: str) -> list[BenchTask]:
 
 
 def write(split: TaskSplit, out: Path, ratio: float, seed: int) -> None:
-    """Write the split, so that the run that follows knows what it may learn from."""
+    """Write the split, so that the run that follows knows what it may learn from.
+
+    Each side is written twice: as the manifest of the tasks it holds, and as
+    the task files themselves, so a half of the split can be run like any other
+    directory of tasks.
+    """
     out.mkdir(parents=True, exist_ok=True)
     for name, tasks in (("train", split.train), ("test", split.test)):
         payload = {
@@ -93,6 +118,10 @@ def write(split: TaskSplit, out: Path, ratio: float, seed: int) -> None:
             "domains": sorted({task.stratum for task in tasks}),
         }
         (out / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        directory = out / name
+        directory.mkdir(parents=True, exist_ok=True)
+        for task in tasks:
+            _write_task(task, directory)
 
 
 def main(argv: list[str] | None = None) -> int:

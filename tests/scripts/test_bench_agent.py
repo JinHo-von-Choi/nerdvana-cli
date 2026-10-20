@@ -15,6 +15,10 @@ from types import ModuleType
 
 import pytest
 
+from nerdvana_cli.core.harness.library import DomainLibrary, ExperienceNote
+from nerdvana_cli.core.harness.ppc import assign_anonymous_ids
+from nerdvana_cli.core.harness.surface import NERDVANA_SURFACE
+
 SCRIPT  = Path(__file__).parents[2] / "scripts" / "bench_agent.py"
 TASKS   = Path(__file__).parents[2] / "benchmarks" / "tasks"
 
@@ -135,7 +139,7 @@ IDLER = "import json\nprint(json.dumps({'type': 'result', 'subtype': 'success', 
 def _options() -> argparse.Namespace:
     return argparse.Namespace(
         approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="",
-        isolate=False, no_network=False,
+        isolate=False, no_network=False, library=None, learn=False,
         method=bench.BenchMethod.parse("single"), substrate=bench.BenchSubstrate.parse("loop"),
     )
 
@@ -487,3 +491,112 @@ def test_a_preset_that_does_not_exist_is_reported(monkeypatch: pytest.MonkeyPatc
 
     assert "no sub-agent preset named 'no-such-preset'" in attempt.error
     assert "settings" not in seen
+
+
+# ---------------------------------------------------------------------------
+# The domain library
+# ---------------------------------------------------------------------------
+
+
+LEARNER = (
+    "import json, pathlib\n"
+    "p = pathlib.Path('calc.py'); p.write_text(p.read_text().replace('range(start, stop)', 'range(start, stop + 1)'))\n"
+    "d = pathlib.Path('.nerdvana/skills/lesson/SKILL.md'); d.parent.mkdir(parents=True, exist_ok=True)\n"
+    "d.write_text('---\\nname: lesson\\ndescription: d\\n---\\n\\nthe lesson\\n')\n"
+    "print(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 2, 'total_cost_usd': 0.25}))\n"
+)
+SEEKER = (
+    "import json, pathlib\n"
+    "p = pathlib.Path('seen.txt')\n"
+    "q = pathlib.Path('NIRNA.local.md')\n"
+    "p.write_text(q.read_text() if q.is_file() else '')\n"
+    "print(json.dumps({'type': 'result', 'subtype': 'success', 'num_turns': 1, 'total_cost_usd': 0.1}))\n"
+)
+
+
+def _library(root: Path) -> DomainLibrary:
+    return DomainLibrary(root=root, domain="python", surface=NERDVANA_SURFACE)
+
+
+def test_learning_without_a_library_is_refused(capsys: pytest.CaptureFixture[str]) -> None:
+    assert bench.main([str(TASKS), "--learn"]) == 2
+    assert "--learn needs --library" in capsys.readouterr().err
+
+
+def test_a_task_starts_from_what_its_domain_learned(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    _library(library).add(
+        "t0",
+        harness={".nerdvana/skills/x/SKILL.md": "---\nname: x\ndescription: d\n---\n\nthe lesson\n"},
+        experience=ExperienceNote(cue="c", lesson="l", evidence="e"),
+    )
+    options = _options()
+    options.library = library
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", SEEKER])
+
+    bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    seen = (tmp_path / "sum-range-1" / "seen.txt").read_text(encoding="utf-8")
+    assert "the lesson" in seen
+
+
+def test_a_task_that_passed_leaves_what_it_learned_in_the_library(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    options = _options()
+    options.library = library
+    options.learn   = True
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", LEARNER])
+
+    bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    assert ".nerdvana/skills/lesson/SKILL.md" in _library(library).inherited_tree()
+
+
+def test_a_task_that_failed_leaves_nothing_in_the_library(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    options = _options()
+    options.library = library
+    options.learn   = True
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", IDLER])
+
+    bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    assert _library(library).inherited_tree() == {}
+
+
+def test_the_harness_a_run_left_behind_is_not_written_to_the_result_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    options = _options()
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", LEARNER])
+
+    attempt = bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    record = attempt.to_record()
+    assert "harness" not in record
+    assert record["harness_paths"] == [".nerdvana/skills/lesson/SKILL.md"]
+
+
+def test_the_winner_is_the_one_with_the_lower_anonymous_id() -> None:
+    results = [(1, bench.Attempt("t", 1, passed=True)), (2, bench.Attempt("t", 1, passed=True))]
+    ids     = assign_anonymous_ids(["c1", "c2"], "t", 2, "single")
+    expected = min(ids, key=lambda label: ids[label])
+
+    winner = bench._best_candidate(results, "t", "single")
+
+    assert winner is not None
+    assert f"c{winner[0]}" == expected
+
+
+def test_a_candidate_that_failed_is_never_the_winner() -> None:
+    results = [(1, bench.Attempt("t", 1, passed=False)), (2, bench.Attempt("t", 1, passed=True))]
+
+    winner = bench._best_candidate(results, "t", "single")
+
+    assert winner is not None
+    assert winner[0] == 2
+
+
+def test_the_library_is_part_of_the_mark_of_the_run() -> None:
+    first  = bench.runmark_settings(bench.parse_args([str(TASKS), "--library", "/tmp/one"]))
+    second = bench.runmark_settings(bench.parse_args([str(TASKS), "--library", "/tmp/two"]))
+
+    assert first != second

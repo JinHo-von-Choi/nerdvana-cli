@@ -89,6 +89,48 @@ The split is written as `train.json` and `test.json`, and it is reproducible:
 the same tasks and the same seed always give the same split. A domain with a
 single task goes to the train side, since it cannot be split.
 
+### Carrying what was learned over
+
+The split is only half the experiment: something has to carry the learning from
+the train side to the test side, or the test side starts from nothing. That is
+the domain library (`nerdvana_cli.core.harness.library`), and the benchmark
+reaches it with two options:
+
+| Option | Meaning |
+|-|-|
+| `--library DIR` | the directory the domain library is kept in; a task of a domain starts from what that domain learned |
+| `--learn` | let a task leave behind what it learned, so the next task of its domain starts from it (needs `--library`) |
+
+The library keeps what a task left behind: the skill it wrote and the helper
+script it wrote, whole, under the domain the task belongs to. A task that
+passed and changed something teaches; a task that failed teaches nothing, and
+one that changed nothing has nothing to teach.
+
+What the next task receives arrives in two channels, and both of them are ones
+a run reads without asking: the helper scripts, which the agent runs with its
+shell, and the local project instructions (`NIRNA.local.md`), which the prompt
+always carries. A skill travels as its text — what the next task starts from is
+the knowledge, not the mechanism that produced it.
+
+So the experiment is two runs over two halves of the split:
+
+```bash
+# the train half: the tasks may learn from, and what they learn is kept
+python scripts/bench_agent.py benchmarks/split/train --library lib --learn --yes
+
+# the test half: the tasks may not learn from, and they start from the library
+python scripts/bench_agent.py benchmarks/split/test --library lib --yes
+```
+
+The test run inherits and does not write, so what it is measured on is what the
+train half learned and nothing else. The library is part of the mark of the
+run, so the two runs cannot be counted as one.
+
+The lesson is written for the next task and not for this one: the instruction
+the run is given says so, and the note the library keeps names the domain and
+not the task. A lesson that named one task would not be a lesson the next task
+of the domain could use, and the measurement would say nothing.
+
 ## Task files
 
 One YAML file per task in `benchmarks/tasks/`:
@@ -186,13 +228,14 @@ without solving anything, so a score measured with the history reachable oversta
 the task's `setup` command runs. The agent then finds no history, tags, branches, remotes or reflog. A task
 whose `setup` needs real history (a version derived from tags, for example) cannot use it.
 
-`--no-network` refuses TCP connections from the agent's shell commands (Landlock, which is why the sandbox
-must be `require` and the kernel 6.7 or later; the script stops at start-up otherwise) and denies the
-in-process `WebFetch` and `WebSearch` tools. `nerdvana run --set` cannot change the `sandbox` or
-`permissions` sections, so the script writes a copy of your configuration (the first of `NERDVANA_CONFIG`,
-the user config file and the legacy one) with `sandbox.network: false`, `sandbox.mode: require` and those
-two tools in `permissions.always_deny`, and passes it with `--config` for every attempt. A `nerdvana.yml` in
-a task repository is then not read.
+`--no-network` refuses TCP connections from the agent's shell commands to everything but the
+package registries (Landlock, which is why the sandbox must be `require` and the kernel 6.7 or later;
+the script stops at start-up otherwise) and denies the in-process `WebFetch` and `WebSearch` tools.
+`nerdvana run --set` cannot change the `sandbox` or `permissions` sections, so the script writes a copy
+of your configuration (the first of `NERDVANA_CONFIG`, the user config file and the legacy one) with
+`sandbox.network: allowlist`, the registries in `sandbox.allowed_domains`, `sandbox.mode: require` and
+those two tools in `permissions.always_deny`, and passes it with `--config` for every attempt. A
+`nerdvana.yml` in a task repository is then not read.
 
 What these two do not cover, honestly:
 

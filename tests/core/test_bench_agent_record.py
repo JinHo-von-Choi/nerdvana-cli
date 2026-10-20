@@ -39,7 +39,7 @@ bench = _load()
 def _options(**changes: object) -> argparse.Namespace:
     base = {
         "approval_mode": "yolo", "sandbox": "require", "gate": False, "set": [], "model": "", "provider": "",
-        "isolate": False, "no_network": False,
+        "isolate": False, "no_network": False, "library": None, "learn": False,
         "method": bench.BenchMethod.parse("single"), "substrate": bench.BenchSubstrate.parse("loop"),
     }
     return argparse.Namespace(**{**base, **changes})

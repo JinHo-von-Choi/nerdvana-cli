@@ -47,7 +47,8 @@ import sys
 import tempfile
 import time
 from collections import Counter
-from dataclasses import asdict, dataclass, field
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -64,10 +65,15 @@ from nerdvana_cli.core.harness.bench_spec import (
     BenchTask,
     RunmarkMismatchError,
     check_runmark,
+    domain_of,
     evaluation_network,
     load_benchmark,
     write_runmark,
 )
+from nerdvana_cli.core.harness.library import DomainLibrary, ExperienceNote
+from nerdvana_cli.core.harness.ppc import AnonymizedSelector, AnonymousCandidate, Candidate
+from nerdvana_cli.core.harness.surface import NERDVANA_SURFACE
+from nerdvana_cli.core.harness.transfer import changed_tree, give_tree, read_tree
 from nerdvana_cli.core.safety.sandbox import landlock_abi
 
 DEFAULT_MAX_TURNS    = 30
@@ -78,6 +84,18 @@ VERIFY_TIMEOUT       = 600
 RECOMMENDED_ATTEMPTS = 4
 MIN_USEFUL_ATTEMPTS  = 3
 NO_NETWORK_ABI       = 4
+
+# What the task is told when the run may leave behind what it learned. The
+# lesson is written for the next task of the domain, so it does not name this
+# one: a lesson that names a task is not one the next task can use.
+LEARN_INSTRUCTION = """
+
+When the task is done, leave behind what made it work, so the next task of this kind starts from it.
+Write a skill at .nerdvana/skills/<name>/SKILL.md (front matter with a name and a description) that
+states the approach in general terms, and a helper script under scripts/ when a script is what made it
+work. Keep it short, and do not name this task: write it for the next one.
+"""
+
 REPO_ROOT            = Path(__file__).resolve().parent.parent
 GIT_IDENTITY         = ("-c", "user.name=bench", "-c", "user.email=bench@localhost", "-c", "commit.gpgsign=false")
 
@@ -115,6 +133,8 @@ class Task:
     timeout:      int   = DEFAULT_TIMEOUT
     tags:         tuple[str, ...] = ()
     domain:       str   = ""
+    # The file the task was read from, when it was read from one.
+    file:         str   = ""
 
 
 @dataclass
@@ -135,6 +155,16 @@ class Attempt:
     environment:  dict[str, Any] = field(default_factory=dict)
     audit:        list[dict[str, str]] = field(default_factory=list)
     candidates:   int = 1
+    # What the run changed in the harness: the files it left behind. It is not
+    # written to the result file; the paths it holds are.
+    harness:      dict[str, str] = field(default_factory=dict)
+
+    def to_record(self) -> dict[str, Any]:
+        """The attempt as it is written to the result file."""
+        record = asdict(self)
+        record.pop("harness", None)
+        record["harness_paths"] = sorted(self.harness)
+        return record
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +208,10 @@ def load_tasks(source: Path) -> list[Task]:
     tasks: list[Task] = []
     for file in files:
         try:
-            tasks.append(parse_task(yaml.safe_load(file.read_text(encoding="utf-8")), file.parent))
+            task = parse_task(yaml.safe_load(file.read_text(encoding="utf-8")), file.parent)
         except (TaskError, yaml.YAMLError, ValueError, OSError) as exc:
             raise TaskError(f"{file}: {exc}") from exc
+        tasks.append(replace(task, file=str(file)))
     ids = [t.id for t in tasks]
     if len(set(ids)) != len(ids):
         raise TaskError("task ids must be unique")
@@ -578,8 +609,9 @@ def network_off_config(root: Path) -> Path:
 
 def agent_command(task: Task, options: argparse.Namespace) -> list[str]:
     """The ``nerdvana run`` invocation for a task; the events stream is what the transcript audit reads."""
+    prompt = task.prompt + (LEARN_INSTRUCTION if getattr(options, "learn", False) else "")
     command = [
-        sys.executable, "-c", "from nerdvana_cli.main import app; app()", "run", task.prompt,
+        sys.executable, "-c", "from nerdvana_cli.main import app; app()", "run", prompt,
         "--output-format", "stream-json",
         "--max-turns", str(task.max_turns),
         "--max-cost-usd", str(task.max_cost_usd),
@@ -634,21 +666,93 @@ def run_attempt(
 
     Every candidate is run, so the method spends the same on every task; the
     attempt is judged by the best of them, and the cost it reports is what all
-    of them spent together.
+    of them spent together. The winner is picked among anonymous ids, so the
+    order the candidates came in does not decide it.
     """
     candidates = options.method.candidates
-    best: Attempt | None = None
+    results: list[tuple[int, Attempt]] = []
     spent = 0.0
     for index in range(1, candidates + 1):
         result = run_candidate(task, number, index, candidates, options, root, run_env=run_env, config=config)
         spent += result.cost_usd
-        if best is None or (result.passed and not best.passed):
-            best = result
+        results.append((index, result))
+    best = _best_candidate(results, task.id, options.method.name)
     if best is None:
         raise TaskError(f"{task.id}: the method produced no candidate")
-    best.cost_usd   = spent
-    best.candidates = candidates
-    return best
+    _, attempt = best
+    attempt.cost_usd   = spent
+    attempt.candidates = candidates
+    _keep_learning(task, attempt, options)
+    return attempt
+
+
+def _best_candidate(results: list[tuple[int, Attempt]], task_id: str, mode: str) -> tuple[int, Attempt] | None:
+    """The candidate that wins, picked without letting the order decide it.
+
+    The candidates are presented under anonymous ids, in the order of those ids,
+    so a candidate that passed is not preferred for having come first.
+    """
+    if not results:
+        return None
+    selector  = AnonymizedSelector(task_id, mode=mode)
+    candidates = [
+        Candidate(label=f"c{index}", kind="candidate", deliverable="passed" if attempt.passed else "failed")
+        for index, attempt in results
+    ]
+
+    def judge(presented: Sequence[AnonymousCandidate]) -> str:
+        return next(
+            (entry.anonymous_id for entry in presented if entry.deliverable == "passed"),
+            presented[0].anonymous_id,
+        )
+
+    winner = selector.select(candidates, judge)
+    if winner is None:
+        return None
+    return next((pair for pair in results if f"c{pair[0]}" == winner.label), results[0])
+
+
+def _library_of(options: argparse.Namespace, task: Task) -> DomainLibrary | None:
+    """The library of the task's domain, when the run has one."""
+    if not options.library:
+        return None
+    return DomainLibrary(root=options.library, domain=domain_of(task.tags, task.domain), surface=NERDVANA_SURFACE)
+
+
+def _keep_learning(task: Task, attempt: Attempt, options: argparse.Namespace) -> None:
+    """Keep what the task learned, so the next task of its domain starts from it.
+
+    Only a task that passed teaches anything: a harness that did not work is
+    not kept, and a run that changed nothing has nothing to teach.
+    """
+    if not options.learn or not attempt.passed or not attempt.harness:
+        return
+    library = _library_of(options, task)
+    if library is None:
+        return
+    library.add(f"{task.id}#{attempt.attempt}", attempt.harness, _experience_note(task, library, attempt))
+
+
+def _experience_note(task: Task, library: DomainLibrary, attempt: Attempt) -> ExperienceNote:
+    """The note that goes with what the task learned.
+
+    The note names the domain and not the task: a lesson that names one task
+    is not one the next task of the domain can use.
+    """
+    domain = library.domain
+    skills = sorted(path for path in attempt.harness if path.startswith(".nerdvana/skills/"))
+    scripts = sorted(path for path in attempt.harness if path.startswith("scripts/"))
+    kept: list[str] = []
+    if skills:
+        kept.append("the skills " + ", ".join(skills))
+    if scripts:
+        kept.append("the helper scripts " + ", ".join(scripts))
+    lesson = "What made it work: " + ("; ".join(kept) if kept else "what the agent left behind") + "."
+    return ExperienceNote(
+        cue      = f"a task of the {domain} domain",
+        lesson   = lesson,
+        evidence = f"the verify command passed on a {domain} task; the harness is kept whole.",
+    )
 
 
 def run_candidate(
@@ -667,6 +771,7 @@ def run_candidate(
         result.error = problem
         return result
 
+    before = _give_harness(task, workdir, options)
     command = agent_command(task, options) + (["--config", str(config)] if config else [])
     started = time.monotonic()
     try:
@@ -682,7 +787,16 @@ def run_candidate(
 
     verdict       = _shell(task.verify, workdir, VERIFY_TIMEOUT)
     result.passed = verdict is not None and verdict.returncode == 0
+    result.harness = changed_tree(before, read_tree(workdir))
     return result
+
+
+def _give_harness(task: Task, workdir: Path, options: argparse.Namespace) -> dict[str, str]:
+    """Give the run the harness its domain learned; returns the tree it started from."""
+    library = _library_of(options, task)
+    if library is not None:
+        give_tree(library.inherited_tree(), workdir)
+    return read_tree(workdir)
 
 
 def run_subagent_candidate(
@@ -715,6 +829,7 @@ def run_subagent_candidate(
     if preset is None:
         result.error = f"no sub-agent preset named '{options.substrate.preset}'"
         return result
+    before = _give_harness(task, workdir, options)
     settings = NerdvanaSettings.load(str(config) if config else None)
     settings.cwd             = str(workdir)
     settings.session.persist = False
@@ -743,6 +858,7 @@ def run_subagent_candidate(
     result.duration_s = time.monotonic() - started
     verdict       = _shell(task.verify, workdir, VERIFY_TIMEOUT)
     result.passed = verdict is not None and verdict.returncode == 0
+    result.harness = changed_tree(before, read_tree(workdir))
     return result
 
 
@@ -759,6 +875,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--benchmark", default="", help="the name of a known benchmark (short-20, long-8, ...); the tasks path is used when it is not given")
     parser.add_argument("--source", default="", help="where the tasks of an external benchmark are")
     parser.add_argument("--results-dir", type=Path, default=None, help="the directory the results are kept in; one made with another configuration is not continued")
+    parser.add_argument("--library", type=Path, default=None, help="the directory the domain library is kept in; a task starts from what its domain learned")
+    parser.add_argument("--learn", action="store_true", help="let a task leave behind what it learned, so the next task of its domain starts from it (needs --library)")
     parser.add_argument("--set", action="append", default=[], metavar="SECTION.FIELD=VALUE", help="override a setting in every attempt (nerdvana run --set), e.g. to compare compaction thresholds")
     parser.add_argument("--gate", action="store_true", help="hold the agent to each task's verify command (nerdvana run --verify) instead of checking only afterwards")
     parser.add_argument("--tag", action="append", default=[], help="run only tasks carrying this tag (repeatable)")
@@ -785,6 +903,8 @@ def option_problem(options: argparse.Namespace) -> str:
         return "a task file or a --benchmark is needed"
     if options.substrate.startswith("subagent") and ":" not in options.substrate:
         return "--substrate subagent needs the preset: --substrate subagent:code-reviewer"
+    if options.learn and not options.library:
+        return "--learn needs --library: what a task learns is kept in the library"
     if options.no_network and options.sandbox != "require":
         return "--no-network needs --sandbox require"
     if options.no_network and landlock_abi() < NO_NETWORK_ABI:
@@ -799,6 +919,8 @@ def runmark_settings(options: argparse.Namespace) -> dict[str, Any]:
         "gate":     options.gate,
         "isolate":  options.isolate,
         "k":        options.k,
+        "learn":    options.learn,
+        "library":  str(options.library) if options.library else "",
         "model":    options.model,
         "network":  not options.no_network,
         "provider": options.provider,
@@ -829,7 +951,7 @@ def _run_all(tasks: list[Task], options: argparse.Namespace, root: Path) -> list
             attempt = run_attempt(task, number, options, root, run_env=run_env, config=config)
             attempts.append(attempt)
             with options.out.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(asdict(attempt)) + "\n")
+                handle.write(json.dumps(attempt.to_record()) + "\n")
             flagged = f", audit {len(attempt.audit)}" if attempt.audit else ""
             print(f"{task.id} #{number}: {'pass' if attempt.passed else 'fail'} ({attempt.stop or 'no result'}, ${attempt.cost_usd:.4f}, {attempt.duration_s:.0f}s{flagged})", flush=True)
     return attempts

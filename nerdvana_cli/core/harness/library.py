@@ -70,6 +70,11 @@ class DomainLibrary:
         return self._root / self._domain
 
     @property
+    def domain(self) -> str:
+        """The domain the library holds the experiences of."""
+        return self._domain
+
+    @property
     def index_path(self) -> Path:
         """The index of this domain."""
         return self.domain_dir / _INDEX_NAME
@@ -130,6 +135,43 @@ class DomainLibrary:
         if not path.is_file():
             return None
         return ExperienceNote(**json.loads(path.read_text(encoding="utf-8")))
+
+    def retained_ids(self) -> list[str]:
+        """The tasks whose experience is kept, in the order they were stored."""
+        if not self.domain_dir.is_dir():
+            return []
+        kept: list[str] = []
+        for entry in sorted(p for p in self.domain_dir.iterdir() if p.is_dir()):
+            marker = entry / "retained"
+            if marker.is_file() and marker.read_text(encoding="utf-8").startswith("retained"):
+                kept.append(entry.name)
+        return kept
+
+    def notes(self) -> list[tuple[str, ExperienceNote]]:
+        """The kept experiences, each with the task it came from."""
+        found: list[tuple[str, ExperienceNote]] = []
+        for task_id in self.retained_ids():
+            note = self.load_note(task_id)
+            if note is not None:
+                found.append((task_id, note))
+        return found
+
+    def inherited_tree(self) -> HarnessTree:
+        """The tree the next task of this domain starts from.
+
+        The kept experiences are merged in the order they were stored, so a later
+        one may correct an earlier one. A task that kept nothing leaves the
+        tree empty, and the next task starts from nothing.
+        """
+        tree: HarnessTree = {}
+        for task_id in self.retained_ids():
+            tree.update(self.load_tree(task_id))
+        return tree
+
+    def index_text(self) -> str:
+        """The index of the domain, rebuilt and read back."""
+        self.rebuild_index()
+        return self.index_path.read_text(encoding="utf-8") if self.index_path.is_file() else ""
 
     def rebuild_index(self) -> Path:
         """Write the index of the domain from what it holds."""

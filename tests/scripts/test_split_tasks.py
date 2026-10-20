@@ -86,3 +86,38 @@ def test_a_task_that_names_its_domain_is_stratified_by_that_domain(tmp_path: Pat
     assert train["domains"] == ["rust"]
     assert test["domains"] == ["rust"]
     assert train["tasks"] and test["tasks"]
+
+
+def test_each_side_is_written_as_the_task_files_a_run_can_read(tmp_path: Path) -> None:
+    assert split.main([str(TASKS), "--out", str(tmp_path)]) == 0
+
+    train = sorted(path.name for path in (tmp_path / "train").glob("*.yml"))
+    test  = sorted(path.name for path in (tmp_path / "test").glob("*.yml"))
+    assert train and test
+    assert not (set(train) & set(test))
+
+
+def test_the_task_files_of_a_side_keep_their_limits_and_their_path(tmp_path: Path) -> None:
+    assert split.main([str(TASKS), "--out", str(tmp_path)]) == 0
+
+    import yaml
+
+    written = yaml.safe_load((tmp_path / "train" / sorted(path.name for path in (tmp_path / "train").glob("*.yml"))[0]).read_text(encoding="utf-8"))
+    original = yaml.safe_load((TASKS / sorted(path.name for path in TASKS.glob("*.yml"))[0]).read_text(encoding="utf-8"))
+
+    assert written["id"] == original["id"]
+    assert written["verify"] == original["verify"]
+    assert written["max_turns"] == original["max_turns"]
+    assert Path(written["path"]).is_absolute()
+    assert Path(written["path"]).is_dir()
+
+
+def test_a_side_can_be_run_like_any_other_directory_of_tasks(tmp_path: Path) -> None:
+    assert split.main([str(TASKS), "--out", str(tmp_path)]) == 0
+
+    import bench_agent
+
+    tasks = bench_agent.load_tasks(tmp_path / "train")
+
+    assert tasks
+    assert all(task.path and Path(task.path).is_dir() for task in tasks)
