@@ -48,6 +48,27 @@ Tools that keep state outside the project, such as package managers and compiler
 with a cache in the home directory, need those directories in `write_paths`, for
 example `~/.cache`, `~/.npm` or `~/.cargo`.
 
+## The sandbox of `run_code`
+
+The `run_code` tool runs a short Python program with the read-only tools bound into
+it. That program runs in a process of its own, under the same Landlock, with a
+different policy: it may read nothing that was not named, and it may write, create,
+remove or execute nothing at all.
+
+The paths it may read are the Python it runs on, so the interpreter keeps working.
+The project is not among them: a file is read through a binding — `FileRead`,
+`Grep`, `Glob`, `lsp_find_references` — and every call of a binding goes through the
+same monotonic guards as any other tool call and is recorded in the session as a
+`tool/ptc-dispatch` event. The home directory is not among them either, so a run
+cannot reach the credentials that live there.
+
+On a kernel that has Landlock ABI 4 the TCP network is refused as well. What
+Landlock does not say: it governs the filesystem and the TCP network, not the Unix
+sockets, so a host that offers one can still be reached from inside.
+
+Without Landlock the runner is not available, and the tool says so instead of running
+the program unconfined.
+
 ## Limiting the network to a list of domains
 
 Landlock refuses TCP connections by port, not by host name, so `network: allowlist` works through

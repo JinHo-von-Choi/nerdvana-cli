@@ -106,27 +106,37 @@ def create_tool_registry(
         registry.register(RegisterExternalProjectTool())
         registry.register(QueryExternalProjectTool())
 
-    # LSP tools — registered only when a language server binary is installed
+    _register_lsp_tools(registry)
+
+    # The sandboxed runner: a program that calls the read-only tools in one turn.
+    from nerdvana_cli.tools.ptc_tool import RunCodeTool
+
+    registry.register(RunCodeTool(parent_registry=registry, settings=settings))
+
+    return registry
+
+
+def _register_lsp_tools(registry: ToolRegistry) -> None:
+    """The LSP and symbol tools, registered only when a language server is installed."""
     from nerdvana_cli.codeintel.lsp_client import LspClient
     from nerdvana_cli.tools.lsp import create_lsp_tools
     lsp = LspClient()
-    if lsp.has_any_server():
-        for lsp_tool in create_lsp_tools(lsp):
-            registry.register(lsp_tool)
+    if not lsp.has_any_server():
+        return
+    for lsp_tool in create_lsp_tools(lsp):
+        registry.register(lsp_tool)
 
-        # Semantic symbol tools
-        from nerdvana_cli.codeintel.code_editor import CodeEditor
-        from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
-        from nerdvana_cli.tools.symbol_tools import create_symbol_tools
+    # Semantic symbol tools
+    from nerdvana_cli.codeintel.code_editor import CodeEditor
+    from nerdvana_cli.codeintel.symbol import LanguageServerSymbolRetriever
+    from nerdvana_cli.tools.symbol_tools import create_symbol_tools
 
-        retriever = LanguageServerSymbolRetriever(client=lsp)
-        editor    = CodeEditor(project_root=lsp._project_root)   # noqa: SLF001
-        for sym_tool in create_symbol_tools(
-            client=lsp, retriever=retriever, editor=editor,
-        ):
-            registry.register(sym_tool)
-
-    return registry
+    retriever = LanguageServerSymbolRetriever(client=lsp)
+    editor    = CodeEditor(project_root=lsp._project_root)   # noqa: SLF001
+    for sym_tool in create_symbol_tools(
+        client=lsp, retriever=retriever, editor=editor,
+    ):
+        registry.register(sym_tool)
 
 
 __all__ = [

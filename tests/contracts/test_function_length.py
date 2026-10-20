@@ -29,7 +29,7 @@ KNOWN_LONG: dict[str, int] = {
     "ui/slash/model_commands.py:switch_provider": 83,
     "core/config/settings.py:NerdvanaSettings.load": 69,
     "cli/updater.py:run_self_update": 91,
-    "tools/registry.py:create_tool_registry": 86,
+    "tools/registry.py:create_tool_registry": 73,
     "providers/base.py:detect_provider": 82,
     "providers/gemini_provider.py:GeminiProvider.stream": 70,
     "providers/gemini_provider.py:GeminiProvider._convert_messages": 80,

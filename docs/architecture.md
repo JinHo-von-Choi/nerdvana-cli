@@ -31,9 +31,9 @@ The package is `nerdvana_cli`. Imports point down the layers below; the structur
 | `hooks` | the lifecycle event engine, shell command hooks, user hook modules |
 | `state` | sessions, checkpoints, todos, goals, rewind marks, the run store, shared cost budgets, concurrency slots, the run signal counters, the session projections |
 | `context` | the system prompt, NIRNA.md, skills, memories, user slash commands, the tool index, token estimation, compaction (client-side and provider-side) and observation masking |
-| `safety` | the permission policy and approvals, the action classifier, the sandbox and egress proxy, secret masking, profiles, edit guards, the monotonic guards that no hook or permission rule can switch off |
+| `safety` | the permission policy and approvals, the action classifier, the sandbox (what a shell command may write, and the read-only policy of the PTC runner) and egress proxy, secret masking, profiles, edit guards, the monotonic guards that no hook or permission rule can switch off |
 | `telemetry` | the usage and cost ledger (`analytics`), OpenTelemetry traces, the prompt cache watch |
-| `execution` | running a batch of tool calls and the checks around it, the spill store that keeps an oversized result on disk instead of in the context |
+| `execution` | running a batch of tool calls and the checks around it, the spill store that keeps an oversized result on disk instead of in the context, the sandboxed PTC runtime that runs a program with the read-only tools bound into it (`core/execution/ptc_runtime.py`) |
 | `loop` | the agent loop and what drives it: run limits, model failover and provider recovery, recovery and activity hooks, the goal and plan gates, the advisor, cancellation, sub-agent loop settings |
 | `delegation` | sub-agents, swarms, declared workflows, task tracking, worktrees, the shared task graph of a team (who waits for whom, which paths each may write) |
 | `contract` | the task contract: what a task claims, the digest that pins it, the test manifest it is judged by and the verification receipts |

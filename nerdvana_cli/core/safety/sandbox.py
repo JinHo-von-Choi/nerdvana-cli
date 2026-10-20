@@ -48,7 +48,10 @@ _RULE_PATH_BENEATH  = 1
 _RULE_NET_PORT      = 2
 _PR_SET_NO_NEW_PRIVS = 38
 
+_FS_EXECUTE   = 1 << 0
 _FS_WRITE_FILE  = 1 << 1
+_FS_READ_FILE   = 1 << 2
+_FS_READ_DIR    = 1 << 3
 _FS_REMOVE_DIR  = 1 << 4
 _FS_REMOVE_FILE = 1 << 5
 _FS_MAKE_CHAR   = 1 << 6
@@ -191,6 +194,44 @@ def confine(write_paths: list[str], allow_network: bool, connect_ports: tuple[in
 def _syscall_prctl() -> None:
     if _libc().prctl(_PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
         raise SandboxError("could not set no_new_privs")
+
+
+def confine_read_only(read_paths: list[str]) -> None:
+    """Restrict this process to reading *read_paths*, and to nothing else.
+
+    Nothing may be written, created, removed or executed, and on a kernel that
+    offers ABI 4 the network is refused as well. A path that is not named
+    cannot be read at all, so a read-only policy is also a reachability
+    policy: the code that runs under it sees the files it was given and
+    nothing more.
+
+    The restriction is irreversible and applies to everything this process
+    starts afterwards.
+    """
+    abi = landlock_abi()
+    if abi < 1:
+        raise SandboxError("Landlock is not available on this system")
+    fs_mask  = _FS_EXECUTE | _FS_READ_FILE | _FS_READ_DIR | _fs_mask(abi)
+    net_mask = _NET_BIND_TCP | _NET_CONNECT_TCP
+    attr     = struct.pack("<QQ", fs_mask, net_mask) if abi >= 4 else struct.pack("<Q", fs_mask)
+    buffer   = ctypes.create_string_buffer(attr, len(attr))
+    ruleset  = _syscall(_SYS_CREATE_RULESET, buffer, len(attr), 0)
+    try:
+        for path in read_paths:
+            try:
+                handle = os.open(path, os.O_PATH | os.O_CLOEXEC)
+            except OSError:
+                continue
+            try:
+                rights = _FS_READ_FILE | _FS_READ_DIR if os.path.isdir(path) else _FS_READ_FILE
+                rule   = ctypes.create_string_buffer(struct.pack("<Qi", rights, handle), 12)
+                _syscall(_SYS_ADD_RULE, ruleset, _RULE_PATH_BENEATH, rule, 0)
+            finally:
+                os.close(handle)
+        _syscall_prctl()
+        _syscall(_SYS_RESTRICT_SELF, ruleset, 0)
+    finally:
+        os.close(ruleset)
 
 
 def writable_paths(policy: SandboxPolicy, cwd: str) -> list[str]:

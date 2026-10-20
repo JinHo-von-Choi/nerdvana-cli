@@ -23,7 +23,7 @@ from nerdvana_cli.core.loop.activity_state import ActivityState
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.loop.subagent_config import LoopFactories, SubagentConfig
 from nerdvana_cli.core.state.session import SessionStorage
-from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback
+from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
 from nerdvana_cli.tools.subagent_registry import create_subagent_registry
 from nerdvana_cli.tools.tool_search import ToolSearchTool
@@ -56,6 +56,7 @@ def build_agent_loop(settings: NerdvanaSettings, profile: ExecutionProfile) -> A
         settings      = settings,
         task_registry = profile.task_registry,
     )
+    _wire_session(registry, profile.session)
     return AgentLoop(
         settings           = settings,
         registry           = registry,
@@ -67,6 +68,15 @@ def build_agent_loop(settings: NerdvanaSettings, profile: ExecutionProfile) -> A
         on_thinking_chunk  = profile.on_thinking_chunk,
         factories          = loop_factories(),
     )
+
+
+def _wire_session(registry: ToolRegistry, session: SessionStorage | None) -> None:
+    """Let the tools that audit their work reach the session of this run."""
+    from nerdvana_cli.tools.ptc_tool import RunCodeTool
+
+    tool = registry.get("run_code")
+    if isinstance(tool, RunCodeTool):
+        tool.set_session(session)
 
 
 def build_subagent(settings: NerdvanaSettings, definition: AgentDefinition, prompt: str, agent_id: str, category: str) -> SubagentConfig:

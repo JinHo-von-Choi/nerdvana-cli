@@ -405,7 +405,7 @@ On first run after upgrading, the CLI moves any data from `~/.nerdvana-cli/sessi
 
 ## Built-in Tools
 
-The registry assembles 31 built-in tools. Bash, file, search, task, web and agent
+The registry assembles 32 built-in tools. Bash, file, search, task, web and agent
 tools are always present. `Parism` appears when the bundled Parism MCP
 package is reachable. The LSP and symbol tools appear only when a compatible
 language server is installed; with none detected they are simply omitted from
@@ -420,6 +420,7 @@ the registry. The three external project tools stay unregistered until
 | `FileEdit` | Write | String or anchor (`N#hhhhhh`) replacement; refused when the file changed since it was read |
 | `Glob` | Read | File pattern matching |
 | `Grep` | Read | Content search with regex |
+| `run_code` | Read | Run a short Python program in a sandbox with the read-only tools bound into it (`FileRead`, `Grep`, `Glob`, `lsp_find_references`), so a task that needs many files and one answer costs one tool call instead of one per file. The sandbox may not write, execute or reach the network, and it sees no file except through the bindings |
 | `TodoWrite` | Write | Maintain the task list the agent works through |
 | `ActivateSkill` | Meta | Load the instructions of a skill from the catalog in the system prompt; the result lists the files the skill bundles. Registered only when at least one skill can be activated by the model. See [docs/skills.md](docs/skills.md) |
 | `AskUser` | Meta | Ask the user a clarifying question with 2-4 suggested options plus free text; errors when no user is reachable (one-shot runs, MCP server, subagents) |
