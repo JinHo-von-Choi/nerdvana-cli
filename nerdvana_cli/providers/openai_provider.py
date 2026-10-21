@@ -11,7 +11,7 @@ from rich.console import Console
 
 from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, ProviderConfig, ProviderEvent, ProviderName, usage_payload
 from nerdvana_cli.providers.errors import DECODE, error_fields
-from nerdvana_cli.providers.thinking_parser import ThinkBlockParser
+from nerdvana_cli.providers.thinking_parser import ParsedChunk, ThinkBlockParser
 from nerdvana_cli.types import ToolSpec
 
 try:
@@ -83,7 +83,7 @@ def _reports_usage(usage: Any) -> bool:
     return counts["input_tokens"] + counts["output_tokens"] > 0
 
 
-def _text_events(parsed: Any) -> Iterator[ProviderEvent]:
+def _text_events(parsed: ParsedChunk) -> Iterator[ProviderEvent]:
     """The answer and thinking events of one piece the think-block parser returned."""
     if parsed.content:
         yield ProviderEvent(type="content_delta", content=parsed.content)

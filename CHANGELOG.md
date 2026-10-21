@@ -27,9 +27,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - The model can no longer write `.env` or `.iron-laws.yml`; the refusal names the file.
 - Failed, cancelled and retried stream attempts are recorded in the transcript as `assistant_attempt` entries; they never reach the model context.
 - Client-side compaction moved to `nerdvana_cli.core.context.client_compaction`.
+- `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `safe_delete_symbol`, `lsp_rename` and `restart_language_server` are listed by name in the system prompt and declared once `ToolSearch` loads them, unless `session.defer_tools` is `never`. The fixed input of a request in an empty directory falls from about 7,000 to 6,100 estimated tokens.
+- `list_models` raises on a failed request for Anthropic, Gemini and the OpenAI-compatible providers, so `/models` shows the reason instead of an empty list. MiniMax keeps falling back to its known models.
+- WebFetch and WebSearch reuse one HTTP connection pool per session, and WebFetch stops reading at `max_bytes` instead of downloading the whole body first.
+- Grep runs its directory walk in a worker thread, so a large search no longer blocks the interface.
+- The LSP workflow installs from `uv.lock` and uses Node.js 22; `scripts/preflight.sh release` no longer runs the suite a third time against freshly resolved dependencies.
 
 ### Fixed
 
+- WebFetch checked only the first URL against the private address block and then followed redirects, so a public page could redirect it to a loopback, private or cloud metadata address. Redirects are now followed one hop at a time (at most 5) and every hop is checked; unspecified, reserved, multicast and IPv4-mapped addresses are refused as well.
+- A `mcp.json` that could not be parsed dropped every server of that file without a word. The file or entry is now skipped on its own and reported at startup.
+- An instruction file (`NIRNA.md` and the like) that could not be read or decoded was left out silently; it is now logged.
+- `restart_language_server` without a language reported success for the servers that failed to restart; it now names them.
+- The Parism client stopped reading at the first malformed line and left waiting requests to time out; it now skips the line and fails waiting requests as soon as the process output ends.
 - `run_code` returned `can't concat str to bytes` instead of a program's output whenever the program printed anything, and returned long output as an escaped byte string. Output is now decoded as it is read.
 
 ## [1.9.1] - 2026-10-06
