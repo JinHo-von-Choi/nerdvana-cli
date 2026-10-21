@@ -466,9 +466,40 @@ done
 uv run python scripts/bench_compare.py /tmp/gate4/long-ccfa23e.jsonl /tmp/gate4/long-57727d6.jsonl
 ```
 
+## The same comparison on the short tasks
+
+The long tasks are the hard end of the benchmark. The short tasks are the other end: twenty tasks, each a fix, a test or a small feature, most of them a handful of turns. The harness work was measured on the long ones, where the plan wanted the tokens of an attempt to fall by 30 percent. It was measured here as well, to see what the same work does to a run that is small enough for the extra turns to be cheap.
+
+The same two builds, the same twenty task files, the same fixtures, MiniMax-M3.1-Flash-Preview, 4 attempts per task, 80 attempts per arm.
+
+| Build | Passed | `pass^4` | Mean input tokens | Mean cost | Mean turns |
+|-|-|-|-|-|-|
+| 1.9.1 (`ccfa23e`) | 63/80 (79%) | 0.45 | 109,896 | $0.0126 | 8.3 |
+| HEAD (`90c7f3b`, clean tree) | 69/80 (86%) | 0.60 | 110,175 (+0.3%) | $0.0127 (+0.6%) | 8.1 |
+| HEAD (`3b5f067`, tree with the menu change uncommitted) | 74/80 (92%) | 0.80 | 115,331 (+4.9%) | $0.0131 (+3.8%) | 8.4 |
+
+Over the twenty tasks the two builds share, the difference is **+7.5 points** of pass rate (95% bootstrap interval -8.7 to +23.7). The interval contains zero: at this size the two runs cannot be told apart. The tokens say the same thing -- 0.3 percent more per attempt, against the 40.1 percent the same comparison reads on the long tasks.
+
+So the harness work is free on the short tasks, in tokens and in passes, and it is not free on the long ones. The cost of the work is concentrated exactly where the agent has the room to take the extra turns the PTC runtime buys, which is also what the mechanism below says.
+
+How much this measurement can say is worth stating plainly, because the number is not a small one. The two HEAD runs differ from each other by **6.2 points** (-20.0 to +8.7), and they are the same code: the second was run from a clean worktree of the commit, the first from a tree whose only uncommitted change was the menu -- a change a run without a library never reads. The difference the change is supposed to make is 7.5 points, with an interval of sixteen points around it. The run-to-run variation of a single build is the size of the effect being looked for, so a claim of a few points either way would be reading noise.
+
+The clean run is the one the report quotes, because the other was started from a tree that was not clean, and a headline should not rest on that. It is also the one that moved the headline. Read early -- when nine of the twenty tasks were in the comparison, and they were the ones that had happened to finish first -- the difference looked like +22 points with an interval that excluded zero. The full eighty attempts say +7.5, with an interval that contains it.
+
+```bash
+git worktree add /tmp/arm-191 ccfa23e
+git worktree add /tmp/arm-head 90c7f3b
+for arm in 191 head; do
+    (cd "/tmp/arm-$arm" && uv sync --extra all && \
+     uv run python scripts/bench_agent.py benchmarks/tasks --attempts 4 \
+        --model MiniMax-M3.1-Flash-Preview --provider minimax --out "/tmp/gate4/short-$arm.jsonl" --yes)
+done
+uv run python scripts/bench_compare.py /tmp/gate4/short-191.jsonl /tmp/gate4/short-head.jsonl
+```
+
 ## Why the PTC runtime makes the agent take more turns
 
-The table above says the PTC runtime added 73 percent to the requests of an attempt and nothing to the size of a request. That is worth a paragraph of mechanism, because "the agent uses the tool more" is not an explanation, it is a restatement.
+The long-task table says the PTC runtime added 73 percent to the requests of an attempt and nothing to the size of a request. That is worth a paragraph of mechanism, because "the agent uses the tool more" is not an explanation, it is a restatement.
 
 The transcripts of the long runs were read to find out what the agent actually does with the tool. Each run of the agent writes a session file under `~/.nerdvana/sessions/`, one per attempt, and the file names the task and the attempt in its working directory. The bench record names the attempt's duration, so a transcript can be joined to the arm it came from by task, attempt and how long the run took. Six runs of the long tasks are on disk, so the join is approximate -- a transcript is attributed to the arm whose record is closest in duration, and a few of them can be attributed to the wrong arm. The counts below are means over the transcripts attributed to each arm, and they are used for shape, not for the numbers the report claims: the token and turn figures come from the bench records, which are exact.
 
@@ -505,3 +536,5 @@ What an offset would have to do is therefore not shrink the result of a program 
 - **Answer rather than report.** The programs return file contents. A program that returned the answer -- the call sites of a symbol, the lines that mention a name -- would cut the turns as well as the result.
 
 None of these has been built, and this section does not claim that any of them would work: at 32 attempts over 8 tasks on one model, the pass-rate differences between the four builds cannot be told apart at all. What the measurement does establish is where the tokens went.
+
+The short tasks close the loop. There the same PTC runtime costs nothing measurable -- the mean attempt of HEAD is 0.3 percent more input tokens than the attempt of 1.9.1, and the pass rates cannot be told apart -- because a task of eight turns has no room for the extra turns, and because a spilled tool result has little to save when the whole result was short. The extra turns are the cost, and a long task is where they are paid.
