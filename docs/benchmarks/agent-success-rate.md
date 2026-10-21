@@ -555,15 +555,16 @@ The first of the four is the one that was built: the description of `run_code` n
 
 The mechanism above says the agent does a bigger sweep because the PTC runtime makes looking at a file cheap. Reading the transcripts again with a different question -- not how many programs the agent ran, but what the programs *did* -- gives a shorter answer: most of them failed.
 
-Of the 25 programs the agent wrote over the long tasks, 4 worked.
+Of the 22 programs the agent wrote over the long tasks, 3 worked.
 
 | What the program did | What the sandbox answered | How often |
 |-|-|-|
-| `import pathlib`, `import glob`, `import ast` | "the sandbox does not allow importing 'pathlib'" | 17 |
+| `import pathlib`, `import glob`, `import ast` | "the sandbox does not allow importing 'pathlib'" | 16 |
 | `FileRead("a.py")` | "Binding.\_\_call\_\_() takes 1 positional argument" | 2 |
-| `open(path).read()` | "name 'open' is not defined" | 1 |
-| a program that worked | the answer | 4 |
 | a program that did not parse | "SyntaxError" | 1 |
+| a program that worked | the answer | 3 |
+
+In the runs after that, the model wrote `open(path).read()` and was told "name 'open' is not defined".
 
 These are not the model's bad logic. They are the model writing the program it would write anywhere else: `import pathlib` to walk a tree, `open(path).read()` to read a file, `FileRead("a.py")` to call a function. The sandbox allows twenty-one modules from the standard library and no file system at all, and the tool's description said none of that. It showed the bindings as `FileRead(path, offset, limit)`, which reads as a positional call, and it said the program "may import json, re, math and a few other modules of the standard library", which reads as "the standard library is there".
 
