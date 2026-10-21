@@ -13,6 +13,9 @@ first, averaged over the tasks both runs contain) comes with a 95% bootstrap int
 the tasks and, inside each task, the attempts of each run; the generator is seeded, so the same files
 give the same interval. Runs whose recorded environment differs (CPU count, limits, model, sandbox,
 version and the like) are flagged, because a score difference between them may come from the setup.
+The limits of a task -- the turns, the cost and the timeout -- come from the task itself, so they are
+compared on the tasks the two runs share: two runs that cover different tasks carry different limits
+without anything having been changed.
 
 An interval that contains 0 means the runs cannot be told apart at this many tasks and attempts.
 """
@@ -20,6 +23,7 @@ An interval that contains 0 means the runs cannot be told apart at this many tas
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import sys
 from collections.abc import Sequence
@@ -88,6 +92,24 @@ def environment_differences(first: dict[str, Any], second: dict[str, Any]) -> li
     return [f"{key}: {first.get(key, 'unrecorded')} against {second.get(key, 'unrecorded')}" for key in sorted(set(first) | set(second)) if first.get(key) != second.get(key)]
 
 
+# The limits of a task come from the task itself, so two runs that cover
+# different tasks carry different ones; only the tasks both runs have can say
+# whether the limits differed.
+PER_TASK_KEYS = ("max_turns", "max_cost_usd", "timeout_s")
+
+
+def limit_differences(first_by: Grouped, second_by: Grouped, common: list[str]) -> list[str]:
+    """One line for each limit that differed on a task the two runs share."""
+    lines: list[str] = []
+    for task in common:
+        for key in PER_TASK_KEYS:
+            left  = {json.dumps((a.get("environment") or {}).get(key), sort_keys=True) for a in first_by[task]}
+            right = {json.dumps((a.get("environment") or {}).get(key), sort_keys=True) for a in second_by[task]}
+            if left != right:
+                lines.append(f"{task}: {key} {sorted(left)} against {sorted(right)}")
+    return lines
+
+
 def figures(attempts: list[dict[str, Any]], k: int) -> dict[str, Any]:
     """Pass rate, pass^k, mean input tokens and mean cost of one run's attempts."""
     passed = sum(1 for a in attempts if a["passed"])
@@ -122,6 +144,24 @@ def common_figures(first_by: Grouped, second_by: Grouped, k: int) -> dict[str, A
     }
 
 
+def setup_differences(first: list[dict[str, Any]], second: list[dict[str, Any]]) -> list[str]:
+    """The recorded facts of the setup that differ between two runs.
+
+    The limits of a task are left out: they come from the task itself, and
+    they are compared on the tasks the two runs share.
+    """
+    def merged(attempts: list[dict[str, Any]]) -> dict[str, Any]:
+        return merge_environments([
+            {key: value for key, value in (a.get("environment") or {}).items() if key not in PER_TASK_KEYS}
+            for a in attempts if a.get("environment")
+        ])
+
+    left, right = merged(first), merged(second)
+    if not left and not right:
+        return []
+    return environment_differences(left, right)
+
+
 def compare(first: list[dict[str, Any]], second: list[dict[str, Any]], k: int = 0) -> dict[str, Any]:
     """Every figure the report shows."""
     k          = k or default_k(first, second)
@@ -129,6 +169,8 @@ def compare(first: list[dict[str, Any]], second: list[dict[str, Any]], k: int = 
     second_by  = group_by_task(second)
     tasks      = {task: {"first": figures(first_by.get(task, []), k), "second": figures(second_by.get(task, []), k)} for task in [*first_by, *(t for t in second_by if t not in first_by)]}
     first_out, second_out = outcomes(first), outcomes(second)
+    common     = [task for task in first_by if task in second_by]
+    setup      = setup_differences(first, second)
     return {
         "k":           k,
         "tasks":       tasks,
@@ -136,11 +178,11 @@ def compare(first: list[dict[str, Any]], second: list[dict[str, Any]], k: int = 
         "second":      {**figures(second, k), "pass_hat_k": mean([tasks[t]["second"]["pass_hat_k"] for t in second_by])},
         "difference":  rate_difference(first_out, second_out),
         "interval":    bootstrap_difference_ci(first_out, second_out),
-        "common":      sum(1 for task in first_by if task in second_by),
+        "common":      len(common),
         "common_figures": common_figures(first_by, second_by, k),
         "only_first":  [task for task in first_by if task not in second_by],
         "only_second": [task for task in second_by if task not in first_by],
-        "environment": environment_differences(merge_environments([a["environment"] for a in first if a.get("environment")]), merge_environments([a["environment"] for a in second if a.get("environment")])),
+        "environment": setup + limit_differences(first_by, second_by, common),
     }
 
 

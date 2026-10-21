@@ -120,6 +120,21 @@ def test_environments_that_differ_are_flagged_and_equal_ones_are_not() -> None:
     assert "both runs" in cmp.environment_differences({}, {})[0]
 
 
+def test_the_limits_of_a_task_are_compared_on_the_tasks_the_runs_share() -> None:
+    first  = run("a", [True] * 4, env={"max_turns": 20}) + run("only-first", [True], env={"max_turns": 25})
+    second = run("a", [True] * 4, env={"max_turns": 20}) + run("only-second", [True], env={"max_turns": 15})
+    result = cmp.compare(first, second)
+    assert result["environment"] == []
+    assert cmp.limit_differences(cmp.group_by_task(first), cmp.group_by_task(second), ["a"]) == []
+
+
+def test_a_limit_that_differed_on_a_shared_task_is_flagged() -> None:
+    first  = run("a", [True] * 4, env={"max_turns": 20, "max_cost_usd": 0.6})
+    second = run("a", [True] * 4, env={"max_turns": 15, "max_cost_usd": 0.6})
+    result = cmp.compare(first, second)
+    assert result["environment"] == ["a: max_turns ['20'] against ['15']"]
+
+
 def test_the_comparison_covers_each_task_overall_and_the_environment() -> None:
     first  = run("a", [True, True, False, False], tokens=4000, cost=0.4, env={"cpu_count": 8}) + run("only-first", [True])
     second = run("a", [True, True, True, False], tokens=1500, cost=0.15, env={"cpu_count": 4}) + run("only-second", [True])
