@@ -4,10 +4,10 @@
 # Usage: scripts/release.sh X.Y.Z
 #
 # 1. the working tree must be clean and CHANGELOG.md must have entries under [Unreleased]
-# 2. scripts/preflight.sh release passes on the commit as it stands (CI conditions, clean checkout)
-# 3. the version is bumped everywhere, committed, and preflight quick passes again
-# 4. main is pushed WITHOUT the tag, and the script waits until GitHub's checks on that commit are green
-# 5. only then the tag is created and pushed, and the script waits for the Release workflow
+# 2. the version is bumped everywhere, committed, and scripts/preflight.sh quick passes on a clean checkout
+#    (the full test suite runs once, in CI, in the next step)
+# 3. main is pushed WITHOUT the tag, and the script waits until GitHub's checks on that commit are green
+# 4. only then the tag is created and pushed, and the script waits for the Release workflow
 # Any failure stops the script before the next step; nothing is published by a step that follows a failure.
 set -euo pipefail
 
@@ -29,9 +29,6 @@ m = re.search(r"## \[Unreleased\]\n(.*?)\n## \[", text, re.S)
 if not m or not m.group(1).strip():
     sys.exit("release: CHANGELOG.md has nothing under [Unreleased]")
 PY
-
-echo "== release: preflight on the current commit"
-scripts/preflight.sh release
 
 echo "== release: bump to $version"
 today="$(date +%F)"
