@@ -540,6 +540,8 @@ Most of what a request carries is not the work. A bench run in an empty director
 
 The seven turns that the PTC runtime adds to a long attempt cost 79,632 tokens of repeated prefix before they cost a single token of exploration. And on the short tasks -- where the agent takes eight turns and does a small job -- four fifths of the bill is the prefix, sent again and again. The harness work is not expensive because the agent does more; it is expensive because the agent asks more, and the question is expensive to ask.
 
+The short tasks close the loop. There the same PTC runtime costs nothing measurable -- the mean attempt of HEAD is 0.3 percent more input tokens than the attempt of 1.9.1, and the pass rates cannot be told apart -- because a task of eight turns has no room for the extra turns, and because a spilled tool result has little to save when the whole result was short. The extra turns are the cost, and a long task is where they are paid.
+
 What an offset would have to do is therefore not shrink the result of a program -- that part works -- but stop the extra turns, or make the prefix smaller. Four levers are visible in the numbers:
 
 - **Answer rather than report.** The programs return file contents. A program that returned the answer -- the call sites of a symbol, the lines that mention a name -- would cut the turns as well as the result. This is a change to what the tool says about itself, and it is the one that was built and measured (the section below).
@@ -548,5 +550,3 @@ What an offset would have to do is therefore not shrink the result of a program 
 - **Make the prefix smaller.** The declaration of the 28 tools is 5,886 of the 11,060 tokens every request carries -- more than the system prompt. The deferral machinery that keeps the MCP tools out of the request (`ToolSearch`) does not reach the built-in ones, and the built-in ones are the ones every run needs. A tool the model rarely calls is 200 tokens on every request of every task.
 
 The first of the four is the one that was built: the description of `run_code` now says when the program is the wrong tool, tells the model to have the program return the answer rather than the files, and says that a file the program read needs no second read. It costs 108 tokens per request, since the description is in every request. What it bought is measured below.
-
-The short tasks close the loop. There the same PTC runtime costs nothing measurable -- the mean attempt of HEAD is 0.3 percent more input tokens than the attempt of 1.9.1, and the pass rates cannot be told apart -- because a task of eight turns has no room for the extra turns, and because a spilled tool result has little to save when the whole result was short. The extra turns are the cost, and a long task is where they are paid.
