@@ -512,7 +512,7 @@ The transcripts of the long runs were read to find out what the agent actually d
 
 Three things come out of it.
 
-The tool works. A program in the PTC runtime reads the files it was told to read -- one `tool/ptc-dispatch` event per read, `FileRead`, `Grep` or `Glob` -- and returns one JSON object in place of them. The programs of the PTC arm read about sixteen files each, and returned 47 to 210 characters where the individual reads they replaced were at least 500 characters each (the transcript truncates a result at 500).
+The tool reads what it was told to read. A program in the PTC runtime reads the files it names -- one `tool/ptc-dispatch` event per read, `FileRead`, `Grep` or `Glob` -- and answers with one JSON object in place of them. The programs of the PTC arm read about sixteen files each, and returned 47 to 210 characters where the individual reads they replaced were at least 500 characters each (the transcript truncates a result at 500). What the JSON object held was not always what the program computed: the section "The output the runtime swallowed" is about the defect that kept it from being so.
 
 The agent does not spend that saving on fewer turns. In the PTC build a third of the attempts run a program at all, and in those the agent runs about four programs, reads about fifty-seven files through them and takes 29.8 assistant messages against the 14.4 of 1.9.1. But the attempts of the *same* build that ran no program took 20.7 messages -- against the 13.4 of the build that has the SpillPolicy and no PTC runtime. The extra turns are therefore not only the price of running a program: having the program available changes what the agent does even in the attempts where it does not run one. A cheaper way to look at a file is a cheaper way to look at all the files, and the agent plans the bigger sweep whether or not it pays for it.
 
@@ -542,7 +542,7 @@ The seven turns that the PTC runtime adds to a long attempt cost 79,632 tokens o
 
 The short tasks close the loop. There the same PTC runtime costs nothing measurable -- the mean attempt of HEAD is 0.3 percent more input tokens than the attempt of 1.9.1, and the pass rates cannot be told apart -- because a task of eight turns has no room for the extra turns, and because a spilled tool result has little to save when the whole result was short. The extra turns are the cost, and a long task is where they are paid.
 
-What an offset would have to do is therefore not shrink the result of a program -- that part works -- but stop the extra turns, or make the prefix smaller. Four levers are visible in the numbers:
+What an offset would have to do is therefore not shrink the result of a program -- the size of it did come down -- but stop the extra turns, or make the prefix smaller. Four levers are visible in the numbers:
 
 - **Answer rather than report.** The programs return file contents. A program that returned the answer -- the call sites of a symbol, the lines that mention a name -- would cut the turns as well as the result. This is a change to what the tool says about itself, and it is the one that was built and measured (the section below).
 - **Make the program the only way to read a file.** The PTC arm reads 13 files by `Bash` and 4.7 by `FileRead` per attempt, *and* runs programs over the same project. Every file the agent opens by hand is a separate result in the conversation; a file that the program already read should not be opened again.
@@ -553,22 +553,41 @@ The first of the four is the one that was built: the description of `run_code` n
 
 ## The tool that did not work
 
-The mechanism above says the agent does a bigger sweep because the PTC runtime makes looking at a file cheap. Reading the transcripts again with a different question -- not how many programs the agent ran, but what the programs *did* -- gives a shorter answer: most of them failed.
+The mechanism above says the agent does a bigger sweep because the PTC runtime makes looking at a file cheap. Reading the transcripts again with a different question -- not how many programs the agent ran, but what the programs *did* -- gives a shorter answer: most of them failed, and the ones that ran mostly did not come back either.
 
-Of the 22 programs the agent wrote over the long tasks, 3 worked.
+The PTC arm of the long sweep wrote 34 programs. What came back for each of them:
 
-| What the program did | What the sandbox answered | How often |
-|-|-|-|
-| `import pathlib`, `import glob`, `import ast` | "the sandbox does not allow importing 'pathlib'" | 16 |
-| `FileRead("a.py")` | "Binding.\_\_call\_\_() takes 1 positional argument" | 2 |
-| a program that did not parse | "SyntaxError" | 1 |
-| a program that worked | the answer | 3 |
+| What came back | How many |
+|-|-|
+| the host's own error -- the program ran, and its output was thrown away | 17 |
+| the program's own error, and nothing printed | 9 |
+| the output, as the repr of a byte string | 5 |
+| the value of the last expression, and nothing printed | 3 |
 
-In the runs after that, the model wrote `open(path).read()` and was told "name 'open' is not defined".
+Eight of the nine errors were an import the sandbox does not allow -- three times `pathlib`, once each `glob`, `ast`, `os`, `run_code` and `Glob` -- and the ninth was a program that did not parse.
 
-These are not the model's bad logic. They are the model writing the program it would write anywhere else: `import pathlib` to walk a tree, `open(path).read()` to read a file, `FileRead("a.py")` to call a function. The sandbox allows twenty-one modules from the standard library and no file system at all, and the tool's description said none of that. It showed the bindings as `FileRead(path, offset, limit)`, which reads as a positional call, and it said the program "may import json, re, math and a few other modules of the standard library", which reads as "the standard library is there".
+Those imports are not the model's bad logic. They are the model writing the program it would write anywhere else: `import pathlib` to walk a tree, `open(path).read()` to read a file, `FileRead("a.py")` to call a function. The sandbox allows twenty-one modules from the standard library and no file system at all, and the tool's description said none of that. It showed the bindings as `FileRead(path, offset, limit)`, which reads as a positional call, and it said the program "may import json, re, math and a few other modules of the standard library", which reads as "the standard library is there".
 
-So the PTC runtime was a tax. The agent paid for the tool with a turn for every program that failed, and read the files by hand anyway -- which is what the transcripts show: the reads by hand outnumber the reads through programs. The 54.8 percent the PTC runtime added to the long tasks was not the price of exploring more. It was the price of a tool that did not work, plus the exploration that a working tool would have replaced.
+The seventeen programs that ran and came back with nothing are a different failure, and a worse one, because the model was not the cause: the runtime threw their output away. The next section is about that.
+
+## The output the runtime swallowed
+
+The runtime read the pipes of the sandbox as bytes and joined them to text: `stdout = _tail(output) + _tail(noise)`. A program that printed anything made that join raise `TypeError: can't concat str to bytes`, and the model was told "Tool execution error: can't concat str to bytes" instead of what the program had computed. A program whose output was long enough to be cut -- `_tail` keeps the last 8,000 characters -- came back as the repr of a byte string, `b'...'` with the newlines escaped, which is not what the program printed.
+
+Over every PTC run on disk the agent wrote 85 programs, and this is what came back:
+
+| What came back | How many |
+|-|-|
+| the program's own error, and nothing printed | 35 |
+| the host's error -- the output was swallowed | 35 |
+| the output, as the repr of a byte string | 8 |
+| the value of the last expression, and nothing printed | 7 |
+
+Not one program that printed anything had its printed text delivered. The seven that came back with a value printed nothing at all: four of them returned an answer -- the rounding results of the Decimal experiments, and the list of the lines that matched -- two returned a class, and one returned nothing.
+
+The defect is fixed: the pipes are decoded as they are read, so what a program printed comes back as the text it printed (`nerdvana_cli/core/execution/ptc_runtime.py`). The tests are in `tests/core/test_ptc_runtime.py`: what a program prints comes back as text, a long output comes back as text, and a program that prints nothing leaves the output empty.
+
+This is the honest reading of the section above. The PTC runtime was not a tax the agent paid for a tool that was slightly wrong; it was a tool whose output was thrown away, so the agent paid for it with a turn for every program and read the files by hand anyway -- which is what the transcripts show, the reads by hand outnumbering the reads through programs. The 54.8 percent the PTC runtime added to the long tasks was not the price of exploring more. It was the price of a tool that did not work, plus the exploration that a working tool would have replaced.
 
 ## The offset, measured
 
@@ -590,9 +609,11 @@ What the transcripts do say is sharper, because they count rather than weigh:
 | before | 0.78 | 1.4 |
 | after | 0.70 | 0.3 |
 
-The tool is reached for in about a quarter of the attempts, and the failures continue: the model writes `import pathlib` and `open(path).read()` even with a description that says the program has no file system and no `open`. What the fix changes is the *second* program. The transcripts show a failed program followed by one that works -- one program that read thirteen files and answered the question -- which is the promise the tool makes, kept at last.
+The tool is reached for in about a quarter of the attempts, and the failures continue: in the new build the model still wrote `import json, pathlib` and `import sys`, though the description names the modules the sandbox allows. What the fix changes is the answer the program gets back -- it now says which modules there are, and which binding to use instead.
 
-So the offset is: the tool works now, and the run costs the same as before within what this measurement can see. The reason is the one the previous section found: the PTC runtime was never the thing the tokens are made of. Eleven thousand tokens of system prompt and tool declarations are sent again on every turn, and they are 39 to 43 percent of a long attempt and 81 to 84 percent of a short one. A tool that fails is worth fixing -- a description that lies about the sandbox is a defect, and the errors that only refuse cost a turn each -- but the tokens are elsewhere.
+The successful program in these transcripts is in the *old* arm: it read ten files in one call and printed them, and the attempt still failed the task. In the new arm none of the seven programs returned a result at all -- three failed with the program's own error, and four had their output swallowed by the defect of the previous section. Neither arm can say the tool worked, because in neither arm did it.
+
+So the offset is: the tool's interface is honest now, and the run costs the same as before within what this measurement can see. What the measurement cannot show is the tool working, because the runtime that measured it threw the output away -- it was taken before the fix of the previous section, and it should be repeated on top of it. The reason the cost did not move is the one the section before that found: the PTC runtime was never the thing the tokens are made of. Eleven thousand tokens of system prompt and tool declarations are sent again on every turn, and they are 39 to 43 percent of a long attempt and 81 to 84 percent of a short one. A tool that fails is worth fixing -- a description that lies about the sandbox is a defect, and the errors that only refuse cost a turn each -- but the tokens are elsewhere.
 
 The next piece of work, then, is the prefix: the declaration of the 28 tools is 5,882 tokens of the 11,060 every request carries, and the deferral machinery that keeps the MCP tools out of the request does not reach the built-in ones. A tool the model rarely calls is a few hundred tokens on every request of every task, and unlike a change in what the model does, that one is certain.
 
