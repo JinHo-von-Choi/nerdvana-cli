@@ -188,7 +188,8 @@ async def repl_loop(
 
     enforce_managed_policy(settings)
     parism_client = await _connect_parism(settings, cwd)
-    mcp_manager   = await _connect_mcp(cwd)
+    # The TUI connects the MCP servers after it is on screen, so typing need not wait for them.
+    mcp_manager   = _mcp_manager(cwd)
 
     # Launch TUI
     from nerdvana_cli.ui.app import NerdvanaApp
@@ -224,8 +225,8 @@ async def _connect_parism(settings: NerdvanaSettings, cwd: str) -> Any:
     return client
 
 
-async def _connect_mcp(cwd: str) -> Any:
-    """Connect the configured MCP servers; None when none are configured."""
+def _mcp_manager(cwd: str) -> Any:
+    """A manager for the configured MCP servers, not yet connected; None when none are configured."""
     from nerdvana_cli.mcp.config import load_mcp_config
 
     problems: list[str] = []
@@ -240,8 +241,4 @@ async def _connect_mcp(cwd: str) -> Any:
         console.print("[dim yellow]MCP servers are configured but the mcp package is not installed (pip install 'nerdvana-cli[mcp]').[/dim yellow]")
         return None
 
-    manager = McpManager(configs)
-    for name, status in (await manager.connect_all()).items():
-        style = "dim" if status.startswith("connected") else "dim yellow"
-        console.print(f"[{style}]MCP {name}: {status}[/{style}]")
-    return manager
+    return McpManager(configs)

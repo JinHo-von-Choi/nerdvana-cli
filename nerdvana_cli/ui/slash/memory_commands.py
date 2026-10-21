@@ -15,7 +15,7 @@ Date:   2026-04-18
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape
 
@@ -26,9 +26,14 @@ if TYPE_CHECKING:
 # /undo
 # ---------------------------------------------------------------------------
 
+def _checkpoints(app: NerdvanaApp) -> Any:
+    """The checkpoint manager of the session's agent loop, or None before the loop exists."""
+    return getattr(app._agent_loop, "_checkpoint_manager", None)
+
+
 async def handle_undo(app: NerdvanaApp, args: str) -> None:
     """Handle /undo — restore the previous pre-edit checkpoint."""
-    cp = getattr(app, "_checkpoint_manager", None)
+    cp = _checkpoints(app)
     if cp is None:
         app._add_chat_message("[yellow]Checkpoint manager not available.[/yellow]")
         return
@@ -42,7 +47,7 @@ async def handle_undo(app: NerdvanaApp, args: str) -> None:
 
 async def handle_redo(app: NerdvanaApp, args: str) -> None:
     """Handle /redo — re-apply the last undone checkpoint."""
-    cp = getattr(app, "_checkpoint_manager", None)
+    cp = _checkpoints(app)
     if cp is None:
         app._add_chat_message("[yellow]Checkpoint manager not available.[/yellow]")
         return
@@ -61,7 +66,7 @@ _LEGACY_STASH_KIND = "legacy-stash"
 
 async def handle_checkpoints(app: NerdvanaApp, args: str) -> None:
     """Handle /checkpoints — list this session's restorable checkpoints."""
-    cp = getattr(app, "_checkpoint_manager", None)
+    cp = _checkpoints(app)
     if cp is None:
         app._add_chat_message("[yellow]Checkpoint manager not available.[/yellow]")
         return

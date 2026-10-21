@@ -110,7 +110,7 @@ def _parse_frontmatter(block: str, path: Path) -> dict[str, Any]:
             data = yaml.safe_load(_quote_colon_values(block))
         except yaml.YAMLError as exc:
             raise ValueError(f"Unparseable frontmatter in {path}: {exc}") from exc
-        logger.warning("Skill %s: frontmatter was not valid YAML; read it with colon values quoted", path)
+        logger.info("Skill %s: frontmatter was not valid YAML; read it with colon values quoted", path)
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -134,16 +134,22 @@ def _tool_list(value: Any) -> tuple[str, ...]:
     return ()
 
 
-def _warn_nonconforming(path: Path, name: str, directory_name: str | None, description: str, compatibility: str) -> None:
-    """Log every way the skill departs from the specification; the skill still loads."""
-    for problem in name_problems(name):
-        logger.warning("Skill %s: name %r %s", path, name, problem)
+def spec_problems(name: str, directory_name: str | None, description: str, compatibility: str) -> list[str]:
+    """Every way a skill departs from the Agent Skills specification; such a skill still loads."""
+    problems = [f"name {name!r} {problem}" for problem in name_problems(name)]
     if directory_name is not None and name != directory_name:
-        logger.warning("Skill %s: name %r does not match its directory %r", path, name, directory_name)
+        problems.append(f"name {name!r} does not match its directory {directory_name!r}")
     if len(description) > DESCRIPTION_MAX_CHARS:
-        logger.warning("Skill %s: description is longer than %d characters", path, DESCRIPTION_MAX_CHARS)
+        problems.append(f"description is longer than {DESCRIPTION_MAX_CHARS} characters")
     if len(compatibility) > COMPATIBILITY_MAX_CHARS:
-        logger.warning("Skill %s: compatibility is longer than %d characters", path, COMPATIBILITY_MAX_CHARS)
+        problems.append(f"compatibility is longer than {COMPATIBILITY_MAX_CHARS} characters")
+    return problems
+
+
+def _warn_nonconforming(path: Path, name: str, directory_name: str | None, description: str, compatibility: str) -> None:
+    """Log the departures at info level: the skill loads, and `nerdvana doctor` lists them."""
+    for problem in spec_problems(name, directory_name, description, compatibility):
+        logger.info("Skill %s: %s", path, problem)
 
 
 @dataclass

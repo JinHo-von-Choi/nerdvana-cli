@@ -51,7 +51,7 @@ _OUTCOMES: dict[str, tuple[str, bool, int]] = {
 # A system notice from the loop starts with a rich style tag, e.g. "[bold red]...".
 _NOTICE = re.compile(r"^\s*\[(?:(?:bold|dim|italic) )*(?:red|yellow|cyan|green|magenta|blue)\b")
 _LINE_BREAKS = ("\u0085", "\u2028", "\u2029")
-_TOOL_DONE = re.compile(r"^(?P<name>.*) \[(?P<status>done|error)\]$")
+_TOOL_DONE = re.compile(r"^(?P<name>.*?) \[(?P<status>done|error)\](?:\t(?P<result>.*))?$", re.S)
 
 
 @dataclass
@@ -126,7 +126,7 @@ def classify_chunk(chunk: str) -> dict[str, Any]:
         body  = chunk[len(TOOL_DONE_PREFIX):]
         match = _TOOL_DONE.match(body)
         if match:
-            return {"type": "tool_done", "name": match["name"], "is_error": match["status"] == "error"}
+            return {"type": "tool_done", "name": match["name"], "is_error": match["status"] == "error", "result": match["result"] or ""}
         return {"type": "tool_done", "name": body, "is_error": False}
     if chunk.startswith(CONTEXT_USAGE_PREFIX):
         try:
@@ -181,7 +181,9 @@ class RunReporter:
     def chunk(self, chunk: str) -> None:
         """Report one string yielded by the agent loop."""
         if self._fmt == "text":
-            self._console.print(chunk, end="")
+            # The answer is printed as written; only the CLI's own notices carry markup.
+            is_text = classify_chunk(chunk)["type"] == "text"
+            self._console.print(chunk, end="", markup=not is_text, highlight=not is_text)
             return
         event = classify_chunk(chunk)
         if event["type"] == "tool_start":

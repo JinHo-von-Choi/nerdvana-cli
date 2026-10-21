@@ -9,6 +9,7 @@ typed-ahead text to InputQueue and rewinding to Rewinder.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import logging
 import re
@@ -45,7 +46,7 @@ from nerdvana_cli.core.hooks.command_hooks import load_command_hooks
 from nerdvana_cli.core.hooks.hooks import HookContext, HookEngine, HookEvent
 from nerdvana_cli.core.hooks.user_hooks import load_user_hooks
 from nerdvana_cli.core.loop.activity_hooks import register_activity_hooks
-from nerdvana_cli.core.loop.activity_state import ActivityState
+from nerdvana_cli.core.loop.activity_state import ActivityState, summarize_tool_call
 from nerdvana_cli.core.loop.advisor import Advisor
 from nerdvana_cli.core.loop.builtin_hooks import (
     DirectoryRuleInjector,
@@ -99,6 +100,14 @@ logger  = logging.getLogger(__name__)
 
 TOOL_STATUS_PREFIX    = "\x00TOOL:"
 TOOL_DONE_PREFIX      = "\x00TOOL_DONE:"
+# Separates "name [done|error]" from the first line of the tool's result in a TOOL_DONE marker.
+TOOL_DONE_SEPARATOR   = "\t"
+
+
+def first_line(text: str, limit: int = 160) -> str:
+    """The first non-empty line of a tool result, shortened for a one-line display."""
+    line = next((part.strip() for part in str(text).splitlines() if part.strip()), "")
+    return line if len(line) <= limit else line[: limit - 1] + "…"
 CONTEXT_USAGE_PREFIX  = "\x00CTX_USAGE:"
 
 # End-of-turn hooks (unfinished-marker checks and the like) may keep the loop
@@ -237,9 +246,12 @@ class AgentLoop:
         )
 
     def _set_activity(self, **kwargs: Any) -> None:
-        """Mutate self.activity_state and notify subscribers."""
-        for key, value in kwargs.items():
-            setattr(self.activity_state, key, value)
+        """Replace self.activity_state and notify subscribers.
+
+        A new object each time: the TUI holds the state in a reactive attribute, which
+        ignores an assignment of the object it already holds.
+        """
+        self.activity_state = dataclasses.replace(self.activity_state, **kwargs)
         if self._on_activity_change is not None:
             try:
                 self._on_activity_change(self.activity_state)
@@ -531,14 +543,15 @@ class AgentLoop:
         """
         self.session.record_assistant_message(asst_text, tool_uses, provider_blocks)
         for tu in tool_uses:
-            yield f"{TOOL_STATUS_PREFIX}{tu['name']} {json.dumps(tu['input'], ensure_ascii=False)[:80]}"
+            _, detail = summarize_tool_call(tu["name"], tu["input"] if isinstance(tu["input"], dict) else {})
+            yield f"{TOOL_STATUS_PREFIX}{tu['name']} {detail or json.dumps(tu['input'], ensure_ascii=False)[:80]}"
         names_by_id = {tu["id"]: tu["name"] for tu in tool_uses}
         raced   = await race_abort(self.tool_executor.run_batch(tool_uses, tool_ctx), self.input_queue.interrupt, patience=self.input_queue.patience)
         results = interrupted_results(tool_uses) if raced.aborted else raced.value or []
         self._last_tool = tool_uses[-1]["name"] if tool_uses else self._last_tool
         for tr in results:
             tname = names_by_id.get(tr.tool_use_id, "unknown")
-            yield f"{TOOL_DONE_PREFIX}{tname} [{'error' if tr.is_error else 'done'}]"
+            yield f"{TOOL_DONE_PREFIX}{tname} [{'error' if tr.is_error else 'done'}]{TOOL_DONE_SEPARATOR}{first_line(tr.content)}"
         self.state.messages.append(Message(
             role      = Role.ASSISTANT,
             content   = asst_text if asst_text else "[tool execution]",

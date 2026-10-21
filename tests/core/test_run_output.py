@@ -41,8 +41,9 @@ from nerdvana_cli.core.loop.agent_loop import (
     [
         (f'{TOOL_STATUS_PREFIX}FileRead {{"path": "a.py"}}', {"type": "tool_start", "name": "FileRead", "summary": '{"path": "a.py"}'}),
         (f"{TOOL_STATUS_PREFIX}Glob", {"type": "tool_start", "name": "Glob", "summary": ""}),
-        (f"{TOOL_DONE_PREFIX}Bash [done]", {"type": "tool_done", "name": "Bash", "is_error": False}),
-        (f"{TOOL_DONE_PREFIX}Bash [error]", {"type": "tool_done", "name": "Bash", "is_error": True}),
+        (f"{TOOL_DONE_PREFIX}Bash [done]", {"type": "tool_done", "name": "Bash", "is_error": False, "result": ""}),
+        (f"{TOOL_DONE_PREFIX}Bash [error]", {"type": "tool_done", "name": "Bash", "is_error": True, "result": ""}),
+        (f"{TOOL_DONE_PREFIX}Bash [done]\tfile.txt", {"type": "tool_done", "name": "Bash", "is_error": False, "result": "file.txt"}),
         (f"{CONTEXT_USAGE_PREFIX}42", {"type": "context", "percent": 42}),
         (f"{CONTEXT_USAGE_PREFIX}oops", {"type": "context", "percent": 0}),
         (f"{COMPACT_STATUS_PREFIX}done", {"type": "compaction", "status": "done"}),
@@ -191,3 +192,15 @@ def test_failure_in_text_format_prints_the_message_for_a_person() -> None:
     reporter.failure(RunResult(stop="config"), "No API key found for anthropic.")
     assert out.getvalue() == ""
     assert "No API key found for anthropic." in console.getvalue()
+
+
+def test_text_format_prints_the_answer_as_written() -> None:
+    import io
+
+    from rich.console import Console
+
+    buffer  = io.StringIO()
+    console = Console(file=buffer, color_system=None, width=200)
+    reporter = RunReporter("text", write=lambda _s: None, console=console)
+    reporter.chunk("type list[str] and [/b] stay")
+    assert buffer.getvalue() == "type list[str] and [/b] stay"

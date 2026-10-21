@@ -1,110 +1,100 @@
-"""Tests for _add_chat_message thinking markup prefix (option B)."""
+"""Chat messages: answers render as Markdown, status lines as markup, and neither drops the model's text."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from rich.console import Console
+
+from nerdvana_cli.ui.widgets.chat_message import ChatMessage, answer_renderable, markup_or_plain
+
 
 class _ModelCfg:
-    show_thinking     = True
-    provider          = "anthropic"
-    model             = "claude-sonnet"
-    max_tokens        = 8096
-    temperature       = 1.0
-    api_key           = None
-    base_url          = None
-    extended_thinking = False
-    fallback_models: list[str] = []
+    show_thinking = True
 
 
 class _FakeSettings:
     model = _ModelCfg()
 
 
-def _get_markup(widget: object) -> str:
-    """Return the markup string stored in a Static/ChatMessage widget."""
-    # Static stores the initial content in the name-mangled '_Static__content' slot.
-    return str(getattr(widget, "_Static__content", ""))
+def _shown(widget: ChatMessage) -> str:
+    """What a chat message shows, as plain text."""
+    console = Console(width=100, record=True, color_system=None)
+    console.print(widget._Static__content)
+    return console.export_text()
 
 
 def _make_app() -> MagicMock:
-    """Return a minimal NerdvanaApp stub with the real _add_chat_message logic."""
+    """A NerdvanaApp stub that runs the real message methods and records what they mount."""
     from nerdvana_cli.ui.app import NerdvanaApp
-    from nerdvana_cli.ui.widgets import ChatMessage, StreamingOutput
 
-    # We test only the logic of _add_chat_message — no Textual event loop needed.
-    # Patch query_one to capture mounted widgets.
     app = MagicMock(spec=NerdvanaApp)
     app.settings = _FakeSettings()
-
-    mounted_messages: list[ChatMessage] = []
-
-    def _fake_mount(widget: ChatMessage, **kwargs: object) -> None:
-        mounted_messages.append(widget)
-
-    fake_scroll = MagicMock()
-    fake_scroll.mount.side_effect = _fake_mount
-    fake_scroll.scroll_end = MagicMock()
-
-    fake_streaming = MagicMock(spec=StreamingOutput)
-
-    def _query_one(selector: str, type_: type | None = None) -> MagicMock:
-        if "chat-frame" in str(selector):
-            return fake_scroll
-        return fake_streaming
-
-    app.query_one.side_effect = _query_one
-    app._mounted_messages = mounted_messages
-
-    # Bind the real method to the stub
+    app.settings.model.show_thinking = True
+    mounted: list[ChatMessage] = []
+    app._mount_chat = mounted.append
+    app._mounted_messages = mounted
     app._add_chat_message = NerdvanaApp._add_chat_message.__get__(app, NerdvanaApp)
+    app._add_answer = NerdvanaApp._add_answer.__get__(app, NerdvanaApp)
     return app
 
 
-class TestAddChatMessageThinkingMarkup:
-    def test_no_thinking_renders_markup_only(self) -> None:
+class TestAnswers:
+    def test_brackets_in_code_are_kept(self) -> None:
         app = _make_app()
-        app._add_chat_message("hello world", thinking="")
-        assert len(app._mounted_messages) == 1
-        msg = app._mounted_messages[0]
-        rendered = _get_markup(msg)
-        assert "hello world" in rendered
-        assert "[thinking]" not in rendered
+        app._add_answer("The type is `list[str]` and `a[0]` is the first item.")
+        shown = _shown(app._mounted_messages[0])
+        assert "list[str]" in shown
+        assert "a[0]" in shown
 
-    def test_thinking_prefixed_before_markup(self) -> None:
+    def test_a_closing_tag_does_not_break_the_message(self) -> None:
         app = _make_app()
-        app._add_chat_message("answer text", thinking="inner reasoning")
-        assert len(app._mounted_messages) == 1
-        rendered = _get_markup(app._mounted_messages[0])
-        assert "[thinking]" in rendered
-        assert "inner reasoning" in rendered
-        # thinking block must come BEFORE the answer
-        assert rendered.index("[thinking]") < rendered.index("answer text")
+        app._add_answer("Rich would choke on [/b] here.")
+        assert "[/b]" in _shown(app._mounted_messages[0])
 
-    def test_thinking_uses_dim_italic_markup(self) -> None:
+    def test_markdown_tables_and_bold_are_rendered(self) -> None:
         app = _make_app()
-        app._add_chat_message("response", thinking="some reasoning")
-        rendered = _get_markup(app._mounted_messages[0])
-        assert "[dim italic]" in rendered
-        assert "[/dim italic]" in rendered
+        app._add_answer("**main files**\n\n| file | size |\n|---|---|\n| a.py | 1 KB |")
+        shown = _shown(app._mounted_messages[0])
+        assert "main files" in shown and "**" not in shown
+        assert "a.py" in shown and "|---|" not in shown
 
-    def test_show_thinking_false_suppresses_block(self) -> None:
+    def test_thinking_comes_before_the_answer(self) -> None:
+        app = _make_app()
+        app._add_answer("answer text", thinking="inner reasoning")
+        shown = _shown(app._mounted_messages[0])
+        assert shown.index("inner reasoning") < shown.index("answer text")
+
+    def test_show_thinking_false_hides_it(self) -> None:
         app = _make_app()
         app.settings.model.show_thinking = False
-        app._add_chat_message("only answer", thinking="hidden reasoning")
-        rendered = _get_markup(app._mounted_messages[0])
-        assert "[thinking]" not in rendered
-        assert "hidden reasoning" not in rendered
-        assert "only answer" in rendered
+        app._add_answer("only answer", thinking="hidden reasoning")
+        shown = _shown(app._mounted_messages[0])
+        assert "hidden reasoning" not in shown and "only answer" in shown
 
-    def test_empty_thinking_no_prefix(self) -> None:
+    def test_clipboard_gets_the_answer_as_written(self) -> None:
         app = _make_app()
-        app._add_chat_message("[bold]msg[/bold]", thinking="")
-        rendered = _get_markup(app._mounted_messages[0])
-        assert rendered == "[bold]msg[/bold]"
+        app._add_answer("**bold** list[str]")
+        assert app._mounted_messages[0]._raw_text == "**bold** list[str]"
 
-    def test_raw_text_preserved_without_thinking_markup(self) -> None:
+
+class TestStatusMessages:
+    def test_markup_is_applied(self) -> None:
         app = _make_app()
-        app._add_chat_message("content", raw_text="plain content", thinking="thought")
-        msg = app._mounted_messages[0]
-        assert msg._raw_text == "plain content"
+        app._add_chat_message("[bold]msg[/bold]")
+        assert _shown(app._mounted_messages[0]).strip() == "msg"
+
+    def test_invalid_markup_is_shown_as_typed(self) -> None:
+        app = _make_app()
+        app._add_chat_message("memory 'x[/y]' removed")
+        assert "x[/y]" in _shown(app._mounted_messages[0])
+
+    def test_raw_text_is_kept(self) -> None:
+        app = _make_app()
+        app._add_chat_message("content", raw_text="plain content")
+        assert app._mounted_messages[0]._raw_text == "plain content"
+
+
+def test_markup_or_plain_and_answer_renderable_never_raise() -> None:
+    markup_or_plain("[/unbalanced]")
+    answer_renderable("[/b] list[str]", "[/thinking]")

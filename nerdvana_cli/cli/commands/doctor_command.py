@@ -290,6 +290,26 @@ def _check_project_docs() -> CheckResult:
     return CheckResult("project_docs", "ok", detail)
 
 
+def _check_skills() -> CheckResult:
+    """Skills that load but depart from the Agent Skills specification (names, directories, field lengths)."""
+    from nerdvana_cli.core.config.settings import NerdvanaSettings
+    from nerdvana_cli.core.context.skills import SkillLoader, spec_problems
+
+    try:
+        skills = SkillLoader.from_settings(NerdvanaSettings.load()).list_skills()
+    except Exception:  # noqa: BLE001 - config problems are reported by the config check
+        return CheckResult("skills", "skip", "config could not be loaded")
+    flagged = [
+        f"{skill.source}: {problems[0]}"
+        for skill in skills
+        if skill.source is not None
+        and (problems := spec_problems(skill.name, skill.directory.name if skill.directory else None, skill.description, skill.compatibility))
+    ]
+    if not flagged:
+        return CheckResult("skills", "ok", f"{len(skills)} skill(s) load")
+    return CheckResult("skills", "warn", f"{len(flagged)} of {len(skills)} skill(s) depart from the spec; first: {flagged[0]}"[:200])
+
+
 def _check_pricing_coverage() -> CheckResult:
     """The configured model and its fallbacks should have a known price, or a cost limit cannot apply."""
     from nerdvana_cli.core.config.model_routing import parse_fallback
@@ -409,6 +429,7 @@ _ALL_CHECKS = [
     _check_sandbox,
     _check_pricing_coverage,
     _check_project_docs,
+    _check_skills,
     _check_pricing_freshness,
     _check_collect_baseline,
 ]

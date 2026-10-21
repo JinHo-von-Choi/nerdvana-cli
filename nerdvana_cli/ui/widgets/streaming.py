@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.text import Text
 from textual.widgets import Static
 
 
@@ -40,11 +41,12 @@ class StreamingOutput(Static):
         self.update("")
 
     def _refresh_display(self) -> None:
-        parts: list[str] = []
+        # Model text is shown as typed: brackets in code must not be read as Rich markup.
+        shown = Text()
         if self._thinking:
-            parts.append(
-                f"[dim italic][thinking]\n{self._thinking}\n[/thinking][/dim italic]"
-            )
+            shown.append(self._thinking, style="dim italic")
+        if self._thinking and self._content:
+            shown.append("\n\n")
         if self._content:
-            parts.append(self._content)
-        self.update("\n\n".join(parts))
+            shown.append(self._content)
+        self.update(shown)

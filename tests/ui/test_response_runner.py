@@ -146,6 +146,8 @@ class _App:
         self.messages: list[tuple[str, dict[str, Any]]] = []
         self.context_usage: list[int]                   = []
         self.deferred: list[Any]                        = []
+        self.cards: list[Any]                           = []
+        self._tool_started: dict[str, list[str]]        = {}
 
     def query_one(self, selector: Any, widget_type: type | None = None) -> Any:
         if not isinstance(selector, str):
@@ -159,6 +161,12 @@ class _App:
 
     def _add_chat_message(self, message: str, **kwargs: Any) -> None:
         self.messages.append((message, kwargs))
+
+    def _add_answer(self, text: str, **kwargs: Any) -> None:
+        self.messages.append((text, {"raw_text": text, **kwargs}))
+
+    def _mount_chat(self, message: Any) -> None:
+        self.cards.append(message)
 
     def call_later(self, callback: Any, *args: Any) -> bool:
         self.deferred.append(callback)

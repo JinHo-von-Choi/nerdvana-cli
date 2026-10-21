@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -32,8 +33,8 @@ class _App:
     def __init__(self, cwd: str = ".", checkpoint_manager: Any = None) -> None:
         self.settings            = _Settings(cwd)
         self.messages: list[str] = []
-        if checkpoint_manager is not None:
-            self._checkpoint_manager = checkpoint_manager
+        # The checkpoint manager belongs to the session's agent loop.
+        self._agent_loop: Any = SimpleNamespace(_checkpoint_manager=checkpoint_manager)
 
     def _add_chat_message(self, message: str, **kwargs: Any) -> None:
         self.messages.append(message)

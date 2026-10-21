@@ -55,6 +55,10 @@ from nerdvana_cli.ui.widgets import (
     StreamingOutput,
     ToolStatusLine,
 )
+from nerdvana_cli.ui.widgets.chat_message import answer_renderable
+
+# Name of the worker that runs a response; Escape cancels it.
+RESPONSE_WORKER = "response"
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +172,7 @@ class NerdvanaApp(App[object]):
         Binding("ctrl+l", "clear_chat",       "Clear",     show=True),
         Binding("ctrl+d", "toggle_dashboard", "Dashboard", show=True),
         Binding("ctrl+t", "steer_input",      "Steer",     show=True,  priority=True),
-        Binding("escape", "focus_input",      "Input",     show=False, priority=True),
+        Binding("escape", "focus_input",      "Stop",      show=False, priority=True),
     ]
 
     def __init__(
@@ -186,6 +190,8 @@ class NerdvanaApp(App[object]):
         self._resume_id     = resume_id
         self._agent_loop: AgentLoop | None = None
         self._is_generating = False
+        # What each running tool call is doing, by tool name in start order, for its card when it ends.
+        self._tool_started: dict[str, list[str]] = {}
         self._confirm_lock  = asyncio.Lock()
         self._pending_images: list[dict[str, Any]] | None = None
         self._commands_cache:   list[UserCommand] = []
@@ -277,6 +283,9 @@ class NerdvanaApp(App[object]):
 
     def on_unmount(self) -> None:
         """Close the agent session so SESSION_END hooks run on exit."""
+        task = getattr(self, "_mcp_connect_task", None)
+        if task is not None and not task.done():
+            task.cancel()
         if self._agent_loop is not None:
             self._agent_loop.close_session("exit")
 
@@ -287,7 +296,7 @@ class NerdvanaApp(App[object]):
             session            = SessionStorage(session_id=resume_id, persist=self.settings.session.persist),
             task_registry      = self._task_registry,
             parism_client      = self.parism_client,
-            mcp_tools          = self.mcp_manager.get_all_tools() if self.mcp_manager else [],
+            mcp_tools          = [],
             on_activity_change = make_activity_change_callback(self, threading.get_ident()),
             on_ask_user        = self._ask_user_prompt,
             on_confirm         = self._confirm_prompt,
@@ -321,6 +330,23 @@ class NerdvanaApp(App[object]):
 
         self._show_load_warnings()
         self._check_update_task = asyncio.create_task(check_for_update(self))
+        if self.mcp_manager is not None:
+            self._mcp_connect_task = asyncio.create_task(self._connect_mcp_servers())
+
+    async def _connect_mcp_servers(self) -> None:
+        """Connect the MCP servers in the background and add their tools; the input stays usable meanwhile."""
+        from nerdvana_cli.tools.registry import attach_mcp_tools
+
+        self.notify("Connecting MCP servers...", timeout=3)
+        statuses = await self.mcp_manager.connect_all()
+        loop     = self._agent_loop
+        if loop is not None:
+            attach_mcp_tools(loop.registry, self.mcp_manager.get_all_tools(), loop.skill_loader)
+        failed = [name for name, status in statuses.items() if not status.startswith("connected")]
+        connected = len(statuses) - len(failed)
+        note = f"MCP: {connected} of {len(statuses)} server(s) connected" + (f"; failed: {', '.join(failed)}" if failed else "")
+        self._add_chat_message(f"[dim]{escape(note)}[/dim]")
+        refresh_mcp_section(self)
 
     def _init_sidebar(self, registry: Any, skills: list[Skill]) -> None:
         """Fill the sidebar sections and start the timers that keep them current."""
@@ -424,7 +450,7 @@ class NerdvanaApp(App[object]):
         self._add_chat_message("[bold cyan]Estelle :[/bold cyan]")
         self._generate_response("\n\n".join(loop.take_queued_input()))
 
-    @work(exclusive=True)
+    @work(exclusive=True, name=RESPONSE_WORKER)
     async def _generate_response(self, prompt: str) -> None:
         """Run agent loop and stream response to chat.
 
@@ -445,16 +471,19 @@ class NerdvanaApp(App[object]):
         show_session_context(self, registry)
 
     def _add_chat_message(self, markup: str, raw_text: str = "", thinking: str = "") -> None:
-        """Add a clickable chat message to the chat frame."""
-        chat_frame  = self.query_one("#chat-frame", VerticalScroll)
-        streaming   = self.query_one("#streaming-output", StreamingOutput)
-        full_markup = markup
+        """Add a clickable status or system message; text that is not valid markup is shown as typed."""
         if thinking and getattr(self.settings.model, "show_thinking", True):
-            thinking_block = (
-                f"[dim italic][thinking]\n{thinking}\n[/thinking][/dim italic]\n\n"
-            )
-            full_markup = thinking_block + markup
-        msg = ChatMessage(full_markup, raw_text=raw_text)
+            markup = f"[dim italic]{escape(thinking)}[/dim italic]\n\n{markup}"
+        self._mount_chat(ChatMessage(markup, raw_text=raw_text))
+
+    def _add_answer(self, text: str, thinking: str = "") -> None:
+        """Add a model answer, rendered as Markdown; the clipboard gets the text as written."""
+        shown = thinking if getattr(self.settings.model, "show_thinking", True) else ""
+        self._mount_chat(ChatMessage(answer_renderable(text, shown), raw_text=text))
+
+    def _mount_chat(self, msg: ChatMessage) -> None:
+        chat_frame = self.query_one("#chat-frame", VerticalScroll)
+        streaming  = self.query_one("#streaming-output", StreamingOutput)
         chat_frame.mount(msg, before=streaming)
         chat_frame.scroll_end(animate=False)
 
@@ -518,7 +547,12 @@ class NerdvanaApp(App[object]):
         return super().check_action(action, parameters)
 
     def action_focus_input(self) -> None:
-        """Focus input widget (Escape)."""
+        """Escape: stop the response in progress, keeping what has streamed; otherwise focus the input."""
+        running = [w for w in self.workers if w.name == RESPONSE_WORKER and not w.is_finished]
+        for worker in running:
+            worker.cancel()
+        if running:
+            self.notify("Stopped.", timeout=2)
         self.query_one("#user-input", Input).focus()
 
     def action_toggle_project_tree(self) -> None:

@@ -41,6 +41,23 @@ def _register_skill_and_agent_tools(registry: ToolRegistry, settings: Any, task_
         registry.register(AdvisorTool())
 
 
+def attach_mcp_tools(registry: ToolRegistry, tools: list[Any], loader: Any) -> None:
+    """Add MCP tools discovered after the registry was built, and the skills an MCP server offers.
+
+    The loop reads the registry at the start of every run, so tools attached between runs are
+    declared (or deferred) from the next run on.
+    """
+    from nerdvana_cli.mcp.skills import McpSkillFileTool
+    from nerdvana_cli.tools.skill_tool import ActivateSkillTool
+
+    for tool in tools:
+        registry.register(tool)
+        if isinstance(tool, McpSkillFileTool):
+            loader.add_skills(tool.library.skills())
+    if registry.get("ActivateSkill") is None and loader.model_skills():
+        registry.register(ActivateSkillTool(loader))
+
+
 def create_tool_registry(
     parism_client:  Any    = None,
     mcp_tools:      Any    = None,

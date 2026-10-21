@@ -10,7 +10,6 @@ Date:   2026-10-03
 
 from __future__ import annotations
 
-import asyncio
 import json
 import subprocess
 import sys
@@ -55,7 +54,7 @@ def test_the_repl_start_reports_a_missing_package_instead_of_stopping(
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setitem(sys.modules, "nerdvana_cli.mcp.manager", None)
 
-    manager = asyncio.run(runtime._connect_mcp(str(tmp_path)))
+    manager = runtime._mcp_manager(str(tmp_path))
 
     assert manager is None
     assert "pip install" in capsys.readouterr().out

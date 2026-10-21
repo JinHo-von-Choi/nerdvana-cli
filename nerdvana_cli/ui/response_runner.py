@@ -13,11 +13,18 @@ import contextlib
 import time
 from typing import TYPE_CHECKING, Any
 
+from rich.markup import escape
 from rich.text import Text
 from textual.containers import VerticalScroll
 
 from nerdvana_cli.core.context.loop_context import COMPACT_STATUS_PREFIX
-from nerdvana_cli.core.loop.agent_loop import CONTEXT_USAGE_PREFIX, TOOL_DONE_PREFIX, TOOL_STATUS_PREFIX
+from nerdvana_cli.core.loop.agent_loop import (
+    CONTEXT_USAGE_PREFIX,
+    TOOL_DONE_PREFIX,
+    TOOL_DONE_SEPARATOR,
+    TOOL_STATUS_PREFIX,
+)
+from nerdvana_cli.ui.widgets.chat_message import ChatMessage
 
 if TYPE_CHECKING:
     from nerdvana_cli.ui.app import NerdvanaApp
@@ -72,17 +79,27 @@ def _show_status_chunk(app: NerdvanaApp, chunk: str, tool_status: ToolStatusLine
     if chunk.startswith(CONTEXT_USAGE_PREFIX):
         app._update_context_usage(int(chunk[len(CONTEXT_USAGE_PREFIX):]))
     elif chunk.startswith(TOOL_STATUS_PREFIX):
-        tool_info = chunk[len(TOOL_STATUS_PREFIX):].replace("[", "\\[")
-        tool_status.update(Text.from_markup(f"  [cyan]⟳ {tool_info}[/cyan]"))
+        tool_info     = chunk[len(TOOL_STATUS_PREFIX):]
+        name, _, what = tool_info.partition(" ")
+        app._tool_started.setdefault(name, []).append(what)
+        tool_status.update(Text(f"  ⟳ {tool_info}", style="cyan"))
         tool_status.add_class("active")
         chat_frame.scroll_end(animate=False)
     elif chunk.startswith(TOOL_DONE_PREFIX):
-        tool_info = chunk[len(TOOL_DONE_PREFIX):]
-        safe_info = tool_info.replace("[", "\\[")
-        if "[error]" in tool_info:
-            tool_status.update(Text.from_markup(f"  [red]✗ {safe_info}[/red]"))
-        else:
-            tool_status.update(Text.from_markup(f"  [green]✓ {safe_info}[/green]"))
+        head, _, result = chunk[len(TOOL_DONE_PREFIX):].partition(TOOL_DONE_SEPARATOR)
+        failed  = "[error]" in head
+        name    = head.rsplit(" [", 1)[0]
+        pending = app._tool_started.get(name) or [""]
+        started = pending.pop(0)
+        mark, color = ("✗", "red") if failed else ("✓", "green")
+        tool_status.update(Text(f"  {mark} {name} {started}".rstrip(), style=color))
+        # Each finished call stays in the chat, so what ran and what it returned can be read back.
+        card = Text(f"  {mark} {name}", style=f"bold {color}")
+        if started:
+            card.append(f"  {started}", style="cyan")
+        if result:
+            card.append(f"\n    {result}", style="dim")
+        app._mount_chat(ChatMessage(card, raw_text=card.plain))
     elif chunk.startswith(COMPACT_STATUS_PREFIX):
         _show_compaction(app, chunk[len(COMPACT_STATUS_PREFIX):])
     else:
@@ -156,7 +173,7 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         streaming.reset()
         thinking_buf = getattr(app._agent_loop, "last_thinking", "")
         if accumulated.strip():
-            app._add_chat_message(accumulated, raw_text=accumulated, thinking=thinking_buf)
+            app._add_answer(accumulated, thinking=thinking_buf)
 
         # Final status with total elapsed
         elapsed = time.monotonic() - start_time
@@ -174,11 +191,11 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         _teardown()
         if accumulated.strip():
             with contextlib.suppress(Exception):
-                app._add_chat_message(accumulated, raw_text=accumulated)
+                app._add_answer(accumulated)
         raise
     except Exception as e:
         _teardown()
-        app._add_chat_message(f"\n[bold red]Error: {e}[/bold red]")
+        app._add_chat_message(f"\n[bold red]Error: {escape(str(e))}[/bold red]")
     finally:
         app._is_generating = False
         app.call_later(app._after_response)

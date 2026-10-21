@@ -4,7 +4,25 @@ from __future__ import annotations
 
 from typing import Any
 
+from rich.console import Group, RenderableType
+from rich.errors import MarkupError
+from rich.markdown import Markdown
+from rich.text import Text
 from textual.widgets import Static
+
+
+def markup_or_plain(markup: str) -> RenderableType:
+    """*markup* as Rich markup, or as plain text when it is not valid markup."""
+    try:
+        return Text.from_markup(markup)
+    except MarkupError:
+        return Text(markup)
+
+
+def answer_renderable(text: str, thinking: str = "") -> RenderableType:
+    """A model answer rendered as Markdown, its thinking above it in dim italics; neither is read as markup."""
+    body = Markdown(text)
+    return Group(Text(thinking, style="dim italic"), Text(""), body) if thinking else body
 
 
 class ChatMessage(Static):
@@ -23,9 +41,12 @@ class ChatMessage(Static):
     }
     """
 
-    def __init__(self, content: str, raw_text: str = "", **kwargs: Any) -> None:
+    def __init__(self, content: str | RenderableType, raw_text: str = "", **kwargs: Any) -> None:
+        if isinstance(content, str):
+            raw_text = raw_text or self._strip_markup(content)
+            content  = markup_or_plain(content)
         super().__init__(content, **kwargs)
-        self._raw_text = raw_text or self._strip_markup(content)
+        self._raw_text = raw_text
 
     @staticmethod
     def _strip_markup(text: str) -> str:

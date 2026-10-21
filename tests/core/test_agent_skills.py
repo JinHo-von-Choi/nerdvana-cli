@@ -164,9 +164,9 @@ def test_name_rules() -> None:
     assert name_problems("has space")
 
 
-def test_a_name_that_breaks_the_rules_warns_and_still_loads(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_a_name_that_breaks_the_rules_is_logged_and_still_loads(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     _write(tmp_path / "agents" / "dirname" / "SKILL.md", "Not_Valid--Name")
-    with caplog.at_level(logging.WARNING, logger=LOGGER):
+    with caplog.at_level(logging.INFO, logger=LOGGER):
         skills = _by_name(_loader(tmp_path))
     assert "Not_Valid--Name" in skills
     messages = " ".join(r.getMessage() for r in caplog.records)
@@ -523,3 +523,10 @@ def test_skill_trust_command_records_the_digest_for_a_directory(tmp_path: Path, 
     assert str(skill.resolve()) in load_trust_record()
     missing = runner.invoke(app, ["skill", "trust", str(tmp_path / "nothing")])
     assert missing.exit_code == 1
+
+
+def test_spec_problems_are_not_warnings(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    _write(tmp_path / "agents" / "dirname" / "SKILL.md", "Not_Valid--Name")
+    with caplog.at_level(logging.WARNING, logger=LOGGER):
+        _by_name(_loader(tmp_path))
+    assert not [r for r in caplog.records if "does not match its directory" in r.getMessage()]

@@ -91,6 +91,7 @@ class _FakeApp:
         self.status_bar     = _FakeWidget()
         self.chat_frame     = _FakeWidget()
         self.messages:      list[str] = []
+        self._tool_started: dict[str, list[str]] = {}
         self._is_generating = False
         self.parism_client  = None
         self.settings       = SimpleNamespace(
@@ -111,6 +112,12 @@ class _FakeApp:
 
     def _add_chat_message(self, text: str, raw_text: str | None = None, thinking: str = "") -> None:
         self.messages.append(text)
+
+    def _add_answer(self, text: str, thinking: str = "") -> None:
+        self.messages.append(text)
+
+    def _mount_chat(self, message: Any) -> None:
+        return None
 
     def call_later(self, callback: Any, *args: Any) -> bool:
         return True
