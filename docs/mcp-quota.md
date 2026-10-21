@@ -1,8 +1,5 @@
 # MCP Per-Tenant Quota Enforcement
 
-작성자: 최진호  
-작성일: 2026-05-13
-
 ## Overview
 
 Per-tenant rate-limit and token quota enforcement sits between the ACL check and

@@ -1,8 +1,5 @@
 # Contributing to NerdVana CLI
 
-Author: 최진호
-Created: 2026-04-29
-
 ---
 
 ## Environment bootstrap

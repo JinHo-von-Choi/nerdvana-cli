@@ -1,8 +1,5 @@
 # Live Provider Smoke Tests
 
-Author: 최진호
-Created: 2026-05-13
-
 Live tests in `tests/live/` exercise every supported AI provider end-to-end. They
 hit real APIs, consume tokens, and may incur cost — unlike unit tests they are
 **skipped automatically when the required environment variable is absent**, so

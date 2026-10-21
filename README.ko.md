@@ -1,40 +1,117 @@
-# NerdVana CLI
+<p align="center">
+  <img src="docs/logo.png" alt="NerdVana CLI" width="480">
+</p>
 
-AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, Ollama 등 **21개 AI 플랫폼**을 지원합니다.
+<p align="center">
+  <strong>터미널에서 쓰는 코딩 에이전트 — 21개 AI 플랫폼을 하나의 인터페이스로</strong>
+</p>
 
-판올림 1.9.1 · Python 3.11 이상 · MIT 라이선스 · [English README](README.md)
+<p align="center">
+  <a href="#설치"><img src="https://img.shields.io/badge/install-one--line-blue?style=flat-square" alt="Install"></a>
+  <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/providers-21-green?style=flat-square" alt="Providers">
+  <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/version-1.9.1-orange?style=flat-square" alt="Version">
+  <a href="https://github.com/JinHo-von-Choi/nerdvana-cli"><img src="https://img.shields.io/github/stars/JinHo-von-Choi/nerdvana-cli?style=flat-square&color=brightgreen" alt="Stars"></a>
+</p>
 
-## 기능
+<p align="center">
+  <a href="README.md">English</a> | 한국어
+</p>
 
-- **다중 제공자 지원** — 하나의 CLI로 21개 AI 플랫폼 사용 가능
-- **대화형 REPL** — 스트리밍 출력과 슬래시 명령어, 토큰 사용량 표시기
-- **비대화형 모드** — 스크립팅을 위한 단일 프롬프트 실행 (`nerdvana run`)
-- **32개 내장 도구**: 파일 I/O, 검색, 셸, 웹, 작업 목록, MCP 외에 LSP·심볼·서브에이전트·스웜·태스크 관리·샌드박스 코드 실행 도구
-- **편집 무결성**: `FileRead`가 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙입니다. `FileEdit`와 `FileWrite`는 세션에서 읽지 않았거나 읽은 뒤 바뀐 파일을 고치지 않으며, 자기 편집으로 밀린 앵커는 다시 찾아 맞춥니다. `find_symbol`에 `include_body`를 주면 심볼 소스가 앵커와 함께 나오고, 그 줄들은 파일 전체를 읽지 않고도 고칠 수 있습니다. 편집 직후 언어 서버가 그 편집으로 새로 생긴 오류를 알려 줍니다.
-- **서브에이전트와 백그라운드 작업**: `Agent` / `Swarm`이 서브에이전트를 각자의 시스템 프롬프트, 턴 한도, 도구 범위로 실행합니다. 제공자당 동시 실행 수는 `session.max_parallel_agents`로 묶입니다. 백그라운드 작업이 끝나면 결과가 모델에게 자동으로 전달되고, 쉬고 있던 세션은 스스로 깨어나 결과를 검토합니다.
-- **복구와 완주**: 제공자 실패를 분류해 백오프로 재시도한 뒤 다른 모델이나 제공자로 넘어갑니다. 컨텍스트 초과는 압축 후 재시도하고, 멈춘 스트림은 시간 제한으로 끊습니다. 열린 todo 항목이 있으면 진척이 멈출 때까지 작업을 이어 갑니다. [자동 복구](#자동-복구) 참고.
-- **권한 정책**: `--approval-mode`, `permissions.mode`, `always_allow`, `always_deny`가 서브에이전트를 포함한 모든 도구 호출에 적용됩니다. [권한과 승인 모드](#권한과-승인-모드) 참고.
-- **되묻기**: `AskUser` 도구로 모델이 추측 대신 사용자에게 묻습니다. 에이전트가 일하는 동안 입력한 글은 다음 단계에 반영되고, 파일 변경 확인에는 diff가 표시됩니다.
-- **사용자 명령과 훅**: 마크다운 명령 템플릿과 셸 명령 훅. [사용자 명령과 명령 훅](#사용자-명령과-명령-훅) 참고.
-- **Claude Code 호환 지침**: 루트의 `AGENTS.md`와 `CLAUDE.md`를 `NIRNA.md` 다음에 읽고, 하위 디렉터리의 규칙 파일은 그 안의 파일을 처음 다룰 때 주입합니다. 스킬은 Agent Skills 표준을 따릅니다. `.agents/skills`, `.nerdvana/skills`, `.claude/skills`의 `SKILL.md` 디렉터리를 모델에게 목록으로 보여 주고 필요할 때 불러옵니다([docs/skills.md](docs/skills.md)).
-- **실시간 활동 표시기 + 추론 태그 렌더링** — DeepSeek-R1, QwQ, Qwen3-thinking, GLM, Kimi K2.5 thinking, MiniMax M2 가 보내는 `<think>...</think>` 블록을 dim italic 으로 분리 표시하고, `ActivityIndicator` 위젯이 현재 phase(idle / thinking / waiting_api / streaming / tool_running)와 활성 도구 대상을 보여줍니다.
-- **시작 시 업데이트 알림**: 실행할 때마다 GitHub 릴리즈를 확인해 새 판이 있으면 한 줄로 알려줍니다 (24시간 캐시). `--no-update-check`, `NERDVANA_NO_UPDATE_CHECK=1`, `nerdvana.yml`의 `session.update_check: false`로 끌 수 있습니다.
-- **세션 지속성**: JSONL 트랜스크립트를 저장하고 `nerdvana session resume <id>`로 대화를 복원합니다
-- **자동 제공자 감지** — 모델 이름에서 적절한 제공자 자동 선택
-- **MCP 통합** — 외부 MCP 서버를 연결하여 도구 시스템 확장
-- **구성 가능** — YAML 설정, 환경 변수, CLI 플래그
+---
 
-## 지원하는 제공자
+NerdVana CLI는 터미널에서 저장소의 코드를 읽고, 고치고, 시험합니다. 모델은 고를 수 있습니다. Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Mistral, 로컬 Ollama·vLLM 서버를 포함해 21개 플랫폼을 지원합니다. 어떤 모델이 답하든 도구, 권한 규칙, 세션 형식, 비용 집계가 같으므로 모델을 바꿔도 사용법과 스크립트를 다시 만들 필요가 없습니다.
+
+## 동작 방식
+
+```mermaid
+flowchart LR
+    U[사용자 또는 스크립트] --> F[REPL, run,<br/>serve, acp]
+    F --> L[에이전트 루프]
+    L <--> P[모델 제공자<br/>21개 플랫폼]
+    L --> G[권한 정책과<br/>보호 장치]
+    G --> T[도구: 셸, 파일,<br/>LSP, MCP, 서브에이전트]
+    T --> L
+    L --> R[답변과<br/>영수증]
+```
+
+에이전트 루프는 요청을 모델에 보내고, 모델이 요청한 도구를 실행해 결과를 돌려주기를 작업이 끝날 때까지 반복합니다. 모든 도구 호출은 먼저 권한 정책을 거칩니다. 단발 실행은 바뀐 파일, 비용, 실행 중 생긴 문제를 담은 결과 객체로 끝납니다.
+
+## 주요 기능
+
+| 기능 | 내용 |
+|-|-|
+| 21개 제공자 | 모든 제공자를 CLI 하나로 씁니다. 모델 이름으로 제공자를 고르고, 대체 모델은 다른 제공자로도 넘어갑니다 |
+| 안전한 파일 편집 | 줄을 `N#hhhhhh` 앵커로 읽습니다. 읽은 뒤 바뀐 파일의 편집은 거부하고, 편집 직후 새로 생긴 언어 서버 오류를 알려 줍니다 |
+| 코드 인텔리전스 | 언어 서버가 있으면 LSP·심볼 도구(정의, 참조, 이름 바꾸기, 심볼 본문 교체, 안전 삭제)를 씁니다 |
+| 권한과 샌드박스 | 승인 모드, 허용·거부 규칙, 셸 쓰기를 막는 OS 샌드박스. 모델은 `.env`와 `.iron-laws.yml`을 쓸 수 없습니다 |
+| 서브에이전트 | `Agent`와 `Swarm`이 내장 프로필 6종을 전경이나 백그라운드에서 실행합니다 |
+| 헤드리스 실행 | `nerdvana run`: JSON 출력, 턴·비용·토큰 한도, 작업 완료를 판정하는 `--verify` 명령 |
+| 백그라운드·예약·워크플로 | 터미널을 닫아도 도는 백그라운드 에이전트, 비용 상한이 있는 cron 작업, 이어서 실행할 수 있는 다중 에이전트 워크플로 |
+| 양방향 MCP | 외부 MCP 서버를 도구로 쓰고, `nerdvana serve`로 NerdVana 도구를 다른 에이전트에 제공합니다(클라이언트별 할당량) |
+| 편집기 연동 | `nerdvana acp`가 Zed 같은 편집기와 Agent Client Protocol로 연결합니다 |
+| 프로젝트 지침과 스킬 | `NIRNA.md`, `AGENTS.md`, `CLAUDE.md`, Agent Skills(`SKILL.md`)를 자동으로 읽습니다 |
+| 세션과 메모리 | 재개·되감기가 되는 JSONL 대화 기록, 검토함이 있는 프로젝트 메모리 |
+| 비용 확인 | `nerdvana cost`와 `/context`가 토큰과 비용이 어디에 쓰였는지 보여 줍니다 |
+
+## 설치
+
+필요 조건: Python 3.11 이상, git.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
+```
+
+설치 스크립트는 `~/.nerdvana-cli/`에 전용 가상 환경과 함께 설치하고 `nerdvana`, `nc` 명령을 PATH에 추가합니다. 업그레이드는 `nerdvana update`로 합니다.
+
+소스에서 설치:
+
+```bash
+git clone https://github.com/JinHo-von-Choi/nerdvana-cli.git
+cd nerdvana-cli
+pip install -e ".[all]"          # 모든 제공자 SDK
+# pip install -e ".[anthropic]"  # 제공자 하나만: anthropic, openai, gemini
+```
+
+## 빠른 시작
+
+1. 제공자를 고르고 API 키를 넣고 모델을 선택합니다.
+
+   ```bash
+   nerdvana setup
+   ```
+
+   직접 키를 내보내도 됩니다. 예: `export ANTHROPIC_API_KEY="sk-ant-..."`
+
+2. 프로젝트로 이동해 REPL을 시작합니다.
+
+   ```bash
+   cd your-project
+   nerdvana
+   ```
+
+3. `/init`으로 이 프로젝트의 지침 파일 `NIRNA.md`를 만들고, 할 일을 요청합니다. 예: `이 프로젝트 구조를 설명해 줘`, `tests/test_api.py의 실패하는 시험을 고쳐 줘`.
+
+4. 스크립트와 CI에서는 프롬프트 하나를 실행하고 끝냅니다.
+
+   ```bash
+   nerdvana run "fix the failing test" --approval-mode yolo --max-cost-usd 2 --output-format json
+   ```
+
+한 세션만 다른 제공자나 모델로 쓰려면 `nerdvana --provider openai --model gpt-4.1`처럼 실행합니다.
+
+## 지원 제공자
 
 | 제공자 | 기본 모델 | API 키 환경 변수 |
-|--------|-----------|------------------|
+|-|-|-|
 | **Anthropic** | claude-sonnet-5-5 | `ANTHROPIC_API_KEY` |
 | **OpenAI** | gpt-4.1 | `OPENAI_API_KEY` |
 | **Google Gemini** | gemini-2.5-flash | `GEMINI_API_KEY` |
 | **Groq** | llama-3.3-70b-versatile | `GROQ_API_KEY` |
 | **OpenRouter** | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` |
 | **xAI (Grok)** | grok-3 | `XAI_API_KEY` |
-| **Ollama** | qwen3 | `OLLAMA_API_KEY` |
+| **Ollama** | qwen3 | `OLLAMA_API_KEY` (Ollama Cloud만) |
 | **vLLM** | Qwen/Qwen3-32B | `VLLM_API_KEY` |
 | **DeepSeek** | deepseek-chat | `DEEPSEEK_API_KEY` |
 | **Mistral** | mistral-medium-latest | `MISTRAL_API_KEY` |
@@ -50,440 +127,108 @@ AI 기반 CLI 개발 도구 — Anthropic Claude, OpenAI, Google Gemini, Groq, O
 | **Fireworks AI** | accounts/fireworks/models/llama-v3p3-70b-instruct | `FIREWORKS_API_KEY` |
 | **Cerebras** | llama-3.3-70b | `CEREBRAS_API_KEY` |
 
-## 설치
+로컬 서버: [docs/local-models.md](docs/local-models.md). 제공자별 동작(추론, effort, 캐시): [docs/providers-compat.md](docs/providers-compat.md).
 
-### 한 줄 설치 (권장)
+## 설정
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
-```
+설정은 YAML 파일에서 읽습니다. 가장 먼저 찾은 파일 하나를 씁니다.
 
-이 명령은 NerdVana CLI를 `~/.nerdvana-cli/`에 설치하고 가상환경을 구성한 뒤, `nerdvana` / `nc` 명령어를 PATH에 추가합니다.
+1. `--config <경로>`
+2. `NERDVANA_CONFIG`
+3. `./nerdvana.yml` 또는 `./nerdvana.yaml`
+4. `~/.nerdvana/config.yml`
+5. `~/.config/nerdvana-cli/config.yml` (예전 위치, 계속 읽음)
 
-요구사항: Python >= 3.11, git
-
-### PyPI 설치
-
-패키지가 PyPI에 게시된 이후부터 사용할 수 있습니다. 그 전에는 위의 한 줄 설치를 사용하십시오.
-
-```bash
-uv tool install nerdvana-cli
-# 또는
-pipx install nerdvana-cli
-
-# 모든 제공자 SDK 포함
-uv tool install "nerdvana-cli[all]"
-```
-
-이전 릴리스로 되돌리려면 버전을 고정해 다시 설치합니다.
-
-```bash
-uv tool install nerdvana-cli==<이전-버전>
-# 또는
-pipx install --force nerdvana-cli==<이전-버전>
-```
-
-### 수동 설치
-
-```bash
-# 저장소 클론 후 모든 제공자와 함께 설치
-git clone https://github.com/JinHo-von-Choi/nerdvana-cli.git
-cd nerdvana-cli
-pip install -e ".[all]"
-
-# 또는 특정 제공자만 설치
-pip install -e ".[anthropic]"   # Anthropic만
-pip install -e ".[openai]"      # OpenAI만
-pip install -e ".[gemini]"      # Gemini만
-```
-
-## 빠른 시작
-
-```bash
-# 제공자별 API 키 설정
-export ANTHROPIC_API_KEY="sk-ant-..."
-# 또는
-export OPENAI_API_KEY="sk-..."
-# 또는
-export GEMINI_API_KEY="..."
-
-# 대화형 REPL (모델 이름에서 제공자 자동 감지)
-nerdvana
-
-# 명시적으로 제공자 지정
-nerdvana --provider anthropic --model claude-opus-5-5
-nerdvana --provider openai --model gpt-4.1
-nerdvana --provider gemini --model gemini-2.5-pro
-nerdvana --provider groq --model llama-3.3-70b-versatile
-nerdvana --provider ollama --model qwen3
-
-# 단일 프롬프트 실행
-nerdvana run "이 프로젝트의 아키텍처 설명"
-nerdvana run "이 코드 리팩터링" --provider deepseek
-
-# 모든 제공자 목록 보기
-nerdvana providers
-```
-
-## 사용자 명령과 명령 훅
-
-**명령.** `~/.nerdvana/commands/` 또는 `<프로젝트>/.nerdvana/commands/` 아래의 마크다운 파일이 슬래시 명령이 됩니다. `review.md`는 `/review`, `git/commit.md`는 `/git:commit`입니다. 입력하면 파일 내용이 프롬프트로 전송되고, `$ARGUMENTS`는 명령 뒤에 친 전체 텍스트로, `$1`~`$9`는 각 단어로 바뀝니다(공백이 든 단어는 따옴표로 묶음). 자리표시자가 없으면 인자를 본문 뒤에 붙입니다. YAML 머리말의 `description:`은 명령 메뉴에 표시됩니다. 같은 이름이면 프로젝트 파일이 전역 파일을 대체하고, 내장 명령과 스킬이 항상 우선합니다.
-
-**명령 훅.** `~/.nerdvana/hooks.yml`과 `<프로젝트>/.nerdvana/hooks.yml`이 에이전트 이벤트마다 셸 명령을 실행합니다.
+최소 `nerdvana.yml`:
 
 ```yaml
-hooks:
-  - event: before_tool        # before_tool, after_tool, session_start, session_end
-    match: "Bash"             # 도구 이름 glob (before_tool, after_tool), 기본 "*"
-    command: "scripts/check-command.sh"
-    timeout: 5                # 초, 1~30
+model:
+  provider: anthropic
+  model: claude-sonnet-5-5
+  fallback_models:           # 재시도를 다 쓰면 차례로 시도
+    - openai:gpt-4.1         # provider:model 형식이면 제공자도 바뀜
+
+permissions:
+  mode: default              # default, accept-edits, bypass, plan
+  always_allow: ["FileRead", "Bash(git status)"]
+  always_deny: []
+
+sandbox:
+  mode: off                  # off, auto, require (Linux Landlock)
 ```
 
-명령은 프로젝트 디렉터리에서 실행되고 stdin으로 JSON 객체 하나(`event`, `tool_name`, `tool_input`, `cwd`, `after_tool`이면 `tool_result`)를 받으며, `NERDVANA_HOOK_EVENT`와 `NERDVANA_TOOL_NAME`이 설정됩니다. 종료 코드 `0`은 계속 진행합니다. 종료 코드 `2`는 `before_tool` 호출을 막고 명령의 출력을 모델에게 알리며, `after_tool`이면 출력을 메시지로 모델에게 전달합니다. 그 밖의 종료 코드, 시간 초과, 시작하지 못한 명령은 기록만 하고 무시하므로 고장 난 훅이 에이전트를 멈추지 않습니다. 훅이 도는 동안 에이전트가 기다리므로 빠르게 유지하세요.
-
-프로젝트의 `hooks.yml`은 저장소에 딸린 셸 명령을 실행하므로 프로젝트 파이썬 훅과 같은 규칙을 따릅니다. `hooks.allow_project_hooks: true`와 승인된 해시(`nerdvana hook trust <경로>`)가 필요하고, 파일을 고치면 승인이 취소됩니다.
-
-## 헤드리스 실행
-
-`nerdvana run`은 프롬프트 하나를 실행하고 끝납니다. 스크립트, CI, 에이전트를 내장하는 프로그램에서 쓰는 방식입니다.
-
-```bash
-nerdvana run "실패하는 테스트를 고쳐" --approval-mode yolo --max-turns 30 --max-cost-usd 2 --output-format json
-```
-
-| 옵션 | 의미 |
-|-|-|
-| `--output-format text\|json\|stream-json` | `text`(기본)는 사람이 읽는 스트림입니다. `json`은 끝에 결과 객체 하나를 출력합니다. `stream-json`은 한 줄에 이벤트 하나를 출력하고 같은 결과 객체로 끝납니다. 두 JSON 형식에서 stdout에는 JSON만 나가고 안내 문구는 stderr로 갑니다. |
-| `--max-turns N` | 모델 턴이 N번이 되면 멈춥니다. |
-| `--max-total-tokens N` | 모든 요청의 입력과 출력 토큰 합이 N에 이르면 멈춥니다. 가격을 몰라도 모든 모델에서 동작합니다. |
-| `--image PATH` | 프롬프트에 이미지(PNG, JPEG, GIF, WebP, 5 MB 이하, 최대 6개)를 첨부합니다(반복 가능). 형식은 파일 첫 바이트로 판단하며, 이미지를 받지 못하는 모델은 제공자의 오류로 답합니다. |
-| `--set section.field=value` | 이 실행에서만 설정 하나를 덮어씁니다(반복 가능, 값은 YAML로 읽음). 예: `--set session.compact_threshold=0.5`. `permissions`, `hooks`, `sandbox` 섹션은 이 방법으로 바꿀 수 없고 각자의 옵션을 씁니다. |
-| `--resume SESSION_ID` | 그 세션에 기록된 대화를 이어서 실행합니다(`nerdvana session list` 참고). 프롬프트는 다음 메시지가 됩니다. 기록된 대화가 없는 세션은 잘못된 옵션(종료 코드 2)입니다. `nerdvana agents resume` 이 이 옵션을 씁니다. |
-| `--scope PATH` | `--verify` 와 함께: 작업이 다루는 경로(반복 가능). 그 밖의 편집은 먼저 묻고, 물을 사람이 없으면 거부합니다. |
-| `--verify COMMAND` | 작업이 끝났는지 판정하는 명령입니다. 모델이 끝났다고 하면 이 명령을 실행하고, 종료 코드가 0이 아니면 출력의 끝부분을 모델에 돌려주어 계속 일하게 합니다. 통과하거나, `--verify-attempts N`번 실패하거나(기본 `goal.max_attempts`, 5), 턴·비용 한도에 이르면 끝납니다. 결과에 `verification` 객체가 붙습니다. |
-| `--sandbox off\|auto\|require` | 이 실행에서 셸 명령의 쓰기 범위를 제한하며 `sandbox.mode` 보다 우선합니다([docs/sandbox.md](docs/sandbox.md)). |
-| `--require-price` | `--max-cost-usd` 를 줬는데 모델의 가격을 모르면 실행을 거부합니다. |
-| `--max-cost-usd X` | 실행의 추정 비용이 X달러에 이르면 멈춥니다(모델의 가격을 알아야 동작). |
-| `--approval-mode default\|auto_edit\|yolo\|plan` | 권한 프리셋입니다. 터미널이 없으면 확인 요청이 거부되므로, 파일을 쓰는 무인 실행은 대개 `yolo`가 필요합니다. |
-
-종료 코드: `0` 성공, `1` 실행 실패(제공자 오류, 예기치 않은 오류), `2` 옵션이나 설정 오류(API 키 없음 포함), `3` 턴, 비용, 토큰 또는 검증 한도로 중단.
-
-결과 객체(`schema_version` 1, 필드는 추가만 하고 바꾸지 않음):
-
-```json
-{"type": "result", "schema_version": 1, "subtype": "success", "is_error": false,
- "result": "최종 답변", "session_id": "ab12cd34", "provider": "anthropic",
- "model": "claude-sonnet-5-5", "num_turns": 4, "duration_ms": 18234, "total_cost_usd": 0.0421,
- "usage": {"input_tokens": 51230, "output_tokens": 2210, "cache_read_tokens": 38000, "cache_write_tokens": 9000},
- "signals": {"cas_rejected": 1, "new_diagnostics": 2}}
-```
-
-`receipt`(파일을 바꿨거나 `--verify` 목표가 있었을 때만)는 주장 옆에 증거를 둡니다: `files_changed`(파일별 적용된 편집 수), `verification`, `sandbox` 정책, `cost_by_agent`(에이전트 종류별 요청 수와 USD, 서브에이전트 포함), `problems`(오래된 파일 편집 거부, 새 언어 서버 오류, 거부된 반복, 범위 밖 편집, 가려진 비밀, 실패한 검증, 승급의 횟수). 실행이 직접 측정한 값으로 만들고 모델은 아무것도 쓰지 않습니다. `receipt_version`은 1입니다. `signals`는 실행 중 무엇이 잘못됐는지를 종류별로 센 값입니다(`cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction` 등). 일어나지 않은 종류는 없습니다. `subtype`은 `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` 중 하나이고, 오류 결과에는 원인을 아는 경우 `error` 문자열이 붙습니다. `result`는 모델이 마지막 도구 호출 뒤에 쓴 텍스트입니다.
-
-`stream-json`은 결과 앞에 이벤트를 한 줄씩 냅니다. `system`(subtype `init`, 세션 id·제공자·모델), `text`(답변 조각), `notice`(재시도나 폴백 같은 에이전트 자체 안내), `tool_start`(`name`, `summary`), `tool_done`(`name`, `is_error`), `request`(요청 하나의 `provider`, `model`, `agent_type`, `turn`, `last_tool`, 캐시 토큰을 포함한 토큰 수, `cost_usd`), `compaction`, `context`(창 사용률)입니다.
-
-## CLI 서브명령어
-
-### 메인 명령어
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana` | 대화형 REPL 시작 (서브명령어 없이 실행 시 기본 동작) |
-| `nerdvana run <프롬프트>` | 단일 프롬프트를 비대화형으로 실행 |
-| `nerdvana setup` | 대화형 설정 마법사 — 제공자 선택, API 키 입력, 모델 선택 |
-| `nerdvana providers` | 지원하는 모든 AI 제공자 목록 표시 |
-| `nerdvana version` | 버전 표시 |
-| `nerdvana update` | 최신 릴리스를 내려받아 CLI 를 다시 설치합니다 (fast-forward 가 실패한 깨끗한 git 체크아웃은 `origin/main` 로 재설정합니다. 사용자 데이터는 건드리지 않습니다) |
-| `nerdvana serve` | NerdVana를 MCP 1.0 서버로 시작 (stdio 또는 HTTP 트랜스포트) |
-| `nerdvana acp` | Zed 같은 편집기를 위해 Agent Client Protocol 에이전트로 stdio 에서 실행 (`acp` extra 필요). [docs/acp.md](docs/acp.md) |
-| `nerdvana doctor` | 설치 상태·API 키·외부 의존성 진단 (`--strict`, `--json`) |
-| `nerdvana import claude\|codex` | 슬래시 명령(`.claude/commands`, `~/.codex/prompts`)을 덮어쓰지 않고 `.nerdvana/commands` 로 가져오고, Claude Code `settings.json` 의 권한 규칙을 이 도구의 문법으로 바꿔 출력합니다. `--write` 전에는 계획만 보여 줍니다 |
-| `nerdvana review` | 작업 트리를 git ref 와 비교해, 바뀐 함수와 그것을 쓰는 줄에서 출발하는 읽기 전용 에이전트로 리뷰합니다(`--base`, `--context-only`, `--fail-on`). [docs/review.md](docs/review.md) |
-| `nerdvana context [id]` | 저장된 세션(기본은 가장 최근)에서 컨텍스트 윈도우가 어디에 쓰이는지 보여 줍니다. 시스템 프롬프트 구성, 도구별 선언, 역할별 메시지, 도구별 결과를 윈도우와 압축 임계값에 견줍니다(`--top`, `--json`). [docs/context-history.md](docs/context-history.md) |
-| `nerdvana approvals` | 계속 승인하는 권한 질문에 대해 `always_allow` 규칙(`Bash(git status)`)을 제안합니다. 설정은 바뀌지 않습니다 |
-| `nerdvana cost` | 지정 기간의 토큰·캐시 토큰 사용량과 USD 비용 집계 (요청마다 보고된 사용량 기준). `--by provider\|model\|agent\|category\|tool` 로 비용이 어디에 쓰였는지 봅니다 |
-
-### 예약 실행 (`nerdvana schedule ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana schedule add "<크론 또는 every 15m>" --prompt "..."` | 작업 추가 (`--cwd`, `--max-cost-usd`, `--approval-mode plan\|default`, `--name`). 따로 지정하지 않으면 읽기 전용(`plan`)과 비용 상한으로 실행합니다 |
-| `nerdvana schedule list` | 작업과 다음 실행 시각, 마지막 실행 결과 표시 |
-| `nerdvana schedule remove <이름>` | 작업 삭제 (저장된 실행 기록은 남습니다) |
-| `nerdvana schedule run <이름>` | 작업을 지금 한 번 실행하고 끝날 때까지 기다립니다 |
-| `nerdvana schedule daemon` | 포그라운드에서 때가 된 작업을 시작하는 루프. 작업별과 일별 비용 상한이 있고, 데몬이 꺼져 있던 동안 놓친 실행은 되풀이하지 않습니다 |
-| `nerdvana schedule install-systemd` | 데몬용 systemd 사용자 유닛을 출력합니다. 설치하지는 않습니다 |
-
-[docs/scheduling.md](docs/scheduling.md) 참고.
-
-### 워크플로 (`nerdvana workflow ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana workflow list` | 프로젝트(`.nerdvana/workflows`), `~/.nerdvana/workflows`, 번들 워크플로 목록 |
-| `nerdvana workflow show <이름>` | 워크플로의 입력과 단계를 표시 |
-| `nerdvana workflow run <이름>` | 선언된 다중 에이전트 워크플로를 실행합니다 (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`, `--approval-mode`). 파일이 쓰기를 허용하지 않으면 에이전트는 읽기 전용이고, 끝난 단위는 저장되어 중단된 실행을 이어서 할 수 있습니다 |
-
-[docs/workflows.md](docs/workflows.md) 참고.
-### 백그라운드 에이전트 (`nerdvana agents ...`)
-
-| `nerdvana agents start "<프롬프트>"` | 터미널보다 오래 사는 감독 프로세스 아래에서 백그라운드 실행을 시작합니다(`--worktree` 는 전용 worktree, `--max-cost-usd`, 같은 `--key` 로 다시 시작하면 기존 실행을 돌려줌, `--cwd`, `--approval-mode`) |
-| `nerdvana agents list` | 실행 목록과 상태, 경과 시간, 지금까지의 비용, 마지막 신호 표시. 프로세스가 사라진 실행은 `orphaned` 로 표시됩니다 |
-| `nerdvana agents show <id>` | 실행의 기록, 로그 끝부분, 결과 표시 |
-| `nerdvana agents attach <id>` | 실행이 끝날 때까지 로그를 따라갑니다. Ctrl+C 는 따라가기만 멈춥니다 |
-| `nerdvana agents stop <id>` | 실행에 종료를 요청하고, 유예 시간이 지나면 강제 종료합니다 |
-| `nerdvana agents resume <id>` | 고아가 되었거나 중지·실패한 실행을 세션 기록에서 다시 시작합니다 |
-| `nerdvana agents clean` | `--days`(기본 7일) 전에 끝난 실행의 기록을 지웁니다. 변경이 있는 worktree 는 남기고 경로를 출력합니다 |
-
-세션의 백그라운드 `Agent` 작업도 같은 저장소에 기록됩니다. [docs/background.md](docs/background.md) 참고.
-
-### 세션 기록 (`nerdvana session ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana session list` | `~/.nerdvana/sessions/`에 저장된 JSONL 기록 목록 표시 |
-| `nerdvana session resume <id>` | 기존 기록으로 REPL 재개 |
-| `nerdvana session purge` | 저장된 기록 삭제 |
-| `nerdvana history search "<검색어>"` | 저장된 기록의 메시지를 검색해 세션 id, 날짜, 역할, 발췌를 출력합니다(`--since 7d`, `--cwd .`, `--limit`). [docs/context-history.md](docs/context-history.md) |
-
-### MCP 서버 (`nerdvana mcp ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana mcp list` | `~/.nerdvana/mcp.json`과 `<cwd>/.mcp.json`에 선언된 서버 목록 표시 |
-| `nerdvana mcp add <이름>` | 두 파일 중 하나에 서버 항목 추가 |
-| `nerdvana mcp remove <이름>` | 서버 항목 제거 |
-
-### 스킬 (`nerdvana skill ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana skill list` | 내장·전역·프로젝트 스킬 목록 표시 |
-| `nerdvana skill show <이름>` | 스킬의 프론트매터와 본문 출력 |
-| `nerdvana skill install <소스>` | `~/.nerdvana/skills/`에 스킬 설치 |
-| `nerdvana skill remove <이름>` | 설치된 스킬 삭제 |
-| `nerdvana skill trust <경로>` | 프로젝트 스킬을 승인해 로드되게 함 ([docs/skills.md](docs/skills.md) 참조) |
-
-### 프로젝트 메모리 (`nerdvana memory ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana memory list` | 현재 프로젝트에 기록된 메모리 목록 표시 |
-| `nerdvana memory add <내용>` | 새 메모리 기록 |
-| `nerdvana memory remove <id>` | 메모리 한 건 삭제 |
-| `nerdvana memory purge` | 선택한 범위의 메모리 전체 삭제 |
-| `nerdvana memory inbox` | 에이전트가 제안한 메모리(`memory.review: true` 일 때)를 현재 항목과의 차이와 함께 표시 |
-| `nerdvana memory approve <id>` | 제안 한 건 적용. `--all` 은 대기 중인 전부 적용 |
-| `nerdvana memory reject <id>` | 제안 폐기 |
-| `nerdvana memory forget <이름>` | 확인 후 메모리 삭제(`--yes` 로 확인 생략), 감사 로그에 기록 |
-| `nerdvana memory stale` | `--days N`(기본 30)일 동안 수정되지 않았고 읽힌 적 없는 메모리 표시. `--remove` 는 확인 후 삭제 |
-
-[docs/memory.md](docs/memory.md) 참조.
-
-### 훅 브리지 (`nerdvana hook ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana hook pre-tool-use` | pre-tool-use 훅 이벤트 처리 — stdin에서 JSON 읽기, stdout에 응답 출력 |
-| `nerdvana hook post-tool-use` | post-tool-use 훅 이벤트 처리 |
-| `nerdvana hook prompt-submit` | prompt-submit 훅 이벤트 처리 |
-| `nerdvana hook list` | 지원하는 훅 이벤트 타입 목록 표시 |
-| `nerdvana hook trust <경로>` | 프로젝트 로컬 훅을 승인해 실행 가능하게 함 |
-| `nerdvana hook revoke <경로>` | 프로젝트 로컬 훅의 승인 기록 해제 |
-| `nerdvana hook trusted` | 승인된 프로젝트 훅 목록과 내용이 바뀐 항목 표시 |
-
-### ACL 관리 (`nerdvana admin acl ...`)
-
-| 서브명령어 | 설명 |
-|-|-|
-| `nerdvana admin acl list` | 모든 클라이언트와 할당된 역할 목록 표시 |
-| `nerdvana admin acl add <클라이언트> <역할>` | 클라이언트의 역할 추가 또는 갱신 |
-| `nerdvana admin acl revoke <접두사>` | 이름이 접두사와 일치하는 클라이언트의 ACL 항목 취소 |
-
-## 디렉토리 구조
-
-NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니다:
-
-```
-~/.nerdvana-cli/     — 설치 루트 (git 저장소 + venv). install.sh가 관리합니다.
-                       런타임에서 읽기 전용 — 이 디렉토리를 직접 수정하지 마세요.
-
-~/.nerdvana/         — 사용자 데이터 루트 ($NERDVANA_DATA_HOME으로 변경 가능).
-  ├── config.yml     — 전역 설정
-  ├── NIRNA.md       — 전역 지침
-  ├── mcp.json       — 전역 MCP 서버
-  ├── sessions/      — 대화 기록 (JSONL)
-  ├── skills/        — 전역 사용자 스킬
-  ├── hooks/         — 전역 사용자 훅
-  ├── agents/        — 전역 에이전트 정의용 예약 디렉토리 (현재 미사용)
-  ├── teams/         — 팀 상태
-  ├── cache/         — 런타임 캐시
-  └── logs/          — 로그 (예약됨)
-
-<프로젝트>/           — 현재 작업 디렉토리 (선택적 프로젝트 오버라이드)
-  ├── nerdvana.yml
-  ├── NIRNA.md
-  ├── .mcp.json
-  └── .nerdvana/
-      ├── skills/
-      ├── hooks/
-      └── agents/
-```
+`--set section.field=value`는 한 번의 실행에서만 설정을 바꾸고, `nerdvana --dump-config`는 적용될 설정과 각 키가 온 계층을 보여 줍니다. 모든 절과 필드는 [docs/configuration.md](docs/configuration.md)에, 전체 예시는 [nerdvana.yml.example](nerdvana.yml.example)에 있습니다.
 
 ### 환경 변수
 
-| 변수 | 설명 | 기본값 |
-|---|---|---|
-| `NERDVANA_HOME` | 설치 루트 | `~/.nerdvana-cli` |
-| `NERDVANA_DATA_HOME` | 사용자 데이터 루트 | `~/.nerdvana` |
-| `NERDVANA_CONFIG` | 명시적 설정 파일 경로 | `~/.nerdvana/config.yml` |
-| `NERDVANA_NO_UPDATE_CHECK` | `1`로 두면 시작 시 판올림 확인을 건너뛴다 | 미설정 |
-| `NERDVANA_EXTERNAL_PROJECTS_ROOT` | 외부 프로젝트 도구가 벗어날 수 없는 경계 루트 | 미설정 |
-| `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | 설정 파일 없이 외부 프로젝트 도구를 등록 | `false` |
+| 변수 | 용도 | 기본값 |
+|-|-|-|
+| `NERDVANA_HOME` | 설치 위치 | `~/.nerdvana-cli` |
+| `NERDVANA_DATA_HOME` | 사용자 데이터 위치 | `~/.nerdvana` |
+| `NERDVANA_CONFIG` | 설정 파일 경로 | `~/.nerdvana/config.yml` |
+| `NERDVANA_NO_UPDATE_CHECK` | `1`이면 시작 시 업데이트 알림을 끔 | 없음 |
+| `NERDVANA_EXTERNAL_PROJECTS_ROOT` | 외부 프로젝트 도구가 벗어날 수 없는 경계 | 없음 |
+| `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | 설정 파일을 고치지 않고 외부 프로젝트 도구를 등록 | `false` |
 
-### 마이그레이션
+API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어야 `WebSearch` 도구가 동작합니다. 제공자와 모델에는 환경 변수가 없습니다. `--provider`, `--model`, `/provider`, `/model`이나 설정 파일로 정합니다.
 
-업그레이드 후 첫 실행 시 `~/.nerdvana-cli/sessions/` 및 `~/.config/nerdvana-cli/`의 데이터를 `~/.nerdvana/`로 이동합니다. `.migrated` 센티넬 파일이 재실행을 방지합니다.
+### 파일과 디렉터리
 
-## REPL 슬래시 명령어
+```
+~/.nerdvana-cli/     설치 위치(git 체크아웃 + venv). install.sh가 관리하므로 직접 고치지 않음
+~/.nerdvana/         사용자 데이터 ($NERDVANA_DATA_HOME)
+  ├── config.yml     전역 설정
+  ├── NIRNA.md       전역 지침
+  ├── mcp.json       전역 MCP 서버
+  ├── sessions/      대화 기록
+  ├── skills/        전역 스킬
+  ├── commands/      전역 슬래시 명령
+  ├── hooks/         전역 Python 훅
+  ├── hooks.yml      전역 셸 명령 훅
+  └── agents/        전역 에이전트 정의용 예약 위치
+<project>/
+  ├── nerdvana.yml   프로젝트 설정
+  ├── NIRNA.md       프로젝트 지침 (커밋하지 않을 지침은 NIRNA.local.md)
+  ├── .mcp.json      프로젝트 MCP 서버
+  └── .nerdvana/     프로젝트 스킬, 명령, 훅, 워크플로
+```
 
-| 명령어 | 설명 |
-|--------|------|
-| `/help` | 사용 가능한 슬래시 명령어 목록 표시 |
-| `/clear` | 현재 대화 내용 지우기 |
-| `/init` | 현재 디렉토리에 `NIRNA.md` 프로젝트 지침 파일 생성 (별칭: `/setup`) |
-| `/model` | 현재 model 표시/변경 (provider 별 마지막 model 이 config.yml 에 기록되어 재실행 시 유지) |
-| `/models` | 사용 가능한 model 목록 (cursor 가 현재 active model 에서 시작) |
-| `/provider` | provider 추가/전환 (선택은 config.yml 에 저장되어 재실행 시 유지) |
-| `/mode` | 모드 프로파일 활성화/비활성화 |
-| `/context` | 컨텍스트 윈도우가 어디에 쓰이는지(시스템 프롬프트 구성, 도구 선언, 메시지, 도구 결과를 윈도우와 압축 임계값에 견줌) 보여 주고 이어서 컨텍스트 프로파일을 표시합니다. `/context list`, `/context <이름>` 은 프로파일을 설정합니다 |
-| `/mcp` | 연결된 MCP 서버 상태 표시 |
-| `/tokens` | 누적 토큰 사용량 및 컨텍스트 윈도우 사용률 표시 |
-| `/skills` | 등록된 에이전트 스킬 목록 표시 |
-| `/tools` | 활성화된 모든 내장 도구 및 MCP 도구 목록 표시 |
-| `/update` | 최신 버전 확인 및 업데이트 설치 (`/update parism` 입력 시 내장 Parism MCP 패키지를 최신 버전으로 강제 갱신) |
-| `/memories` | 프로젝트 메모리 목록 표시 |
-| `/memory` | `/memory inbox`, `approve <id>` 또는 `approve --all`, `reject <id>`, `forget <이름> --yes`, `stale [--days N]`: 에이전트의 메모리 제안 검토와 메모리 정리 ([docs/memory.md](docs/memory.md) 참조) |
-| `/undo` | 편집 전 git 체크포인트로 복원 |
-| `/rewind` | `/rewind [N]` 은 마지막 N개 프롬프트 이전으로 되돌립니다. 그 메시지는 버려지고 편집 도구가 한 편집은 취소됩니다(셸 명령이 바꾼 것은 제외) |
-| `/redo` | 마지막으로 되돌린 체크포인트 재적용 |
-| `/checkpoints` | 세션 체크포인트 목록 표시 |
-| `/route-knowledge` | 콘텐츠를 분류하여 WriteMemory 스코프 제안 |
-| `/dashboard` | 관찰 가능성 대시보드 토글 |
-| `/health` | 7일간 도구 호출 건강 요약 표시 |
-| `/image` | `/image <경로> [<경로> ...] <질문>` 은 앞쪽의 이미지 파일을 첨부해 질문합니다. 기록에는 그림이 아니라 파일 이름만 남습니다 |
-| `/history` | `/history <검색어> [--since 7d] [--cwd DIR]` 로 과거 세션 기록을 검색합니다 |
-| `/btw` | `/btw <질문>` 은 대화를 맥락으로 곁질문을 합니다. 질문도 답도 이력에 남지 않고, 요청의 캐시된 앞부분을 재사용합니다 |
-| `/steer` | `/steer <텍스트>` 는 진행 중인 단계(모델 응답이나 실행 중인 도구)를 멈추고 그 텍스트로 다음 단계를 시작합니다. Ctrl+T 는 입력창의 내용을 같은 방식으로 보냅니다 ([docs/background.md](docs/background.md) 참조) |
-| `/goal` | `/goal <목표> --verify <명령>` 은 에이전트가 끝났다고 할 때마다 명령을 실행하고, 종료 코드가 0이 될 때까지 실패를 돌려보냅니다. `/goal`, `/goal pause`, `/goal resume`, `/goal clear` |
-| `/policy` | 적용 중인 관리형 정책 파일과 각 항목이 한 일을 표시합니다 ([docs/managed-policy.md](docs/managed-policy.md)) |
-| `/thinking` | 인라인 추론 표시 토글 (on/off, config.yml 에 저장) |
-| `/activity` | 활동 표시기 위젯 토글 (on/off, config.yml 에 저장) |
-| `/quit` | REPL 종료 (별칭: `/exit`, `/q`) |
+업그레이드 뒤 첫 실행에서 `~/.nerdvana-cli/sessions/`와 예전 위치 `~/.config/nerdvana-cli/`의 데이터를 `~/.nerdvana/`로 한 번 옮깁니다(마이그레이션).
 
-## 내장 도구
+## 권한
 
-레지스트리는 32개의 내장 도구를 조립합니다. 셸·파일·검색·작업 목록·웹·에이전트·태스크 도구는 항상 등록됩니다.
-`Parism`은 번들된 Parism MCP 패키지에 접근할 수 있을 때 등록됩니다. LSP·심볼 도구는 호환 언어 서버가 설치된
-경우에만 등록되며, 없으면 조용히 생략됩니다. 외부 프로젝트 도구 3종은 설정에서 `external_projects_enabled: true`
-를 켜기 전까지 등록되지 않습니다.
+모든 도구 호출은 서브에이전트와 백그라운드 에이전트를 포함해 다음 순서로 판정합니다.
 
-| 도구 | 유형 | 설명 |
-|------|------|------|
-| `Bash` | 쓰기 | 셸 명령어 실행 (타임아웃, 작업 디렉토리, 환경 변수 지원) |
-| `FileRead` | 읽기 | 파일 내용을 읽고 각 줄에 `N#hhhhhh`(줄 번호와 내용 해시)를 붙이며, 세션에 파일 다이제스트를 기록. 바이너리 파일은 종류와 크기만 알림 |
-| `FileWrite` | 쓰기 | 새 파일 생성, 또는 이 세션에서 읽은 뒤 바뀌지 않은 파일 덮어쓰기 |
-| `FileEdit` | 쓰기 | 문자열 교체 또는 앵커(`N#hhhhhh`) 기반 편집. 읽은 뒤 파일이 바뀌었으면 거부 |
-| `Glob` | 읽기 | 파일 패턴 매칭 |
-| `Grep` | 읽기 | 정규식 기반 콘텐츠 검색 |
-| `run_code` | 읽기 | 읽기 전용 도구(`FileRead`, `Grep`, `Glob`, `lsp_find_references`)가 바인딩된 샌드박스에서 짧은 파이썬 프로그램을 실행. 파일이 많이 필요하지만 답은 하나인 작업을 파일마다 한 번이 아니라 도구 호출 한 번으로 처리. 샌드박스는 쓰기·실행·네트워크를 할 수 없고, 바인딩을 통해서만 파일을 본다 |
-| `TodoWrite` | 쓰기 | 에이전트가 수행할 작업 목록 관리 |
-| `ActivateSkill` | 메타 | 시스템 프롬프트의 스킬 목록에 있는 스킬의 지침을 불러오고, 결과에 그 스킬이 담은 파일 목록을 붙임. 모델이 켤 수 있는 스킬이 하나라도 있을 때만 등록. [docs/skills.md](docs/skills.md) 참조 |
-| `AskUser` | 메타 | 모호한 요구사항에서 사용자에게 선택지 2~4개와 자유 입력으로 질문. 사용자가 없는 실행(단발 실행, MCP 서버, 서브에이전트)에서는 오류 반환 |
-| `WebFetch` | 읽기 | URL을 가져와 읽을 수 있는 본문으로 변환 |
-| `WebSearch` | 읽기 | Brave Search 질의. `BRAVE_API_KEY`가 없으면 호출 시점에 오류 |
-| `Parism` | 쓰기 | 화이트리스트된 44개 셸 명령어를 구조화된 JSON 출력으로 실행 |
-| `Agent` | 오케스트레이션 | 서브에이전트를 전경 또는 백그라운드로 실행. 백그라운드면 `task_id` 반환 |
-| `Swarm` | 오케스트레이션 | 여러 서브에이전트를 병렬로 발사하여 독립 작업을 분산 |
-| `TaskGet` | 협업 | 백그라운드 작업의 상태와 결과 조회 (끝난 작업은 자동으로도 보고됨) |
-| `TaskStop` | 협업 | 실행 중인 비동기 작업 중단 |
-| `lsp_diagnostics` | LSP | 파일에 대한 LSP 진단(에러·경고) 조회 |
-| `lsp_goto_definition` | LSP | 심볼의 정의 위치로 이동 |
-| `lsp_find_references` | LSP | 심볼의 모든 참조 위치 검색 |
-| `lsp_rename` | LSP | 심볼을 안전하게 일괄 리네임 |
-| `symbol_overview` | 읽기 | 파일 또는 디렉토리의 심볼 맵(클래스·함수·변수) 반환 |
-| `find_symbol` | 읽기 | 이름 경로로 심볼을 찾고 선택적으로 본문 반환 |
-| `find_referencing_symbols` | 읽기 | 지정 심볼을 참조하는 모든 심볼 검색 |
-| `restart_language_server` | 쓰기 | 툴체인·의존성 변경 후 언어 서버 재기동 |
-| `replace_symbol_body` | 쓰기 | 심볼 본문을 한 번의 원자적 연산으로 교체 |
-| `insert_before_symbol` | 쓰기 | 심볼 정의 바로 앞에 코드 삽입 |
-| `insert_after_symbol` | 쓰기 | 심볼 정의 바로 뒤에 코드 삽입 |
-| `safe_delete_symbol` | 쓰기 | 잔여 참조가 없음을 확인한 후 심볼 삭제 |
-| `ListQueryableProjects` | 읽기 | 위임 가능한 등록 외부 nerdvana 프로젝트 카탈로그 조회 |
-| `RegisterExternalProject` | 쓰기 | 서브프로세스 격리 쿼리 위임을 위한 외부 nerdvana 프로젝트 등록 |
-| `QueryExternalProject` | 읽기 | 등록된 외부 프로젝트에 nerdvana 쿼리를 격리된 서브프로세스로 위임 |
-
-## 에이전트 타입
-
-`Agent` / `Swarm` 도구는 6개 빌트인 에이전트 타입 중 하나로 작업을 보냅니다. 타입마다 시스템 프롬프트, 턴 한도, 허용 도구 목록이 있고 모두 실제로 적용됩니다. `*`는 에이전트 생성, 작업 제어, `AskUser`를 뺀 세션의 모든 도구를, `@read`는 읽기 전용 도구 전부(LSP 조회, 심볼 조회, 웹 읽기)를 허용합니다.
-
-| 에이전트 타입 | 최대 턴 | 허용 도구 | 용도 |
-|-|-|-|-|
-| `general-purpose` | 50 | `*` | 범용 에이전트 |
-| `Explore` | 12 | `Glob`, `Grep`, `FileRead`, `@read` | 코드베이스 탐색 전용, 파일 수정 불가 |
-| `Plan` | 15 | `Glob`, `Grep`, `FileRead`, `@read` | 구현 계획 수립 전용, `planning_gate`와 함께 동작 |
-| `code-reviewer` | 12 | `FileRead`, `Grep`, `Glob`, `@read` | 코드 품질과 정확성 검토, 읽기 전용 |
-| `git-management` | 20 | `Bash`, `FileRead` | git 작업 전담 |
-| `test-writer` | 30 | `*` | 테스트 작성과 실행 |
-
-서브에이전트는 세션의 언어 서버와 MCP 연결을 함께 쓰고, 같은 권한 정책을 따르며, 다른 에이전트를 만들 수 없습니다. 진행 상황은 TUI 우측 `TaskPanel`에 표시되고, 백그라운드 작업이 끝나면 결과가 모델에게 전달됩니다. `TaskStop`으로 중단합니다.
-
-## 자동 복구
-
-| 장치 | 동작 |
-|-|-|
-| 제공자 복구 | 실패를 일시 오류(429, 5xx, 시간 초과), 컨텍스트 초과, 인증, 디코딩으로 분류합니다. 일시 오류는 백오프나 서버의 `Retry-After`에 따라 `model.max_retries`번 재시도한 뒤 `model.fallback_models`의 다음 항목으로 넘어갑니다(`provider:model`이면 제공자도 바꿈). 컨텍스트 초과는 한 번 압축한 뒤 다시 요청합니다. 응답 일부가 이미 출력됐으면 재시도하지 않습니다. |
-| 스트림 시간 제한 | `session.stream_idle_timeout`초 동안 응답이 없거나 `session.stream_total_timeout`초를 넘기면 일시 오류로 처리합니다. |
-| todo 가드 | 열린 `TodoWrite` 항목이 남은 채 턴이 끝나면 계속하라고 요청합니다. 세 번 연속 진척이 없으면 멈추고 남은 항목을 보고합니다. 압축 뒤에는 열린 항목을 다시 알려 줍니다. |
-| `context_limit_recovery` | `max_tokens`로 끝나면 마지막 요청을 인용해 이어쓰기를 요청합니다. |
-| `json_parse_recovery` | 도구 결과의 JSON 파싱이 실패하면 올바른 JSON을 요청합니다. |
-| `ralph_loop_check` | `end_turn`에 `TODO`, `FIXME`, `NotImplemented`, `# 구현 필요`, `# 미구현` 표시가 남아 있으면 마무리를 요청합니다. 턴 종료 훅으로 이어지는 진행은 프롬프트당 세 번까지입니다. |
-| 반복 호출 차단 | 같은 인자의 같은 도구 호출이 연속 세 번째면 경고하고, 다섯 번째면 거부합니다(`TaskGet` 폴링 제외). |
-| 출력 상한 | 도구 결과는 기본적으로 12,000자까지 인라인에 남기고(도구 자체 한도인 약 30,000토큰, `WebFetch`는 10,000토큰도 함께 적용), 더 긴 결과는 앞뒤를 남겨 자릅니다. 전문은 `~/.nerdvana/tool-output/session-<digest>/`에 저장되고, 안내 문구가 파일 경로를 알려 주므로 모델이 FileRead나 Grep로 다시 읽을 수 있습니다. `tools.max_result_chars`로 도구별 한도를 바꿀 수 있습니다. |
-
-## 권한과 승인 모드
-
-메인 루프, 서브에이전트, 백그라운드 에이전트의 모든 도구 호출은 다음 순서로 판정합니다.
-
-1. `permissions.always_deny`(도구 이름, glob 패턴 가능): 거부
-2. 현재 모드가 제외한 도구: 거부하고 모델에게도 숨김
+1. `permissions.always_deny`: 거부
+2. 현재 모드가 제외한 도구: 거부하고 모델에게 숨김
 3. 도구 자체의 거부(예: 차단된 셸 명령): 거부
 4. `permissions.always_allow`: 묻지 않고 허용
-5. 모드의 신뢰 수준: `strict`는 모든 쓰기 전에, `balanced`는 파괴적 도구와 확인이 필요한 도구 전에 묻고, `yolo`는 묻지 않음
+5. 모드의 신뢰 수준: `strict`는 모든 쓰기 전에, `balanced`는 파괴적 도구 전에 묻고, `yolo`는 묻지 않음
 
-그 다음에 단조 가드(monotonic guard)가 마지막 권한을 갖습니다. 가드는 거절만 할 수 있고, 훅·권한 규칙·승인 모드가 이를 끌 수는 없습니다. 불변 파일(`.iron-laws.yml`, `.env`) 쓰기, 태스크 계약이 보호하는 테스트 파일 쓰기, 비밀 파일을 네트워크 싱크로 보내는 명령은 `yolo` 모드에서도 거부됩니다.
+이 판정 뒤에도 어떤 훅·규칙·모드로도 끌 수 없는 보호 장치가 `.env`·`.iron-laws.yml` 쓰기, 작업 계약이 보호하는 시험 파일 쓰기, 비밀 파일을 네트워크로 보내는 명령을 거부합니다.
 
-| `--approval-mode` | 모드 프로필 | 신뢰 수준 | 효과 |
-|-|-|-|-|
-| `default` | `interactive` | balanced | 일반 대화형 사용 |
-| `auto_edit` | `editing` | balanced | 같은 도구, 편집 중심 프롬프트 |
-| `yolo` | `one-shot` | yolo | 확인 없음 |
-| `plan` | `planning` | strict | 쓰기 도구와 `Bash` 숨김 |
+| `--approval-mode` | 신뢰 수준 | 효과 |
+|-|-|-|
+| `default` | balanced | 일반 대화형 사용 |
+| `auto_edit` | balanced | 같은 도구, 편집 중심 프롬프트 |
+| `yolo` | yolo | 확인 없음 |
+| `plan` | strict | 쓰기 도구와 `Bash`를 숨김 |
 
-`--approval-mode`나 `session.default_mode`가 없으면 `nerdvana.yml`의 `permissions.mode`(`default`, `accept-edits`, `bypass`, `plan`)가 같은 프로필을 고릅니다. 터미널이 없으면 확인 요청은 거부로 처리됩니다.
+터미널이 없으면 확인 질문은 거부가 되므로, 파일을 쓰는 무인 실행에는 `yolo`가 필요합니다. `nerdvana approvals`는 자주 승인한 질문을 보고 `always_allow` 규칙을 제안합니다. 샌드박스: [docs/sandbox.md](docs/sandbox.md). 사용자 설정보다 우선하는 관리자 정책: [docs/managed-policy.md](docs/managed-policy.md).
 
-## MCP 서버 통합
+## 프로젝트 지침
 
-외부 [MCP](https://modelcontextprotocol.io/) 서버를 붙여 도구 시스템을 넓힙니다. 발견된 도구는 `mcp__{서버}__{도구}` 이름으로 자동 등록됩니다.
+지침은 아래 순서로 시스템 프롬프트에 들어가며, 뒤의 것이 우선합니다.
 
-서버는 `nerdvana.yml`이 아니라 JSON 파일에 선언합니다. 전역 파일을 먼저, 프로젝트 파일을 나중에 읽으므로 이름이 같으면 프로젝트 쪽이 이깁니다.
+1. `~/.nerdvana/NIRNA.md`: 전역 지침
+2. `<project>/NIRNA.md`: 저장소에 커밋하는 프로젝트 지침
+3. `<project>/NIRNA.local.md`: 커밋하지 않는 로컬 지침
 
-| 파일 | 범위 |
-|-|-|
-| `~/.nerdvana/mcp.json` | 전역, 모든 프로젝트에 적용 |
-| `<cwd>/.mcp.json` | 프로젝트 (Claude Code와 같은 파일 이름) |
+프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`는 그 뒤에 읽습니다. 도구가 하위 디렉터리의 파일을 처음 다룰 때 그 디렉터리와 루트 사이의 규칙 파일을 한 번 주입합니다(세션당 32 KB까지). `/init`이 `NIRNA.md` 초안을 만듭니다. 스킬: [docs/skills.md](docs/skills.md). 사용자 슬래시 명령: [docs/commands.md](docs/commands.md). 훅: [docs/hooks.md](docs/hooks.md).
 
-두 파일 모두 `mcpServers` 객체를 씁니다:
+## MCP 서버
+
+서버는 `~/.nerdvana/mcp.json`(전역)과 `<project>/.mcp.json`(프로젝트, 같은 이름의 전역 항목을 덮어씀)에 Claude Code와 같은 `mcpServers` 형식으로 적습니다.
 
 ```json
 {
@@ -498,265 +243,215 @@ NerdVana CLI는 *설치 디렉토리*와 *사용자 데이터*를 분리합니�
 }
 ```
 
-`nerdvana mcp add`, `nerdvana mcp list`, `nerdvana mcp remove`가 이 파일들을 대신 편집합니다. REPL에서는 `/mcp`로 연결 상태를, `/tools`로 MCP 도구를 포함한 전체 도구 목록을 봅니다.
+서버의 도구는 `mcp__{server}__{tool}` 이름으로 나타납니다. `nerdvana mcp add|list|remove`가 파일을 고치고, `/mcp`가 연결 상태를 보여 줍니다. 자세한 내용: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). NerdVana 도구를 다른 에이전트에 제공하려면: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
 
-## NIRNA.md, 프로젝트 지침
+## 명령 참조
 
-시스템 프롬프트에 프로젝트별 지침을 주입하는 파일입니다 (Claude Code의 `CLAUDE.md`에 해당).
+### 기본 명령
 
-탐색 순서 (뒤로 갈수록 우선순위가 높음):
-1. `~/.nerdvana/NIRNA.md` (전역 사용자 지침)
-2. `<cwd>/NIRNA.md` (프로젝트 지침, 저장소에 커밋)
-3. `<cwd>/NIRNA.local.md` (로컬 지침, gitignore 대상)
+| 명령 | 용도 |
+|-|-|
+| `nerdvana` | 대화형 REPL 시작 |
+| `nerdvana run <prompt>` | 프롬프트 하나를 실행하고 종료. 옵션, 종료 코드, JSON 결과는 [docs/headless.md](docs/headless.md) |
+| `nerdvana setup` | 제공자 선택, API 키 입력, 모델 선택 |
+| `nerdvana providers` | 지원 제공자 목록 |
+| `nerdvana version` | 버전 표시 |
+| `nerdvana update` | 최신 릴리스 설치(사용자 데이터는 건드리지 않음) |
+| `nerdvana doctor` | 설치, 키, 외부 의존성 점검 (`--strict`, `--json`) |
+| `nerdvana serve` | stdio 또는 HTTP MCP 서버로 실행 |
+| `nerdvana acp` | 편집기용 Agent Client Protocol 에이전트로 실행(`acp` extra 필요). [docs/acp.md](docs/acp.md) |
+| `nerdvana review` | 읽기 전용 에이전트로 git 기준점 대비 작업 트리를 리뷰 (`--base`, `--fail-on`). [docs/review.md](docs/review.md) |
+| `nerdvana import claude\|codex` | Claude Code·Codex 명령을 `.nerdvana/commands`로 복사하고 변환한 권한 규칙을 출력 (`--write`로 적용) |
+| `nerdvana context [id]` | 저장된 세션의 컨텍스트 창 사용 내역 (`--top`, `--json`) |
+| `nerdvana cost` | 기간별 토큰 사용량, 캐시 적중률, USD 비용 (`--by provider\|model\|agent\|category\|tool`) |
+| `nerdvana approvals` | 반복 승인에서 `always_allow` 규칙을 제안. 아무것도 쓰지 않음 |
+| `nerdvana history search "<query>"` | 지난 대화 기록 검색 (`--since 7d`, `--cwd .`, `--limit`). [docs/context-history.md](docs/context-history.md) |
 
-이어서 프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`를 읽습니다. 도구가 하위 디렉터리의 파일을 처음 다루면, 그 디렉터리부터 프로젝트 루트 사이에 있는 규칙 파일(`NIRNA.md`, `AGENTS.md`, `CLAUDE.md`)을 가까운 순서로 한 번씩 주입합니다. 세션당 상한은 32KB입니다.
+### 백그라운드 에이전트, 예약 실행, 워크플로
 
-REPL에서 `/init`으로 초안 파일을 만듭니다.
+| 명령 | 용도 |
+|-|-|
+| `nerdvana agents start "<prompt>"` | 터미널을 닫아도 계속 도는 백그라운드 실행 시작 (`--worktree`, `--max-cost-usd`, `--key`) |
+| `nerdvana agents list` | 실행 목록: 상태, 경과 시간, 비용, 마지막 신호 |
+| `nerdvana agents show <id>` | 실행 기록, 로그 끝부분, 결과 |
+| `nerdvana agents attach <id>` | 로그 따라 보기. Ctrl+C는 분리만 함 |
+| `nerdvana agents stop <id>` | 실행 중지 |
+| `nerdvana agents resume <id>` | 고아·중지·실패한 실행을 대화 기록에서 다시 시작 |
+| `nerdvana agents clean` | `--days`일 전에 끝난 실행 기록 삭제(기본 7) |
+| `nerdvana schedule add "<cron or every 15m>" --prompt "..."` | 작업 추가. 따로 정하지 않으면 읽기 전용이며 비용 상한이 있음 |
+| `nerdvana schedule list` | 작업 목록, 다음 실행, 마지막 결과 |
+| `nerdvana schedule remove <name>` | 작업 삭제 |
+| `nerdvana schedule run <name>` | 작업을 지금 한 번 실행 |
+| `nerdvana schedule daemon` | 때가 된 작업을 전경에서 실행(작업별·일별 비용 상한) |
+| `nerdvana schedule install-systemd` | 데몬용 systemd 사용자 유닛 출력 |
+| `nerdvana workflow list` | 프로젝트·사용자·내장 워크플로 목록 |
+| `nerdvana workflow show <name>` | 워크플로 입력과 단계 표시 |
+| `nerdvana workflow run <name>` | 워크플로 실행 (`--input k=v`, `--max-cost-usd`, `--resume <run-id>`) |
 
-## 설정
+안내서: [docs/background.md](docs/background.md), [docs/scheduling.md](docs/scheduling.md), [docs/workflows.md](docs/workflows.md).
 
-### 환경 변수
+### 세션, 메모리, 스킬, MCP, 훅, ACL
 
-제공자와 모델은 `--provider` / `--model` 플래그, `/provider`·`/model` 슬래시 명령어, 또는 설정 파일로 고릅니다.
-둘 다 환경 변수 오버라이드가 없습니다. `NERDVANA_` 접두사는 위의 환경 변수 표에 적힌 스칼라 설정에만 닿습니다.
+| 명령 | 용도 |
+|-|-|
+| `nerdvana session list` | `~/.nerdvana/sessions/`에 저장된 대화 기록 목록 |
+| `nerdvana session resume <id>` | 대화 기록으로 REPL 다시 열기 |
+| `nerdvana session purge` | 저장된 대화 기록 삭제 |
+| `nerdvana memory list` | 프로젝트 메모리 목록 |
+| `nerdvana memory add <text>` | 메모리 기록 |
+| `nerdvana memory remove <id>` | 메모리 하나 삭제 |
+| `nerdvana memory purge` | 선택한 범위의 메모리 전부 삭제 |
+| `nerdvana memory inbox` | 에이전트가 제안한 메모리를 diff와 함께 표시 (`memory.review: true`) |
+| `nerdvana memory approve <id>` | 제안 적용 (`--all`은 전부) |
+| `nerdvana memory reject <id>` | 제안 버림 |
+| `nerdvana memory forget <name>` | 메모리를 삭제하고 감사 기록에 남김 |
+| `nerdvana memory stale` | `--days N`일 동안 쓰지 않은 메모리 목록 (`--remove`로 삭제) |
+| `nerdvana skill list` | 내장·전역·프로젝트 스킬 목록 |
+| `nerdvana skill show <name>` | 스킬 내용 출력 |
+| `nerdvana skill install <source>` | `~/.nerdvana/skills/`에 스킬 설치 |
+| `nerdvana skill remove <name>` | 설치한 스킬 삭제 |
+| `nerdvana skill trust <path>` | 프로젝트 스킬을 승인해 읽을 수 있게 함 |
+| `nerdvana mcp list` | 설정된 MCP 서버 목록 |
+| `nerdvana mcp add <name>` | 서버 항목 추가 |
+| `nerdvana mcp remove <name>` | 서버 항목 삭제 |
+| `nerdvana hook list` | 훅 이벤트 종류 목록 |
+| `nerdvana hook trust <path>` | 프로젝트 훅 승인 |
+| `nerdvana hook revoke <path>` | 프로젝트 훅 승인 취소 |
+| `nerdvana hook trusted` | 승인한 프로젝트 훅 목록, 내용이 바뀐 훅 표시 |
+| `nerdvana hook pre-tool-use` | 다른 에이전트용 훅 브리지: stdin으로 pre-tool-use 이벤트를 받아 stdout으로 응답 |
+| `nerdvana hook post-tool-use` | 훅 브리지: post-tool-use 이벤트 |
+| `nerdvana hook prompt-submit` | 훅 브리지: prompt-submit 이벤트 |
+| `nerdvana admin acl list` | MCP 서버 클라이언트와 역할 목록 |
+| `nerdvana admin acl add <client> <roles>` | 클라이언트 역할 추가·변경 |
+| `nerdvana admin acl revoke <prefix>` | 이름이 접두사와 맞는 클라이언트 권한 취소 |
 
-```bash
-# 실행 위치와 동작
-export NERDVANA_DATA_HOME="$HOME/.nerdvana"   # 사용자 데이터 루트
-export NERDVANA_CONFIG="$HOME/.nerdvana/config.yml"
-export NERDVANA_NO_UPDATE_CHECK=1             # 시작 시 판올림 확인 생략
+안내서: [docs/memory.md](docs/memory.md), [docs/skills.md](docs/skills.md), [docs/hooks.md](docs/hooks.md).
 
-# API 키 (제공자별 자동 감지)
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-export GEMINI_API_KEY="..."
-export GROQ_API_KEY="gsk_..."
-export OPENROUTER_API_KEY="sk-or-..."
-export XAI_API_KEY="xai-..."
-export DEEPSEEK_API_KEY="sk-..."
-export MISTRAL_API_KEY="..."
-export CO_API_KEY="co-..."
-export TOGETHER_API_KEY="..."
-export MOONSHOT_API_KEY="..."
-export DASHSCOPE_API_KEY="..."
-export MINIMAX_API_KEY="..."
-export PERPLEXITY_API_KEY="..."
-export FIREWORKS_API_KEY="..."
-export CEREBRAS_API_KEY="..."
+### REPL 슬래시 명령
 
-# 웹 검색 (없으면 WebSearch 도구가 호출 시점에 오류를 낸다)
-export BRAVE_API_KEY="..."
-```
+| 명령 | 설명 |
+|-|-|
+| `/help` | 도움말 |
+| `/clear` | 대화 화면 지우기 |
+| `/init` | `NIRNA.md` 생성 (별칭 `/setup`) |
+| `/model`, `/models` | 모델 확인·변경, 제공자의 모델 목록 |
+| `/provider` | 제공자 추가·전환 |
+| `/mode` | 모드 프로필 전환 |
+| `/context` | 컨텍스트 창 사용 내역. `/context <name>`은 컨텍스트 프로필 지정 |
+| `/tokens` | 토큰 사용량 |
+| `/tools`, `/skills`, `/mcp` | 도구 목록, 스킬 목록, MCP 서버 상태 |
+| `/memories`, `/memory` | 메모리 목록, 제안 검토 (`inbox`, `approve`, `reject`, `forget`, `stale`) |
+| `/undo`, `/redo`, `/checkpoints` | 편집 git 체크포인트 복원, 재적용, 목록 |
+| `/rewind [N]` | 마지막 N개 프롬프트 이전으로 돌아가고 그 사이 도구 편집을 되돌림 |
+| `/image <path> ... <question>` | 이미지 파일에 대해 질문 |
+| `/history <query>` | 지난 대화 기록 검색 |
+| `/btw <question>` | 대화 기록에 남기지 않는 곁가지 질문 |
+| `/steer <text>` | 진행 중인 단계를 끊고 입력한 글로 이어 감 (Ctrl+T) |
+| `/goal <objective> --verify <command>` | 명령이 통과할 때까지 작업을 이어 감. `pause`, `resume`, `clear` |
+| `/policy` | 적용 중인 관리자 정책 파일 |
+| `/route-knowledge` | 내용에 맞는 메모리 범위 제안 |
+| `/dashboard`, `/health` | 관측 대시보드, 7일간 도구 호출 상태 |
+| `/thinking`, `/activity` | 추론 표시와 활동 표시기 켜고 끄기 |
+| `/update` | 업데이트 확인·설치 (`/update parism`은 Parism 갱신) |
+| `/quit` | 종료 (`/exit`, `/q`) |
 
-### 설정 파일 (`nerdvana.yml`)
+### 내장 도구
 
-```yaml
-model:
-  provider: anthropic              # 또는 openai, gemini, groq, ollama, zai 등
-  model: claude-sonnet-5-5
-  api_key: ""                      # 환경 변수 사용 시 비워둠
-  base_url: ""                     # API 엔드포인트 재정의
-  max_tokens: 8192
-  temperature: 1.0
-  max_retries: 2                   # 일시 오류 시 같은 모델 재시도 횟수
-  prompt_caching: true             # 처리된 프롬프트 앞부분을 요청 사이에 재사용
-  fallback_models:                 # 재시도를 다 쓰면 순서대로 사용
-    - claude-haiku-4-5-20251001
-    - openai:gpt-4.1               # provider:model 이면 제공자도 전환
-  extended_thinking: false         # 선택 사항인 Anthropic 모델에서 사고 기능 켜기 (Claude 5 계열은 기본으로 사고)
-  thinking_budget: 8192            # 수동 예산을 받는 모델(Haiku 4.5)의 사고 토큰 예산
-  show_thinking: true              # 사고 요약을 요청하고 <think>...</think> 블록을 흐린 이탤릭으로 표시 (/thinking 로 토글)
+레지스트리에는 32개 내장 도구가 있습니다. LSP·심볼 도구는 언어 서버가 설치되어 있을 때만, `Parism`은 MCP 패키지에 접근할 수 있을 때만, 외부 프로젝트 도구 3종은 `external_projects_enabled: true`일 때만 나타납니다.
 
-# 제공자별 마지막 사용 모델. /model 과 /provider 가 자동으로 갱신한다.
-model_history: {}
+| 도구 | 유형 | 설명 |
+|-|-|-|
+| `Bash` | Write | 셸 명령 실행 |
+| `FileRead` | Read | `N#hhhhhh` 줄 앵커와 함께 파일을 읽고 다이제스트를 기록 |
+| `FileWrite` | Write | 파일 생성, 또는 이 세션에서 읽은 뒤 바뀌지 않은 파일 덮어쓰기 |
+| `FileEdit` | Write | 문자열 또는 앵커 치환. 읽은 뒤 파일이 바뀌었으면 거부 |
+| `Glob` | Read | 패턴으로 파일 찾기 |
+| `Grep` | Read | 정규식으로 내용 검색 |
+| `run_code` | Read | 읽기 전용 도구를 묶은 샌드박스에서 짧은 Python 프로그램을 실행해, 여러 파일에 걸친 질문을 호출 한 번으로 답함 |
+| `TodoWrite` | Write | 에이전트가 처리할 작업 목록 관리 |
+| `ActivateSkill` | Meta | 카탈로그에서 스킬 지침 불러오기 |
+| `AskUser` | Meta | 추천 답과 함께 사용자에게 질문 |
+| `WebFetch` | Read | URL을 읽기 쉬운 텍스트로 가져오기 |
+| `WebSearch` | Read | Brave 검색 (`BRAVE_API_KEY` 필요) |
+| `Parism` | Write | JSON 출력의 구조화된 셸 실행 (허용 명령 44개) |
+| `Agent` | Write | 서브에이전트를 전경 또는 백그라운드에서 시작 |
+| `Swarm` | Write | 공유 예산 안에서 여러 에이전트를 병렬 실행 |
+| `TaskGet` | Read | 백그라운드 작업의 상태와 결과 |
+| `TaskStop` | Write | 실행 중인 에이전트 작업 취소 |
+| `lsp_diagnostics` | Read | 언어 서버 진단 |
+| `lsp_goto_definition` | Read | 심볼 정의로 이동 |
+| `lsp_find_references` | Read | 심볼 참조 목록 |
+| `lsp_rename` | Write | 워크스페이스 전체 이름 바꾸기 |
+| `symbol_overview` | Read | 파일·디렉터리의 심볼 지도 |
+| `find_symbol` | Read | 이름 경로로 심볼 찾기, 본문 포함 가능 |
+| `find_referencing_symbols` | Read | 심볼을 참조하는 심볼 |
+| `restart_language_server` | Write | 언어 서버 재시작 |
+| `replace_symbol_body` | Write | 심볼 본문 전체 교체 |
+| `insert_before_symbol` | Write | 심볼 앞에 코드 삽입 |
+| `insert_after_symbol` | Write | 심볼 뒤에 코드 삽입 |
+| `safe_delete_symbol` | Write | 참조가 남지 않은 심볼 삭제 |
+| `ListQueryableProjects` | Read | 등록된 외부 프로젝트 목록 |
+| `RegisterExternalProject` | Write | 위임 질의용 외부 프로젝트 등록 |
+| `QueryExternalProject` | Read | 등록된 프로젝트에서 격리된 하위 프로세스로 질의 실행 |
 
-permissions:
-  mode: default                    # default | accept-edits | bypass | plan
-  always_allow: []                 # 도구 이름 또는 glob 패턴, 예: ["FileRead", "lsp_*", "Bash(git status)"]
-  always_deny: []
+### 에이전트 유형
 
-session:
-  persist: true
-  max_turns: 200
-  max_context_tokens: 180000
-  compact_threshold: 0.8           # 컨텍스트 사용률이 임계값 도달 시 자동 압축
-  compact_max_failures: 3          # 압축 연속 실패 허용 횟수 (회로 차단기)
-  planning_gate: false             # 복잡도 기반 Plan 에이전트 선행 실행
-  default_context: standalone      # 기본 런타임 컨텍스트 프로파일 이름
-  default_mode: interactive        # 기본 런타임 모드 이름 (interactive, planning 등)
-  show_activity: true              # ActivityIndicator 위젯 표시 (/activity 로 토글)
-  update_check: true               # 시작 시 새 판 확인 (24시간 캐시)
-  stream_idle_timeout: 300         # 제공자 응답이 이 초 동안 없으면 요청 포기
-  stream_total_timeout: 3600
-  post_edit_diagnostics: true      # 편집 후 언어 서버로 새 오류 확인
-  max_parallel_agents: 5           # 제공자당 동시 서브에이전트 수
+`Agent`와 `Swarm`은 아래 프로필을 씁니다. `*`는 생성·작업 제어·`AskUser`를 뺀 세션의 모든 도구, `@read`는 모든 읽기 전용 도구를 뜻합니다.
 
-skills:
-  include_claude_skills: false     # ~/.claude/skills, ./.claude/skills 도 읽기
+| 에이전트 유형 (agent) | 최대 턴 (max turns) | 허용 도구 | 용도 |
+|-|-|-|-|
+| `general-purpose` | 50 | `*` | 기본 에이전트 |
+| `Explore` | 12 | `Glob`, `Grep`, `FileRead`, `@read` | 읽기 전용 탐색 |
+| `Plan` | 15 | `Glob`, `Grep`, `FileRead`, `@read` | 읽기 전용 계획 |
+| `code-reviewer` | 12 | `FileRead`, `Grep`, `Glob`, `@read` | 쓰기 없는 리뷰 |
+| `git-management` | 20 | `Bash`, `FileRead` | 브랜치, 커밋, 병합 |
+| `test-writer` | 30 | `*` | 시험 작성과 실행 |
 
-agents:
-  categories: {}                   # 서브에이전트 카테고리별 모델 (예: quick: claude-haiku-4-5-20251001)
+서브에이전트는 세션의 언어 서버와 MCP 연결을 함께 쓰고, 같은 권한 정책을 따르며, 다른 에이전트를 시작할 수 없습니다. 사용자 정의 에이전트: [docs/agents.md](docs/agents.md).
 
-goal:
-  verify_timeout: 300              # 검증 명령을 중단하기까지의 초
-  max_attempts: 5                  # 목표를 포기하기까지 허용하는 검증 실패 횟수
-  output_tail_chars: 4000          # 실패한 출력 중 모델에 보여주는 끝부분의 길이
+## 한계
 
-sandbox:
-  mode: off                        # off | auto | require: OS 수준으로 Bash 쓰기 범위 제한 (Linux Landlock)
-  network: true                    # false 면 TCP 연결도 차단 (Linux 6.7 이상)
-  write_paths: []                  # 프로젝트·임시 디렉터리 외에 쓰기를 허용할 경로
-
-checkpoint:
-  enabled: true
-  per_session_max: 50
-
-parism:
-  enabled: true
-  config_path: ""
-  format: json
-  fallback_to_bash: true
-
-hooks:
-  # <cwd>/.nerdvana/hooks/*.py 실행 허용. 켜는 것만으로는 부족하고
-  # ~/.nerdvana/trusted_hooks.json 에 기록된 SHA-256 해시와도 일치해야 한다.
-  allow_project_hooks: false
-
-# ListQueryableProjects / RegisterExternalProject / QueryExternalProject 등록.
-# 등록된 디렉토리를 읽기 가능한 서브프로세스에 넘기므로 기본은 꺼둔다.
-external_projects_enabled: false
-```
-
-설정 검색 순서. 먼저 존재하는 파일 하나만 읽습니다:
-1. `--config` 플래그
-2. `NERDVANA_CONFIG` 환경 변수
-3. `./nerdvana.yml` (현재 디렉토리)
-4. `./nerdvana.yaml` (현재 디렉토리)
-5. `~/.nerdvana/config.yml`
-6. `~/.config/nerdvana-cli/config.yml` (마이그레이션 이전 위치, 하위 호환을 위해 계속 읽음)
-
-### 설정 계층 (`--profile`, `--patch`, `--dump-config`)
-
-실행의 설정은 파일 하나가 아닙니다. 아래 순서로 겹쳐서 적용되고, 뒤에 오는 층이 앞의 층을 덮습니다:
-
-1. 기본 설정 (위의 설정 파일)
-2. 프런트엔드 프로필 — `--profile tui | headless | acp | serve | bench-strict`
-3. 홈 패치 — `~/.nerdvana/nerdvana.patch.yml`
-4. 프로젝트 패치 — `<cwd>/.nerdvana/nerdvana.patch.yml`
-5. 커맨드 라인 — `--patch section.field=value` (반복 가능)
-
-패치 파일은 줄마다 키 하나씩을 담습니다:
-
-```yaml
-session:
-  max_turns: 50
-```
-
-프로필은 권한 모드를 절대 바꾸지 않습니다. 권한 모드는 사용자의 결정이지 프런트엔드의 결정이 아닙니다.
-프로젝트 패치와 커맨드 라인은 `permissions`, `hooks`, `sandbox`, `secrets` 섹션을 바꿀 수 없습니다.
-저장소와 커맨드 라인이 자신이 시작한 실행의 규칙을 느슨하게 만들 수는 없습니다.
-
-`--dump-config`는 실행이 쓰게 될 설정과 각 키가 어느 층에서 왔는지까지 출력합니다.
-의아한 설정은 한 번의 조회로 답을 얻습니다:
-
-```bash
-nerdvana --profile bench-strict --dump-config
-```
-
-자격 증명은 절대 출력하지 않습니다. 값을 담는 필드는 `[set]`으로 표시됩니다.
-
-## 로컬 모델 (Ollama / vLLM)
-
-로컬 서빙 도구를 OpenAI 호환 엔드포인트로 연결합니다. 모델은 미리 내려받아 둡니다.
-
-### Ollama
-
-Ollama는 세 가지 방식으로 연결합니다.
-
-**로컬 (기본값)** — `http://localhost:11434/v1`. API 키와 별도 설정이 필요 없습니다.
-
-```bash
-ollama pull qwen3
-nerdvana --provider ollama --model qwen3
-```
-
-**자체 호스팅** — 다른 호스트의 Ollama 주소를 지정합니다. 대화형 REPL은 `nerdvana.yml`, 단발 실행은 `--set`으로 지정합니다.
-
-```yaml
-# nerdvana.yml
-model:
-  provider: ollama
-  model: qwen3
-  base_url: http://ollama.example.com:11434/v1
-```
-
-```bash
-nerdvana run --provider ollama --model qwen3 \
-  --set model.base_url=http://ollama.example.com:11434/v1 \
-  "이 프로젝트의 구조를 설명해 줘"
-```
-
-**Ollama Cloud** — `https://ollama.com/v1`. `OLLAMA_API_KEY`가 필요합니다.
-
-```bash
-export OLLAMA_API_KEY="your-key"
-nerdvana run --provider ollama --model gpt-oss:120b \
-  --set model.base_url=https://ollama.com/v1 \
-  "최신 로컬 모델의 차이를 정리해 줘"
-```
-
-### vLLM
-
-OpenAI 호환 서버를 띄운 뒤 기본 주소 `http://localhost:8000/v1`로 연결합니다.
-
-```bash
-vllm serve Qwen/Qwen3-32B
-nerdvana --provider vllm --model Qwen/Qwen3-32B
-```
-
-원격 vLLM 서버도 `model.base_url`로 같은 방식으로 지정합니다.
-
-```bash
-nerdvana run --provider vllm --model Qwen/Qwen3-32B \
-  --set model.base_url=http://vllm.example.com:8000/v1 \
-  "이 프로젝트의 테스트를 실행해 줘"
-```
-
-## 개발
-
-```bash
-# 개발 의존성 설치
-pip install -e ".[dev]"
-
-# 테스트 실행
-pytest
-
-# 린트
-ruff check nerdvana_cli/
-
-# 타입 체크
-mypy nerdvana_cli/
-```
+- PyPI에는 배포되지 않습니다. 설치 스크립트나 소스로 설치합니다.
+- LSP·심볼 도구는 해당 언어의 언어 서버가 설치되어 있어야 합니다.
+- 셸 샌드박스와 `run_code`는 Linux Landlock이 필요하고, TCP 차단은 Linux 6.7 이상에서만 됩니다.
+- `--max-cost-usd`는 모델 가격을 알아야 동작합니다. `--max-total-tokens`는 모든 모델에서 동작합니다.
+- 터미널이 없으면 모든 확인 질문은 거부가 됩니다.
 
 ## 문서
 
-| 문서 | 설명 |
+| 주제 | 문서 |
 |-|-|
-| [docs/configuration.md](docs/configuration.md) | 설정 전체 레퍼런스 |
-| [docs/hooks.md](docs/hooks.md) | 훅 이벤트 체계와 브리지 규약 |
-| [docs/managed-policy.md](docs/managed-policy.md) | 관리자가 모든 사용자·프로젝트 설정 위에 두는 기기 단위 설정 |
-| [docs/scheduling.md](docs/scheduling.md) | 예약 실행: 크론과 간격 작업, 데몬, 비용 상한 |
-| [docs/workflows.md](docs/workflows.md) | 선언형 다중 에이전트 워크플로: 단계, 병렬 실행, 교차 검증, 재개, 비용 상한 |
-| [docs/agents.md](docs/agents.md) | 에이전트 타입, 도구 예산, 스웜 패턴 |
-| [docs/architecture.md](docs/architecture.md) | 패키지와 core 하위 패키지, 허용된 의존 방향 |
-| [docs/mcp-quota.md](docs/mcp-quota.md) | MCP 서버 테넌트별 쿼터 스키마 |
-| [docs/testing-live.md](docs/testing-live.md) | 실 제공자 시험 행렬과 비밀값 설정 |
-| [CHANGELOG.md](CHANGELOG.md) | 판올림 기록 |
+| 모든 설정 | [docs/configuration.md](docs/configuration.md) |
+| 헤드리스 실행과 JSON 결과 | [docs/headless.md](docs/headless.md) |
+| 재시도, 대체 모델, 출력 한도 | [docs/recovery.md](docs/recovery.md) |
+| 샌드박스, 비밀값, 보안 정책 | [docs/sandbox.md](docs/sandbox.md), [docs/secret-masking.md](docs/secret-masking.md), [docs/security.md](docs/security.md) |
+| 에이전트, 목표, 조언자 | [docs/agents.md](docs/agents.md), [docs/goals.md](docs/goals.md), [docs/advisor.md](docs/advisor.md) |
+| 관측과 OpenTelemetry | [docs/observability.md](docs/observability.md) |
+| GitHub 댓글 실행 | [docs/github-action.md](docs/github-action.md) |
+| 패키지 구조 | [docs/architecture.md](docs/architecture.md) |
+| 실제 제공자 시험 | [docs/testing-live.md](docs/testing-live.md) |
+| 벤치마크 | [docs/benchmarks/](docs/benchmarks/) |
+| 릴리스 노트 | [CHANGELOG.md](CHANGELOG.md) |
+
+docs 아래 안내서는 영어로 작성되어 있습니다.
+
+## 기여
+
+```bash
+uv sync --extra dev --extra mcp
+pre-commit install
+uv run pytest -m "not lsp_integration and not live" -q
+```
+
+개발 환경과 PR 관문: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 라이선스
 
 MIT
 
-## 작성자
+---
 
-최진호 (jinho@nerdvana.kr)
+<p align="center">
+  Made by <a href="mailto:jinho.von.choi@nerdvana.kr">Jinho Choi</a> &nbsp;|&nbsp;
+  <a href="https://buymeacoffee.com/jinho.von.choi">Buy me a coffee</a>
+</p>

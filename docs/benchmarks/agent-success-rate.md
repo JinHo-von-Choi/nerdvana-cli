@@ -168,7 +168,7 @@ lessons reached a test task.
 | without the library | 22/24 (92%) | 0.67 | 97,309 | $0.0109 |
 | with the library | 17/24 (71%) | 0.33 | 215,509 (+121.5%) | $0.0239 (+119.9%) |
 
-The plan wanted the test half's pass^4 to be 10 points or more higher with the library.
+The target was for the test half's pass^4 to be 10 points or more higher with the library.
 It was 33 points lower, and the difference in pass rate is -20.8 points with a 95
 percent bootstrap interval of -0.542 to +0.125: the interval contains zero, so at 6
 tasks and 4 attempts the two runs cannot be told apart. Per task, one task gained
@@ -183,7 +183,7 @@ for a different concern. And the inherited lessons sit in the always-on context 
 every request, so the run starts from more text and reads more: the mean attempt
 more than doubled its input tokens and its cost.
 
-What this says about the plan: the recursion works -- the model writes real, general,
+What this says about the target: the recursion works -- the model writes real, general,
 domain-level lessons on its own, and they are kept and handed over -- but handing a
 task the whole shelf of its domain is not the same as handing it the lesson it needs.
 The measurement also cannot say much at this size: 6 test tasks means one task is
@@ -217,8 +217,8 @@ of 4, is 4 of 4 under the menu, and `fix-js-median` is 4 of 4 against the shelf'
 121.5 percent, and it buys back the passes the shelf lost.
 
 What it does not do is raise the pass rate. The menu is level with the baseline, and
-the interval contains zero, so the two cannot be told apart at 6 tasks. The plan
-wanted 10 points more; the honest reading is that the library now costs little and
+the interval contains zero, so the two cannot be told apart at 6 tasks. The target
+was 10 points more; the honest reading is that the library now costs little and
 does nothing measurable for the pass rate -- which is a different statement from the
 one the shelf gave, and a better place to start from.
 
@@ -444,7 +444,7 @@ The harness work since 1.9.1 was measured on the eight long tasks, 4 attempts ea
 | + SpillPolicy + PTC (`6607ab0`) | 18/32 | 577,291 (+54.8%) | $0.0525 | 22.6 | 21,139 |
 | HEAD (`57727d6`) | 19/32 | 522,464 (+40.1%) | $0.0475 | 20.3 | 21,134 |
 
-The plan wanted the mean input tokens to fall by 30 percent or more with the SpillPolicy and the PTC runtime. They did not: they rose by 54.8 percent. The two features are worth separating, because they do different things.
+The target was for the mean input tokens to fall by 30 percent or more with the SpillPolicy and the PTC runtime. They did not: they rose by 54.8 percent. The two features are worth separating, because they do different things.
 
 The SpillPolicy does what it was built for: a tool result that would have been inlined whole is previewed and spilled, and the request that carries it is 13 percent smaller. That saving does not reach the attempt, because the agent took more turns (14.8 against 13.1), and every turn sends the whole conversation again. The two effects nearly cancel: 8.9 percent less per attempt, against 13.0 percent less per request.
 
@@ -452,7 +452,7 @@ The PTC runtime is what turns the number around. It gives the agent a way to run
 
 No pair of the four builds can be told apart on the pass rate. Every difference has a 95 percent bootstrap interval that contains zero, and the largest is the SpillPolicy against 1.9.1 at +3.1 points (-0.250 to +0.312). A single model on 32 attempts over 8 tasks is a weak instrument: it shows that the pass rate did not fall, and it cannot rule out a fall of a few points.
 
-What this says about the plan: the SpillPolicy's claim is about a request, and it holds. The claim of a 30 percent cut to an attempt was a claim about the whole run, and it needs the agent to take fewer turns, not the same turns with a smaller body. The PTC runtime makes the agent take more turns, and its value has to be paid for somewhere else.
+What this says about the target: the SpillPolicy's claim is about a request, and it holds. The claim of a 30 percent cut to an attempt was a claim about the whole run, and it needs the agent to take fewer turns, not the same turns with a smaller body. The PTC runtime makes the agent take more turns, and its value has to be paid for somewhere else.
 
 Each arm is a build of this repository run from a worktree of its own commit, so the four numbers come from four trees:
 
@@ -468,7 +468,7 @@ uv run python scripts/bench_compare.py /tmp/gate4/long-ccfa23e.jsonl /tmp/gate4/
 
 ## The same comparison on the short tasks
 
-The long tasks are the hard end of the benchmark. The short tasks are the other end: twenty tasks, each a fix, a test or a small feature, most of them a handful of turns. The harness work was measured on the long ones, where the plan wanted the tokens of an attempt to fall by 30 percent. It was measured here as well, to see what the same work does to a run that is small enough for the extra turns to be cheap.
+The long tasks are the hard end of the benchmark. The short tasks are the other end: twenty tasks, each a fix, a test or a small feature, most of them a handful of turns. The harness work was measured on the long ones, where the target was for the tokens of an attempt to fall by 30 percent. It was measured here as well, to see what the same work does to a run that is small enough for the extra turns to be cheap.
 
 The same two builds, the same twenty task files, the same fixtures, MiniMax-M3.1-Flash-Preview, 4 attempts per task, 80 attempts per arm.
 
@@ -598,7 +598,7 @@ The interface of the PTC runtime was fixed -- the description now says what the 
 | before (`c9723ae`) | 9 | 8 | 45.3 | 1,707,948 | $0.1580 |
 | after (`24a8476`) | 10 | 10 | 39.3 | 1,309,829 | $0.1085 |
 
-Paired by task, the difference is **-11.6 turns** (95% bootstrap interval -53.4 to +30.1) and **-704,650 input tokens** (-2,915,280 to +1,505,979). Both intervals contain zero, and both are wider than the effect the plan was asking about. The two runs cannot be told apart.
+Paired by task, the difference is **-11.6 turns** (95% bootstrap interval -53.4 to +30.1) and **-704,650 input tokens** (-2,915,280 to +1,505,979). Both intervals contain zero, and both are wider than the effect being looked for. The two runs cannot be told apart.
 
 That is what this instrument can say, and it is worth being plain about how little it is. The sweep was stopped at nine and ten attempts over two of the eight tasks, because the attempts of the second task -- the one with the many look-alike modules -- take fifteen to thirty minutes each, and the paired interval on the turns is already +-50 at this size. A third of a turn is what the 32-attempt measurement of the four builds could resolve; this one resolves nothing about the cost.
 

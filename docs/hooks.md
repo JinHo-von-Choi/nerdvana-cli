@@ -130,7 +130,7 @@ When `FileRead`, `FileEdit` or `FileWrite` first touches a file in a subdirector
 
 ## Command hooks
 
-Shell commands can be declared without writing Python, in `~/.nerdvana/hooks.yml` and `<project>/.nerdvana/hooks.yml`; see "Custom Commands and Command Hooks" in the README for the format. Each entry names an event (`before_tool`, `after_tool`, `session_start`, `session_end`, `permission_denied`, `pre_compact`, `post_compact`, `pre_model_switch`, `post_model_switch` or `instructions_loaded`), an optional `match` glob on the tool name (the tool events `before_tool`, `after_tool` and `permission_denied` only), a `command` and a `timeout`.
+Shell commands can be declared without writing Python, in `~/.nerdvana/hooks.yml` and `<project>/.nerdvana/hooks.yml`. Each entry names an event (`before_tool`, `after_tool`, `session_start`, `session_end`, `permission_denied`, `pre_compact`, `post_compact`, `pre_model_switch`, `post_model_switch` or `instructions_loaded`), an optional `match` glob on the tool name (the tool events `before_tool`, `after_tool` and `permission_denied` only), a `command` and a `timeout`.
 
 The command receives one JSON object on standard input: `event`, `cwd`, then `tool_name` and `tool_input` for the three tool events, a shortened `tool_result` for `after_tool`, and `details` (the `extra` keys of the table above) for `permission_denied`, `pre_compact`, `post_compact`, `pre_model_switch`, `post_model_switch` and `instructions_loaded`.
 
@@ -144,10 +144,14 @@ An exit code of 2 means:
 | `pre_compact` | Cancels this compaction, the output is the reason. |
 | every other event | Ignored. |
 
-Exit code 0 carries on, and every other outcome (another exit code, a timeout, a command that cannot start) is logged and ignored. A project `hooks.yml` is subject to the same opt-in and digest approval as project Python hooks.
+Exit code 0 carries on, and every other outcome (another exit code, a timeout, a command that cannot start) is logged and ignored, so a broken hook never stops the agent. The command runs in the project directory with `NERDVANA_HOOK_EVENT` and `NERDVANA_TOOL_NAME` set, and the agent waits for it, so keep hooks fast. A project `hooks.yml` is subject to the same opt-in and digest approval as project Python hooks: `hooks.allow_project_hooks: true` and `nerdvana hook trust <path>`; editing the file revokes the approval.
 
 ```yaml
 hooks:
+  - event: before_tool        # see the event list above
+    match: "Bash"             # tool name glob for the tool events, default "*"
+    command: "scripts/check-command.sh"
+    timeout: 5                # seconds, 1 to 30
   - event: permission_denied
     match: "Bash"
     command: "scripts/explain-denial.sh"   # prints a sentence on stdout and exits 2: the model reads it next to the refusal

@@ -1,8 +1,5 @@
 # Provider Compatibility
 
-Author: 최진호
-Created: 2026-10-03
-
 `nerdvana` names 21 providers and talks to them through three adapters. This page states what each adapter and each family supports. Every row is a fact read from the code in `nerdvana_cli/providers/` and pinned by a test in `tests/providers/` (mainly `test_provider_contract.py`, which replays one scenario against every adapter, and `test_openai_responses.py`). Where a fact could only be checked against the vendor documentation and not against a live API, the last section says so.
 
 ## Which adapter serves which provider
