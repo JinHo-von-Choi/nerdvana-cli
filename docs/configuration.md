@@ -146,6 +146,7 @@ Every tool call goes through one policy, in this order: `always_deny`, tools exc
 | `default_context` | str | `"standalone"` | Default runtime context profile name |
 | `default_mode` | str | `"interactive"` | Default runtime mode name (`interactive`, `planning`, etc.) |
 | `show_activity` | bool | `true` | Show the live ActivityIndicator widget between the chat log and the input row. Toggled via `/activity on|off`. |
+| `statusline_command` | string | `""` | Shell command run in the project directory after every response; it receives `{"model", "provider", "cwd", "session_id", "input_tokens", "output_tokens", "cost_usd"}` as JSON on stdin, and the first line it prints (up to 120 characters) is shown at the end of the TUI status bar. A command that fails or takes more than 2 seconds shows nothing. |
 | `stream_idle_timeout` | float | `300.0` | Seconds a provider stream may stay silent before the request is abandoned and treated as a transient failure. `0` disables. |
 | `stream_total_timeout` | float | `3600.0` | Seconds one response may take in total. `0` disables. |
 | `post_edit_diagnostics` | bool | `true` | After a file or symbol edit, ask the running language server for errors and append only the errors the edit introduced to the tool result. |

@@ -481,6 +481,25 @@ class NerdvanaApp(App[object]):
         shown = thinking if getattr(self.settings.model, "show_thinking", True) else ""
         self._mount_chat(ChatMessage(answer_renderable(text, shown), raw_text=text))
 
+    def _refresh_statusline(self) -> None:
+        """Run session.statusline_command in the background and show its output in the status bar."""
+        command = self.settings.session.statusline_command
+        loop    = self._agent_loop
+        if not command or loop is None:
+            return
+        payload = {
+            "model": self.settings.model.model, "provider": self.settings.model.provider, "cwd": self.settings.cwd,
+            "session_id": loop.session.session_id, "input_tokens": loop.state.usage.input_tokens,
+            "output_tokens": loop.state.usage.output_tokens, "cost_usd": loop.total_cost_usd(),
+        }
+
+        async def show() -> None:
+            from nerdvana_cli.ui.statusline import run_statusline
+
+            self.query_one("#status-bar", StatusBar).set_extra(await run_statusline(command, payload, self.settings.cwd))
+
+        self._statusline_task = asyncio.create_task(show())
+
     def _mount_chat(self, msg: ChatMessage) -> None:
         chat_frame = self.query_one("#chat-frame", VerticalScroll)
         streaming  = self.query_one("#streaming-output", StreamingOutput)

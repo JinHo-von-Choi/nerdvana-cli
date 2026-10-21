@@ -189,6 +189,7 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         )
 
         status_bar.update_status(**_status_fields(app, usage))
+        app._refresh_statusline()
     except asyncio.CancelledError:
         # CancelledError derives from BaseException, so the handler below never
         # sees it. Without this branch a cancelled worker leaks the timer task,

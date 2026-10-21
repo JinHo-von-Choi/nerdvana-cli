@@ -188,6 +188,9 @@ class SessionConfig(BaseModel):
     default_mode:    str = "interactive"
     show_activity:   bool = True
     update_check:    bool = True  # startup new-version check (cached, 24h TTL)
+    # Shell command whose first output line the TUI shows at the end of the status bar; it gets the
+    # session as JSON on stdin after every response. Empty = none.
+    statusline_command: str = ""
     # Provider stream limits in seconds; 0 disables. Idle is the longest gap
     # between two events, total the longest single response.
     stream_idle_timeout:  float = 300.0

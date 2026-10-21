@@ -181,6 +181,9 @@ class _App:
     def _drain_queued_input(self) -> None:
         return None
 
+    def _refresh_statusline(self) -> None:
+        return None
+
     def _after_response(self) -> None:
         return None
 

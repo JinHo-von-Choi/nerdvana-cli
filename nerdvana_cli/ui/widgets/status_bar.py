@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from rich.text import Text
 from textual.widgets import Static
 
 
 class StatusBar(Static):
     """Bottom status bar showing model, tokens, session info."""
+
+    # The output of session.statusline_command, shown last; empty without one.
+    extra: str = ""
+    _last: dict[str, Any] | None = None
+
+    def set_extra(self, text: str) -> None:
+        """Show *text* at the end of the bar and redraw it with the last values."""
+        self.extra = text
+        self.update_status(**(self._last or {}))
 
     def update_status(
         self,
@@ -20,6 +32,10 @@ class StatusBar(Static):
         elapsed_s: float = 0.0,
         cache_read: int = 0,
     ) -> None:
+        self._last = {
+            "model": model, "provider": provider, "tokens_in": tokens_in, "tokens_out": tokens_out, "tools": tools,
+            "parism": parism, "thinking": thinking, "elapsed_s": elapsed_s, "cache_read": cache_read,
+        }
         parts: list[str] = []
         if thinking:
             elapsed_str = f"{elapsed_s:.1f}s" if elapsed_s < 60 else f"{elapsed_s / 60:.1f}m"
@@ -38,4 +54,6 @@ class StatusBar(Static):
             if parism:
                 tool_text += " (Parism)"
             parts.append(tool_text)
-        self.update(" | ".join(parts) if parts else "Ready")
+        if self.extra:
+            parts.append(self.extra)
+        self.update(Text(" | ".join(parts) if parts else "Ready"))
