@@ -390,6 +390,48 @@ async def test_a_program_that_prints_a_lot_does_not_stall() -> None:
     assert len(result.stdout) <= 8_100
 
 
+@needs_landlock
+async def test_what_a_program_prints_comes_back_as_text() -> None:
+    """The output of a program is text, not the bytes of a pipe.
+
+    The runtime reads the pipes of the sandbox as bytes. Handing those bytes on
+    as they were made the result unreadable -- and joining them to the text of
+    the other pipe raised, so a program that printed anything came back as a
+    tool error and the model never saw what it had computed.
+    """
+    runtime = await _runtime()
+
+    result = await runtime.run("print('the answer is 42')")
+
+    assert result.ok
+    assert result.stdout == "the answer is 42\n"
+    assert "b'" not in result.stdout
+
+
+@needs_landlock
+async def test_a_long_output_comes_back_as_text_too() -> None:
+    """The tail of a long output is text as well."""
+    runtime = await _runtime()
+
+    result = await runtime.run("print('y' * 200000)")
+
+    assert result.ok
+    assert isinstance(result.stdout, str)
+    assert "characters omitted" in result.stdout
+    assert "b'" not in result.stdout
+
+
+@needs_landlock
+async def test_a_program_that_prints_nothing_leaves_the_output_empty() -> None:
+    runtime = await _runtime()
+
+    result = await runtime.run("'the answer is 42'")
+
+    assert result.ok
+    assert result.stdout == ""
+    assert result.value == "the answer is 42"
+
+
 # The description of the tool
 # ---------------------------------------------------------------------------
 

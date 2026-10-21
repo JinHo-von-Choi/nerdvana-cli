@@ -296,13 +296,19 @@ class PtcRuntime:
         await writer.drain()
 
     async def _drain(self, stream: Any) -> str:
-        """Everything a pipe of the sandbox holds, read without blocking the loop."""
+        """Everything a pipe of the sandbox holds, read without blocking the loop.
+
+        The pipe holds bytes and the result holds text, so the bytes are decoded
+        here: a program that printed something has to have its output come back
+        as something the model can read.
+        """
         if stream is None:
             return ""
         try:
-            return await asyncio.to_thread(stream.read)
+            raw = await asyncio.to_thread(stream.read)
         except (OSError, ValueError):
             return ""
+        return bytes(raw).decode("utf-8", errors="replace")
 
     async def _watch_abort(self, abort: asyncio.Event | None, process: subprocess.Popen[bytes]) -> None:
         """End the run as soon as *abort* is set."""
