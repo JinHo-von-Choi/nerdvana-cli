@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-10-22
+
 ### Changed
 
 - `AgentLoop` takes its front-end callbacks as one `LoopCallbacks` object (`on_activity_change`, `on_thinking_chunk`, `on_ask_user`, `on_confirm`) instead of four keyword arguments.
