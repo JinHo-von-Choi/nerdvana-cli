@@ -140,6 +140,7 @@ def _options() -> argparse.Namespace:
     return argparse.Namespace(
         approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="",
         isolate=False, no_network=False, library=None, learn=False,
+        library_mode="menu", library_top=3,
         method=bench.BenchMethod.parse("single"), substrate=bench.BenchSubstrate.parse("loop"),
     )
 
@@ -536,8 +537,52 @@ def test_a_task_starts_from_what_its_domain_learned(monkeypatch: pytest.MonkeyPa
 
     bench.run_attempt(_sum_range(), 1, options, tmp_path)
 
+    workdir = tmp_path / "sum-range-1"
+    seen = (workdir / "seen.txt").read_text(encoding="utf-8")
+    # the menu names the lesson and says where it is; the lesson itself is a
+    # file the task may read
+    assert "- `x` -- d" in seen
+    assert "the lesson" not in seen
+    assert (workdir / ".nerdvana/skills/x/SKILL.md").is_file()
+
+
+def test_the_shelf_hands_the_lesson_over_whole(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    _library(library).add(
+        "t0",
+        harness={".nerdvana/skills/x/SKILL.md": "---\nname: x\ndescription: d\n---\n\nthe lesson\n"},
+        experience=ExperienceNote(cue="c", lesson="l", evidence="e"),
+    )
+    options = _options()
+    options.library      = library
+    options.library_mode = "shelf"
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", SEEKER])
+
+    bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
     seen = (tmp_path / "sum-range-1" / "seen.txt").read_text(encoding="utf-8")
     assert "the lesson" in seen
+
+
+def test_the_menu_does_not_hand_over_the_scripts_of_another_task(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    _library(library).add(
+        "t0",
+        harness={
+            ".nerdvana/skills/x/SKILL.md": "---\nname: x\ndescription: d\n---\n\nthe lesson\n",
+            "scripts/check_other.py": "print('other')\n",
+        },
+        experience=ExperienceNote(cue="c", lesson="l", evidence="e"),
+    )
+    options = _options()
+    options.library = library
+    monkeypatch.setattr(bench, "agent_command", lambda t, o: [sys.executable, "-c", SEEKER])
+
+    bench.run_attempt(_sum_range(), 1, options, tmp_path)
+
+    workdir = tmp_path / "sum-range-1"
+    assert not (workdir / "scripts" / "check_other.py").exists()
+    assert (workdir / ".nerdvana/skills/x/SKILL.md").is_file()
 
 
 def test_a_task_that_passed_leaves_what_it_learned_in_the_library(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

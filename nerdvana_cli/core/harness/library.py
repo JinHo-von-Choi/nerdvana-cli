@@ -156,6 +156,21 @@ class DomainLibrary:
                 found.append((task_id, note))
         return found
 
+    def entries(self) -> list[LibraryEntry]:
+        """The kept experiences of this domain, with their trees."""
+        found: list[LibraryEntry] = []
+        for task_id in self.retained_ids():
+            note = self.load_note(task_id)
+            if note is None:
+                continue
+            found.append(LibraryEntry(
+                task_id    = task_id,
+                harness    = self.load_tree(task_id),
+                experience = note,
+                retained   = True,
+            ))
+        return found
+
     def inherited_tree(self) -> HarnessTree:
         """The tree the next task of this domain starts from.
 

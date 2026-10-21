@@ -37,6 +37,7 @@ def _options() -> argparse.Namespace:
     return argparse.Namespace(
         approval_mode="yolo", sandbox="require", gate=False, set=[], model="", provider="",
         isolate=False, no_network=False, library=None, learn=False,
+        library_mode="menu", library_top=3,
         method=bench.BenchMethod.parse("single"), substrate=bench.BenchSubstrate.parse("loop"),
     )
 

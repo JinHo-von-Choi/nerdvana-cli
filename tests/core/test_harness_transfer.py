@@ -10,13 +10,16 @@ from pathlib import Path
 
 import pytest
 
+from nerdvana_cli.core.harness.library import ExperienceNote, LibraryEntry
 from nerdvana_cli.core.harness.transfer import (
     LOCAL_INSTRUCTIONS,
     MAX_INSTRUCTION_CHARS,
     changed_tree,
+    give_menu,
     give_tree,
     read_tree,
     render_instructions,
+    render_menu,
 )
 
 # A tree as the library holds it: a skill and a helper script.
@@ -129,3 +132,64 @@ def test_the_paths_that_were_written_are_named(tmp_path: Path) -> None:
 
     assert ".nerdvana/skills/py-slug/SKILL.md" in written
     assert "scripts/check_slug.py" in written
+
+
+# ---------------------------------------------------------------------------
+# The menu
+# ---------------------------------------------------------------------------
+
+
+def _entry(name: str, description: str, *extra: str) -> LibraryEntry:
+    """A stored experience with one skill in it."""
+    return LibraryEntry(
+        task_id = name,
+        harness = {
+            f".nerdvana/skills/{name}/SKILL.md": f"---\nname: {name}\ndescription: {description}\n---\n\nthe lesson\n",
+            **dict.fromkeys(extra, "print('x')\n"),
+        },
+        experience = ExperienceNote(cue="c", lesson="l", evidence="e"),
+    )
+
+
+def test_the_menu_names_every_lesson_once_with_the_situation_it_applies_to() -> None:
+    entries = [
+        _entry("a", "use when a page count is one short"),
+        _entry("a", "use when a page count is one short"),
+        _entry("b", "use when a parser splits on every separator"),
+    ]
+
+    menu = render_menu(entries)
+
+    assert menu.count("`a`") == 1
+    assert "use when a page count is one short" in menu
+    assert "use when a parser splits on every separator" in menu
+
+
+def test_the_files_bundled_with_a_skill_are_not_lessons_of_their_own() -> None:
+    entries = [_entry("a", "use when a page count is one short", ".nerdvana/skills/a/scripts/check.py")]
+
+    menu = render_menu(entries)
+
+    assert "`scripts`" not in menu
+    assert menu.count("- `") == 1
+
+
+def test_the_menu_of_a_domain_that_holds_nothing_is_empty() -> None:
+    assert render_menu([]) == ""
+
+
+def test_the_menu_is_handed_over_with_the_lessons_it_names(tmp_path: Path) -> None:
+    written = give_menu([_entry("a", "use when a page count is one short")], tmp_path)
+
+    assert ".nerdvana/skills/a/SKILL.md" in written
+    assert LOCAL_INSTRUCTIONS in written
+    assert "use when a page count is one short" in (tmp_path / LOCAL_INSTRUCTIONS).read_text(encoding="utf-8")
+
+
+def test_the_menu_does_not_hand_over_the_scripts_of_another_task(tmp_path: Path) -> None:
+    entries = [_entry("a", "use when a page count is one short", "scripts/check_other.py")]
+
+    give_menu(entries, tmp_path)
+
+    assert not (tmp_path / "scripts" / "check_other.py").exists()
+    assert (tmp_path / ".nerdvana/skills/a/SKILL.md").is_file()

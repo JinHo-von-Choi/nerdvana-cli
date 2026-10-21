@@ -73,7 +73,14 @@ from nerdvana_cli.core.harness.bench_spec import (
 from nerdvana_cli.core.harness.library import DomainLibrary, ExperienceNote
 from nerdvana_cli.core.harness.ppc import AnonymizedSelector, AnonymousCandidate, Candidate
 from nerdvana_cli.core.harness.surface import NERDVANA_SURFACE
-from nerdvana_cli.core.harness.transfer import changed_tree, give_tree, read_tree
+from nerdvana_cli.core.harness.transfer import (
+    changed_tree,
+    front_matter_fields,
+    give_menu,
+    give_tree,
+    read_tree,
+    tree_of,
+)
 from nerdvana_cli.core.safety.sandbox import landlock_abi
 
 DEFAULT_MAX_TURNS    = 30
@@ -736,8 +743,9 @@ def _keep_learning(task: Task, attempt: Attempt, options: argparse.Namespace) ->
 def _experience_note(task: Task, library: DomainLibrary, attempt: Attempt) -> ExperienceNote:
     """The note that goes with what the task learned.
 
-    The note names the domain and not the task: a lesson that names one task
-    is not one the next task of the domain can use.
+    The note names the situation and not the task: a lesson that names one task
+    is not one the next task of the domain can use, and the library matches a
+    lesson against a task by the situation it applies to.
     """
     domain = library.domain
     skills = sorted(path for path in attempt.harness if path.startswith(".nerdvana/skills/"))
@@ -748,8 +756,16 @@ def _experience_note(task: Task, library: DomainLibrary, attempt: Attempt) -> Ex
     if scripts:
         kept.append("the helper scripts " + ", ".join(scripts))
     lesson = "What made it work: " + ("; ".join(kept) if kept else "what the agent left behind") + "."
+
+    situations = [
+        fields["description"]
+        for path, content in sorted(attempt.harness.items())
+        for fields in [front_matter_fields(content)]
+        if fields.get("description")
+    ]
+    cue = f"a {domain} task: " + ("; ".join(situations) if situations else "a task of the kind the domain holds")
     return ExperienceNote(
-        cue      = f"a task of the {domain} domain",
+        cue      = cue,
         lesson   = lesson,
         evidence = f"the verify command passed on a {domain} task; the harness is kept whole.",
     )
@@ -792,10 +808,21 @@ def run_candidate(
 
 
 def _give_harness(task: Task, workdir: Path, options: argparse.Namespace) -> dict[str, str]:
-    """Give the run the harness its domain learned; returns the tree it started from."""
+    """Give the run the harness its domain learned; returns the tree it started from.
+
+    Two ways to hand it over. The shelf gives the run everything the domain
+    holds, inlined as instructions -- the way the first measurement was made,
+    and the way it found the shelf unhelpful. The menu gives the run the
+    lessons as the files they are and a list of them to choose from, so the
+    task reads the one that applies to it and the rest costs it nothing.
+    """
     library = _library_of(options, task)
     if library is not None:
-        give_tree(library.inherited_tree(), workdir)
+        entries = library.entries()
+        if options.library_mode == "menu":
+            give_menu(entries, workdir)
+        else:
+            give_tree(tree_of(entries), workdir)
     return read_tree(workdir)
 
 
@@ -876,6 +903,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--source", default="", help="where the tasks of an external benchmark are")
     parser.add_argument("--results-dir", type=Path, default=None, help="the directory the results are kept in; one made with another configuration is not continued")
     parser.add_argument("--library", type=Path, default=None, help="the directory the domain library is kept in; a task starts from what its domain learned")
+    parser.add_argument("--library-mode", choices=("menu", "shelf"), default="menu", help="how the domain's lessons reach a task: 'menu' offers them and lets the task choose, 'shelf' hands over all of them")
     parser.add_argument("--learn", action="store_true", help="let a task leave behind what it learned, so the next task of its domain starts from it (needs --library)")
     parser.add_argument("--set", action="append", default=[], metavar="SECTION.FIELD=VALUE", help="override a setting in every attempt (nerdvana run --set), e.g. to compare compaction thresholds")
     parser.add_argument("--gate", action="store_true", help="hold the agent to each task's verify command (nerdvana run --verify) instead of checking only afterwards")
@@ -921,6 +949,7 @@ def runmark_settings(options: argparse.Namespace) -> dict[str, Any]:
         "k":        options.k,
         "learn":    options.learn,
         "library":  str(options.library) if options.library else "",
+        "library_mode": options.library_mode,
         "model":    options.model,
         "network":  not options.no_network,
         "provider": options.provider,
