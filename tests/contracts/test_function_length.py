@@ -40,7 +40,6 @@ KNOWN_LONG: dict[str, int] = {
     "tools/external_project_tools.py:RegisterExternalProjectTool._safe_resolve": 68,
     "codeintel/code_editor.py:CodeEditor.prepare_insert_after": 67,
     "tools/file_tools.py:FileReadTool.call": 64,
-    "tools/search_tools.py:GrepTool.call": 62,
     "utils/path.py:safe_makedirs": 62,
 }
 

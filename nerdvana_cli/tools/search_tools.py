@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import os
+import re
+from collections.abc import Iterator
 from typing import Any, ClassVar
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
@@ -133,49 +136,14 @@ Examples:
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
 
-            import re
-
-            flags = 0 if args.case_sensitive else re.IGNORECASE
-            regex = re.compile(args.pattern, flags)
-
-            search_path = os.path.join(context.cwd, args.path)
-            results: list[str] = []
-            files_with_matches: set[str] = set()
-            match_count = 0
-
-            for root, dirs, files in os.walk(search_path):
-                dirs[:] = [d for d in dirs if not d.startswith(".")]
-                for name in files:
-                    if args.include and not fnmatch.fnmatch(name, args.include):
-                        continue
-
-                    filepath = os.path.join(root, name)
-                    rel_path = os.path.relpath(filepath, context.cwd)
-
-                    # Open through the O_NOFOLLOW walk so a symlink planted
-                    # inside cwd cannot make the reader follow it out of the
-                    # sandbox. A symlinked component raises ELOOP and the
-                    # entry is skipped, exactly as an unreadable file is.
-                    try:
-                        fd = safe_open_fd(rel_path, context.cwd, os.O_RDONLY)
-                    except OSError:
-                        continue
-
-                    try:
-                        with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
-                            for line_num, line in enumerate(f, 1):
-                                if regex.search(line):
-                                    match_count += 1
-                                    files_with_matches.add(rel_path)
-                                    if match_count <= 100:
-                                        results.append(f"{rel_path}:{line_num}: {line.rstrip()}")
-                    except OSError:
-                        continue
-
+            regex = re.compile(args.pattern, 0 if args.case_sensitive else re.IGNORECASE)
+            # The walk and the reads block, so they run off the event loop.
+            match_count, file_count, results = await asyncio.to_thread(
+                _grep, os.path.join(context.cwd, args.path), context.cwd, regex, args.include,
+            )
             if match_count == 0:
                 return ToolResult(tool_use_id="", content=f"No matches found for pattern: {args.pattern}")
 
-            file_count = len(files_with_matches)
             header = f"Found {match_count} match(es) in {file_count} file(s):\n"
             return ToolResult(tool_use_id="", content=self.truncate_result(header + "\n".join(results)))
 
@@ -183,3 +151,49 @@ Examples:
             return ToolResult(tool_use_id="", content=f"Invalid regex pattern: {e}", is_error=True)
         except Exception as e:
             return ToolResult(tool_use_id="", content=f"Error in grep search: {e}", is_error=True)
+
+
+_GREP_SHOWN_MATCHES = 100
+
+
+def _searched_files(search_path: str, cwd: str, include: str) -> Iterator[str]:
+    """Paths relative to *cwd* of the files under *search_path*, hidden directories skipped."""
+    for root, dirs, files in os.walk(search_path):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for name in files:
+            if not include or fnmatch.fnmatch(name, include):
+                yield os.path.relpath(os.path.join(root, name), cwd)
+
+
+def _matching_lines(rel_path: str, cwd: str, regex: re.Pattern[str]) -> Iterator[tuple[int, str]]:
+    """Line numbers and lines of *rel_path* that match; an unreadable file has none.
+
+    The file is opened through the O_NOFOLLOW walk so a symlink planted inside cwd
+    cannot make the reader follow it out of the sandbox: a symlinked component
+    raises ELOOP and the file is skipped, exactly as an unreadable file is.
+    """
+    try:
+        fd = safe_open_fd(rel_path, cwd, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
+            for line_num, line in enumerate(f, 1):
+                if regex.search(line):
+                    yield line_num, line.rstrip()
+    except OSError:
+        return
+
+
+def _grep(search_path: str, cwd: str, regex: re.Pattern[str], include: str) -> tuple[int, int, list[str]]:
+    """Total matches, files with a match, and the first matches formatted as ``path:line: text``."""
+    match_count = 0
+    files_with_matches: set[str] = set()
+    results: list[str] = []
+    for rel_path in _searched_files(search_path, cwd, include):
+        for line_num, line in _matching_lines(rel_path, cwd, regex):
+            match_count += 1
+            files_with_matches.add(rel_path)
+            if match_count <= _GREP_SHOWN_MATCHES:
+                results.append(f"{rel_path}:{line_num}: {line}")
+    return match_count, len(files_with_matches), results
