@@ -19,7 +19,7 @@ from nerdvana_cli.providers.anthropic_features import (
     supports_compaction,
     with_beta,
 )
-from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName, usage_payload
 from nerdvana_cli.providers.errors import error_fields
 from nerdvana_cli.types import ToolSpec
 
@@ -67,17 +67,11 @@ def _usage_dict(usage: Any, output_tokens: int | None = None) -> dict[str, int]:
     fresh = _count(usage, "input_tokens")
     write = _count(usage, "cache_creation_input_tokens")
     read  = _count(usage, "cache_read_input_tokens")
-    result = {
-        "input_tokens":  fresh + write + read,
-        "output_tokens": _count(usage, "output_tokens") if output_tokens is None else output_tokens,
-    }
-    if read:
-        result["cache_read_tokens"] = read
-    if write:
-        result["cache_write_tokens"] = write
-    if thinking := _thinking_tokens(usage):
-        result["thinking_tokens"] = thinking
-    return result
+    return usage_payload(
+        fresh + write + read,
+        _count(usage, "output_tokens") if output_tokens is None else output_tokens,
+        cache_read=read, cache_write=write, thinking=_thinking_tokens(usage),
+    )
 
 
 # Model families, by id prefix (https://platform.claude.com/docs/en/build-with-claude/thinking).

@@ -37,6 +37,18 @@ class ProviderName(StrEnum):
     CEREBRAS = "cerebras"
 
 
+def usage_payload(input_tokens: int, output_tokens: int, cache_read: int = 0, cache_write: int = 0, thinking: int = 0) -> dict[str, int]:
+    """The usage dict every adapter reports: the two totals, and the cache and thinking parts only when non-zero.
+
+    ``input_tokens`` is the whole prompt, cached tokens included.
+    """
+    result = {"input_tokens": input_tokens, "output_tokens": output_tokens}
+    for key, value in (("cache_read_tokens", cache_read), ("cache_write_tokens", cache_write), ("thinking_tokens", thinking)):
+        if value:
+            result[key] = value
+    return result
+
+
 @dataclass
 class ProviderEvent:
     """Streaming event from provider."""

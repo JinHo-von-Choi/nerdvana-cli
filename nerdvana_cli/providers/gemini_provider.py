@@ -9,7 +9,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
-from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, ProviderName, usage_payload
 from nerdvana_cli.providers.errors import error_fields
 from nerdvana_cli.types import ToolSpec
 
@@ -71,14 +71,11 @@ def _decode_signature(text: Any) -> bytes | None:
 
 def _usage_dict(usage_metadata: Any) -> dict[str, int]:
     """Normalise Gemini ``usage_metadata``; cached prompt tokens are part of the prompt count."""
-    result = {
-        "input_tokens":  _gemini_int(getattr(usage_metadata, "prompt_token_count", 0)),
-        "output_tokens": _gemini_int(getattr(usage_metadata, "candidates_token_count", 0)),
-    }
-    cached = _gemini_int(getattr(usage_metadata, "cached_content_token_count", 0))
-    if cached:
-        result["cache_read_tokens"] = cached
-    return result
+    return usage_payload(
+        _gemini_int(getattr(usage_metadata, "prompt_token_count", 0)),
+        _gemini_int(getattr(usage_metadata, "candidates_token_count", 0)),
+        cache_read=_gemini_int(getattr(usage_metadata, "cached_content_token_count", 0)),
+    )
 
 
 def _hit_token_limit(candidate: Any) -> bool:

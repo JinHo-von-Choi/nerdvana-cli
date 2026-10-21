@@ -46,7 +46,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent
+from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, usage_payload
 from nerdvana_cli.providers.errors import RETRYABLE, error_fields
 from nerdvana_cli.providers.gemini_provider import GeminiProvider, _gemini_int
 from nerdvana_cli.providers.openai_provider import parse_arguments
@@ -71,14 +71,11 @@ def _stop_reason(status: str, called: bool) -> str:
 
 def _usage(usage: Any) -> dict[str, int]:
     """Normalise ``interaction.usage``; the cached part of the prompt is reported as ``cache_read_tokens``."""
-    cached = _gemini_int(getattr(usage, "total_cached_tokens", 0))
-    result = {
-        "input_tokens":  _gemini_int(getattr(usage, "total_input_tokens", 0)),
-        "output_tokens": _gemini_int(getattr(usage, "total_output_tokens", 0)) + _gemini_int(getattr(usage, "total_thought_tokens", 0)),
-    }
-    if cached:
-        result["cache_read_tokens"] = cached
-    return result
+    return usage_payload(
+        _gemini_int(getattr(usage, "total_input_tokens", 0)),
+        _gemini_int(getattr(usage, "total_output_tokens", 0)) + _gemini_int(getattr(usage, "total_thought_tokens", 0)),
+        cache_read=_gemini_int(getattr(usage, "total_cached_tokens", 0)),
+    )
 
 
 def _text(text: str) -> dict[str, Any]:

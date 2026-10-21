@@ -9,7 +9,7 @@ from typing import Any
 
 from rich.console import Console
 
-from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, ProviderConfig, ProviderEvent, ProviderName
+from nerdvana_cli.providers.base import DEFAULT_BASE_URLS, ProviderConfig, ProviderEvent, ProviderName, usage_payload
 from nerdvana_cli.providers.errors import DECODE, error_fields
 from nerdvana_cli.providers.thinking_parser import ThinkBlockParser
 from nerdvana_cli.types import ToolSpec
@@ -72,13 +72,7 @@ def _usage_dict(usage: Any) -> dict[str, int]:
     """
     cached = _int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0))
     cached = cached or _int(getattr(usage, "prompt_cache_hit_tokens", 0))  # DeepSeek
-    result = {
-        "input_tokens":  _int(getattr(usage, "prompt_tokens", 0)),
-        "output_tokens": _int(getattr(usage, "completion_tokens", 0)),
-    }
-    if cached:
-        result["cache_read_tokens"] = cached
-    return result
+    return usage_payload(_int(getattr(usage, "prompt_tokens", 0)), _int(getattr(usage, "completion_tokens", 0)), cache_read=cached)
 
 
 def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:

@@ -51,7 +51,7 @@ import json
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent
+from nerdvana_cli.providers.base import ProviderConfig, ProviderEvent, usage_payload
 from nerdvana_cli.providers.errors import CONTEXT_LIMIT, OTHER, RETRYABLE
 from nerdvana_cli.providers.openai_provider import (
     OpenAIProvider,
@@ -96,13 +96,7 @@ def _reasoning_block(item: Any) -> dict[str, Any] | None:
 def _usage(usage: Any) -> dict[str, int]:
     """Normalise ``response.usage``; the cached part of the prompt is reported as ``cache_read_tokens``."""
     cached = _int(getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", 0))
-    result = {
-        "input_tokens":  _int(getattr(usage, "input_tokens", 0)),
-        "output_tokens": _int(getattr(usage, "output_tokens", 0)),
-    }
-    if cached:
-        result["cache_read_tokens"] = cached
-    return result
+    return usage_payload(_int(getattr(usage, "input_tokens", 0)), _int(getattr(usage, "output_tokens", 0)), cache_read=cached)
 
 
 def _failure(code: str | None, message: str | None) -> ProviderEvent:
