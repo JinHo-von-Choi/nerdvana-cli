@@ -78,6 +78,18 @@ def _usage_dict(usage_metadata: Any) -> dict[str, int]:
     )
 
 
+def _parts(response: Any) -> Iterator[Any]:
+    """The content parts of every candidate of a response or stream chunk."""
+    for candidate in response.candidates or []:
+        if candidate.content and candidate.content.parts:
+            yield from candidate.content.parts
+
+
+def _truncated(response: Any) -> bool:
+    """True when a candidate of a response or stream chunk stopped at the token limit."""
+    return any(_hit_token_limit(candidate) for candidate in response.candidates or [])
+
+
 def _hit_token_limit(candidate: Any) -> bool:
     """Whether the candidate stopped on the output token limit (its ``finish_reason`` is ``MAX_TOKENS``)."""
     reason = getattr(candidate, "finish_reason", None)
@@ -183,18 +195,7 @@ class GeminiProvider:
             )
             return
 
-        # Convert tools to Gemini format
-        gemini_tools = None
-        if tools:
-            function_declarations = [
-                types.FunctionDeclaration(
-                    name=t.name,
-                    description=t.description_text,
-                    parameters=self._convert_schema(t.input_schema),  # type: ignore[arg-type]
-                )
-                for t in tools
-            ]
-            gemini_tools = [types.Tool(function_declarations=function_declarations)]
+        gemini_tools = self._gemini_tools(types, tools)
 
         # Convert messages
         contents = self._convert_messages(messages)
@@ -213,14 +214,11 @@ class GeminiProvider:
             async for chunk in stream:
                 # Counts are cumulative; the last chunk that carries them is the total.
                 usage_metadata = getattr(chunk, "usage_metadata", None) or usage_metadata
-                if chunk.candidates:
-                    for candidate in chunk.candidates:
-                        truncated = truncated or _hit_token_limit(candidate)
-                        if candidate.content and candidate.content.parts:
-                            for part in candidate.content.parts:
-                                for event in _part_events(part):
-                                    called = called or event.type == "tool_use_complete"
-                                    yield event
+                truncated      = truncated or _truncated(chunk)
+                for part in _parts(chunk):
+                    for event in _part_events(part):
+                        called = called or event.type == "tool_use_complete"
+                        yield event
 
             if usage_metadata is not None:
                 yield ProviderEvent(type="usage", usage=_usage_dict(usage_metadata))
@@ -228,6 +226,20 @@ class GeminiProvider:
 
         except Exception as e:
             yield ProviderEvent(type="error", error=str(e), **error_fields(e))
+
+    def _gemini_tools(self, types: Any, tools: Sequence[ToolSpec]) -> list[Any] | None:
+        """*tools* as one Gemini ``Tool`` of function declarations, or None without tools."""
+        if not tools:
+            return None
+        declarations = [
+            types.FunctionDeclaration(
+                name=t.name,
+                description=t.description_text,
+                parameters=self._convert_schema(t.input_schema),
+            )
+            for t in tools
+        ]
+        return [types.Tool(function_declarations=declarations)]
 
     async def send(
         self,
@@ -242,17 +254,7 @@ class GeminiProvider:
         except ImportError:
             return {"content": "", "tool_uses": [], "usage": {}, "is_error": True}
 
-        gemini_tools = None
-        if tools:
-            function_declarations = [
-                types.FunctionDeclaration(
-                    name=t.name,
-                    description=t.description_text,
-                    parameters=self._convert_schema(t.input_schema),  # type: ignore[arg-type]
-                )
-                for t in tools
-            ]
-            gemini_tools = [types.Tool(function_declarations=function_declarations)]
+        gemini_tools = self._gemini_tools(types, tools)
 
         contents = self._convert_messages(messages)
         try:
@@ -265,25 +267,20 @@ class GeminiProvider:
 
             content = ""
             tool_uses = []
-            truncated = False
-
-            if response.candidates:
-                for candidate in response.candidates:
-                    truncated = truncated or _hit_token_limit(candidate)
-                    if candidate.content and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            if part.text:
-                                content += part.text
-                            elif part.function_call:
-                                fn_name, args, signature = _read_call(part)
-                                tool_uses.append(
-                                    {
-                                        "id": make_tool_use_id(fn_name),
-                                        "name": fn_name,
-                                        "input": args,
-                                        **({"thought_signature": signature} if signature else {}),
-                                    }
-                                )
+            truncated = _truncated(response)
+            for part in _parts(response):
+                if part.text:
+                    content += part.text
+                elif part.function_call:
+                    fn_name, args, signature = _read_call(part)
+                    tool_uses.append(
+                        {
+                            "id": make_tool_use_id(fn_name),
+                            "name": fn_name,
+                            "input": args,
+                            **({"thought_signature": signature} if signature else {}),
+                        }
+                    )
 
             usage = _usage_dict(response.usage_metadata) if response.usage_metadata else {}
 
