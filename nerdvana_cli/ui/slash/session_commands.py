@@ -110,8 +110,7 @@ def show_session_context(app: NerdvanaApp, registry: Any) -> None:
     if app._agent_loop:
         skills = app._agent_loop.skill_loader.list_skills()
         if skills:
-            triggers = ", ".join(s.trigger for s in skills)
-            parts.append(f"  Skills: {triggers}")
+            parts.append(f"  Skills: {len(skills)} (/skills lists them)")
 
     # Context window
     ctx_k = app.settings.session.max_context_tokens // 1000

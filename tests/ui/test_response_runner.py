@@ -375,3 +375,11 @@ class TestTeardown:
             await run_response_stream(app, "hi")
 
         assert app.messages == []
+
+
+class TestTextAroundToolCalls:
+    async def test_text_before_a_tool_call_is_its_own_message(self) -> None:
+        app = _app(["Let me look.", f"{TOOL_STATUS_PREFIX}FileRead a.py", f"{TOOL_DONE_PREFIX}FileRead [done]\t[File: a.py]", "It adds."])
+        await run_response_stream(app, "hi")
+        assert app.texts[:2] == ["Let me look.", "It adds."]
+        assert len(app.cards) == 1

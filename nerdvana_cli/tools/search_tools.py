@@ -59,15 +59,7 @@ Examples:
             if path_error:
                 return ToolResult(tool_use_id="", content=path_error, is_error=True)
             search_path = os.path.join(context.cwd, args.path)
-            matches = []
-            for root, dirs, files in os.walk(search_path):
-                dirs[:] = [d for d in dirs if not d.startswith(".")]
-                for name in files:
-                    filepath = os.path.relpath(os.path.join(root, name), context.cwd)
-                    if fnmatch.fnmatch(filepath, args.pattern) or fnmatch.fnmatch(name, args.pattern):
-                        matches.append(filepath)
-
-            matches.sort()
+            matches     = sorted(await asyncio.to_thread(_glob, search_path, context.cwd, args.pattern))
             if not matches:
                 return ToolResult(tool_use_id="", content=f"No files matched pattern: {args.pattern}")
 
@@ -197,3 +189,44 @@ def _grep(search_path: str, cwd: str, regex: re.Pattern[str], include: str) -> t
             if match_count <= _GREP_SHOWN_MATCHES:
                 results.append(f"{rel_path}:{line_num}: {line}")
     return match_count, len(files_with_matches), results
+
+
+def glob_regex(pattern: str) -> re.Pattern[str]:
+    """*pattern* as a regex over ``/``-separated paths: ``**/`` is zero or more directories, ``*`` and ``?`` stay within one."""
+    out: list[str] = []
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        elif pattern[i] == "[" and (end := pattern.find("]", i + 1)) > i:
+            body = pattern[i + 1:end]
+            out.append("[" + ("^" + body[1:] if body.startswith("!") else body) + "]")
+            i = end + 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("".join(out) + r"\Z")
+
+
+def _glob(search_path: str, cwd: str, pattern: str) -> list[str]:
+    """Paths relative to *cwd* under *search_path* that match *pattern*; a pattern without ``/`` also matches a file name anywhere."""
+    regex = glob_regex(pattern)
+    by_name = "/" not in pattern
+    found: list[str] = []
+    for root, dirs, files in os.walk(search_path):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for name in files:
+            relpath = os.path.relpath(os.path.join(root, name), cwd).replace(os.sep, "/")
+            if regex.match(relpath) or (by_name and regex.match(name)):
+                found.append(relpath)
+    return found

@@ -157,6 +157,11 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         app._agent_loop._on_thinking_chunk = _on_thinking_chunk
 
         async for chunk in app._agent_loop.run(prompt, app.take_pending_images()):
+            if chunk.startswith(TOOL_STATUS_PREFIX) and accumulated.strip():
+                # Text before a tool call is its own message, so it reads before the tool lines and not glued to the answer.
+                app._add_answer(accumulated)
+                accumulated = ""
+                streaming.update_content("")
             if _show_status_chunk(app, chunk, tool_status, chat_frame):
                 continue
             tool_status.remove_class("active")
