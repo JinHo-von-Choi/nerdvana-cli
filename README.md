@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>A coding agent for the terminal — 21 AI platforms, one interface</strong>
+  <strong>One terminal coding agent for 21 AI platforms</strong>
 </p>
 
 <p align="center">
@@ -21,7 +21,17 @@
 
 ---
 
-NerdVana CLI reads, edits and tests code in your repository from the terminal, with the model of your choice: Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Mistral, a local Ollama or vLLM server, and 15 more. The tools, permission rules, session format and cost accounting stay the same whichever model answers, so you can switch models without relearning the tool or rewriting your scripts.
+A coding agent for your terminal. Use models from 21 platforms, from Claude, GPT and Gemini to Ollama on your own machine, all the same way.
+
+## Why NerdVana CLI
+
+- **No lock-in to one model.** Switch models and keep your commands, permission rules and scripts. When a model stops answering, the agent moves on to the fallback you named.
+- **Edits that don't break your code.** A file that changed since it was read is not edited, and errors an edit introduces are reported right away.
+- **Risky actions are blocked.** Approval modes and a sandbox set what the agent may do. Secret files such as `.env` are never written by the model, whatever the settings.
+- **Runs without you.** `nerdvana run` has JSON output, cost and turn limits, and a `--verify` command that decides when a task is done, so it drops straight into CI and scripts.
+- **Hand off long jobs.** Background runs that survive a closed terminal, cron schedules, and workflows that split work across several agents.
+- **Works with your other tools.** Plug in MCP servers as tools, or offer NerdVana's tools to other agents and to editors such as Zed.
+- **You see what it costs.** Every request's tokens and cost are recorded; `nerdvana cost` shows where they went.
 
 ## How it works
 
@@ -36,24 +46,7 @@ flowchart LR
     L --> R[Answer and<br/>receipt]
 ```
 
-The agent loop sends your request to the model, runs the tools it asks for, and returns the results until the task is done. Every tool call passes the permission policy first. A one-shot run ends with a result object that records the files changed, the cost and the problems the run met.
-
-## Features
-
-| Feature | What you get |
-|-|-|
-| 21 providers | One CLI for every provider; the provider is picked from the model name, and fallback models can cross providers |
-| Safe file edits | Lines are read as `N#hhhhhh` anchors; an edit to a file that changed since it was read is refused, and new language-server errors are reported after each edit |
-| Code intelligence | LSP and symbol tools (definitions, references, rename, replace a symbol body, safe delete) when a language server is installed |
-| Permissions and sandbox | Approval modes, allow and deny rules, an OS sandbox for shell writes; `.env` and `.iron-laws.yml` are never written by the model |
-| Sub-agents | `Agent` and `Swarm` run six built-in agent profiles in the foreground or the background |
-| Headless runs | `nerdvana run` with JSON output, turn, cost and token limits, and a `--verify` command that decides when a task is done |
-| Background, scheduled and workflow runs | Supervised background agents, cron jobs with cost ceilings, declared multi-agent workflows that resume |
-| MCP in both directions | Use external MCP servers as tools; `nerdvana serve` exposes NerdVana's tools to other agents, with per-client quotas |
-| Editor integration | `nerdvana acp` speaks the Agent Client Protocol for editors such as Zed |
-| Project instructions and skills | `NIRNA.md`, `AGENTS.md`, `CLAUDE.md` and Agent Skills (`SKILL.md`) are loaded automatically |
-| Sessions and memory | JSONL transcripts you can resume and rewind, project memories with a review inbox |
-| Cost visibility | `nerdvana cost` and `/context` show where tokens and money go |
+The model picks the tools a request needs; the agent checks permissions and runs them, and repeats until the task is done. A one-shot run ends with a result that lists the files changed and the cost.
 
 ## Installation
 
