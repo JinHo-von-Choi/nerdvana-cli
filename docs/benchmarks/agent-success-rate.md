@@ -529,7 +529,18 @@ The scale of the waste grows with it. Every arm re-reads each file it looks at f
 
 And that is where the money goes. A request carries the whole conversation, so the cost of an attempt is roughly the number of turns times the size of the conversation at that turn. The PTC lowered the size of one result and left the size of the request where it was (21,139 against 21,392 input tokens per request), and then multiplied the number of requests by 1.7. The compression is real and it is smaller than the exploration it buys.
 
-What an offset would have to do is therefore not shrink the result of a program -- that part works -- but stop the extra turns. Three levers are visible in the numbers, and none of them is in the PTC runtime today:
+Most of what a request carries is not the work. A bench run in an empty directory -- the way the bench runs, in a copy of the task's files -- spends **11,060 input tokens on its first request**, before the agent has done anything: the system prompt, the declaration of the 28 tools, and the task. Every turn after that pays the same 11,060 again, and only the conversation on top of it is new. So the cost of an attempt is:
+
+| | Turns | Fixed prefix, re-sent every turn | The attempt | The prefix's share |
+|-|-|-|-|-|
+| 1.9.1, long tasks | 13.1 | 144,886 | 372,921 | 39% |
+| HEAD, long tasks | 20.3 | 224,518 | 522,464 | 43% |
+| 1.9.1, short tasks | 8.3 | 91,798 | 109,896 | 84% |
+| HEAD, short tasks | 8.1 | 89,586 | 110,175 | 81% |
+
+The seven turns that the PTC runtime adds to a long attempt cost 79,632 tokens of repeated prefix before they cost a single token of exploration. And on the short tasks -- where the agent takes eight turns and does a small job -- four fifths of the bill is the prefix, sent again and again. The harness work is not expensive because the agent does more; it is expensive because the agent asks more, and the question is expensive to ask.
+
+What an offset would have to do is therefore not shrink the result of a program -- that part works -- but stop the extra turns, or make the prefix smaller. Three levers are visible in the numbers, and none of them is in the PTC runtime today:
 
 - **Make the program the only way to read a file.** The PTC arm reads 13 files by `Bash` and 4.7 by `FileRead` per attempt, *and* runs programs over the same project. Every file the agent opens by hand is a separate result in the conversation; a file that the program already read should not be opened again.
 - **Bound the sweep.** A program that read sixteen files in one call invites a second program. A cap on the reads one program may perform, or on the dispatches one attempt may spend, bounds the exploration the agent buys.
