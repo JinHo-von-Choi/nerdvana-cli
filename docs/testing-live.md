@@ -1,7 +1,7 @@
 # Live Provider Smoke Tests
 
 Live tests in `tests/live/` exercise every supported AI provider end-to-end. They
-hit real APIs, consume tokens, and may incur cost — unlike unit tests they are
+hit real APIs, consume tokens, and may incur cost. Unlike unit tests, they are
 **skipped automatically when the required environment variable is absent**, so
 they never break a developer machine that lacks credentials.
 
@@ -88,10 +88,10 @@ Live tests issue real, billable API calls on metered providers. Recommendations:
   credentials before bulk runs.
 - **Anthropic / OpenAI / xAI / OpenRouter / Mistral / Cohere / Fireworks / Cerebras /
   DashScope / MiniMax / Moonshot**: each smoke run typically consumes < 500 tokens,
-  costing fractions of a cent — but multiplied by 21 providers and frequent CI
+  costing fractions of a cent, but multiplied by 21 providers and frequent CI
   reruns this adds up. Prefer running the suite manually, not in `pre-commit`.
 - **Free tiers**: Groq, Gemini, OpenRouter (some models), and Perplexity expose
-  free tiers with rate limits. Hitting the limit returns HTTP 429 — tests are
+  free tiers with rate limits. Hitting the limit returns HTTP 429, and tests are
   expected to skip or xfail rather than fail loudly.
 - **Self-hosted (Ollama / vLLM)**: zero per-call cost but require the respective
   server running and reachable at the default base URL. Override with
@@ -111,12 +111,12 @@ The `.github/workflows/live_smoke.yml` workflow runs live tests on `main` and
 
 A live test that fails on CI almost always means one of:
 
-1. The provider's free-tier rate limit was hit (transient — rerun).
-2. The provider rotated API host, model id, or response schema (real bug —
+1. The provider's free-tier rate limit was hit (transient; rerun).
+2. The provider rotated API host, model id, or response schema (a real bug:
    investigate the `tests/live/test_<provider>_smoke.py` file).
 3. The org secret was rotated or expired (admin action required).
 
-CI workers skip providers without secrets — this is by design so individual
+CI workers skip providers without secrets by design, so individual
 contributors can ship without owning every API key.
 
 ---
@@ -131,7 +131,7 @@ add `tests/live/test_<provider>_smoke.py` containing:
    `pytest.skip("<PROVIDER>_API_KEY not set")` when absent.
 3. At least one `test_basic_completion` that streams a short prompt and asserts
    non-empty content.
-4. A tool-calling test (skip if provider does not support tools — see Perplexity).
+4. A tool-calling test (skip it if the provider does not support tools; see Perplexity).
 
 Update the matrix table above in the same PR so this document stays the single
 source of truth.

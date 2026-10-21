@@ -109,11 +109,11 @@ A pre-commit secret scanner such as `detect-secrets` is recommended to catch acc
 
 ## Monotonic Guards
 
-Some rules are the owner's, not the run's. A `BEFORE_TOOL` hook may veto a call, a permission rule may allow one, and `--approval-mode yolo` may ask nothing at all — but none of them may switch an owner invariant off. The monotonic guards (`core/safety/monotonic_guard.py`) run in the tool waterfall after the hooks and the permission gate, and a guard can only refuse: it never rewrites a call, never approves one, and the first refusal ends the evaluation.
+Some rules are the owner's, not the run's. A `BEFORE_TOOL` hook may veto a call, a permission rule may allow one, and `--approval-mode yolo` may ask nothing at all, but none of them may switch an owner invariant off. The monotonic guards (`core/safety/monotonic_guard.py`) run in the tool waterfall after the hooks and the permission gate, and a guard can only refuse: it never rewrites a call, never approves one, and the first refusal ends the evaluation.
 
 The guards refuse:
 
-- a write to an invariant file — `.iron-laws.yml` and `.env` (and `.env.local` and friends), because they hold the rules the run is judged by and the secrets it must not leak. The user edits those files;
+- a write to an invariant file: `.iron-laws.yml` and `.env` (and `.env.local` and friends), because they hold the rules the run is judged by and the secrets it must not leak. The user edits those files;
 - a write to a test file a task contract protects, so a run cannot weaken the tests that judge it;
 - a command that hands a secret file to a network sink (`curl -d @.env …`, `scp .env host:`), which would leak the secret.
 
@@ -127,8 +127,8 @@ The protected test files are the ones a run declares: the tool context carries t
 
 Two CLI subcommands provide access control and audit surfaces:
 
-- `nerdvana admin acl ...` — manages per-tenant allow/deny rules for MCP tool exposure.
-- `nerdvana hook` — registers and lists lifecycle hooks that fire around agent interactions.
+- `nerdvana admin acl ...`: manages per-tenant allow/deny rules for MCP tool exposure.
+- `nerdvana hook`: registers and lists lifecycle hooks that fire around agent interactions.
 
 Both subcommands are available on a minimal install (no `[mcp]` extras required). The audit log and ACL enforcement paths remain functional regardless of which optional dependency groups are installed.
 

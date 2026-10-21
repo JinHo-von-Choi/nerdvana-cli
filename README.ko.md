@@ -56,7 +56,7 @@ flowchart LR
 curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
 ```
 
-설치 스크립트는 `~/.nerdvana-cli/`에 전용 가상 환경과 함께 설치하고 `nerdvana`, `nc` 명령을 PATH에 추가합니다. 업그레이드는 `nerdvana update`로 합니다.
+설치 스크립트가 `~/.nerdvana-cli/`에 전용 가상 환경을 만들어 설치하고, `nerdvana`와 `nc` 명령을 PATH에 넣습니다. 업그레이드는 `nerdvana update` 한 줄이면 됩니다.
 
 소스에서 설치:
 
@@ -124,7 +124,7 @@ pip install -e ".[all]"          # 모든 제공자 SDK
 
 ## 설정
 
-설정은 YAML 파일에서 읽습니다. 가장 먼저 찾은 파일 하나를 씁니다.
+설정은 YAML 파일 하나에서 읽습니다. 아래 순서로 찾아 처음 나온 파일을 씁니다.
 
 1. `--config <경로>`
 2. `NERDVANA_CONFIG`
@@ -150,7 +150,7 @@ sandbox:
   mode: off                  # off, auto, require (Linux Landlock)
 ```
 
-`--set section.field=value`는 한 번의 실행에서만 설정을 바꾸고, `nerdvana --dump-config`는 적용될 설정과 각 키가 온 계층을 보여 줍니다. 모든 절과 필드는 [docs/configuration.md](docs/configuration.md)에, 전체 예시는 [nerdvana.yml.example](nerdvana.yml.example)에 있습니다.
+한 번만 바꿀 설정은 `--set section.field=value`로 넘깁니다. 실제로 적용될 설정과 각 값이 어디서 왔는지는 `nerdvana --dump-config`로 봅니다. 모든 절과 필드는 [docs/configuration.md](docs/configuration.md)에, 전체 예시는 [nerdvana.yml.example](nerdvana.yml.example)에 있습니다.
 
 ### 환경 변수
 
@@ -163,7 +163,7 @@ sandbox:
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | 외부 프로젝트 도구가 벗어날 수 없는 경계 | 없음 |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | 설정 파일을 고치지 않고 외부 프로젝트 도구를 등록 | `false` |
 
-API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어야 `WebSearch` 도구가 동작합니다. 제공자와 모델에는 환경 변수가 없습니다. `--provider`, `--model`, `/provider`, `/model`이나 설정 파일로 정합니다.
+API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어야 `WebSearch` 도구가 동작합니다. 제공자와 모델은 환경 변수로 정할 수 없고, `--provider`, `--model`, `/provider`, `/model`이나 설정 파일로 정합니다.
 
 ### 파일과 디렉터리
 
@@ -198,7 +198,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 4. `permissions.always_allow`: 묻지 않고 허용
 5. 모드의 신뢰 수준: `strict`는 모든 쓰기 전에, `balanced`는 파괴적 도구 전에 묻고, `yolo`는 묻지 않음
 
-이 판정 뒤에도 어떤 훅·규칙·모드로도 끌 수 없는 보호 장치가 `.env`·`.iron-laws.yml` 쓰기, 작업 계약이 보호하는 시험 파일 쓰기, 비밀 파일을 네트워크로 보내는 명령을 거부합니다.
+이 순서와 별개로, 어떤 훅·규칙·모드로도 끌 수 없는 보호 장치가 있습니다. 이 장치는 `.env`·`.iron-laws.yml` 쓰기, 작업 계약이 보호하는 시험 파일 쓰기, 비밀 파일을 네트워크로 보내는 명령을 항상 거부합니다.
 
 | `--approval-mode` | 신뢰 수준 | 효과 |
 |-|-|-|
@@ -207,7 +207,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 | `yolo` | yolo | 확인 없음 |
 | `plan` | strict | 쓰기 도구와 `Bash`를 숨김 |
 
-터미널이 없으면 확인 질문은 거부가 되므로, 파일을 쓰는 무인 실행에는 `yolo`가 필요합니다. `nerdvana approvals`는 자주 승인한 질문을 보고 `always_allow` 규칙을 제안합니다. 샌드박스: [docs/sandbox.md](docs/sandbox.md). 사용자 설정보다 우선하는 관리자 정책: [docs/managed-policy.md](docs/managed-policy.md).
+터미널이 없으면 확인 질문은 모두 거부로 처리됩니다. 그래서 파일을 쓰는 무인 실행에는 `yolo`가 필요합니다. 자주 승인하는 질문은 `nerdvana approvals`가 `always_allow` 규칙으로 바꿔 쓰도록 제안합니다. 샌드박스: [docs/sandbox.md](docs/sandbox.md). 사용자 설정보다 우선하는 관리자 정책: [docs/managed-policy.md](docs/managed-policy.md).
 
 ## 프로젝트 지침
 
@@ -217,7 +217,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 2. `<project>/NIRNA.md`: 저장소에 커밋하는 프로젝트 지침
 3. `<project>/NIRNA.local.md`: 커밋하지 않는 로컬 지침
 
-프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`는 그 뒤에 읽습니다. 도구가 하위 디렉터리의 파일을 처음 다룰 때 그 디렉터리와 루트 사이의 규칙 파일을 한 번 주입합니다(세션당 32 KB까지). `/init`이 `NIRNA.md` 초안을 만듭니다. 스킬: [docs/skills.md](docs/skills.md). 사용자 슬래시 명령: [docs/commands.md](docs/commands.md). 훅: [docs/hooks.md](docs/hooks.md).
+프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`는 그 뒤에 읽습니다. 하위 디렉터리의 파일을 처음 다룰 때는 그 디렉터리부터 루트까지의 규칙 파일을 한 번 더 읽어 넣습니다(세션당 32 KB까지). `/init`이 `NIRNA.md` 초안을 만듭니다. 스킬: [docs/skills.md](docs/skills.md). 사용자 슬래시 명령: [docs/commands.md](docs/commands.md). 훅: [docs/hooks.md](docs/hooks.md).
 
 ## MCP 서버
 
@@ -236,7 +236,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 }
 ```
 
-서버의 도구는 `mcp__{server}__{tool}` 이름으로 나타납니다. `nerdvana mcp add|list|remove`가 파일을 고치고, `/mcp`가 연결 상태를 보여 줍니다. 자세한 내용: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). NerdVana 도구를 다른 에이전트에 제공하려면: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
+연결한 서버의 도구는 `mcp__{server}__{tool}` 이름으로 씁니다. `nerdvana mcp add|list|remove`가 파일을 고치고, `/mcp`가 연결 상태를 보여 줍니다. 자세한 내용: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). NerdVana 도구를 다른 에이전트에 제공하려면: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
 
 ## 명령 참조
 
@@ -336,7 +336,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 | `/memories`, `/memory` | 메모리 목록, 제안 검토 (`inbox`, `approve`, `reject`, `forget`, `stale`) |
 | `/undo`, `/redo`, `/checkpoints` | 편집 git 체크포인트 복원, 재적용, 목록 |
 | `/rewind [N]` | 마지막 N개 프롬프트 이전으로 돌아가고 그 사이 도구 편집을 되돌림 |
-| `/image <path> ... <question>` | 이미지 파일에 대해 질문 |
+| `/image <path> ... <question>` | 이미지 파일을 보고 답하기 |
 | `/history <query>` | 지난 대화 기록 검색 |
 | `/btw <question>` | 대화 기록에 남기지 않는 곁가지 질문 |
 | `/steer <text>` | 진행 중인 단계를 끊고 입력한 글로 이어 감 (Ctrl+T) |

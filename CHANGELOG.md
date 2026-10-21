@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- README.md and README.ko.md open with a one-line description and a list of benefits in place of the feature table; the Korean installation, configuration, permission and MCP sections are shorter.
+- The guides in `docs/` and CONTRIBUTING.md use colons, commas and parentheses where they used em-dash asides.
+
 ## [1.10.1] - 2026-10-22
 
 ### Changed

@@ -56,8 +56,8 @@ different policy: it may read nothing that was not named, and it may write, crea
 remove or execute nothing at all.
 
 The paths it may read are the Python it runs on, so the interpreter keeps working.
-The project is not among them: a file is read through a binding — `FileRead`,
-`Grep`, `Glob`, `lsp_find_references` — and every call of a binding goes through the
+The project is not among them: a file is read through a binding (`FileRead`,
+`Grep`, `Glob`, `lsp_find_references`), and every call of a binding goes through the
 same monotonic guards as any other tool call and is recorded in the session as a
 `tool/ptc-dispatch` event. The home directory is not among them either, so a run
 cannot reach the credentials that live there.

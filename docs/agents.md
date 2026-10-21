@@ -2,7 +2,7 @@
 
 NerdVana CLI's `Agent` tool spawns a subagent with an isolated context and a
 restricted tool set. The tool filter is enforced at registry level by
-`create_subagent_registry(allowed_tools=...)` — an agent that was not granted
+`create_subagent_registry(allowed_tools=...)`: an agent that was not granted
 `FileWrite` literally does not have the tool in its registry and cannot call it.
 
 ## Built-in agent types
@@ -26,7 +26,7 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 
 - **Max turns:** 15
 - **Allowed tools:** `Glob`, `Grep`, `FileRead`
-- **System prompt:** "You are an architect agent. Analyze the codebase and produce a structured implementation plan. Do not write code — only plan."
+- **System prompt:** "You are an architect agent. Analyze the codebase and produce a structured implementation plan. Do not write code; only plan."
 - **Use:** architecture planning without side effects.
 
 ### `code-reviewer`
@@ -34,7 +34,7 @@ Defined in `nerdvana_cli/agents/builtin.py`.
 - **Max turns:** 12
 - **Allowed tools:** `FileRead`, `Grep`, `Glob`
 - **System prompt:** "You are a code review agent. Read files, search for patterns, and identify bugs, security issues, and style problems. Do not modify files. Return a structured review report."
-- **Use:** read-only code quality review. Cannot execute Bash or modify files — safe for review-only workflows.
+- **Use:** read-only code quality review. Cannot execute Bash or modify files, so it is safe for review-only workflows.
 
 ### `git-management`
 
@@ -107,19 +107,19 @@ scope; definitions placed there are not loaded today.
 
 ```yaml
 # .nerdvana/agents/security-auditor.yml
-name: security-auditor              # required — agent_type identifier
-description: OWASP security audit   # optional — shown in Agent tool schema
-max_turns: 25                       # optional — default 50
-allowed_tools:                      # optional — default ["*"] (all)
+name: security-auditor              # required: agent_type identifier
+description: OWASP security audit   # optional: shown in Agent tool schema
+max_turns: 25                       # optional: default 50
+allowed_tools:                      # optional: default ["*"] (all)
   - FileRead
   - Glob
   - Grep
   - Bash
-write_scope: none                   # optional — what it may write: none, project (default) or a list such as [tests, docs/api]
+write_scope: none                   # optional: what it may write: none, project (default) or a list such as [tests, docs/api]
 network: false                      # optional, false also refuses TCP connections of its commands (Linux 6.7+); true does not widen a sandbox.network: allowlist session
-model: claude-opus-5-5              # optional — "model" or "provider:model"; default is the parent's model
-category: deep                      # optional — model taken from agents.categories when no model is set
-system_prompt: |                    # optional — injected into child's system prompt
+model: claude-opus-5-5              # optional: "model" or "provider:model"; default is the parent's model
+category: deep                      # optional: model taken from agents.categories when no model is set
+system_prompt: |                    # optional: injected into child's system prompt
   You are a security expert.
   Audit code for OWASP Top 10 vulnerabilities.
 ```
@@ -152,7 +152,7 @@ Custom agents are loaded on **every** `Agent` tool call, not at startup. This
 means edits to `.nerdvana/agents/*.yml` take effect on the next invocation
 without restarting NerdVana CLI.
 
-Malformed YAML files are silently skipped — check `/verbose` mode logs if an
+Malformed YAML files are skipped; check `/verbose` mode logs if an
 agent type seems missing.
 
 ### Using a custom agent
@@ -257,12 +257,12 @@ accounting reflects actual sub-agent token spend.
 
 `nerdvana_cli/ui/` is split into three primary concerns:
 
-- `app.py` — `NerdvanaApp(App[object])`: widget composition and event wiring
+- `app.py`: `NerdvanaApp(App[object])`: widget composition and event wiring
   only. Does not run the agent loop or parse commands directly.
-- `response_runner.py` — `run_response_stream(app, prompt)`: drives the agent
+- `response_runner.py`: `run_response_stream(app, prompt)`: drives the agent
   loop and streams output tokens, tool-status markers, and compaction notices to
   the chat widgets.
-- `command_dispatcher.py` — `dispatch_command(app, cmd)`: routes slash commands
+- `command_dispatcher.py`: `dispatch_command(app, cmd)`: routes slash commands
   to per-area handlers in `nerdvana_cli/ui/slash/`.
 
 `ui/widgets/` contains one class per file: `ActivityIndicator`, `ChatMessage`,
@@ -288,16 +288,16 @@ unchanged; only the source of truth moved from inline Python to YAML.
 Every tool call on the built-in MCP server (`nerdvana_cli/server/mcp_server.py`)
 passes through the following stages in order:
 
-1. **Auth** — `_resolve_identity()` extracts the tenant identifier from the
+1. **Auth**: `_resolve_identity()` extracts the tenant identifier from the
    active transport context.
-2. **ACL** — `ACLManager.check(tenant, tool_name)` enforces role-based access.
+2. **ACL**: `ACLManager.check(tenant, tool_name)` enforces role-based access.
    Denied calls are audited and raise `PermissionError` immediately.
-3. **Quota** — `QuotaPolicyResolver.resolve(tenant, roles=acl.effective_roles(tenant))`
+3. **Quota**: `QuotaPolicyResolver.resolve(tenant, roles=acl.effective_roles(tenant))`
    selects the applicable quota policy; `QuotaStore.check(tenant, policy)` tests
    the current counters. Denied calls are audited and raise `QuotaExceeded`.
-4. **Execute** — `_call_tool_raw(tool_name, args)` dispatches to the concrete
+4. **Execute**: `_call_tool_raw(tool_name, args)` dispatches to the concrete
    `BaseTool` implementation.
-5. **Release** — `QuotaStore.release(tenant, tokens=result.tokens)` decrements
+5. **Release**: `QuotaStore.release(tenant, tokens=result.tokens)` decrements
    in-flight counters and records token spend in the rolling windows.
 
 For the full quota policy schema (rpm, rph, daily_tokens, max_concurrent, tenant

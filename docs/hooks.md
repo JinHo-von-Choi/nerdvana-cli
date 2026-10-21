@@ -168,7 +168,7 @@ NerdVana CLI auto-loads any `*.py` file from these directories on every
 | `<cwd>/.nerdvana/hooks/` | Project-local | No, see below |
 
 Files starting with `_` are skipped. Failures (import errors, missing
-`register`, register raising) are logged and skipped — they never crash
+`register`, register raising) are logged and skipped; they never crash
 the agent loop.
 
 ### Project-local hooks are opt-in and per-file approved
@@ -219,9 +219,9 @@ def _my_handler(ctx: HookContext) -> HookResult:
 
 ### `system_prompt_append` vs `inject_messages`
 
-- `HookResult.system_prompt_append` — sticky text appended to the system
+- `HookResult.system_prompt_append`: sticky text appended to the system
   prompt on every turn until `reset_session()` is called.
-- `HookResult.inject_messages` — one-shot conversation messages prepended
+- `HookResult.inject_messages`: one-shot conversation messages prepended
   to the next turn only.
 
 ## Writing your own hook
@@ -282,6 +282,6 @@ def retry_on_network_error(ctx: HookContext) -> HookResult | None:
 
 Three recovery hooks are defined in `nerdvana_cli/core/loop/builtin_hooks.py` and registered automatically inside `AgentLoop.__init__`. Users do not need to register them; they are always active.
 
-- **`context_limit_recovery`** — registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "max_tokens"`; injects a continuation message asking the model to resume from where it left off, optionally including the last user message (up to 200 characters) as context.
-- **`json_parse_recovery`** — registered on `AFTER_TOOL`: triggers when `ctx.extra["json_error"]` is populated by the loop after a tool call whose arguments could not be parsed; injects a correction message containing the tool name and parse error, instructing the model to retry with valid JSON.
-- **`ralph_loop_check`** — registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "end_turn"` and the current assistant turn (read from `ctx.extra["asst_text"]`, falling back to message history) contains any of the patterns `TODO`, `FIXME`, `#\s*구현\s*필요`, `#\s*미구현`, `#\s*needs?\s*implementation`, `NotImplemented`, or `raise\s+NotImplementedError`; injects a follow-up message listing up to five unique matched markers and asking the model to complete all unfinished items before declaring the task done.
+- **`context_limit_recovery`**: registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "max_tokens"`; injects a continuation message asking the model to resume from where it left off, optionally including the last user message (up to 200 characters) as context.
+- **`json_parse_recovery`**: registered on `AFTER_TOOL`: triggers when `ctx.extra["json_error"]` is populated by the loop after a tool call whose arguments could not be parsed; injects a correction message containing the tool name and parse error, instructing the model to retry with valid JSON.
+- **`ralph_loop_check`**: registered on `AFTER_API_CALL`: triggers when `ctx.stop_reason == "end_turn"` and the current assistant turn (read from `ctx.extra["asst_text"]`, falling back to message history) contains any of the patterns `TODO`, `FIXME`, `#\s*구현\s*필요`, `#\s*미구현`, `#\s*needs?\s*implementation`, `NotImplemented`, or `raise\s+NotImplementedError`; injects a follow-up message listing up to five unique matched markers and asking the model to complete all unfinished items before declaring the task done.

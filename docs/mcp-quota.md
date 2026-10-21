@@ -4,7 +4,7 @@
 
 Per-tenant rate-limit and token quota enforcement sits between the ACL check and
 tool dispatch. When no quota file is present the system applies an unconstrained
-policy — existing behavior is preserved.
+policy, so existing behavior is preserved.
 
 ## Configuration file
 
@@ -111,5 +111,5 @@ The audit record carries `error_class="quota_denied:<limit_name>"`.
 
 The default `QuotaStore` is in-process and uses a threading lock. It is safe for
 concurrent async tool calls within a single server process. Multi-process
-deployments (multiple uvicorn workers) require a shared store — a Redis adapter
+deployments (multiple uvicorn workers) require a shared store; a Redis adapter
 slot is reserved in `QuotaStore` for future use.

@@ -86,13 +86,13 @@ green, and only then creates and pushes the tag. A tag is never pushed ahead of 
 
 ## Optional gates
 
-**LSP integration tests** — requires `pyright` and `typescript-language-server` on PATH:
+**LSP integration tests**: requires `pyright` and `typescript-language-server` on PATH:
 
 ```bash
 uv run pytest -m lsp_integration
 ```
 
-**Live smoke tests** — requires provider API keys set as environment variables.
+**Live smoke tests**: requires provider API keys set as environment variables.
 See [docs/security.md](docs/security.md) for the secrets policy and
 [docs/testing-live.md](docs/testing-live.md) for the full provider matrix,
 single-provider run recipes, and cost-aware execution guidance:
@@ -111,10 +111,10 @@ Files that require changes:
 - `nerdvana_cli/providers/factory.py`: wire new provider class
 - `nerdvana_cli/providers/pricing.yml`: add token pricing entry
 - `tests/providers/test_<provider>_provider.py`: unit tests covering detect, build, stream, error paths
-- `README.md` — add row to the Supported Providers table
-- `CHANGELOG.md` — add entry under Unreleased
-- `docs/configuration.md` — document provider-specific env vars and options
-- `nerdvana.yml.example` — add commented example block
+- `README.md`: add row to the Supported Providers table
+- `CHANGELOG.md`: add entry under Unreleased
+- `docs/configuration.md`: document provider-specific env vars and options
+- `nerdvana.yml.example`: add commented example block
 
 ---
 

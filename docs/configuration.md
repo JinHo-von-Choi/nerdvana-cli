@@ -53,8 +53,8 @@ defaults below, never to a lower-priority file.
 | `ZHIPUAI_API_KEY` | ZAI (GLM) |
 | `FEATHERLESS_API_KEY` | Featherless AI |
 | `MIMO_API_KEY` | Xiaomi MiMo (`XIAOMI_API_KEY` accepted as fallback) |
-| `MOONSHOT_API_KEY` | Moonshot AI (Kimi) — `KIMI_API_KEY` accepted as fallback |
-| `DASHSCOPE_API_KEY` | Alibaba DashScope (Qwen) — `ALIBABA_API_KEY` accepted as fallback |
+| `MOONSHOT_API_KEY` | Moonshot AI (Kimi); `KIMI_API_KEY` is accepted as a fallback |
+| `DASHSCOPE_API_KEY` | Alibaba DashScope (Qwen); `ALIBABA_API_KEY` is accepted as a fallback |
 | `MINIMAX_API_KEY` | MiniMax |
 | `PERPLEXITY_API_KEY` | Perplexity (`PPLX_API_KEY` accepted as fallback) |
 | `FIREWORKS_API_KEY` | Fireworks AI |
@@ -348,7 +348,7 @@ Snapshot comment format (first comment line inside the provider block):
 
 ```yaml
 anthropic:
-  # 2026-04-29 snapshot — https://www.anthropic.com/pricing
+  # snapshot of https://www.anthropic.com/pricing
   claude-sonnet-5-5: ...
 ```
 
