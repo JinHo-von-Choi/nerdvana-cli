@@ -24,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -50,13 +50,13 @@ jobs:
           npm install -g typescript-language-server typescript
 
       - name: Install nerdvana-cli dev deps
-        run: pip install -e ".[dev,mcp,acp,otel,all]"
+        run: uv sync --locked --all-extras
 
       - name: Run base tests (excluding LSP integration)
-        run: pytest tests/ -q -m "not lsp_integration"
+        run: uv run pytest tests/ -q -m "not lsp_integration"
 
       - name: Run LSP integration tests
-        run: pytest tests/ -v -m "lsp_integration" --junit-xml=pytest-report.xml
+        run: uv run pytest tests/ -v -m "lsp_integration" --junit-xml=pytest-report.xml
 
       - name: Upload pytest report
         uses: actions/upload-artifact@v4
