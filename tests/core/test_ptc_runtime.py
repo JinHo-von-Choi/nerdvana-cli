@@ -182,7 +182,7 @@ async def test_a_run_that_is_cancelled_stops_at_once() -> None:
         abort.set()
 
     canceller = asyncio.create_task(cancel_soon())
-    result = await runtime.run("sum(range(100000000))", abort=abort)
+    result = await runtime.run("while True:\n    pass", abort=abort)
     await canceller
 
     assert not result.ok
@@ -193,7 +193,7 @@ async def test_a_run_that_is_cancelled_stops_at_once() -> None:
 async def test_a_run_that_takes_too_long_is_stopped() -> None:
     runtime = await _runtime(timeout_ms=1_000)
 
-    result = await runtime.run("sum(range(100000000))")
+    result = await runtime.run("while True:\n    pass")
 
     assert not result.ok
     assert result.timed_out
