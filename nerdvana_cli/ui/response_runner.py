@@ -37,6 +37,59 @@ def _status_fields(app: NerdvanaApp, usage: Any) -> dict[str, Any]:
     }
 
 
+async def _thinking_timer(app: NerdvanaApp, status_bar: StatusBar, start_time: float) -> None:
+    """Refresh the status bar with the elapsed thinking time until cancelled."""
+    while True:
+        usage = app._agent_loop.state.usage if app._agent_loop else None
+        status_bar.update_status(
+            model      = app.settings.model.model,
+            provider   = app.settings.model.provider,
+            tokens_in  = usage.input_tokens if usage else 0,
+            tokens_out = usage.output_tokens if usage else 0,
+            tools      = len(app._agent_loop.registry.all_tools()) if app._agent_loop else 0,
+            parism     = app.parism_client is not None,
+            thinking   = True,
+            elapsed_s  = time.monotonic() - start_time,
+        )
+        await asyncio.sleep(0.5)
+
+
+def _show_compaction(app: NerdvanaApp, info: str) -> None:
+    from nerdvana_cli.ui.widgets import ToolStatusLine
+
+    if "done" in info or "fallback" in info:
+        with contextlib.suppress(Exception):
+            app.query_one(ToolStatusLine).remove_class("active")
+        return
+    with contextlib.suppress(Exception):
+        line = app.query_one(ToolStatusLine)
+        line.update("[dim yellow]compressing context...[/dim yellow]")
+        line.add_class("active")
+
+
+def _show_status_chunk(app: NerdvanaApp, chunk: str, tool_status: ToolStatusLine, chat_frame: VerticalScroll) -> bool:
+    """Apply one status chunk of the loop to the UI; False when *chunk* is answer text."""
+    if chunk.startswith(CONTEXT_USAGE_PREFIX):
+        app._update_context_usage(int(chunk[len(CONTEXT_USAGE_PREFIX):]))
+    elif chunk.startswith(TOOL_STATUS_PREFIX):
+        tool_info = chunk[len(TOOL_STATUS_PREFIX):].replace("[", "\\[")
+        tool_status.update(Text.from_markup(f"  [cyan]⟳ {tool_info}[/cyan]"))
+        tool_status.add_class("active")
+        chat_frame.scroll_end(animate=False)
+    elif chunk.startswith(TOOL_DONE_PREFIX):
+        tool_info = chunk[len(TOOL_DONE_PREFIX):]
+        safe_info = tool_info.replace("[", "\\[")
+        if "[error]" in tool_info:
+            tool_status.update(Text.from_markup(f"  [red]✗ {safe_info}[/red]"))
+        else:
+            tool_status.update(Text.from_markup(f"  [green]✓ {safe_info}[/green]"))
+    elif chunk.startswith(COMPACT_STATUS_PREFIX):
+        _show_compaction(app, chunk[len(COMPACT_STATUS_PREFIX):])
+    else:
+        return False
+    return True
+
+
 async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
     """Run the agent loop and stream its output into the chat UI.
 
@@ -57,27 +110,8 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
     streaming.add_class("active")
     streaming.update("")
 
-    start_time    = time.monotonic()
-    timer_running = True
-
-    async def _update_thinking_timer() -> None:
-        """Periodically refresh the status bar with elapsed thinking time."""
-        while timer_running:
-            elapsed = time.monotonic() - start_time
-            usage   = app._agent_loop.state.usage if app._agent_loop else None
-            status_bar.update_status(
-                model      = app.settings.model.model,
-                provider   = app.settings.model.provider,
-                tokens_in  = usage.input_tokens if usage else 0,
-                tokens_out = usage.output_tokens if usage else 0,
-                tools      = len(app._agent_loop.registry.all_tools()) if app._agent_loop else 0,
-                parism     = app.parism_client is not None,
-                thinking   = True,
-                elapsed_s  = elapsed,
-            )
-            await asyncio.sleep(0.5)
-
-    timer_task  = asyncio.create_task(_update_thinking_timer())
+    start_time  = time.monotonic()
+    timer_task  = asyncio.create_task(_thinking_timer(app, status_bar, start_time))
     accumulated = ""
 
     def _teardown() -> None:
@@ -87,8 +121,6 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         that is torn down mid-stream cannot leave the timer task alive or the
         streaming and tool-status widgets stuck in their active state.
         """
-        nonlocal timer_running
-        timer_running = False
         timer_task.cancel()
         with contextlib.suppress(Exception):
             tool_status.remove_class("active")
@@ -108,44 +140,13 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
         app._agent_loop._on_thinking_chunk = _on_thinking_chunk
 
         async for chunk in app._agent_loop.run(prompt, app.take_pending_images()):
-            if chunk.startswith(CONTEXT_USAGE_PREFIX):
-                pct = int(chunk[len(CONTEXT_USAGE_PREFIX):])
-                app._update_context_usage(pct)
+            if _show_status_chunk(app, chunk, tool_status, chat_frame):
                 continue
+            tool_status.remove_class("active")
+            accumulated += chunk
+            streaming.update_content(accumulated)
+            chat_frame.scroll_end(animate=False)
 
-            elif chunk.startswith(TOOL_STATUS_PREFIX):
-                tool_info = chunk[len(TOOL_STATUS_PREFIX):].replace("[", "\\[")
-                tool_status.update(Text.from_markup(f"  [cyan]⟳ {tool_info}[/cyan]"))
-                tool_status.add_class("active")
-                chat_frame.scroll_end(animate=False)
-
-            elif chunk.startswith(TOOL_DONE_PREFIX):
-                tool_info = chunk[len(TOOL_DONE_PREFIX):]
-                safe_info = tool_info.replace("[", "\\[")
-                if "[error]" in tool_info:
-                    tool_status.update(Text.from_markup(f"  [red]✗ {safe_info}[/red]"))
-                else:
-                    tool_status.update(Text.from_markup(f"  [green]✓ {safe_info}[/green]"))
-
-            elif chunk.startswith(COMPACT_STATUS_PREFIX):
-                compact_info = chunk[len(COMPACT_STATUS_PREFIX):]
-                if "done" in compact_info or "fallback" in compact_info:
-                    with contextlib.suppress(Exception):
-                        app.query_one(ToolStatusLine).remove_class("active")
-                else:
-                    with contextlib.suppress(Exception):
-                        tool_status_l = app.query_one(ToolStatusLine)
-                        tool_status_l.update("[dim yellow]compressing context...[/dim yellow]")
-                        tool_status_l.add_class("active")
-
-            else:
-                tool_status.remove_class("active")
-                accumulated += chunk
-                streaming.update_content(accumulated)
-                chat_frame.scroll_end(animate=False)
-
-        # Stop timer
-        timer_running = False
         timer_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await timer_task

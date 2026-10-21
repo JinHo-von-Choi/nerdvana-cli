@@ -21,11 +21,10 @@ LIMIT = 60
 
 KNOWN_LONG: dict[str, int] = {
     "cli/setup.py:run_setup": 161,
-    "ui/response_runner.py:run_response_stream": 144,
+    "ui/response_runner.py:run_response_stream": 92,
     "providers/openai_provider.py:OpenAIProvider.stream": 102,
     "main.py:run": 108,
     "tools/file_tools.py:FileEditTool.call": 78,
-    "core/loop/activity_state.py:summarize_tool_call": 108,
     "ui/slash/model_commands.py:switch_provider": 83,
     "core/config/settings.py:NerdvanaSettings.load": 69,
     "cli/updater.py:run_self_update": 91,
