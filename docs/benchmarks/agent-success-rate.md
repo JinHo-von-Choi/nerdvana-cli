@@ -151,6 +151,8 @@ domain each belongs to:
 
 The lessons are about the kind of task and not about the task: `fix-inclusive-range-endpoint`
 says how to read the endpoint contract before touching a bound, and names no task.
+The c domain has a single task, so it went to the train half whole and none of its
+lessons reached a test task.
 
 | Test half | Passed | mean pass^4 | Mean input tokens | Mean cost |
 |-|-|-|-|-|
@@ -164,22 +166,22 @@ tasks and 4 attempts the two runs cannot be told apart. Per task, one task gaine
 (`add-py-slug-max-length`, pass^4 0 to 1), three lost (`fix-js-median`, `multi-js-config-loader`,
 `recover-shared-rate`, pass^4 1 to 0) and two were unchanged.
 
-The mechanism is visible in the turns. The library hands over everything its domain
-holds, and two things follow. The helper scripts are written for the task that made
-them and travel under their own names: the python shelf carries `check_state_leak.py`
-and `check_pure_accumulate.py` from a mutable-default task, and a test task about
-shared state is handed checks written for a different concern. And the inherited
-lessons sit in the always-on context of every request, so the run starts from more
-text and reads more: the mean attempt more than doubled its input tokens and its cost.
+Two things follow from handing over everything a domain holds. The helper scripts
+are written for the task that made them and travel under their own names: the python
+shelf carries `check_state_leak.py` and `check_pure_accumulate.py` from a
+mutable-default task, and a test task about shared state is handed checks written
+for a different concern. And the inherited lessons sit in the always-on context of
+every request, so the run starts from more text and reads more: the mean attempt
+more than doubled its input tokens and its cost.
 
 What this says about the plan: the recursion works -- the model writes real, general,
 domain-level lessons on its own, and they are kept and handed over -- but handing a
 task the whole shelf of its domain is not the same as handing it the lesson it needs.
 The measurement also cannot say much at this size: 6 test tasks means one task is
-16.7 points of pass^4, and the interval of a six-task comparison is half the scale it
-is meant to detect. A next version would let the library offer its lessons and let
-the task choose, and would measure on a test half large enough to have a resolution
-finer than the effect being looked for.
+16.7 points of pass^4, and the interval of a six-task comparison is wider than the
+effect it is meant to detect. A next version would let the library offer its lessons
+and let the task choose, and would measure on a test half large enough to have a
+resolution finer than the effect being looked for.
 
 ## Task files
 
