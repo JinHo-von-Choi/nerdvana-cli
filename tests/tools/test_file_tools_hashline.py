@@ -430,3 +430,13 @@ async def test_a_binary_file_can_still_be_overwritten_after_it_was_looked_at(tmp
     await FileReadTool().call(FileReadArgs(path="a.bin"), ctx, None)
     result = await FileWriteTool().call(FileWriteArgs(path="a.bin", content="text now"), ctx, None)
     assert not result.is_error
+
+
+async def test_an_anchor_edit_without_a_newline_keeps_the_next_line_separate(tmp_path: Path) -> None:
+    (tmp_path / "r.py").write_text("def f():\n    x = 1\n    return x\n", encoding="utf-8")
+    ctx = _ctx(tmp_path)
+    await _read(ctx, "r.py")
+    result = await _anchor_edit(ctx, "r.py", f"2#{_h('    x = 1')}", "    x = 2")
+    assert not result.is_error
+    assert (tmp_path / "r.py").read_text(encoding="utf-8") == "def f():\n    x = 2\n    return x\n"
+

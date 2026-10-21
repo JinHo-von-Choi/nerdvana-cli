@@ -103,3 +103,14 @@ def test_legitimate_command_allowed(bash_tool: BashTool, context: ToolContext, l
     assert result.behavior == PermissionBehavior.ALLOW, (
         f"[{label}] expected ALLOW but got {result.behavior!r} for command: {command}"
     )
+
+
+class TestRefusalsSayWhatWorks:
+    def test_a_dot_named_directory_is_not_mistaken_for_the_current_one(self) -> None:
+        tool = BashTool()
+        assert tool.check_permissions(BashArgs(command="rm -rf .verify"), ToolContext(cwd=".")).behavior != PermissionBehavior.DENY
+        assert tool.check_permissions(BashArgs(command="rm -rf ."), ToolContext(cwd=".")).behavior == PermissionBehavior.DENY
+
+    def test_inline_interpreter_code_is_refused_with_the_alternative(self) -> None:
+        result = BashTool().check_permissions(BashArgs(command="python3 -c 'print(1)'"), ToolContext(cwd="."))
+        assert "write the code to a file" in result.message

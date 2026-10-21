@@ -53,6 +53,18 @@ def _build_env(cwd: str) -> dict[str, str]:
     return env
 
 
+
+# Inline interpreter code is refused; the refusal says what works instead, so the model does not retry variants.
+_INLINE_CODE_PATTERNS = frozenset({
+    r"\b(?:python|python2|python3)(?:\d*(?:\.\d+)?)?(?:\s+-\w+)*\s+-c\b",
+    r"\b(?:perl|ruby|node|nodejs)(?:\s+-\w+)*\s+-e\b",
+    r"\bphp(?:\s+-\w+)*\s+-r\b",
+})
+_INLINE_CODE_HINT = (
+    ". Inline interpreter code is not run: write the code to a file in the project with FileWrite and run "
+    "the file (for example `python3 check_x.py`), then remove it."
+)
+
 class BashArgs:
     def __init__(self, command: str, timeout: int = 120, description: str = ""):
         self.command = command
@@ -115,7 +127,8 @@ Examples:
         re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+\*"),
         re.compile(r"\brm\s+-r\s+-f\s+[/~*]"),
         re.compile(r"\brm\s+-f\s+-r\s+[/~*]"),
-        re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+\."),
+        # The current or parent directory itself ("rm -rf ." or "rm -rf ../"), not a dot-named entry such as .venv.
+        re.compile(r"\brm\s+(?:-\w*r\w*f|-\w*f\w*r)\s+\.\.?/?(?=\s|$|[;&|])"),
         re.compile(r"\bmkfs\b"),
         re.compile(r"\bdd\s+if=/dev/(?:sd|nvme|vd|hd)"),
         re.compile(r">\s*/dev/(?:sd|nvme|vd|hd)"),
@@ -188,9 +201,10 @@ Examples:
 
         for pattern in self._DANGEROUS_PATTERNS:
             if pattern.search(cmd_stripped) or pattern.search(full_cmd):
+                hint = _INLINE_CODE_HINT if pattern.pattern in _INLINE_CODE_PATTERNS else ""
                 return PermissionResult(
                     behavior=PermissionBehavior.DENY,
-                    message=f"Dangerous command blocked: {pattern.pattern}",
+                    message=f"Dangerous command blocked: {pattern.pattern}{hint}",
                 )
 
         for pattern in self._ASK_PATTERNS:

@@ -604,7 +604,13 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 is_error=True,
             )
         line_count            = len(raw_lines)
-        raw_lines[target_idx] = args.new_string
+        old_line              = raw_lines[target_idx]
+        ending                = old_line[len(old_line.rstrip("\r\n")):]
+        replacement           = args.new_string
+        # The replaced line keeps its line ending, or the line after it would be joined onto the new text.
+        if ending and not replacement.endswith(("\n", "\r")):
+            replacement += ending
+        raw_lines[target_idx] = replacement
         new_content = "".join(raw_lines)
         try:
             _atomic_write(args.path, context.cwd, new_content)
