@@ -64,6 +64,16 @@ BUILTINS: tuple[str, ...] = (
 )
 
 
+# The first argument of each binding, so an error can show the call the model
+# should have written. The bindings take keyword arguments only.
+_FIRST_ARGUMENT: dict[str, str] = {
+    "FileRead":           "path='a.py'",
+    "Grep":               "pattern='name'",
+    "Glob":               "pattern='**/*.py'",
+    "lsp_find_references": "file_path='a.py', line=1, symbol='name'",
+}
+
+
 class Channel:
     """The socket to the host: a request goes out, an answer comes back."""
 
@@ -107,16 +117,32 @@ class Binding:
         self._name = name
         self._channel = channel
 
-    def __call__(self, **kwargs: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Call the binding. The arguments are the ones the tool names."""
+        if args:
+            raise TypeError(
+                f"{self._name} takes keyword arguments only: {self._name}({_FIRST_ARGUMENT[self._name]})"
+                if self._name in _FIRST_ARGUMENT else
+                f"{self._name} takes keyword arguments only."
+            )
         return self._channel.call(self._name, kwargs)
 
 
 def _guarded_import(name: str, namespace: dict[str, Any] | None = None, scope: dict[str, Any] | None = None,
                     fromlist: tuple[str, ...] = (), level: int = 0) -> Any:
-    """An import that only lets the modules of :data:`IMPORTABLE` through."""
+    """An import that only lets the modules of :data:`IMPORTABLE` through.
+
+    The error says what the sandbox does have, because a program that asks for
+    ``pathlib`` has to learn that a file is read through a binding, and a
+    program that fails once should not have to fail twice to learn it.
+    """
     root = name.split(".")[0]
     if root not in IMPORTABLE:
-        raise ImportError(f"the sandbox does not allow importing '{root}'")
+        raise ImportError(
+            f"the sandbox does not allow importing '{root}'. The program has no file system: "
+            "read a file with FileRead(path=...) and find one with Glob(pattern=...). "
+            f"The modules it allows: {', '.join(sorted(IMPORTABLE))}."
+        )
     return __import__(name, namespace, scope, fromlist, level)
 
 

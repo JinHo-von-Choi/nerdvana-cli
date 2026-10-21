@@ -409,4 +409,67 @@ def test_the_description_says_when_the_program_is_the_right_tool_and_when_it_is_
     assert "Do not use it to explore" in description
     assert "return the answer, not the files" in description
     assert "needs no second read" in description
-    assert "needs no second program" in description
+
+
+# The errors a program gets, and what they teach
+# ---------------------------------------------------------------------------
+
+
+@needs_landlock
+async def test_a_program_that_imports_a_forbidden_module_is_told_what_to_use() -> None:
+    """The model writes ``import pathlib`` because that is how it reads a file.
+
+    The sandbox has no file system, so the error has to say so -- and say what
+    the program may use instead. An error that only names the refusal leaves
+    the model to guess again, and the guess costs a turn.
+    """
+    runtime = await _runtime()
+
+    result = await runtime.run("import pathlib\n'never'")
+
+    assert not result.ok
+    assert "does not allow importing 'pathlib'" in result.error
+    assert "FileRead(path=...)" in result.error
+    assert "Glob(pattern=...)" in result.error
+    assert "json" in result.error and "re" in result.error
+
+
+@needs_landlock
+async def test_a_program_that_calls_a_binding_by_position_is_told_the_call_to_write() -> None:
+    """The bindings take keyword arguments, and the error shows the keyword form."""
+    runtime = await _runtime()
+
+    result = await runtime.run("FileRead('a.py')")
+
+    assert not result.ok
+    assert "keyword arguments only" in result.error
+    assert "FileRead(path=" in result.error
+
+
+@needs_landlock
+async def test_a_program_that_reads_with_open_is_told_that_there_is_none() -> None:
+    """``open`` is not among the builtins, and the program needs to know that."""
+    runtime = await _runtime()
+
+    result = await runtime.run("open('a.py').read()")
+
+    assert not result.ok
+    assert "open" in result.error
+
+
+def test_the_description_says_what_the_sandbox_allows() -> None:
+    """The description is in every request, so it has to carry the whole truth.
+
+    A model that writes ``FileRead(path)`` because the description shows
+    ``FileRead(path, offset, limit)``, or that imports ``pathlib`` because the
+    description says "a few other modules of the standard library", pays a
+    turn for every program that fails.
+    """
+    from nerdvana_cli.tools.ptc_tool import RunCodeTool
+
+    description = " ".join(RunCodeTool.description_text.split())
+
+    assert "no open(), no pathlib, no os" in description
+    assert "taking keyword arguments only" in description
+    assert "FileRead(path=..., offset=..., limit=...)" in description
+    assert "Only a few standard library modules are importable" in description

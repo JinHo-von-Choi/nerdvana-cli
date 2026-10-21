@@ -82,26 +82,24 @@ class RunCodeTool(BaseTool[RunCodeArgs]):
     description_text = """Run a Python program with the read-only tools bound into it.
 
 The program runs in a sandbox: it cannot write, execute or reach the network,
-and it sees no file except through the bindings.
+and it has no file system: no open(), no pathlib, no os. A file is read with
+FileRead(path=...) and found with Glob(pattern=...).
 
 Use it when you already know which files to read and what to compute from them:
 the loop then costs one tool call instead of one per file. Do not use it to
-explore -- one or two files are cheaper to read directly, and a program that
-sweeps a project answers a question nobody asked.
+explore. Have it return the answer, not the files -- a count, a name, the lines
+that match -- because what comes back is what stays in the conversation, and
+every turn sends the conversation again. A file it read needs no second read.
 
-Have the program return the answer, not the files: a count, a name, the lines
-that match. What comes back is what stays in the conversation, and every turn
-sends the conversation again. A file the program read needs no second read, and
-a question the program answered needs no second program.
+Bound tools, each returning data and taking keyword arguments only:
+FileRead(path=..., offset=..., limit=...) gives the text of a file,
+Grep(pattern=..., path=...) gives the matching lines as "path:line: text",
+Glob(pattern=..., path=...) gives the paths, and lsp_find_references(file_path=...,
+line=..., symbol=...) gives the places. A failed call returns "ERROR: ...".
 
-Bound tools, each returning data: FileRead(path, offset, limit) gives the text
-of the file, Grep(pattern, path, include, case_sensitive) gives the matching
-lines as "path:line: text", Glob(pattern, path) gives the paths, and
-lsp_find_references(file_path, line, symbol) gives the places. A failed call
-returns "ERROR: ...".
-
-The value of the last expression is the result. The program may import json,
-re, math and a few other modules of the standard library.
+Only a few standard library modules are importable: json, re, math, csv,
+collections, itertools, statistics, textwrap, datetime, functools, string. The
+value of the last expression is the result.
 
 Example: code: "sum(len(FileRead(path=f).splitlines()) for f in Glob(pattern='**/*.py'))"
 """
