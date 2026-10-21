@@ -569,3 +569,29 @@ In the runs after that, the model wrote `open(path).read()` and was told "name '
 These are not the model's bad logic. They are the model writing the program it would write anywhere else: `import pathlib` to walk a tree, `open(path).read()` to read a file, `FileRead("a.py")` to call a function. The sandbox allows twenty-one modules from the standard library and no file system at all, and the tool's description said none of that. It showed the bindings as `FileRead(path, offset, limit)`, which reads as a positional call, and it said the program "may import json, re, math and a few other modules of the standard library", which reads as "the standard library is there".
 
 So the PTC runtime was a tax. The agent paid for the tool with a turn for every program that failed, and read the files by hand anyway -- which is what the transcripts show: the reads by hand outnumber the reads through programs. The 54.8 percent the PTC runtime added to the long tasks was not the price of exploring more. It was the price of a tool that did not work, plus the exploration that a working tool would have replaced.
+
+## The offset, measured
+
+The interface of the PTC runtime was fixed -- the description now says what the sandbox allows, and the errors say what to use instead -- and the guidance was added: the program is for a question the agent already knows how to ask, and it should return the answer rather than the files. The change was measured the way the rest of this report measures: two builds of this repository, the same long tasks, the same fixtures, MiniMax-M3.1-Flash-Preview, each arm a worktree of its own commit.
+
+| | Attempts | Passed | Turns | Input tokens | Cost |
+|-|-|-|-|-|-|
+| before (`c9723ae`) | 9 | 8 | 45.3 | 1,707,948 | $0.1580 |
+| after (`24a8476`) | 10 | 10 | 39.3 | 1,309,829 | $0.1085 |
+
+Paired by task, the difference is **-11.6 turns** (95% bootstrap interval -53.4 to +30.1) and **-704,650 input tokens** (-2,915,280 to +1,505,979). Both intervals contain zero, and both are wider than the effect the plan was asking about. The two runs cannot be told apart.
+
+That is what this instrument can say, and it is worth being plain about how little it is. The sweep was stopped at nine and ten attempts over two of the eight tasks, because the attempts of the second task -- the one with the many look-alike modules -- take fifteen to thirty minutes each, and the paired interval on the turns is already +-50 at this size. A third of a turn is what the 32-attempt measurement of the four builds could resolve; this one resolves nothing about the cost.
+
+What the transcripts do say is sharper, because they count rather than weigh:
+
+| | Programs per attempt | Files read through programs, per attempt |
+|-|-|-|
+| before | 0.78 | 1.4 |
+| after | 0.70 | 0.3 |
+
+The tool is reached for in about a quarter of the attempts, and the failures continue: the model writes `import pathlib` and `open(path).read()` even with a description that says the program has no file system and no `open`. What the fix changes is the *second* program. The transcripts show a failed program followed by one that works -- one program that read thirteen files and answered the question -- which is the promise the tool makes, kept at last.
+
+So the offset is: the tool works now, and the run costs the same as before within what this measurement can see. The reason is the one the previous section found: the PTC runtime was never the thing the tokens are made of. Eleven thousand tokens of system prompt and tool declarations are sent again on every turn, and they are 39 to 43 percent of a long attempt and 81 to 84 percent of a short one. A tool that fails is worth fixing -- a description that lies about the sandbox is a defect, and the errors that only refuse cost a turn each -- but the tokens are elsewhere.
+
+The next piece of work, then, is the prefix: the declaration of the 28 tools is 5,882 tokens of the 11,060 every request carries, and the deferral machinery that keeps the MCP tools out of the request does not reach the built-in ones. A tool the model rarely calls is a few hundred tokens on every request of every task, and unlike a change in what the model does, that one is certain.
