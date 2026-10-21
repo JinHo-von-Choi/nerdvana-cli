@@ -483,7 +483,18 @@ Three things come out of it.
 
 The tool works. A program in the PTC runtime reads the files it was told to read -- one `tool/ptc-dispatch` event per read, `FileRead`, `Grep` or `Glob` -- and returns one JSON object in place of them. The programs of the PTC arm read about sixteen files each, and returned 47 to 210 characters where the individual reads they replaced were at least 500 characters each (the transcript truncates a result at 500).
 
-The agent does not spend that saving on fewer turns. A third of the attempts of the PTC build run a program at all (9 of 29 transcripts), and in those attempts the agent runs about four programs and reads about fifty-seven files through them -- against the three or four files it reads by hand in the same build without the tool. Every arm re-reads each file it looks at four or five times, so the agent was always wasteful; what the PTC changes is the scale of the waste. The PTC arm mentions 82 file paths per attempt against 58 in 1.9.1, and the number of distinct files it touches grows from 12.7 to 16.4. A cheap way to read a file is also a cheap way to read all the files, and the agent takes the offer.
+The agent does not spend that saving on fewer turns. In the PTC build a third of the attempts run a program at all, and in those the agent runs about four programs, reads about fifty-seven files through them and takes 29.8 assistant messages against the 14.4 of 1.9.1. But the attempts of the *same* build that ran no program took 20.7 messages -- against the 13.4 of the build that has the SpillPolicy and no PTC runtime. The extra turns are therefore not only the price of running a program: having the program available changes what the agent does even in the attempts where it does not run one. A cheaper way to look at a file is a cheaper way to look at all the files, and the agent plans the bigger sweep whether or not it pays for it.
+
+| Build | Attempts | Assistant messages | `run_code` per attempt | Reads inside programs | `FileRead` | `Bash` |
+|-|-|-|-|-|-|-|
+| 1.9.1 | 31 | 14.4 | 0.06 | 0 | 3.5 | 9.4 |
+| + SpillPolicy | 31 | 13.4 | 0.00 | 0 | 3.8 | 8.9 |
+| + SpillPolicy + PTC, with a program | 9 | 29.8 | 3.67 | 57.2 | 3.9 | 13.3 |
+| + SpillPolicy + PTC, without one | 20 | 20.7 | 0.00 | 0 | 5.0 | 12.8 |
+| HEAD, with a program | 9 | 28.9 | 2.00 | 20.0 | 3.6 | 18.1 |
+| HEAD, without one | 26 | 15.0 | 0.00 | 0 | 4.4 | 9.5 |
+
+The scale of the waste grows with it. Every arm re-reads each file it looks at four or five times, so the agent was always wasteful; what the PTC changes is the scale. The PTC arm mentions 82 file paths per attempt against 58 in 1.9.1, and the number of distinct files it touches grows from 12.7 to 16.4.
 
 And that is where the money goes. A request carries the whole conversation, so the cost of an attempt is roughly the number of turns times the size of the conversation at that turn. The PTC lowered the size of one result and left the size of the request where it was (21,139 against 21,392 input tokens per request), and then multiplied the number of requests by 1.7. The compression is real and it is smaller than the exploration it buys.
 
