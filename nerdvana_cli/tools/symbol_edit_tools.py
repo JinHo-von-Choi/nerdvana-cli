@@ -275,6 +275,7 @@ class SymbolEditTool(BaseTool[ArgsT]):
     side_effects:          ClassVar[ToolSideEffect] = ToolSideEffect.FILESYSTEM
     tags:                  ClassVar[frozenset[str]] = frozenset({"lsp", "symbol", "edit"})
     requires_confirmation: ClassVar[bool]           = True
+    deferrable:            ClassVar[bool]           = True
 
     #: Whether step 1 needs a body payload. Safe delete does not.
     requires_body: ClassVar[bool] = True

@@ -76,6 +76,33 @@ def test_built_in_tools_are_never_deferred() -> None:
     assert ToolIndex.build([_Builtin(), *_big()], "always", 0).deferred.keys().isdisjoint({"Plain"})
 
 
+class _Rare(_Builtin):
+    name       = "RareEdit"
+    deferrable = True
+
+
+def test_deferrable_built_in_tools_are_deferred_without_any_mcp_tool_unless_never() -> None:
+    tools = [_Builtin(), _Rare()]
+    assert set(ToolIndex.build(tools, "auto").deferred) == {"RareEdit"}
+    assert set(ToolIndex.build(tools, "always").deferred) == {"RareEdit"}
+    assert ToolIndex.build(tools, "never").deferred == {}
+
+
+def test_a_small_mcp_set_stays_declared_when_only_built_in_tools_are_deferred() -> None:
+    index = ToolIndex.build([_Rare(), _Mcp("mcp__a__t", "tiny")], "auto", 3000)
+    assert set(index.deferred) == {"RareEdit"}
+
+
+def test_the_symbol_edit_tools_are_the_deferrable_built_ins() -> None:
+    from nerdvana_cli.tools.registry import create_tool_registry
+
+    deferrable = {t.name for t in create_tool_registry().all_tools() if t.deferrable}
+    assert deferrable <= {
+        "replace_symbol_body", "insert_before_symbol", "insert_after_symbol",
+        "safe_delete_symbol", "lsp_rename", "restart_language_server",
+    }
+
+
 def test_declared_hides_unloaded_tools_and_keeps_the_order_of_the_rest() -> None:
     tools = [_Builtin(), *_big()]
     index = ToolIndex.build(tools, "always")

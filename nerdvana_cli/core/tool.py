@@ -113,6 +113,8 @@ class BaseTool(ABC, Generic[T]):
     requires_confirmation: ClassVar[bool]            = False
     # Arguments outside ``input_schema`` are rejected unless the schema says otherwise.
     reject_unknown_args:   ClassVar[bool]            = True
+    # A tool most tasks never call: the main loop lists it by name and declares it once ToolSearch loads it.
+    deferrable:            ClassVar[bool]            = False
 
     @property
     def is_read_only(self) -> bool:

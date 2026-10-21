@@ -6,7 +6,8 @@ Date:   2026-10-03
 Every request carries the declaration (name, description and parameter schema) of every tool. A few
 built-in tools cost a few thousand tokens; an MCP server can add dozens of tools and tens of thousands.
 When that cost gets large, the MCP tools are *deferred*: the system prompt lists their names with one line
-each, and a ``ToolSearch`` tool lets the model load the ones it needs. A loaded tool is declared in full
+each, and a ``ToolSearch`` tool lets the model load the ones it needs. Built-in tools that most tasks never
+call (``BaseTool.deferrable``) are deferred the same way. A loaded tool is declared in full
 from the next request on and stays declared for the session. Loading appends to the end of the declaration
 list, so the part of the request that came before keeps its place.
 """
@@ -34,6 +35,10 @@ def _is_mcp(tool: Any) -> bool:
     return "mcp" in getattr(tool, "tags", frozenset())
 
 
+def _is_deferrable(tool: Any) -> bool:
+    return bool(getattr(tool, "deferrable", False))
+
+
 def _first_line(text: str, limit: int = 110) -> str:
     line = (text.strip().splitlines() or [""])[0].strip()
     return line if len(line) <= limit else line[: limit - 1] + "…"
@@ -48,13 +53,18 @@ class ToolIndex:
 
     @classmethod
     def build(cls, tools: list[Any], mode: str = "auto", threshold: int = DEFAULT_THRESHOLD) -> ToolIndex:
-        """Decide which of *tools* to defer: MCP tools, when ``mode`` says so or their declarations are large."""
-        candidates = [t for t in tools if _is_mcp(t)]
-        if mode == "never" or not candidates:
+        """Decide which of *tools* to defer.
+
+        Built-in tools marked ``deferrable`` are deferred unless ``mode`` is ``never``. MCP tools are deferred
+        when ``mode`` is ``always``, or under ``auto`` when their declarations add up to more than *threshold*.
+        """
+        if mode == "never":
             return cls()
-        if mode == "auto" and sum(declaration_tokens(t) for t in candidates) <= threshold:
-            return cls()
-        return cls({t.name: t for t in candidates})
+        deferred = [t for t in tools if _is_deferrable(t) and not _is_mcp(t)]
+        mcp      = [t for t in tools if _is_mcp(t)]
+        if mcp and (mode == "always" or sum(declaration_tokens(t) for t in mcp) > threshold):
+            deferred += mcp
+        return cls({t.name: t for t in deferred})
 
     def declared(self, tools: list[Any]) -> list[Any]:
         """The tools to declare in a request: everything except deferred tools that are not loaded yet."""

@@ -13,7 +13,7 @@ tokens), they are deferred:
 - A loaded tool is declared in full from the next request on and stays declared for the rest of the session.
 - Calling a tool that is deferred and not loaded is refused with a message that says how to load it.
 
-Built-in tools are always declared in full, and sub-agents (`Agent`, `Swarm`) declare every tool they are allowed.
+The built-in tools most tasks never call (`replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `safe_delete_symbol`, `lsp_rename`, `restart_language_server`) are deferred the same way unless `defer_tools` is `never`; the other built-in tools are always declared in full. Sub-agents (`Agent`, `Swarm`) declare every tool they are allowed.
 
 ```yaml
 session:

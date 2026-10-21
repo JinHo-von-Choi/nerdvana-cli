@@ -42,6 +42,7 @@ class RestartLanguageServerTool(BaseTool[RestartLanguageServerArgs]):
     side_effects:          ClassVar[ToolSideEffect]  = ToolSideEffect.EXTERNAL
     tags:                  ClassVar[frozenset[str]]  = frozenset({"lsp", "symbol"})
     requires_confirmation: ClassVar[bool]            = False
+    deferrable:            ClassVar[bool]            = True
 
     _LANG_TO_EXT: ClassVar[dict[str, str]] = {
         "python":     ".py",

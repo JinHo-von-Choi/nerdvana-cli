@@ -421,12 +421,8 @@ def _environment_section(
             for line in git["recent"].splitlines():
                 parts.append(f"  {line}")
 
-    parts.append("")
-    parts.append("## NIRNA.md (Project Instructions) — CRITICAL")
-    parts.append("NIRNA.md files are LOCAL FILES on the filesystem, NOT documents on any MCP server.")
-    parts.append("NEVER use list_docs, get_doc, or any MCP document tool to find NIRNA.md.")
-    parts.append("Use FileRead tool to read them. Paths:")
-    parts.append("1. ~/.nerdvana/NIRNA.md (global)")
-    parts.append("2. <cwd>/NIRNA.md (project)")
-    parts.append("3. <cwd>/NIRNA.local.md (local, gitignored)")
+    parts.append(
+        "- Project instructions are local files (~/.nerdvana/NIRNA.md, <cwd>/NIRNA.md, <cwd>/NIRNA.local.md), "
+        "not MCP documents; the ones that exist are included below."
+    )
     return "\n".join(parts)

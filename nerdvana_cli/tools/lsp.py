@@ -206,6 +206,7 @@ class LspRenameTool(BaseTool[LspRenameArgs]):
     side_effects           = ToolSideEffect.FILESYSTEM
     tags: ClassVar[frozenset[str]] = frozenset({"lsp", "symbol", "refactor"})
     requires_confirmation  = True
+    deferrable: ClassVar[bool] = True
 
     def __init__(self, client: LspClient):
         super().__init__()

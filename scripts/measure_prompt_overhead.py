@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from nerdvana_cli.cli.bootstrap import loop_factories
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.token_estimator import approx_tokens
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
@@ -44,8 +45,9 @@ def measure(cwd: str) -> dict[str, Any]:
     settings     = NerdvanaSettings()
     settings.cwd = cwd
     registry     = create_tool_registry(settings=settings)
-    loop         = AgentLoop(settings=settings, registry=registry)
-    tools        = [t for t in registry.all_tools() if loop.policy.is_visible(t.name)]
+    loop         = AgentLoop(settings=settings, registry=registry, factories=loop_factories())
+    # The tools the first request declares: deferred tools are listed in the prompt instead.
+    tools        = loop._declared(loop._prepare_tools())
     prompt       = loop.build_system_prompt()
     sections     = [(approx_tokens(part), part.splitlines()[0][:60]) for part in _SECTION.split(prompt) if part.strip()]
     declared     = [(approx_tokens(json.dumps(d, ensure_ascii=False)), d["name"]) for d in declarations(tools)]
