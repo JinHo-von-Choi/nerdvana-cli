@@ -465,3 +465,32 @@ for build in ccfa23e a6f9dc2 6607ab0 57727d6; do
 done
 uv run python scripts/bench_compare.py /tmp/gate4/long-ccfa23e.jsonl /tmp/gate4/long-57727d6.jsonl
 ```
+
+## Why the PTC runtime makes the agent take more turns
+
+The table above says the PTC runtime added 73 percent to the requests of an attempt and nothing to the size of a request. That is worth a paragraph of mechanism, because "the agent uses the tool more" is not an explanation, it is a restatement.
+
+The transcripts of the long runs were read to find out what the agent actually does with the tool. Each run of the agent writes a session file under `~/.nerdvana/sessions/`, one per attempt, and the file names the task and the attempt in its working directory. The bench record names the attempt's duration, so a transcript can be joined to the arm it came from by task, attempt and how long the run took. Six runs of the long tasks are on disk, so the join is approximate -- a transcript is attributed to the arm whose record is closest in duration, and a few of them can be attributed to the wrong arm. The counts below are means over the transcripts attributed to each arm, and they are used for shape, not for the numbers the report claims: the token and turn figures come from the bench records, which are exact.
+
+| Build | Assistant messages | Tool calls | `Bash` | `FileRead` | `FileEdit` | `run_code` | Reads inside programs |
+|-|-|-|-|-|-|-|-|-|
+| 1.9.1 | 14.4 | 17.8 | 9.4 | 3.5 | 2.6 | 0.06 | 0 |
+| + SpillPolicy | 13.4 | 18.7 | 8.9 | 3.8 | 3.5 | 0.00 | 0 |
+| + SpillPolicy + PTC | 23.5 | 26.9 | 13.0 | 4.7 | 5.2 | 1.14 | 17.8 |
+| HEAD | 18.6 | 23.9 | 11.7 | 4.2 | 4.8 | 0.51 | 5.1 |
+
+Three things come out of it.
+
+The tool works. A program in the PTC runtime reads the files it was told to read -- one `tool/ptc-dispatch` event per read, `FileRead`, `Grep` or `Glob` -- and returns one JSON object in place of them. The programs of the PTC arm read about sixteen files each, and returned 47 to 210 characters where the individual reads they replaced were at least 500 characters each (the transcript truncates a result at 500).
+
+The agent does not spend that saving on fewer turns. A third of the attempts of the PTC build run a program at all (9 of 29 transcripts), and in those attempts the agent runs about four programs and reads about fifty-seven files through them -- against the three or four files it reads by hand in the same build without the tool. Every arm re-reads each file it looks at four or five times, so the agent was always wasteful; what the PTC changes is the scale of the waste. The PTC arm mentions 82 file paths per attempt against 58 in 1.9.1, and the number of distinct files it touches grows from 12.7 to 16.4. A cheap way to read a file is also a cheap way to read all the files, and the agent takes the offer.
+
+And that is where the money goes. A request carries the whole conversation, so the cost of an attempt is roughly the number of turns times the size of the conversation at that turn. The PTC lowered the size of one result and left the size of the request where it was (21,139 against 21,392 input tokens per request), and then multiplied the number of requests by 1.7. The compression is real and it is smaller than the exploration it buys.
+
+What an offset would have to do is therefore not shrink the result of a program -- that part works -- but stop the extra turns. Three levers are visible in the numbers, and none of them is in the PTC runtime today:
+
+- **Make the program the only way to read a file.** The PTC arm reads 13 files by `Bash` and 4.7 by `FileRead` per attempt, *and* runs programs over the same project. Every file the agent opens by hand is a separate result in the conversation; a file that the program already read should not be opened again.
+- **Bound the sweep.** A program that read sixteen files in one call invites a second program. A cap on the reads one program may perform, or on the dispatches one attempt may spend, bounds the exploration the agent buys.
+- **Answer rather than report.** The programs return file contents. A program that returned the answer -- the call sites of a symbol, the lines that mention a name -- would cut the turns as well as the result.
+
+None of these has been built, and this section does not claim that any of them would work: at 32 attempts over 8 tasks on one model, the pass-rate differences between the four builds cannot be told apart at all. What the measurement does establish is where the tokens went.
