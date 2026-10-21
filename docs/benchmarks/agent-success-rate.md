@@ -131,6 +131,56 @@ the run is given says so, and the note the library keeps names the domain and
 not the task. A lesson that named one task would not be a lesson the next task
 of the domain could use, and the measurement would say nothing.
 
+### What the library learned, and what it was worth
+
+Measured on the 20 short tasks, MiniMax-M3.1-Flash-Preview. The tasks were split by
+domain into a train half of 14 and a test half of 6, and each half was run with 4
+attempts per task. The train half ran with `--learn` and filled the library; the test
+half ran twice, once with nothing and once with `--library`, so the two runs differ
+in one thing only: what the test tasks started from.
+
+The train half solved 14 of 14 tasks (mean pass@4 1.00, mean pass^4 0.64, $1.58 for
+56 attempts) and left behind 12 skills and 14 helper scripts, kept whole under the
+domain each belongs to:
+
+| Domain | Skills | Scripts |
+|-|-|-|
+| c | `ring-buffer-invariants` | `stress_ring.c` |
+| node | `deduping-duplicated-js-functions`, `emitter-listener-management`, `extending-callback-registry-api`, `testing-pure-js-helpers` | |
+| python | `extend-stock-ledger`, `fix-ceil-division-boundary`, `fix-first-separator-split`, `fix-inclusive-range-endpoint`, `fix-one-based-table-lookup`, `fix-suffix-overflow-width`, `write-interval-merge-tests` | 13 |
+
+The lessons are about the kind of task and not about the task: `fix-inclusive-range-endpoint`
+says how to read the endpoint contract before touching a bound, and names no task.
+
+| Test half | Passed | mean pass^4 | Mean input tokens | Mean cost |
+|-|-|-|-|-|
+| without the library | 22/24 (92%) | 0.67 | 97,309 | $0.0109 |
+| with the library | 17/24 (71%) | 0.33 | 215,509 (+121.5%) | $0.0239 (+119.9%) |
+
+The plan wanted the test half's pass^4 to be 10 points or more higher with the library.
+It was 33 points lower, and the difference in pass rate is -20.8 points with a 95
+percent bootstrap interval of -0.542 to +0.125: the interval contains zero, so at 6
+tasks and 4 attempts the two runs cannot be told apart. Per task, one task gained
+(`add-py-slug-max-length`, pass^4 0 to 1), three lost (`fix-js-median`, `multi-js-config-loader`,
+`recover-shared-rate`, pass^4 1 to 0) and two were unchanged.
+
+The mechanism is visible in the turns. The library hands over everything its domain
+holds, and two things follow. The helper scripts are written for the task that made
+them and travel under their own names: the python shelf carries `check_state_leak.py`
+and `check_pure_accumulate.py` from a mutable-default task, and a test task about
+shared state is handed checks written for a different concern. And the inherited
+lessons sit in the always-on context of every request, so the run starts from more
+text and reads more: the mean attempt more than doubled its input tokens and its cost.
+
+What this says about the plan: the recursion works -- the model writes real, general,
+domain-level lessons on its own, and they are kept and handed over -- but handing a
+task the whole shelf of its domain is not the same as handing it the lesson it needs.
+The measurement also cannot say much at this size: 6 test tasks means one task is
+16.7 points of pass^4, and the interval of a six-task comparison is half the scale it
+is meant to detect. A next version would let the library offer its lessons and let
+the task choose, and would measure on a test half large enough to have a resolution
+finer than the effect being looked for.
+
 ## Task files
 
 One YAML file per task in `benchmarks/tasks/`:
@@ -334,3 +384,24 @@ builds only on the same tasks, model and attempt count.
 | 8 long tasks (`benchmarks/long`, about 32 turns) | 24 | 23 of 24 / 22 of 24 | -5.1 percent | +13.4 percent | 16 of 24 |
 
 On the long tasks masking cleared 712 results in total and the runs took 30 percent more turns (41.5 against 31.9 on average): the model read the cleared files again. The cache share of input fell from 95.1 to 88.9 percent, because a cleared message changes the start of the request. The pass rates cannot be told apart (95 percent interval of the difference -0.21 to +0.04). On this model and these tasks masking saves nothing, so it stays off by default. A model without cheap cached input, or a task set whose reads are never repeated, may behave differently and has not been measured.
+
+## The token cost of the harness work, measured
+
+The harness work since 1.9.1 was measured on the eight long tasks, 4 attempts each (32 attempts per arm), MiniMax-M3.1-Flash-Preview. Each arm is a build of this repository, run from a worktree of its own commit; the tasks and the fixtures are byte-identical in all of them.
+
+| Build | Passed | Mean input tokens | Mean cost | Mean turns | Input per turn |
+|-|-|-|-|-|-|
+| 1.9.1 (`ccfa23e`) | 18/32 | 372,921 | $0.0359 | 13.1 | 21,392 |
+| + SpillPolicy (`a6f9dc2`) | 19/32 | 339,711 (-8.9%) | $0.0348 | 14.8 | 18,620 (-13.0%) |
+| + SpillPolicy + PTC (`6607ab0`) | 18/32 | 577,291 (+54.8%) | $0.0525 | 22.6 | 21,139 |
+| HEAD (`57727d6`) | 19/32 | 522,464 (+40.1%) | $0.0475 | 20.3 | 21,134 |
+
+The plan wanted the mean input tokens to fall by 30 percent or more with the SpillPolicy and the PTC runtime. They did not: they rose by 54.8 percent. The two features are worth separating, because they do different things.
+
+The SpillPolicy does what it was built for: a tool result that would have been inlined whole is previewed and spilled, and the request that carries it is 13 percent smaller. That saving does not reach the attempt, because the agent took more turns (14.8 against 13.1), and every turn sends the whole conversation again. The two effects nearly cancel: 8.9 percent less per attempt, against 13.0 percent less per request.
+
+The PTC runtime is what turns the number around. It gives the agent a way to run a program with the read-only tools in it, and on these tasks the agent uses it: 22.6 turns against 13.1, 73 percent more requests, each carrying a conversation that is no longer smaller per request than it was in 1.9.1 (21,139 against 21,392, the saving of the SpillPolicy gone). The cost per attempt follows: +54.8 percent against the base, +46.2 percent in dollars.
+
+No pair of the four builds can be told apart on the pass rate. Every difference has a 95 percent bootstrap interval that contains zero, and the largest is the SpillPolicy against 1.9.1 at +3.1 points (-0.250 to +0.312). A single model on 32 attempts over 8 tasks is a weak instrument: it shows that the pass rate did not fall, and it cannot rule out a fall of a few points.
+
+What this says about the plan: the SpillPolicy's claim is about a request, and it holds. The claim of a 30 percent cut to an attempt was a claim about the whole run, and it needs the agent to take fewer turns, not the same turns with a smaller body. The PTC runtime makes the agent take more turns, and its value has to be paid for somewhere else.
