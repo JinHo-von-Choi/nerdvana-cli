@@ -43,6 +43,9 @@ directories on Linux; it does not stop reading, running programs or UDP.
 | `--substrate SUBSTRATE` | what answers the task: `loop` (the default loop of the CLI) or `subagent:PRESET` (a sub-agent preset, run in this process) |
 | `--benchmark NAME` | the benchmark to run: `short-20`, `long-8`, `migration-campaign`, or an external one (`workbuddy`, `jobbench`) with `--source`; the task path is used when it is not given |
 | `--results-dir DIR` | the directory the results are kept in; it carries the mark of the run that made it, and a directory made with another configuration is not continued |
+| `--library DIR` | the directory the domain library is kept in; a task of a domain starts from what that domain learned |
+| `--library-mode MODE` | how the domain's lessons reach a task: `menu` (default) offers them as a list and lets the task read the one that applies, `shelf` hands over all of them |
+| `--learn` | let a task leave behind what it learned, so the next task of its domain starts from it (needs `--library`) |
 | `--out FILE` | JSONL file each attempt is appended to (default `bench-results.jsonl`, or `results.jsonl` in `--results-dir`) |
 | `--keep-workdirs` | keep each attempt's working directory |
 | `--yes` | actually run the agent and spend money |
