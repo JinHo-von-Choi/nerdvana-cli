@@ -70,6 +70,7 @@ from nerdvana_cli.core.harness.bench_spec import (
     load_benchmark,
     write_runmark,
 )
+from nerdvana_cli.core.harness.external_cli import external_command, external_usage
 from nerdvana_cli.core.harness.library import DomainLibrary, ExperienceNote
 from nerdvana_cli.core.harness.ppc import AnonymizedSelector, AnonymousCandidate, Candidate
 from nerdvana_cli.core.harness.surface import NERDVANA_SURFACE
@@ -665,6 +666,17 @@ def _record_report(result: Attempt, agent: subprocess.CompletedProcess[str]) -> 
     return report
 
 
+def _record_external(result: Attempt, agent: subprocess.CompletedProcess[str], cli: str) -> None:
+    """What another CLI reported: its exit code, and the turns and tokens it printed (absent ones stay unmeasured)."""
+    usage            = external_usage(cli, agent.stdout)
+    result.exit_code = agent.returncode
+    result.stop      = "success" if agent.returncode == 0 else "error"
+    result.turns     = usage.get("turns", 0)
+    result.usage     = {key: value for key, value in usage.items() if key != "turns"}
+    if agent.returncode != 0:
+        result.error = agent.stderr.strip()[-300:]
+
+
 def run_attempt(
     task: Task, number: int, options: argparse.Namespace, root: Path,
     *, run_env: dict[str, Any] | None = None, config: Path | None = None,
@@ -787,14 +799,21 @@ def run_candidate(
         result.error = problem
         return result
 
-    before = _give_harness(task, workdir, options)
-    command = agent_command(task, options) + (["--config", str(config)] if config else [])
+    before   = _give_harness(task, workdir, options)
+    external = options.substrate.name == "external"
+    if external:
+        command = external_command(options.substrate.preset, task.prompt, str(workdir), options.model)
+    else:
+        command = agent_command(task, options) + (["--config", str(config)] if config else [])
     started = time.monotonic()
     try:
         agent = subprocess.run(
             command, cwd=workdir, capture_output=True, text=True, timeout=task.timeout, check=False,
         )
-        report = _record_report(result, agent)
+        if external:
+            _record_external(result, agent, options.substrate.preset)
+        else:
+            report = _record_report(result, agent)
     except subprocess.TimeoutExpired:
         result.stop  = "timeout"
         result.error = f"agent exceeded {task.timeout}s"
@@ -898,7 +917,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Measure the agent's success rate on fixed repository tasks.")
     parser.add_argument("tasks", type=Path, nargs="?", help="a task file or a directory of *.yml task files")
     parser.add_argument("--method", default="single", help="how the agent answers a task: single | ppc | ppc:K (the propose-probe-compose run with K candidates)")
-    parser.add_argument("--substrate", default="loop", help="what answers the task: loop | subagent | subagent:PRESET")
+    parser.add_argument("--substrate", default="loop", help="what answers the task: loop | subagent:PRESET | external:CLI (claude, codex, mcode, opencode, copilot)")
     parser.add_argument("--benchmark", default="", help="the name of a known benchmark (short-20, long-8, ...); the tasks path is used when it is not given")
     parser.add_argument("--source", default="", help="where the tasks of an external benchmark are")
     parser.add_argument("--results-dir", type=Path, default=None, help="the directory the results are kept in; one made with another configuration is not continued")

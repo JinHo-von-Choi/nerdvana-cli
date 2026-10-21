@@ -200,8 +200,8 @@ class RunReporter:
         """Report what one provider request used and cost (stream-json only)."""
         if self._fmt == "stream-json":
             keys = ("provider", "model", "agent_type", "turn", "last_tool", "input_tokens", "output_tokens",
-                    "cache_read_tokens", "cache_write_tokens", "cost_usd")
-            self._line({"type": "request", **{key: usage.get(key, 0 if key.endswith(("tokens", "turn", "usd")) else "") for key in keys}})
+                    "cache_read_tokens", "cache_write_tokens", "cost_usd", "first_event_ms", "request_ms")
+            self._line({"type": "request", **{key: usage.get(key, 0 if key.endswith(("tokens", "turn", "usd", "ms")) else "") for key in keys}})
 
     def final_text(self) -> str:
         """The answer: the text produced after the last tool call."""

@@ -64,6 +64,6 @@ One JSON object per line, before the result object.
 | `notice` | A message from the agent itself, such as a retry or a fallback |
 | `tool_start` | `name`, `summary` |
 | `tool_done` | `name`, `is_error`, `result` (the first line of the tool's result) |
-| `request` | One provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, and `cost_usd` |
+| `request` | One provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, `cost_usd`, `first_event_ms` (time to the first streamed event) and `request_ms` (time to the end of the response) |
 | `compaction` | The history was compacted |
 | `context` | Percent of the context window in use |

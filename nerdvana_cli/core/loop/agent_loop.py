@@ -13,6 +13,7 @@ import dataclasses
 import json
 import logging
 import re
+import time
 from collections import Counter
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import replace
@@ -260,7 +261,7 @@ class AgentLoop:
                 # leaves no trace hides itself for as long as nobody looks.
                 logger.warning("activity change callback failed", exc_info=True)
 
-    def _apply_usage(self, usage: dict[str, int], messages_sent: int | None) -> None:
+    def _apply_usage(self, usage: dict[str, int], messages_sent: int | None, timing: dict[str, int] | None = None) -> None:
         """Fold one request's reported *usage* into the session's counters.
 
         ``input_tokens`` is the whole prompt; ``cache_read_tokens`` and
@@ -279,6 +280,7 @@ class AgentLoop:
             self.usage_listener({
                 **usage, "provider": self.settings.model.provider, "model": self.settings.model.model,
                 "agent_type": origin.agent_type, "turn": origin.turn, "last_tool": origin.last_tool, "cost_usd": cost,
+                **(timing or {}),
             })
         if messages_sent is not None:
             self._context_budget.record_usage(current.input_tokens, messages_sent)
@@ -719,7 +721,11 @@ class AgentLoop:
             idle  = self.settings.session.stream_idle_timeout,
             total = self.settings.session.stream_total_timeout,
         )
+        started = time.monotonic()
+        first   = 0.0
         async for ev in until_interrupted(events, self.input_queue.interrupt):
+            if not first and ev.type in ("content_delta", "thinking_delta", "tool_use_start", "tool_use_complete"):
+                first = time.monotonic()
             if ev.type == "content_delta":
                 self._set_activity(
                     phase="streaming",
@@ -738,7 +744,11 @@ class AgentLoop:
             elif ev.type == "tool_use_complete":
                 turn.add_call(ev.tool_use_id, ev.tool_name, ev.tool_input_complete, ev.tool_signature)
             elif ev.type == "usage" and ev.usage:
-                self._apply_usage(ev.usage, turn.sent_count)
+                now = time.monotonic()
+                self._apply_usage(ev.usage, turn.sent_count, {
+                    "first_event_ms": round(((first or now) - started) * 1000),
+                    "request_ms":     round((now - started) * 1000),
+                })
             elif ev.type == "done":
                 # ``done`` ends the response. Reading on would act twice on a provider
                 # that repeats its final chunk.

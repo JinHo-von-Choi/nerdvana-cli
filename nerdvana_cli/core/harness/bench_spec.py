@@ -1,7 +1,5 @@
 """The three axes of a benchmark run: the method, the substrate and the benchmark.
 
-Task 4.1 of the Harness2/DSH enhancement plan.
-
 A benchmark run is one cell of an experiment, and an experiment is a grid.
 The method says how the agent answers a task -- once, or k times with the best
 of them kept. The substrate says what answers it -- the default loop of the
@@ -36,6 +34,7 @@ METHOD_PPC    = "ppc"
 # The substrates: the default loop of the CLI, or a sub-agent preset.
 SUBSTRATE_LOOP     = "loop"
 SUBSTRATE_SUBAGENT = "subagent"
+SUBSTRATE_EXTERNAL = "external"
 
 # The largest k the P-P-C method may take.
 MAX_PPC_K = 3
@@ -111,7 +110,7 @@ class BenchMethod:
 
 @dataclass(frozen=True)
 class BenchSubstrate:
-    """What answers the task: the default loop of the CLI, or a sub-agent preset."""
+    """What answers the task: the default loop of the CLI, a sub-agent preset, or another CLI (``external:claude``)."""
 
     name:   str = SUBSTRATE_LOOP
     preset: str = ""
@@ -124,7 +123,13 @@ class BenchSubstrate:
             return cls(name=SUBSTRATE_LOOP)
         if head == SUBSTRATE_SUBAGENT:
             return cls(name=SUBSTRATE_SUBAGENT, preset=tail)
-        raise BenchError(f"unknown substrate '{text}'; use loop or subagent[:preset]")
+        if head == SUBSTRATE_EXTERNAL:
+            from nerdvana_cli.core.harness.external_cli import EXTERNAL_CLIS
+
+            if tail not in EXTERNAL_CLIS:
+                raise BenchError(f"unknown external CLI '{tail}'; use one of {', '.join(EXTERNAL_CLIS)}")
+            return cls(name=SUBSTRATE_EXTERNAL, preset=tail)
+        raise BenchError(f"unknown substrate '{text}'; use loop, subagent[:preset] or external:CLI")
 
     def to_dict(self) -> dict[str, Any]:
         """The substrate as a plain mapping."""
