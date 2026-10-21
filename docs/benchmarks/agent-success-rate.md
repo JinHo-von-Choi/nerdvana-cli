@@ -405,3 +405,15 @@ The PTC runtime is what turns the number around. It gives the agent a way to run
 No pair of the four builds can be told apart on the pass rate. Every difference has a 95 percent bootstrap interval that contains zero, and the largest is the SpillPolicy against 1.9.1 at +3.1 points (-0.250 to +0.312). A single model on 32 attempts over 8 tasks is a weak instrument: it shows that the pass rate did not fall, and it cannot rule out a fall of a few points.
 
 What this says about the plan: the SpillPolicy's claim is about a request, and it holds. The claim of a 30 percent cut to an attempt was a claim about the whole run, and it needs the agent to take fewer turns, not the same turns with a smaller body. The PTC runtime makes the agent take more turns, and its value has to be paid for somewhere else.
+
+Each arm is a build of this repository run from a worktree of its own commit, so the four numbers come from four trees:
+
+```bash
+for build in ccfa23e a6f9dc2 6607ab0 57727d6; do
+    git worktree add "/tmp/arm-$build" "$build"
+    (cd "/tmp/arm-$build" && uv sync --extra all && \
+     uv run python scripts/bench_agent.py benchmarks/long/tasks --attempts 4 \
+        --model MiniMax-M3.1-Flash-Preview --provider minimax --out "/tmp/gate4/long-$build.jsonl" --yes)
+done
+uv run python scripts/bench_compare.py /tmp/gate4/long-ccfa23e.jsonl /tmp/gate4/long-57727d6.jsonl
+```
