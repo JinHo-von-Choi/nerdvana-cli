@@ -388,3 +388,25 @@ async def test_a_program_that_prints_a_lot_does_not_stall() -> None:
     assert result.ok
     assert result.value == "printed"
     assert len(result.stdout) <= 8_100
+
+
+# The description of the tool
+# ---------------------------------------------------------------------------
+
+
+def test_the_description_says_when_the_program_is_the_right_tool_and_when_it_is_not() -> None:
+    """The tool is in every request, so what it says decides what the agent plans.
+
+    A program that answers a question the agent already knows how to ask is worth
+    one tool call; a program that sweeps a project is worth one turn per file it
+    finds, because every turn sends the conversation again.
+    """
+    from nerdvana_cli.tools.ptc_tool import RunCodeTool
+
+    description = " ".join(RunCodeTool.description_text.split())
+
+    assert "already know which files to read" in description
+    assert "Do not use it to explore" in description
+    assert "return the answer, not the files" in description
+    assert "needs no second read" in description
+    assert "needs no second program" in description

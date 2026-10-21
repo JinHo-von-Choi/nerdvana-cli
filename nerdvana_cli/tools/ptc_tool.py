@@ -82,8 +82,17 @@ class RunCodeTool(BaseTool[RunCodeArgs]):
     description_text = """Run a Python program with the read-only tools bound into it.
 
 The program runs in a sandbox: it cannot write, execute or reach the network,
-and it sees no file except through the bindings. Use it when a task needs many
-files and one answer, so the loop costs one tool call instead of one per file.
+and it sees no file except through the bindings.
+
+Use it when you already know which files to read and what to compute from them:
+the loop then costs one tool call instead of one per file. Do not use it to
+explore -- one or two files are cheaper to read directly, and a program that
+sweeps a project answers a question nobody asked.
+
+Have the program return the answer, not the files: a count, a name, the lines
+that match. What comes back is what stays in the conversation, and every turn
+sends the conversation again. A file the program read needs no second read, and
+a question the program answered needs no second program.
 
 Bound tools, each returning data: FileRead(path, offset, limit) gives the text
 of the file, Grep(pattern, path, include, case_sensitive) gives the matching
