@@ -21,7 +21,7 @@ LIMIT = 60
 
 KNOWN_LONG: dict[str, int] = {
     "ui/response_runner.py:run_response_stream": 92,
-    "providers/openai_provider.py:OpenAIProvider.stream": 102,
+    "providers/openai_provider.py:OpenAIProvider.stream": 77,
     "main.py:run": 108,
     "tools/file_tools.py:FileEditTool.call": 78,
     "ui/slash/model_commands.py:switch_provider": 83,

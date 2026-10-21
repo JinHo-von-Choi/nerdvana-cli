@@ -75,6 +75,22 @@ def _usage_dict(usage: Any) -> dict[str, int]:
     return usage_payload(_int(getattr(usage, "prompt_tokens", 0)), _int(getattr(usage, "completion_tokens", 0)), cache_read=cached)
 
 
+def _reports_usage(usage: Any) -> bool:
+    """True when a chunk's usage says anything: some servers send an all-zero usage on every chunk."""
+    if not usage:
+        return False
+    counts = _usage_dict(usage)
+    return counts["input_tokens"] + counts["output_tokens"] > 0
+
+
+def _text_events(parsed: Any) -> Iterator[ProviderEvent]:
+    """The answer and thinking events of one piece the think-block parser returned."""
+    if parsed.content:
+        yield ProviderEvent(type="content_delta", content=parsed.content)
+    if parsed.thinking:
+        yield ProviderEvent(type="thinking_delta", thinking=parsed.thinking)
+
+
 def _stop_reason(finish_reason: str | None, has_tool_calls: bool) -> str:
     """Map an OpenAI-style ``finish_reason`` to the loop's stop reasons.
 
@@ -238,6 +254,24 @@ class OpenAIProvider:
         models.sort(key=lambda x: x.id)
         return models
 
+    async def _open_stream(self, client: Any, api_messages: list[dict[str, Any]], api_tools: Any) -> Any:
+        """The chat completion stream, asking for the usage where the server takes ``stream_options``."""
+        create_kwargs: dict[str, Any] = {
+            "model": self.config.model,
+            "max_tokens": self.config.max_tokens,
+            "temperature": self.config.temperature,
+            "messages": api_messages,
+            "tools": api_tools,
+            "stream": True,
+            **self._effort_kwargs(),
+        }
+        try:
+            return await client.chat.completions.create(**create_kwargs, stream_options={"include_usage": True})
+        except Exception as exc:
+            if not _is_stream_options_unsupported(exc):
+                raise
+            return await client.chat.completions.create(**create_kwargs)
+
     async def stream(
         self,
         system_prompt: str,
@@ -256,26 +290,7 @@ class OpenAIProvider:
         effort_note = self._effort_note(bool(api_tools))
 
         try:
-            # Some providers don't support stream_options
-            create_kwargs: dict[str, Any] = {
-                "model": self.config.model,
-                "max_tokens": self.config.max_tokens,
-                "temperature": self.config.temperature,
-                "messages": api_messages,
-                "tools": api_tools,
-                "stream": True,
-            }
-            create_kwargs.update(self._effort_kwargs())
-            try:
-                stream = await client.chat.completions.create(
-                    **create_kwargs,
-                    stream_options={"include_usage": True},
-                )
-            except Exception as exc:
-                if not _is_stream_options_unsupported(exc):
-                    raise
-                # Fallback without stream_options
-                stream = await client.chat.completions.create(**create_kwargs)
+            stream = await self._open_stream(client, api_messages, api_tools)
 
             # One slot per tool call, in arrival order. A provider may reuse an
             # index for a different call, so a new id on a used index opens a new slot.
@@ -291,7 +306,7 @@ class OpenAIProvider:
                     # Servers put the usage on a chunk of its own (OpenAI) or on the last chunk that also
                     # carries the finish reason (others), and some repeat it on every chunk. The last
                     # report that says anything is the total, and it is emitted once, after the stream.
-                    if getattr(chunk, "usage", None) and _usage_dict(chunk.usage)["input_tokens"] + _usage_dict(chunk.usage)["output_tokens"] > 0:
+                    if _reports_usage(getattr(chunk, "usage", None)):
                         reported = chunk.usage
                     if not chunk.choices:
                         continue
@@ -301,11 +316,8 @@ class OpenAIProvider:
                     # Content delta — handle potential encoding issues
                     if choice.delta.content:
                         completion.append(choice.delta.content)
-                        parsed = parser.feed(choice.delta.content)
-                        if parsed.content:
-                            yield ProviderEvent(type="content_delta", content=parsed.content)
-                        if parsed.thinking:
-                            yield ProviderEvent(type="thinking_delta", thinking=parsed.thinking)
+                        for event in _text_events(parser.feed(choice.delta.content)):
+                            yield event
 
                     # Tool call deltas
                     for tc in choice.delta.tool_calls or ():
@@ -320,11 +332,8 @@ class OpenAIProvider:
                     continue
 
             # The response is complete: emit what it contained exactly once.
-            final = parser.flush()
-            if final.content:
-                yield ProviderEvent(type="content_delta", content=final.content)
-            if final.thinking:
-                yield ProviderEvent(type="thinking_delta", thinking=final.thinking)
+            for event in _text_events(parser.flush()):
+                yield event
 
             stop_reason = _stop_reason(finish_reason, bool(slots))
             if stop_reason == "tool_use":
