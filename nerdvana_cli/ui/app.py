@@ -29,7 +29,7 @@ from nerdvana_cli.core.loop.activity_state import ActivityState
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 from nerdvana_cli.ui.background_work import connect_mcp_servers, refresh_statusline
-from nerdvana_cli.ui.banner import build_banner
+from nerdvana_cli.ui.banner import LogoBanner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.editor_controller import EditorBufferController
 from nerdvana_cli.ui.editor_pane import EditorPane
@@ -132,6 +132,8 @@ class NerdvanaApp(App[object]):
         padding: 1 0 0 0;
         content-align: center middle;
         text-align: center;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
     #chat-frame {
         height: 1fr;
@@ -211,7 +213,7 @@ class NerdvanaApp(App[object]):
             yield Sidebar(id="sidebar")
             yield ProjectTreePane(root_path=self._project_root, id="project-tree-pane")
             with Vertical(id="main-container"):
-                yield Static(id="logo-banner")
+                yield LogoBanner(id="logo-banner")
                 with VerticalScroll(id="chat-frame"):
                     yield StreamingOutput(id="streaming-output")
                     yield ToolStatusLine(id="tool-status")
@@ -492,9 +494,7 @@ class NerdvanaApp(App[object]):
     def _update_banner(self) -> None:
         """Update the logo banner with current provider/model info."""
         registry_count = len(self._agent_loop.registry.all_tools()) if self._agent_loop else 0
-        self.query_one("#logo-banner", Static).update(
-            build_banner(self.settings, registry_count, self.parism_client is not None)
-        )
+        self.query_one("#logo-banner", LogoBanner).show(self.settings, registry_count, self.parism_client is not None)
 
     async def _handle_command(self, cmd: str) -> None:
         """Handle slash commands by delegating to ``ui.command_dispatcher``."""
