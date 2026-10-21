@@ -345,8 +345,8 @@ class TestServeTlsKeyOption:
         )
 
         assert result.exit_code == 0, result.output
-        assert captured["tls_key"] == key
-        assert captured["tls_cert"] == cert
+        tls = captured["tls"]
+        assert (tls.cert, tls.key, tls.ca) == (cert, key, None)  # type: ignore[attr-defined]
 
     def test_tls_misconfiguration_reports_without_traceback(
         self,
