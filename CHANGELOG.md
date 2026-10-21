@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-22
+
 ### Added
 
 - `nerdvana run --json-schema SCHEMA`: the final answer must be JSON that fits the schema; a misfit is sent back with the reason up to two times, the parsed value is the result's `structured_output`, and an answer that never fits ends with `error_schema`.
