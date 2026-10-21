@@ -135,7 +135,7 @@ def _timer_task() -> asyncio.Task[Any]:
     """Return the runner's thinking-timer task, which must exist while streaming."""
     candidates = [
         task for task in asyncio.all_tasks()
-        if getattr(task.get_coro(), "__name__", "") == "_update_thinking_timer"
+        if getattr(task.get_coro(), "__name__", "") == "_thinking_timer"
     ]
     assert len(candidates) == 1, f"expected one timer task, found {len(candidates)}"
     return candidates[0]
