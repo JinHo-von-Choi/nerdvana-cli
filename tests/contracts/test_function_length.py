@@ -20,7 +20,6 @@ ROOT  = Path(nerdvana_cli.__file__).resolve().parent
 LIMIT = 60
 
 KNOWN_LONG: dict[str, int] = {
-    "cli/setup.py:run_setup": 161,
     "ui/response_runner.py:run_response_stream": 92,
     "providers/openai_provider.py:OpenAIProvider.stream": 102,
     "main.py:run": 108,
