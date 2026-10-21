@@ -45,7 +45,9 @@ the record.
 nerdvana agents start "<prompt>" [--worktree] [--max-cost-usd X] [--key K] [--cwd DIR] [--approval-mode M]
 nerdvana agents list
 nerdvana agents show ID [--lines N]
-nerdvana agents attach ID
+nerdvana agents attach ID [--input]
+nerdvana agents send ID "<message>"
+nerdvana agents apply ID [--check]
 nerdvana agents stop ID
 nerdvana agents resume ID
 nerdvana agents clean [--days N]
@@ -75,7 +77,17 @@ reported with how long ago (`tool Bash (4s ago)`, `text`, `request`, or the resu
 run). When a run is orphaned it says how to resume it.
 
 `show` prints the record, the tail of the log and the result JSON. `attach` follows the log until
-the run ends; Ctrl+C detaches and leaves the run going.
+the run ends; Ctrl+C detaches and leaves the run going. With `--input`, every line you type while
+following is sent to the run with `send`.
+
+`send` gives a run one more user message. A running run finds it in its inbox (`inbox.jsonl` in the
+run's directory, named to the run by `NERDVANA_RUN_INBOX`) once the prompt it is on is answered, and
+answers it in the same session; the run ends when a pass over the inbox finds nothing new. A run that
+has ended continues its recorded session with the message as the prompt, like `resume`.
+
+`apply` takes the changes a `--worktree` run made (`git diff` of its worktree against the commit it
+started from, new files included) and applies them with `git apply` to the directory the run was
+started in. `--check` only says whether they apply cleanly; a run that is still going is refused.
 
 `stop` sends SIGTERM to the monitor, which ends the run's process group with SIGTERM and then
 SIGKILL after the grace period (five seconds), and closes the record as `stopped`. When the monitor

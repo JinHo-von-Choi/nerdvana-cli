@@ -267,7 +267,9 @@ Their tools appear as `mcp__{server}__{tool}`. `nerdvana mcp add|list|remove` ed
 | `nerdvana agents start "<prompt>"` | Start a supervised background run that outlives the terminal (`--worktree`, `--max-cost-usd`, `--key`) |
 | `nerdvana agents list` | List runs with status, age, cost and last signal |
 | `nerdvana agents show <id>` | Show a run's record, log tail and result |
-| `nerdvana agents attach <id>` | Follow a run's log; Ctrl+C detaches |
+| `nerdvana agents attach <id>` | Follow a run's log; Ctrl+C detaches (`--input` also sends what you type to the run) |
+| `nerdvana agents send <id> "<message>"` | Give a run one more message: a running run answers it next, an ended run continues its session with it |
+| `nerdvana agents apply <id>` | Apply the changes a `--worktree` run made to the tree it started from (`--check` only tests it) |
 | `nerdvana agents stop <id>` | Stop a run |
 | `nerdvana agents resume <id>` | Restart an orphaned, stopped or failed run from its transcript |
 | `nerdvana agents clean` | Remove records of runs that ended `--days` ago (default 7) |
@@ -283,12 +285,13 @@ Their tools appear as `mcp__{server}__{tool}`. `nerdvana mcp add|list|remove` ed
 
 Guides: [docs/background.md](docs/background.md), [docs/scheduling.md](docs/scheduling.md), [docs/workflows.md](docs/workflows.md).
 
-### Sessions, memory, skills, MCP, hooks, ACL
+### Sessions, memory, skills, plugins, MCP, hooks, ACL
 
 | Command | Purpose |
 |-|-|
 | `nerdvana session list` | List stored transcripts in `~/.nerdvana/sessions/` |
 | `nerdvana session resume <id>` | Reopen the REPL on a transcript |
+| `nerdvana session fork <id>` | Copy a transcript under a new id, to continue it without changing the original |
 | `nerdvana session purge` | Delete stored transcripts |
 | `nerdvana memory list` | List project memories |
 | `nerdvana memory add <text>` | Record a memory |
@@ -304,6 +307,9 @@ Guides: [docs/background.md](docs/background.md), [docs/scheduling.md](docs/sche
 | `nerdvana skill install <source>` | Install a skill into `~/.nerdvana/skills/` |
 | `nerdvana skill remove <name>` | Delete an installed skill |
 | `nerdvana skill trust <path>` | Approve a project skill so it may load |
+| `nerdvana plugin install <dir or git URL>` | Install a plugin's skills, slash commands and MCP servers in one step (`--allow-hooks` also adds its shell hooks); [docs/plugins.md](docs/plugins.md) |
+| `nerdvana plugin list` | List installed plugins |
+| `nerdvana plugin remove <name>` | Remove exactly what a plugin installed |
 | `nerdvana mcp list` | List configured MCP servers |
 | `nerdvana mcp add <name>` | Add a server entry |
 | `nerdvana mcp remove <name>` | Remove a server entry |
@@ -421,6 +427,7 @@ Sub-agents share the session's language server and MCP connections, follow the s
 | Agents, goals, advisor | [docs/agents.md](docs/agents.md), [docs/goals.md](docs/goals.md), [docs/advisor.md](docs/advisor.md) |
 | Observability and OpenTelemetry | [docs/observability.md](docs/observability.md) |
 | GitHub comment trigger | [docs/github-action.md](docs/github-action.md) |
+| Plugins | [docs/plugins.md](docs/plugins.md) |
 | Package layout | [docs/architecture.md](docs/architecture.md) |
 | Live provider tests | [docs/testing-live.md](docs/testing-live.md) |
 | Benchmarks | [docs/benchmarks/](docs/benchmarks/) |

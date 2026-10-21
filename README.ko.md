@@ -267,7 +267,9 @@ API 키는 각 제공자 표에 있는 변수를 씁니다. `BRAVE_API_KEY`가 �
 | `nerdvana agents start "<prompt>"` | 터미널을 닫아도 계속 도는 백그라운드 실행 시작 (`--worktree`, `--max-cost-usd`, `--key`) |
 | `nerdvana agents list` | 실행 목록: 상태, 경과 시간, 비용, 마지막 신호 |
 | `nerdvana agents show <id>` | 실행 기록, 로그 끝부분, 결과 |
-| `nerdvana agents attach <id>` | 로그 따라 보기. Ctrl+C는 분리만 함 |
+| `nerdvana agents attach <id>` | 로그 따라 보기. Ctrl+C는 분리만 함 (`--input`이면 입력한 줄을 실행에 메시지로 보냄) |
+| `nerdvana agents send <id> "<message>"` | 실행에 메시지 하나를 더 줌. 실행 중이면 지금 프롬프트 다음에 답하고, 끝난 실행은 그 세션을 메시지로 이어 감 |
+| `nerdvana agents apply <id>` | `--worktree` 실행이 만든 변경을 시작한 작업 트리에 적용 (`--check`는 적용 가능 여부만 확인) |
 | `nerdvana agents stop <id>` | 실행 중지 |
 | `nerdvana agents resume <id>` | 고아·중지·실패한 실행을 대화 기록에서 다시 시작 |
 | `nerdvana agents clean` | `--days`일 전에 끝난 실행 기록 삭제(기본 7) |
@@ -283,12 +285,13 @@ API 키는 각 제공자 표에 있는 변수를 씁니다. `BRAVE_API_KEY`가 �
 
 안내서: [docs/background.md](docs/background.md), [docs/scheduling.md](docs/scheduling.md), [docs/workflows.md](docs/workflows.md).
 
-### 세션, 메모리, 스킬, MCP, 훅, ACL
+### 세션, 메모리, 스킬, 플러그인, MCP, 훅, ACL
 
 | 명령 | 용도 |
 |-|-|
 | `nerdvana session list` | `~/.nerdvana/sessions/`에 저장된 대화 기록 목록 |
 | `nerdvana session resume <id>` | 대화 기록으로 REPL 다시 열기 |
+| `nerdvana session fork <id>` | 대화 기록을 새 id로 복사. 원본은 그대로 두고 갈래를 이어 감 |
 | `nerdvana session purge` | 저장된 대화 기록 삭제 |
 | `nerdvana memory list` | 프로젝트 메모리 목록 |
 | `nerdvana memory add <text>` | 메모리 기록 |
@@ -304,6 +307,9 @@ API 키는 각 제공자 표에 있는 변수를 씁니다. `BRAVE_API_KEY`가 �
 | `nerdvana skill install <source>` | `~/.nerdvana/skills/`에 스킬 설치 |
 | `nerdvana skill remove <name>` | 설치한 스킬 삭제 |
 | `nerdvana skill trust <path>` | 프로젝트 스킬을 승인해 읽을 수 있게 함 |
+| `nerdvana plugin install <폴더 또는 git URL>` | 플러그인의 스킬·슬래시 명령·MCP 서버를 한 번에 설치 (`--allow-hooks`면 셸 훅도 추가). [docs/plugins.md](docs/plugins.md) |
+| `nerdvana plugin list` | 설치한 플러그인 목록 |
+| `nerdvana plugin remove <name>` | 플러그인이 설치한 것만 정확히 제거 |
 | `nerdvana mcp list` | 설정된 MCP 서버 목록 |
 | `nerdvana mcp add <name>` | 서버 항목 추가 |
 | `nerdvana mcp remove <name>` | 서버 항목 삭제 |
@@ -421,6 +427,7 @@ API 키는 각 제공자 표에 있는 변수를 씁니다. `BRAVE_API_KEY`가 �
 | 에이전트, 목표, 조언자 | [docs/agents.md](docs/agents.md), [docs/goals.md](docs/goals.md), [docs/advisor.md](docs/advisor.md) |
 | 관측과 OpenTelemetry | [docs/observability.md](docs/observability.md) |
 | GitHub 댓글 실행 | [docs/github-action.md](docs/github-action.md) |
+| 플러그인 | [docs/plugins.md](docs/plugins.md) |
 | 패키지 구조 | [docs/architecture.md](docs/architecture.md) |
 | 실제 제공자 시험 | [docs/testing-live.md](docs/testing-live.md) |
 | 벤치마크 | [docs/benchmarks/](docs/benchmarks/) |

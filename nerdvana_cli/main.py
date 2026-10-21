@@ -18,6 +18,7 @@ from nerdvana_cli.cli.commands.history_command import history_app
 from nerdvana_cli.cli.commands.hook_command import hook_app
 from nerdvana_cli.cli.commands.mcp_command import mcp_app
 from nerdvana_cli.cli.commands.memory_command import memory_app
+from nerdvana_cli.cli.commands.plugin_command import plugin_app
 from nerdvana_cli.cli.commands.schedule_command import schedule_app
 from nerdvana_cli.cli.commands.session_command import session_app
 from nerdvana_cli.cli.commands.skill_command import skill_app
@@ -57,6 +58,7 @@ app.command(name="acp")(acp_command)
 app.add_typer(schedule_app)
 app.add_typer(workflow_app)
 app.add_typer(agents_app)
+app.add_typer(plugin_app)
 
 
 def _maybe_show_update_notice(target: Console | None = None) -> None:
