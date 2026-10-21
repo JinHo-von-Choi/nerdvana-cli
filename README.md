@@ -46,7 +46,7 @@ flowchart LR
     L --> R[Answer and<br/>receipt]
 ```
 
-The model picks the tools a request needs; the agent checks permissions and runs them, and repeats until the task is done. A one-shot run ends with a result that lists the files changed and the cost.
+The model picks whatever tools a request needs. The agent checks permissions, runs them, and repeats until the task is done. A one-shot run ends with a result listing the files changed and the cost.
 
 ## Installation
 
@@ -56,7 +56,7 @@ Requirements: Python 3.11 or later, git.
 curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
 ```
 
-The installer puts NerdVana CLI in `~/.nerdvana-cli/` with its own virtual environment and adds the `nerdvana` and `nc` commands to your PATH. `nerdvana update` upgrades it later.
+The installer puts NerdVana CLI in `~/.nerdvana-cli/` with its own virtual environment and adds the `nerdvana` and `nc` commands to your PATH. Run `nerdvana update` to upgrade later.
 
 From source:
 
@@ -75,7 +75,7 @@ pip install -e ".[all]"          # every provider SDK
    nerdvana setup
    ```
 
-   Or export the key yourself, for example `export ANTHROPIC_API_KEY="sk-ant-..."`.
+   Or export the key yourself: `export ANTHROPIC_API_KEY="sk-ant-..."`.
 
 2. Open your project and start the REPL:
 
@@ -84,15 +84,15 @@ pip install -e ".[all]"          # every provider SDK
    nerdvana
    ```
 
-3. Type `/init` to generate a `NIRNA.md` with instructions for this project, then ask for what you need: `explain the architecture`, `fix the failing test in tests/test_api.py`.
+3. Type `/init` to generate a `NIRNA.md` with project-specific instructions, then ask what you need: `explain the architecture`, `fix the failing test in tests/test_api.py`.
 
-4. For scripts and CI, run one prompt and exit:
+4. For scripts and CI, run a single prompt and exit:
 
    ```bash
    nerdvana run "fix the failing test" --approval-mode yolo --max-cost-usd 2 --output-format json
    ```
 
-Another provider or model for one session: `nerdvana --provider openai --model gpt-4.1`.
+To use a different provider or model for one session: `nerdvana --provider openai --model gpt-4.1`.
 
 ## Supported providers
 
@@ -120,7 +120,7 @@ Another provider or model for one session: `nerdvana --provider openai --model g
 | **Fireworks AI** | accounts/fireworks/models/llama-v3p3-70b-instruct | `FIREWORKS_API_KEY` |
 | **Cerebras** | llama-3.3-70b | `CEREBRAS_API_KEY` |
 
-Local servers: [docs/local-models.md](docs/local-models.md). Provider-specific behaviour (thinking, effort, caching): [docs/providers-compat.md](docs/providers-compat.md).
+For local servers, see [docs/local-models.md](docs/local-models.md). For provider-specific behaviour (thinking, effort, caching), see [docs/providers-compat.md](docs/providers-compat.md).
 
 ## Configuration
 
@@ -150,7 +150,7 @@ sandbox:
   mode: off                  # off, auto, require (Linux Landlock)
 ```
 
-`--set section.field=value` overrides a setting for one run, and `nerdvana --dump-config` prints the settings in effect with the layer each key came from. Every section and field is in [docs/configuration.md](docs/configuration.md); a complete example is [nerdvana.yml.example](nerdvana.yml.example).
+`--set section.field=value` overrides a setting for one run. `nerdvana --dump-config` prints the active settings with the layer each key came from. Every section and field is in [docs/configuration.md](docs/configuration.md); a complete example is [nerdvana.yml.example](nerdvana.yml.example).
 
 ### Environment variables
 
@@ -163,7 +163,7 @@ sandbox:
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | Boundary the external project tools may not leave | unset |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | Register the external project tools without editing the config | `false` |
 
-API keys use the provider variables above. `BRAVE_API_KEY` enables the `WebSearch` tool. Provider and model have no environment variable; use `--provider`, `--model`, `/provider`, `/model` or the config file.
+API keys use the provider variables above. `BRAVE_API_KEY` enables the `WebSearch` tool. Provider and model have no environment variable; use `--provider`, `--model`, `/provider`, `/model`, or the config file.
 
 ### Files and directories
 
@@ -186,7 +186,7 @@ API keys use the provider variables above. `BRAVE_API_KEY` enables the `WebSearc
   └── .nerdvana/     Project skills, commands, hooks, workflows
 ```
 
-On the first run after an upgrade, data from `~/.nerdvana-cli/sessions/` and the legacy `~/.config/nerdvana-cli/` is migrated into `~/.nerdvana/` once.
+On first run after an upgrade, data from `~/.nerdvana-cli/sessions/` and the legacy `~/.config/nerdvana-cli/` is migrated into `~/.nerdvana/` once.
 
 ## Permissions
 
@@ -211,13 +211,13 @@ Without a terminal a question becomes a refusal, so unattended runs that write f
 
 ## Project instructions
 
-Instructions are added to the system prompt from, in ascending priority:
+Instructions are added to the system prompt in ascending priority order:
 
 1. `~/.nerdvana/NIRNA.md`: your global instructions
 2. `<project>/NIRNA.md`: project instructions, committed
 3. `<project>/NIRNA.local.md`: local instructions, not committed
 
-`AGENTS.md` and `CLAUDE.md` in the project root load after these. When a tool first touches a file in a subdirectory, the rule files between that directory and the root are injected once (up to 32 KB per session). `/init` writes a starter `NIRNA.md`. Skills: [docs/skills.md](docs/skills.md). Your own slash commands: [docs/commands.md](docs/commands.md). Hooks: [docs/hooks.md](docs/hooks.md).
+`AGENTS.md` and `CLAUDE.md` in the project root load after these. When a tool first touches a file in a subdirectory, rule files between that directory and the root are injected once (up to 32 KB per session). `/init` writes a starter `NIRNA.md`. Skills: [docs/skills.md](docs/skills.md). Your own slash commands: [docs/commands.md](docs/commands.md). Hooks: [docs/hooks.md](docs/hooks.md).
 
 ## MCP servers
 
@@ -236,7 +236,7 @@ Servers are declared in `~/.nerdvana/mcp.json` (global) and `<project>/.mcp.json
 }
 ```
 
-Their tools appear as `mcp__{server}__{tool}`. `nerdvana mcp add|list|remove` edits the files, `/mcp` shows connection status. Details: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). To serve NerdVana's tools to another agent: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
+Their tools appear as `mcp__{server}__{tool}`. `nerdvana mcp add|list|remove` edits the files; `/mcp` shows connection status. See [docs/mcp-client.md](docs/mcp-client.md) and [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md) for details. To expose NerdVana's tools to another agent: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
 
 ## Command reference
 

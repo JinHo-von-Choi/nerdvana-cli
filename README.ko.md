@@ -25,13 +25,13 @@
 
 ## 장점
 
-- **모델에 묶이지 않습니다.** 모델을 바꿔도 명령, 권한 설정, 스크립트를 그대로 씁니다. 한 모델이 응답하지 않으면 지정해 둔 다른 모델로 넘어갑니다.
-- **코드를 망가뜨리지 않습니다.** 읽은 뒤에 바뀐 파일은 고치지 않고, 편집 직후 새로 생긴 오류를 바로 알려 줍니다.
-- **위험한 작업은 막힙니다.** 승인 모드와 샌드박스로 할 수 있는 일의 범위를 정합니다. `.env` 같은 비밀 파일은 어떤 설정으로도 모델이 쓰지 못합니다.
-- **사람이 없어도 돌아갑니다.** `nerdvana run`은 JSON 결과, 비용·턴 상한, 작업 완료를 판정하는 `--verify` 명령을 갖춰 CI와 스크립트에 바로 붙습니다.
-- **오래 걸리는 일은 맡겨 두면 됩니다.** 터미널을 닫아도 계속 도는 백그라운드 실행, cron 예약 실행, 여러 에이전트가 나눠 하는 워크플로를 지원합니다.
-- **다른 도구와 이어집니다.** MCP 서버를 도구로 붙이고, 반대로 NerdVana의 도구를 다른 에이전트나 Zed 같은 편집기에 제공합니다.
-- **비용이 보입니다.** 요청마다 토큰과 비용을 기록하고, `nerdvana cost`로 어디에 쓰였는지 확인합니다.
+- **모델에 묶이지 않습니다.** 모델을 바꿔도 명령, 권한 설정, 스크립트를 그대로 씁니다. 특정 모델이 응답하지 않으면 미리 지정해 둔 다른 모델로 자동 전환됩니다.
+- **코드를 망가뜨리지 않습니다.** 읽은 뒤 변경된 파일은 건드리지 않고, 편집 직후 새로 생긴 오류를 즉시 알려 줍니다.
+- **위험한 작업은 막힙니다.** 승인 모드와 샌드박스로 작업 범위를 제한합니다. `.env` 같은 비밀 파일은 어떤 설정에서도 모델이 쓸 수 없습니다.
+- **사람이 없어도 돌아갑니다.** `nerdvana run`은 JSON 결과, 비용·턴 상한, 완료 여부를 판정하는 `--verify` 명령을 갖추고 있어 CI와 스크립트에 바로 붙습니다.
+- **오래 걸리는 일은 맡겨 두면 됩니다.** 터미널을 닫아도 계속 실행되는 백그라운드 모드, cron 예약, 여러 에이전트가 나눠 처리하는 워크플로를 지원합니다.
+- **다른 도구와 이어집니다.** MCP 서버를 도구로 붙이거나, 반대로 NerdVana의 도구를 다른 에이전트나 Zed 같은 편집기에 제공할 수 있습니다.
+- **비용이 보입니다.** 요청마다 토큰과 비용을 기록하며, `nerdvana cost`로 세부 내역을 확인합니다.
 
 ## 동작 방식
 
@@ -56,7 +56,7 @@ flowchart LR
 curl -fsSL https://raw.githubusercontent.com/JinHo-von-Choi/nerdvana-cli/main/install.sh | bash
 ```
 
-설치 스크립트가 `~/.nerdvana-cli/`에 전용 가상 환경을 만들어 설치하고, `nerdvana`와 `nc` 명령을 PATH에 넣습니다. 업그레이드는 `nerdvana update` 한 줄이면 됩니다.
+설치 스크립트는 `~/.nerdvana-cli/`에 전용 가상 환경을 만들고, `nerdvana`와 `nc` 명령을 PATH에 등록합니다. 업그레이드는 `nerdvana update` 한 줄로 됩니다.
 
 소스에서 설치:
 
@@ -75,7 +75,7 @@ pip install -e ".[all]"          # 모든 제공자 SDK
    nerdvana setup
    ```
 
-   직접 키를 내보내도 됩니다. 예: `export ANTHROPIC_API_KEY="sk-ant-..."`
+   키를 직접 내보내도 됩니다. 예: `export ANTHROPIC_API_KEY="sk-ant-..."`
 
 2. 프로젝트로 이동해 REPL을 시작합니다.
 
@@ -84,15 +84,15 @@ pip install -e ".[all]"          # 모든 제공자 SDK
    nerdvana
    ```
 
-3. `/init`으로 이 프로젝트의 지침 파일 `NIRNA.md`를 만들고, 할 일을 요청합니다. 예: `이 프로젝트 구조를 설명해 줘`, `tests/test_api.py의 실패하는 시험을 고쳐 줘`.
+3. `/init`으로 이 프로젝트의 지침 파일 `NIRNA.md`를 만든 뒤, 할 일을 요청합니다. 예: `이 프로젝트 구조를 설명해 줘`, `tests/test_api.py의 실패하는 시험을 고쳐 줘`.
 
-4. 스크립트와 CI에서는 프롬프트 하나를 실행하고 끝냅니다.
+4. 스크립트·CI에서는 프롬프트 하나만 실행하고 끝냅니다.
 
    ```bash
    nerdvana run "fix the failing test" --approval-mode yolo --max-cost-usd 2 --output-format json
    ```
 
-한 세션만 다른 제공자나 모델로 쓰려면 `nerdvana --provider openai --model gpt-4.1`처럼 실행합니다.
+한 세션만 다른 제공자나 모델로 쓰려면 `nerdvana --provider openai --model gpt-4.1`처럼 실행하면 됩니다.
 
 ## 지원 제공자
 
@@ -124,7 +124,7 @@ pip install -e ".[all]"          # 모든 제공자 SDK
 
 ## 설정
 
-설정은 YAML 파일 하나에서 읽습니다. 아래 순서로 찾아 처음 나온 파일을 씁니다.
+설정은 YAML 파일 하나에서 읽습니다. 아래 순서로 파일을 찾고, 처음 발견된 파일을 씁니다.
 
 1. `--config <경로>`
 2. `NERDVANA_CONFIG`
@@ -150,7 +150,7 @@ sandbox:
   mode: off                  # off, auto, require (Linux Landlock)
 ```
 
-한 번만 바꿀 설정은 `--set section.field=value`로 넘깁니다. 실제로 적용될 설정과 각 값이 어디서 왔는지는 `nerdvana --dump-config`로 봅니다. 모든 절과 필드는 [docs/configuration.md](docs/configuration.md)에, 전체 예시는 [nerdvana.yml.example](nerdvana.yml.example)에 있습니다.
+한 번만 바꿀 설정은 `--set section.field=value`로 넘기면 됩니다. 실제로 적용될 설정과 각 값의 출처는 `nerdvana --dump-config`로 확인하십시오. 절과 필드 전체 목록은 [docs/configuration.md](docs/configuration.md)에, 전체 예시는 [nerdvana.yml.example](nerdvana.yml.example)에 있습니다.
 
 ### 환경 변수
 
@@ -163,7 +163,7 @@ sandbox:
 | `NERDVANA_EXTERNAL_PROJECTS_ROOT` | 외부 프로젝트 도구가 벗어날 수 없는 경계 | 없음 |
 | `NERDVANA_EXTERNAL_PROJECTS_ENABLED` | 설정 파일을 고치지 않고 외부 프로젝트 도구를 등록 | `false` |
 
-API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어야 `WebSearch` 도구가 동작합니다. 제공자와 모델은 환경 변수로 정할 수 없고, `--provider`, `--model`, `/provider`, `/model`이나 설정 파일로 정합니다.
+API 키는 각 제공자 표에 있는 변수를 씁니다. `BRAVE_API_KEY`가 없으면 `WebSearch` 도구가 동작하지 않습니다. 제공자와 모델은 환경 변수로 지정할 수 없습니다. `--provider`, `--model`, `/provider`, `/model` 또는 설정 파일로 지정하십시오.
 
 ### 파일과 디렉터리
 
@@ -186,7 +186,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
   └── .nerdvana/     프로젝트 스킬, 명령, 훅, 워크플로
 ```
 
-업그레이드 뒤 첫 실행에서 `~/.nerdvana-cli/sessions/`와 예전 위치 `~/.config/nerdvana-cli/`의 데이터를 `~/.nerdvana/`로 한 번 옮깁니다(마이그레이션).
+업그레이드 후 첫 실행 시 `~/.nerdvana-cli/sessions/`와 예전 위치 `~/.config/nerdvana-cli/`의 데이터를 `~/.nerdvana/`로 한 번 옮깁니다(마이그레이션).
 
 ## 권한
 
@@ -211,17 +211,17 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 
 ## 프로젝트 지침
 
-지침은 아래 순서로 시스템 프롬프트에 들어가며, 뒤의 것이 우선합니다.
+지침은 아래 순서로 시스템 프롬프트에 포함되며, 뒤 항목이 앞 항목보다 우선합니다.
 
 1. `~/.nerdvana/NIRNA.md`: 전역 지침
 2. `<project>/NIRNA.md`: 저장소에 커밋하는 프로젝트 지침
 3. `<project>/NIRNA.local.md`: 커밋하지 않는 로컬 지침
 
-프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`는 그 뒤에 읽습니다. 하위 디렉터리의 파일을 처음 다룰 때는 그 디렉터리부터 루트까지의 규칙 파일을 한 번 더 읽어 넣습니다(세션당 32 KB까지). `/init`이 `NIRNA.md` 초안을 만듭니다. 스킬: [docs/skills.md](docs/skills.md). 사용자 슬래시 명령: [docs/commands.md](docs/commands.md). 훅: [docs/hooks.md](docs/hooks.md).
+프로젝트 루트의 `AGENTS.md`와 `CLAUDE.md`는 그 뒤에 읽습니다. 하위 디렉터리 파일을 처음 다룰 때는 해당 디렉터리에서 루트까지 경로의 규칙 파일을 추가로 불러옵니다(세션당 32 KB 한도). `/init`이 `NIRNA.md` 초안을 만듭니다. 스킬: [docs/skills.md](docs/skills.md). 사용자 슬래시 명령: [docs/commands.md](docs/commands.md). 훅: [docs/hooks.md](docs/hooks.md).
 
 ## MCP 서버
 
-서버는 `~/.nerdvana/mcp.json`(전역)과 `<project>/.mcp.json`(프로젝트, 같은 이름의 전역 항목을 덮어씀)에 Claude Code와 같은 `mcpServers` 형식으로 적습니다.
+서버는 `~/.nerdvana/mcp.json`(전역)과 `<project>/.mcp.json`(프로젝트, 같은 이름의 전역 항목을 덮어씀)에 Claude Code와 동일한 `mcpServers` 형식으로 작성합니다.
 
 ```json
 {
@@ -236,7 +236,7 @@ API 키는 위 제공자 표의 변수를 씁니다. `BRAVE_API_KEY`가 있어�
 }
 ```
 
-연결한 서버의 도구는 `mcp__{server}__{tool}` 이름으로 씁니다. `nerdvana mcp add|list|remove`가 파일을 고치고, `/mcp`가 연결 상태를 보여 줍니다. 자세한 내용: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). NerdVana 도구를 다른 에이전트에 제공하려면: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
+연결된 서버의 도구는 `mcp__{server}__{tool}` 형식으로 호출합니다. `nerdvana mcp add|list|remove`로 파일을 편집하고, `/mcp`로 연결 상태를 확인할 수 있습니다. 자세한 내용: [docs/mcp-client.md](docs/mcp-client.md), [docs/mcp-deferred-tools.md](docs/mcp-deferred-tools.md). NerdVana 도구를 다른 에이전트에 노출하려면: [docs/mcp-edit-backend.md](docs/mcp-edit-backend.md), [docs/mcp-quota.md](docs/mcp-quota.md).
 
 ## 명령 참조
 
