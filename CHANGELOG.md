@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-10-22
+
 ### Changed
 
 - The TUI banner shows the full NerdVana logo, a smaller one or the name alone, whichever fits the window, and picks again when the window is resized; banner lines no longer wrap.
