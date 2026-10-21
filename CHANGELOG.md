@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-22
+
 ### Added
 
 - `run_code` tool: runs a short Python program in a Landlock sandbox with `FileRead`, `Grep`, `Glob` and `lsp_find_references` bound in, so a question over many files costs one tool call. The program cannot write, execute, read files outside the bindings or, on Landlock ABI 4, reach the TCP network. Every binding call passes the same guards as a normal tool call and is recorded in the session. Without Landlock the tool reports that it is unavailable.
