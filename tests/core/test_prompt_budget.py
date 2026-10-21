@@ -37,6 +37,7 @@ def _measure(cwd: Path) -> dict:
 @pytest.fixture()
 def empty_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("NERDVANA_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     project = tmp_path / "project"
     project.mkdir()
     return project
