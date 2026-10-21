@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `nerdvana run --json-schema SCHEMA`: the final answer must be JSON that fits the schema; a misfit is sent back with the reason up to two times, the parsed value is the result's `structured_output`, and an answer that never fits ends with `error_schema`.
+- `nerdvana run --input-format stream-json`: after the prompt, every line of standard input is one more user message in the same session; `-` as the prompt takes every message from standard input.
+- `nerdvana run --diagnostics-dir DIR`: every event, the masked settings and the result in one folder.
+- `nerdvana session fork <id>`: a copy of a transcript under a new id.
+- `nerdvana agents send <id> "<message>"`: one more message for a background run, answered after its current prompt, or continuing an ended run's session; `nerdvana agents attach --input` sends typed lines the same way.
+- `nerdvana agents apply <id>`: the changes of a `--worktree` run applied to the tree it started from (`--check` to test).
+- `nerdvana plugin install|list|remove`: skills, slash commands, MCP servers and (with `--allow-hooks`) shell hooks installed and removed as one package.
+- `session.statusline_command`: a command whose first output line is shown at the end of the TUI status bar.
+- `scripts/bench_agent.py --substrate external:claude|codex|mcode|opencode|copilot` runs the benchmark tasks with another coding-agent CLI under the same verify command.
+- stream-json `request` events carry `first_event_ms` and `request_ms`; `tool_done` events carry the first line of the tool's result; the result object carries `price_known`.
+
+### Changed
+
+- The TUI renders answers as Markdown and never reads model text as markup; streaming and thinking show as typed.
+- Every finished tool call stays in the TUI chat with its command or path and the first line of its result, and text written before a tool call is a message of its own.
+- Escape stops the response in progress and keeps what has streamed.
+- The TUI is usable while MCP servers connect; their tools and skills are added when they arrive.
+- An MCP server with more than three deferred tools is listed on one line by tool name, and the skill catalog stops giving descriptions after 1,200 tokens; in a setup with 445 MCP tools and 36 skills a one-line question went from 44,412 to about 9,000 input tokens.
+- Skill specification departures are logged at info level and listed by `nerdvana doctor`; the session summary counts skills instead of listing them.
+- The refusal of inline interpreter code (`python -c` and the like) says to write the code to a file and run it.
+- `jsonschema` is a direct dependency.
+
+### Fixed
+
+- Answers lost text in brackets (`list[str]` showed as `list`) and an answer containing a closing tag such as `[/b]` was not shown at all.
+- The activity indicator stayed on "Waiting for ..." after a response.
+- `/undo`, `/redo` and `/checkpoints` always reported that no checkpoint manager was available.
+- `Glob` with `**/` did not match files at the top of the searched directory or directly under the named folder (`**/*`, `src/**/*.tsx`).
+- An anchor edit whose replacement had no trailing newline joined the next line onto it.
+- `rm -rf` of a dot-named directory such as `.verify` was refused as if it were the current directory.
+
 ## [1.10.2] - 2026-10-22
 
 ### Changed
