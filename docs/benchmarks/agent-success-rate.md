@@ -115,6 +115,12 @@ shell, and the local project instructions (`NIRNA.local.md`), which the prompt
 always carries. A skill travels as its text — what the next task starts from is
 the knowledge, not the mechanism that produced it.
 
+`--library-mode` says how much of it the task is handed. `menu` (the default)
+gives the task the list of the lessons and leaves each lesson a file to read;
+`shelf` gives it everything, inlined. The two are measured below, and they are
+not the same thing: the shelf costs 121.5 percent more input tokens and loses
+passes, the menu costs 19.4 percent and loses none.
+
 So the experiment is two runs over two halves of the split:
 
 ```bash
@@ -185,6 +191,43 @@ The measurement also cannot say much at this size: 6 test tasks means one task i
 effect it is meant to detect. A next version would let the library offer its lessons
 and let the task choose, and would measure on a test half large enough to have a
 resolution finer than the effect being looked for.
+
+### Offering the lessons instead of serving them
+
+The shelf hands a task everything its domain holds, inlined into the always-on
+context, and the helper scripts of tasks it has nothing to do with come with it. The
+menu offers instead: one line per lesson in the always-on context -- its name and the
+situation it applies to, which the model writes as "use when ..." -- and the lesson
+itself stays a file under `.nerdvana/skills/`, so the task reads the one that applies
+to it. The helper scripts are not handed over at all: a script written for another
+task's check is a trap, not a tool.
+
+The same test half, the same library, the same 4 attempts per task:
+
+| Arm | Passed | mean pass^4 | Mean input tokens | Pass rate against the baseline |
+|-|-|-|-|-|
+| without the library | 22/24 (92%) | 0.67 | 97,309 | |
+| the shelf | 17/24 (71%) | 0.33 | 215,509 (+121.5%) | -20.8 points (-0.542 to +0.125) |
+| the menu | 22/24 (92%) | 0.67 | 116,178 (+19.4%) | +0.0 points (-0.167 to +0.208) |
+
+The menu takes the harm away and keeps most of the saving. The two tasks the shelf
+broke are whole again: `recover-shared-rate`, which the shelf took from 4 of 4 to 1
+of 4, is 4 of 4 under the menu, and `fix-js-median` is 4 of 4 against the shelf's
+3 of 4. The cost of the menu is 19.4 percent more input tokens against the shelf's
+121.5 percent, and it buys back the passes the shelf lost.
+
+What it does not do is raise the pass rate. The menu is level with the baseline, and
+the interval contains zero, so the two cannot be told apart at 6 tasks. The plan
+wanted 10 points more; the honest reading is that the library now costs little and
+does nothing measurable for the pass rate -- which is a different statement from the
+one the shelf gave, and a better place to start from.
+
+One attempt to get there was thrown away. Choosing the lessons for the task by word
+overlap -- the inverse document frequency of the words the task and the lesson share
+-- picked the wrong lesson for four of the six test tasks: a task about a tax rate
+was handed the lesson about the endpoint of an inclusive range, because both say
+"returns". The words of a task are too few and too ordinary to say which lesson it
+needs, and the one that knows is the model that reads the menu.
 
 ## Task files
 
