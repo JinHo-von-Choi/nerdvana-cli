@@ -244,7 +244,7 @@ async def test_cancelling_an_mcp_call_returns_at_once() -> None:
 async def test_cancelling_a_web_request_returns_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
     entered, cleaned = asyncio.Event(), asyncio.Event()
 
-    async def slow_get(self: httpx.AsyncClient, url: str, **_: Any) -> httpx.Response:
+    async def slow_send(self: httpx.AsyncClient, request: httpx.Request, **_: Any) -> httpx.Response:
         entered.set()
         try:
             await asyncio.sleep(30)
@@ -252,7 +252,7 @@ async def test_cancelling_a_web_request_returns_at_once(monkeypatch: pytest.Monk
             cleaned.set()
         raise AssertionError("the request was not cancelled")
 
-    monkeypatch.setattr(httpx.AsyncClient, "get", slow_get)
+    monkeypatch.setattr(httpx.AsyncClient, "send", slow_send)
     monkeypatch.setattr("nerdvana_cli.tools.web_tools._check_url", lambda url: None)
     call = asyncio.create_task(WebFetchTool().call(WebFetchArgs(url="http://203.0.113.9/"), ToolContext(cwd=".")))
     await entered.wait()

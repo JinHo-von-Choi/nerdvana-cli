@@ -131,7 +131,7 @@ class TestMiniMaxListModels:
         assert ids == sorted(ids)
 
     @pytest.mark.asyncio
-    async def test_non_minimax_provider_keeps_empty_result(self) -> None:
+    async def test_non_minimax_provider_raises_the_failure(self) -> None:
         config = ProviderConfig(
             provider=ProviderName.OPENAI,
             api_key="bad-key",
@@ -141,10 +141,8 @@ class TestMiniMaxListModels:
         mock_client = AsyncMock()
         mock_client.models.list = AsyncMock(side_effect=Exception("auth error"))
 
-        with patch.object(provider, "_get_client", return_value=mock_client):
-            models = await provider.list_models()
-
-        assert models == []
+        with patch.object(provider, "_get_client", return_value=mock_client), pytest.raises(Exception, match="auth error"):
+            await provider.list_models()
 
 
 class TestMiniMaxM31Entries:

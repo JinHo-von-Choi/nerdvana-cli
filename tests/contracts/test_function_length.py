@@ -36,7 +36,6 @@ KNOWN_LONG: dict[str, int] = {
     "tools/agent_tool.py:AgentTool.call": 66,
     "main.py:serve": 72,
     "providers/gemini_provider.py:GeminiProvider.send": 67,
-    "tools/web_tools.py:WebSearchTool.call": 71,
     "core/config/migrate.py:run_if_needed": 70,
     "utils/path.py:safe_open_fd": 70,
     "tools/external_project_tools.py:RegisterExternalProjectTool._safe_resolve": 68,

@@ -1,5 +1,6 @@
 """Tests for Parism MCP client wrapper."""
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -38,3 +39,43 @@ class TestParismClient:
         client = ParismClient()
         with pytest.raises(RuntimeError, match="not connected"):
             await client.run("echo", ["hello"])
+
+
+class _Stdout:
+    def __init__(self, lines: list[bytes]) -> None:
+        self._lines = list(lines)
+
+    async def readline(self) -> bytes:
+        return self._lines.pop(0) if self._lines else b""
+
+
+class _Process:
+    def __init__(self, lines: list[bytes]) -> None:
+        self.stdout = _Stdout(lines)
+
+
+class TestReadLoop:
+    @pytest.mark.asyncio
+    async def test_bad_line_is_skipped_and_the_answer_after_it_arrives(self):
+        client = ParismClient()
+        loop   = asyncio.get_running_loop()
+        answer = loop.create_future()
+        client._pending[1] = answer
+        client._process = _Process([b"not json\n", b'[1, 2]\n', b'{"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\n'])
+
+        await client._read_loop()
+
+        assert answer.result() == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_requests_still_waiting_fail_when_the_output_ends(self):
+        client = ParismClient()
+        waiting = asyncio.get_running_loop().create_future()
+        client._pending[7] = waiting
+        client._process = _Process([])
+
+        await client._read_loop()
+
+        with pytest.raises(RuntimeError, match="stopped before answering"):
+            waiting.result()
+        assert client._pending == {}

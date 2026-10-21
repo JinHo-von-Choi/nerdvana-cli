@@ -86,14 +86,15 @@ class RestartLanguageServerTool(BaseTool[RestartLanguageServerArgs]):
             )
         else:
             restarted: list[str] = []
+            failed:    list[str] = []
             for lang, ext in self._LANG_TO_EXT.items():
                 try:
                     await self._client.shutdown_server(ext)
                     self._client._disabled.discard(ext)   # noqa: SLF001
                     restarted.append(lang)
-                except Exception:
-                    pass
-            return ToolResult(
-                tool_use_id="",
-                content=f"Restarted language servers: {', '.join(restarted) or 'none'}",
-            )
+                except Exception as exc:  # noqa: BLE001 - one server failing must not stop the others
+                    failed.append(f"{lang} ({exc})")
+            content = f"Restarted language servers: {', '.join(restarted) or 'none'}"
+            if failed:
+                content += f". Failed: {', '.join(failed)}"
+            return ToolResult(tool_use_id="", content=content, is_error=bool(failed) and not restarted)

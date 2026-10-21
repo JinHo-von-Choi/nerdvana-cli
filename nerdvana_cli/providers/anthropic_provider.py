@@ -480,23 +480,20 @@ class AnthropicProvider:
         return {"content": "", "tool_uses": [], "stop_reason": "compaction", "usage": usage, "provider_blocks": blocks}
 
     async def list_models(self) -> list[Any]:
-        """Fetch available models from Anthropic API."""
+        """Fetch available models from Anthropic API; a failed request raises, so the caller can say why."""
         from nerdvana_cli.providers.base import ModelInfo
-        try:
-            client = self._get_client()
-            response = await client.models.list()
-            models = []
-            for m in response.data:
-                models.append(ModelInfo(
-                    id=m.id,
-                    name=getattr(m, 'display_name', m.id),
-                    provider="anthropic",
-                    created=str(getattr(m, 'created_at', '')),
-                ))
-            models.sort(key=lambda x: x.id)
-            return models
-        except Exception:
-            return []
+        client = self._get_client()
+        response = await client.models.list()
+        models = []
+        for m in response.data:
+            models.append(ModelInfo(
+                id=m.id,
+                name=getattr(m, 'display_name', m.id),
+                provider="anthropic",
+                created=str(getattr(m, 'created_at', '')),
+            ))
+        models.sort(key=lambda x: x.id)
+        return models
 
     @staticmethod
     def _assistant_blocks(msg: dict[str, Any]) -> list[dict[str, Any]]:

@@ -41,7 +41,7 @@ class TestOpenAIListModels:
         assert models[1].id == "deepseek-reasoner"
 
     @pytest.mark.asyncio
-    async def test_list_models_error_returns_empty(self):
+    async def test_list_models_error_raises(self):
         config = ProviderConfig(
             provider=ProviderName.OPENAI,
             api_key="bad-key",
@@ -52,7 +52,5 @@ class TestOpenAIListModels:
         mock_client = AsyncMock()
         mock_client.models.list = AsyncMock(side_effect=Exception("auth error"))
 
-        with patch.object(provider, "_get_client", return_value=mock_client):
-            models = await provider.list_models()
-
-        assert models == []
+        with patch.object(provider, "_get_client", return_value=mock_client), pytest.raises(Exception, match="auth error"):
+            await provider.list_models()

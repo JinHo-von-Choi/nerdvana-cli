@@ -1,14 +1,16 @@
 """Unit tests for WebFetchTool and WebSearchTool.
 
 DNS resolution is patched via unittest.mock so no real network calls are made.
-httpx.AsyncClient is mocked at the module level to intercept HTTP traffic.
+HTTP traffic goes to an ``httpx.MockTransport`` handed to the tool.
 """
 
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections.abc import Callable
+from unittest.mock import patch
 
+import httpx
 import pytest
 
 from nerdvana_cli.core.tool import ToolContext
@@ -24,54 +26,17 @@ from nerdvana_cli.tools.web_tools import (
 _CTX = ToolContext(cwd=".")
 
 
-# ---------------------------------------------------------------------------
-# Helper factories
-# ---------------------------------------------------------------------------
-
-def _mock_http_response(
-    status_code: int = 200,
-    text: str        = "hello",
-    content_type: str = "text/html",
-    json_data: dict | None = None,
-) -> MagicMock:
-    """Return a mock that looks like an httpx.Response."""
-    resp = MagicMock()
-    resp.status_code = status_code
-    resp.text        = text
-    resp.headers     = {"content-type": content_type}
-
-    if json_data is not None:
-        resp.json = MagicMock(return_value=json_data)
-    else:
-        resp.json = MagicMock(return_value={})
-
-    # raise_for_status raises only on 4xx/5xx
-    if status_code >= 400:
-        import httpx
-        resp.raise_for_status = MagicMock(
-            side_effect=httpx.HTTPStatusError(
-                f"{status_code}",
-                request=MagicMock(),
-                response=MagicMock(
-                    status_code=status_code,
-                    text=text,
-                ),
-            )
-        )
-    else:
-        resp.raise_for_status = MagicMock()
-
-    return resp
+def _transport(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.MockTransport:
+    return httpx.MockTransport(handler)
 
 
-def _make_client_cm(response: MagicMock) -> MagicMock:
-    """Wrap a mock response in an async context manager mock."""
-    client           = AsyncMock()
-    client.get       = AsyncMock(return_value=response)
-    cm               = AsyncMock()
-    cm.__aenter__    = AsyncMock(return_value=client)
-    cm.__aexit__     = AsyncMock(return_value=False)
-    return cm
+def _answer(status: int = 200, text: str = "hello", content_type: str = "text/html") -> httpx.MockTransport:
+    return _transport(lambda request: httpx.Response(status, text=text, headers={"content-type": content_type}))
+
+
+def _public_dns() -> object:
+    """Every hostname resolves to a public address."""
+    return patch("nerdvana_cli.tools.web_tools._is_private_address", return_value=False)
 
 
 # ---------------------------------------------------------------------------
@@ -170,12 +135,8 @@ class TestWebFetchTool:
 
     @pytest.mark.asyncio
     async def test_200_ok_returns_body(self):
-        tool     = WebFetchTool()
-        response = _mock_http_response(200, "<html>hello</html>", "text/html")
-        cm       = _make_client_cm(response)
-
-        with patch("nerdvana_cli.tools.web_tools._check_url", return_value=None), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        tool = WebFetchTool(transport=_answer(200, "<html>hello</html>", "text/html"))
+        with _public_dns():
             result = await tool.call(WebFetchArgs(url="https://example.com"), _CTX)
 
         assert not result.is_error
@@ -188,14 +149,8 @@ class TestWebFetchTool:
     @pytest.mark.asyncio
     async def test_404_returns_status_not_error(self):
         """404 responses are returned as normal results (not ToolError)."""
-        tool     = WebFetchTool()
-        response = _mock_http_response(404, "Not Found", "text/plain")
-        # 404 must not trigger raise_for_status in WebFetchTool
-        response.raise_for_status = MagicMock()  # reset — fetch tool does not call it
-        cm = _make_client_cm(response)
-
-        with patch("nerdvana_cli.tools.web_tools._check_url", return_value=None), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        tool = WebFetchTool(transport=_answer(404, "Not Found", "text/plain"))
+        with _public_dns():
             result = await tool.call(WebFetchArgs(url="https://example.com/missing"), _CTX)
 
         assert not result.is_error
@@ -204,19 +159,103 @@ class TestWebFetchTool:
 
     @pytest.mark.asyncio
     async def test_max_bytes_truncation(self):
-        tool     = WebFetchTool()
-        body     = "A" * 2000
-        response = _mock_http_response(200, body, "text/plain")
-        cm       = _make_client_cm(response)
-
-        with patch("nerdvana_cli.tools.web_tools._check_url", return_value=None), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        tool = WebFetchTool(transport=_answer(200, "A" * 2000, "text/plain"))
+        with _public_dns():
             result = await tool.call(WebFetchArgs(url="https://example.com", max_bytes=500), _CTX)
 
         assert not result.is_error
         data = json.loads(result.content)
         assert data["truncated"]  is True
         assert len(data["body"])  == 500
+
+    @pytest.mark.asyncio
+    async def test_body_exactly_max_bytes_is_not_truncated(self):
+        tool = WebFetchTool(transport=_answer(200, "A" * 500, "text/plain"))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com", max_bytes=500), _CTX)
+
+        data = json.loads(result.content)
+        assert data["truncated"] is False
+        assert len(data["body"]) == 500
+
+    @pytest.mark.asyncio
+    async def test_reading_stops_at_max_bytes(self):
+        """The body is streamed: chunks past max_bytes are never pulled from the server."""
+        pulled: list[int] = []
+
+        async def body():
+            for index in range(100):
+                pulled.append(index)
+                yield b"B" * 1000
+
+        tool = WebFetchTool(transport=_transport(lambda request: httpx.Response(200, content=body())))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com", max_bytes=2500), _CTX)
+
+        data = json.loads(result.content)
+        assert data["truncated"] is True
+        assert len(data["body"]) == 2500
+        assert len(pulled) < 10
+
+    @pytest.mark.asyncio
+    async def test_public_redirect_is_followed(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/old":
+                return httpx.Response(302, headers={"location": "/new"})
+            return httpx.Response(200, text="moved here")
+
+        tool = WebFetchTool(transport=_transport(handler))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com/old"), _CTX)
+
+        data = json.loads(result.content)
+        assert data["status"] == 200
+        assert data["body"]   == "moved here"
+
+    @pytest.mark.asyncio
+    async def test_redirect_to_loopback_is_refused(self):
+        reached: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            reached.append(str(request.url))
+            return httpx.Response(302, headers={"location": "http://127.0.0.1/admin"})
+
+        tool = WebFetchTool(transport=_transport(handler))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com/"), _CTX)
+
+        assert result.is_error
+        assert "127.0.0.1" in result.content
+        assert reached == ["https://example.com/"]
+
+    @pytest.mark.asyncio
+    async def test_redirect_to_metadata_address_is_refused(self):
+        tool = WebFetchTool(transport=_transport(
+            lambda request: httpx.Response(301, headers={"location": "http://169.254.169.254/latest/meta-data"})
+        ))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com/"), _CTX)
+
+        assert result.is_error
+        assert "169.254.169.254" in result.content
+
+    @pytest.mark.asyncio
+    async def test_redirect_loop_stops(self):
+        tool = WebFetchTool(transport=_transport(lambda request: httpx.Response(302, headers={"location": "/again"})))
+        with _public_dns():
+            result = await tool.call(WebFetchArgs(url="https://example.com/again"), _CTX)
+
+        assert result.is_error
+        assert "Too many redirects" in result.content
+
+    @pytest.mark.asyncio
+    async def test_connection_is_reused_across_calls(self):
+        tool = WebFetchTool(transport=_answer())
+        with _public_dns():
+            await tool.call(WebFetchArgs(url="https://example.com/a"), _CTX)
+            first = tool._clients.get()
+            await tool.call(WebFetchArgs(url="https://example.com/b"), _CTX)
+        assert tool._clients.get() is first
 
     @pytest.mark.asyncio
     async def test_private_ip_blocked(self):
@@ -234,13 +273,11 @@ class TestWebFetchTool:
 
     @pytest.mark.asyncio
     async def test_request_exception_returns_error(self):
-        tool = WebFetchTool()
-        cm   = AsyncMock()
-        cm.__aenter__ = AsyncMock(side_effect=Exception("network failure"))
-        cm.__aexit__  = AsyncMock(return_value=False)
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("network failure", request=request)
 
-        with patch("nerdvana_cli.tools.web_tools._check_url", return_value=None), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        tool = WebFetchTool(transport=_transport(handler))
+        with _public_dns():
             result = await tool.call(WebFetchArgs(url="https://example.com"), _CTX)
 
         assert result.is_error
@@ -293,7 +330,6 @@ class TestWebSearchTool:
 
     @pytest.mark.asyncio
     async def test_successful_search_parses_results(self):
-        tool = WebSearchTool()
         brave_payload = {
             "web": {
                 "results": [
@@ -302,12 +338,9 @@ class TestWebSearchTool:
                 ]
             }
         }
-        response = _mock_http_response(200, json_data=brave_payload)
-        cm       = _make_client_cm(response)
+        tool = WebSearchTool(transport=_transport(lambda request: httpx.Response(200, json=brave_payload)))
 
-        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm), \
-             patch("nerdvana_cli.tools.web_tools._is_private_address", return_value=False):
+        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), _public_dns():
             result = await tool.call(WebSearchArgs(query="example", count=2), _CTX)
 
         assert not result.is_error
@@ -321,7 +354,6 @@ class TestWebSearchTool:
     @pytest.mark.asyncio
     async def test_private_url_in_results_filtered(self):
         """Results pointing to private IPs must be silently dropped."""
-        tool = WebSearchTool()
         brave_payload = {
             "web": {
                 "results": [
@@ -330,11 +362,9 @@ class TestWebSearchTool:
                 ]
             }
         }
-        response = _mock_http_response(200, json_data=brave_payload)
-        cm       = _make_client_cm(response)
+        tool = WebSearchTool(transport=_transport(lambda request: httpx.Response(200, json=brave_payload)))
 
-        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), _public_dns():
             result = await tool.call(WebSearchArgs(query="test"), _CTX)
 
         assert not result.is_error
@@ -345,14 +375,10 @@ class TestWebSearchTool:
 
     @pytest.mark.asyncio
     async def test_empty_results(self):
-        tool = WebSearchTool()
         brave_payload = {"web": {"results": []}}
-        response = _mock_http_response(200, json_data=brave_payload)
-        cm       = _make_client_cm(response)
+        tool = WebSearchTool(transport=_transport(lambda request: httpx.Response(200, json=brave_payload)))
 
-        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm), \
-             patch("nerdvana_cli.tools.web_tools._is_private_address", return_value=False):
+        with patch.dict("os.environ", {"BRAVE_API_KEY": "test-key"}), _public_dns():
             result = await tool.call(WebSearchArgs(query="nothing"), _CTX)
 
         assert not result.is_error
@@ -361,23 +387,9 @@ class TestWebSearchTool:
 
     @pytest.mark.asyncio
     async def test_api_error_returns_tool_error(self):
-        tool = WebSearchTool()
+        tool = WebSearchTool(transport=_transport(lambda request: httpx.Response(401, text="Unauthorized")))
 
-        import httpx
-        client      = AsyncMock()
-        client.get  = AsyncMock(
-            side_effect=httpx.HTTPStatusError(
-                "401",
-                request=MagicMock(),
-                response=MagicMock(status_code=401, text="Unauthorized"),
-            )
-        )
-        cm              = AsyncMock()
-        cm.__aenter__   = AsyncMock(return_value=client)
-        cm.__aexit__    = AsyncMock(return_value=False)
-
-        with patch.dict("os.environ", {"BRAVE_API_KEY": "bad-key"}), \
-             patch("nerdvana_cli.tools.web_tools.httpx.AsyncClient", return_value=cm):
+        with patch.dict("os.environ", {"BRAVE_API_KEY": "bad-key"}):
             result = await tool.call(WebSearchArgs(query="test"), _CTX)
 
         assert result.is_error

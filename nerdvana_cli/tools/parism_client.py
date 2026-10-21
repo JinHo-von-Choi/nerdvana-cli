@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import shutil
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class ParismClient:
@@ -133,25 +136,39 @@ class ParismClient:
         await self._process.stdin.drain()
 
     async def _read_loop(self) -> None:
-        """Read JSON-RPC responses from parism stdout."""
-        while True:
-            try:
+        """Read JSON-RPC responses from parism stdout until it closes.
+
+        A line that is not a JSON object is logged and skipped. When the loop
+        ends, every request still waiting is failed at once instead of waiting
+        out its timeout.
+        """
+        try:
+            while True:
                 assert self._process is not None
                 assert self._process.stdout is not None
                 line = await self._process.stdout.readline()
                 if not line:
                     break
-                data = json.loads(line.decode())
+                try:
+                    data = json.loads(line.decode())
+                except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                    logger.warning("parism: unreadable response line skipped: %s", exc)
+                    continue
+                if not isinstance(data, dict):
+                    continue
                 req_id = data.get("id")
                 if req_id and req_id in self._pending:
-                    if "error" in data:
-                        self._pending[req_id].set_exception(
-                            RuntimeError(data["error"].get("message", "Unknown error"))
-                        )
+                    future = self._pending.pop(req_id)
+                    error  = data.get("error")
+                    if error:
+                        message = error.get("message", "Unknown error") if isinstance(error, dict) else str(error)
+                        future.set_exception(RuntimeError(message))
                     else:
-                        self._pending[req_id].set_result(data.get("result", {}))
-                    del self._pending[req_id]
-            except (json.JSONDecodeError, asyncio.CancelledError):
-                break
-            except Exception:
-                continue
+                        future.set_result(data.get("result", {}))
+        except (OSError, ValueError) as exc:
+            logger.warning("parism: reading responses stopped: %s", exc)
+        finally:
+            for future in self._pending.values():
+                if not future.done():
+                    future.set_exception(RuntimeError("parism stopped before answering"))
+            self._pending.clear()

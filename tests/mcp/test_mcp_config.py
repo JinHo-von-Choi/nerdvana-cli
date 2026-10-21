@@ -173,3 +173,39 @@ class TestLoadMcpConfigOverride:
         )
         assert result["server-a"].command == "project-cmd"
         assert result["server-a"].args == ["--project"]
+
+
+class TestLoadMcpConfigProblems:
+    """A broken file or entry is skipped, reported, and does not take the other file down."""
+
+    def _global_with_server(self, tmp_path):
+        path = tmp_path / "global.json"
+        path.write_text(json.dumps({"mcpServers": {"kept": {"command": "node"}}}))
+        return path
+
+    def test_unparsable_project_file_is_reported_and_global_servers_stay(self, tmp_path, caplog):
+        (tmp_path / ".mcp.json").write_text("{ not json")
+        problems: list[str] = []
+
+        result = load_mcp_config(cwd=str(tmp_path), global_path=str(self._global_with_server(tmp_path)), problems=problems)
+
+        assert list(result) == ["kept"]
+        assert len(problems) == 1
+        assert ".mcp.json" in problems[0] and "cannot be read" in problems[0]
+        assert "MCP config skipped" in caplog.text
+
+    def test_entry_that_is_not_an_object_is_skipped_alone(self, tmp_path):
+        (tmp_path / ".mcp.json").write_text(json.dumps({"mcpServers": {"bad": "node", "good": {"command": "uvx"}}}))
+        problems: list[str] = []
+
+        result = load_mcp_config(cwd=str(tmp_path), global_path=str(tmp_path / "none.json"), problems=problems)
+
+        assert list(result) == ["good"]
+        assert problems == [f"{tmp_path / '.mcp.json'}: server 'bad' must be an object"]
+
+    def test_servers_that_are_not_an_object_are_reported(self, tmp_path):
+        (tmp_path / ".mcp.json").write_text(json.dumps({"mcpServers": ["node"]}))
+        problems: list[str] = []
+
+        assert load_mcp_config(cwd=str(tmp_path), global_path=str(tmp_path / "none.json"), problems=problems) == {}
+        assert "'mcpServers' must be an object" in problems[0]

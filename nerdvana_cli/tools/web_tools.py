@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import os
@@ -18,13 +19,22 @@ _ALLOWED_SCHEMES = {"http", "https"}
 
 _DEFAULT_MAX_BYTES = 1_000_000
 _HTTP_TIMEOUT      = 10.0
+_MAX_REDIRECTS     = 5
+_REDIRECT_CODES    = frozenset({301, 302, 303, 307, 308})
+
+
+def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True for every address a fetch must not reach: loopback, private, link-local, unspecified, reserved, multicast."""
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+    return (
+        addr.is_loopback or addr.is_private or addr.is_link_local
+        or addr.is_unspecified or addr.is_reserved or addr.is_multicast
+    )
 
 
 def _is_private_address(hostname: str) -> bool:
-    """Return True when hostname resolves to a private/loopback/link-local address.
-
-    Raises socket.gaierror when DNS resolution fails (propagated to caller).
-    """
+    """Return True when hostname resolves to an address `_is_blocked_ip` refuses."""
     try:
         resolved = socket.getaddrinfo(hostname, None)
     except OSError:
@@ -37,9 +47,22 @@ def _is_private_address(hostname: str) -> bool:
             addr = ipaddress.ip_address(raw_ip)
         except ValueError:
             continue
-        if addr.is_loopback or addr.is_private or addr.is_link_local:
+        if _is_blocked_ip(addr):
             return True
     return False
+
+
+def _host_error(hostname: str) -> str | None:
+    """Why *hostname* may not be fetched, or None when it may."""
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        if _is_private_address(hostname):
+            return f"Hostname '{hostname}' resolves to a private/loopback address."
+        return None
+    if _is_blocked_ip(addr):
+        return f"Access to private/loopback address '{hostname}' is not allowed."
+    return None
 
 
 def _check_url(url: str) -> str | None:
@@ -55,18 +78,44 @@ def _check_url(url: str) -> str | None:
     if not hostname:
         return "URL contains no hostname."
 
-    # Block bare IP literals that are private/loopback.
+    return _host_error(hostname)
+
+
+class _LoopBoundClient:
+    """One ``httpx.AsyncClient`` per event loop, so calls in a session reuse their connections."""
+
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._transport = transport
+        self._client: httpx.AsyncClient | None = None
+        self._loop:   asyncio.AbstractEventLoop | None = None
+
+    def get(self) -> httpx.AsyncClient:
+        loop = asyncio.get_running_loop()
+        if self._client is None or self._client.is_closed or self._loop is not loop:
+            self._client = httpx.AsyncClient(timeout=_HTTP_TIMEOUT, transport=self._transport)
+            self._loop   = loop
+        return self._client
+
+
+async def _read_limited(response: httpx.Response, max_bytes: int) -> tuple[bytes, bool]:
+    """At most *max_bytes* of the body, and whether more was left unread."""
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in response.aiter_bytes():
+        room = max_bytes - size
+        if len(chunk) > room:
+            chunks.append(chunk[:room])
+            return b"".join(chunks), True
+        chunks.append(chunk)
+        size += len(chunk)
+    return b"".join(chunks), False
+
+
+def _decode(raw: bytes, encoding: str | None) -> str:
     try:
-        addr = ipaddress.ip_address(hostname)
-        if addr.is_loopback or addr.is_private or addr.is_link_local:
-            return f"Access to private/loopback address '{hostname}' is not allowed."
-    except ValueError:
-        pass  # Not a bare IP — proceed to DNS resolution check.
-
-    if _is_private_address(hostname):
-        return f"Hostname '{hostname}' resolves to a private/loopback address."
-
-    return None
+        return raw.decode(encoding or "utf-8", errors="replace")
+    except LookupError:
+        return raw.decode("utf-8", errors="replace")
 
 
 class WebFetchArgs:
@@ -100,6 +149,9 @@ class WebFetchTool(BaseTool[WebFetchArgs]):
     tags:         ClassVar[frozenset[str]] = frozenset({"web", "fetch"})
     requires_confirmation              = False
 
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._clients = _LoopBoundClient(transport)
+
     async def call(
         self,
         args: WebFetchArgs,
@@ -107,30 +159,32 @@ class WebFetchTool(BaseTool[WebFetchArgs]):
         can_use_tool: Any = None,
         on_progress: Any  = None,
     ) -> ToolResult:
-        err = _check_url(args.url)
-        if err:
-            return ToolResult(tool_use_id="", content=err, is_error=True)
-
         max_bytes = max(1, args.max_bytes) if args.max_bytes else _DEFAULT_MAX_BYTES
+        url       = args.url
+        client    = self._clients.get()
 
         try:
-            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT, follow_redirects=True) as client:
-                response = await client.get(args.url)
-        except Exception as exc:  # noqa: BLE001
+            # Redirects are followed here, not by httpx, so that every hop passes _check_url.
+            for _hop in range(_MAX_REDIRECTS + 1):
+                err = _check_url(url)
+                if err:
+                    return ToolResult(tool_use_id="", content=err, is_error=True)
+                async with client.stream("GET", url) as response:
+                    location = response.headers.get("location")
+                    if response.status_code in _REDIRECT_CODES and location:
+                        url = str(response.url.join(location))
+                        continue
+                    raw, truncated = await _read_limited(response, max_bytes)
+                    payload = {
+                        "status":       response.status_code,
+                        "content_type": response.headers.get("content-type", ""),
+                        "body":         _decode(raw, response.encoding),
+                        "truncated":    truncated,
+                    }
+                    return ToolResult(tool_use_id="", content=json.dumps(payload))
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
             return ToolResult(tool_use_id="", content=f"Request failed: {exc}", is_error=True)
-
-        body        = response.text
-        truncated   = len(body) > max_bytes
-        if truncated:
-            body = body[:max_bytes]
-
-        payload = {
-            "status":       response.status_code,
-            "content_type": response.headers.get("content-type", ""),
-            "body":         body,
-            "truncated":    truncated,
-        }
-        return ToolResult(tool_use_id="", content=json.dumps(payload))
+        return ToolResult(tool_use_id="", content=f"Too many redirects (more than {_MAX_REDIRECTS}).", is_error=True)
 
 
 class WebSearchArgs:
@@ -163,6 +217,9 @@ class WebSearchTool(BaseTool[WebSearchArgs]):
 
     _BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._clients = _LoopBoundClient(transport)
+
     async def call(
         self,
         args: WebSearchArgs,
@@ -182,12 +239,7 @@ class WebSearchTool(BaseTool[WebSearchArgs]):
         headers = {"X-Subscription-Token": api_key, "Accept": "application/json"}
 
         try:
-            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
-                response = await client.get(
-                    self._BRAVE_SEARCH_URL,
-                    params=params,
-                    headers=headers,
-                )
+            response = await self._clients.get().get(self._BRAVE_SEARCH_URL, params=params, headers=headers)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             return ToolResult(
@@ -210,20 +262,10 @@ class WebSearchTool(BaseTool[WebSearchArgs]):
 
         results: list[dict[str, str]] = []
         for item in raw_results:
-            url     = item.get("url", "")
+            url      = item.get("url", "")
             # Block results that point to private addresses.
-            parsed  = urlparse(url)
-            hostname = parsed.hostname or ""
-            blocked = False
-            try:
-                addr = ipaddress.ip_address(hostname)
-                if addr.is_loopback or addr.is_private or addr.is_link_local:
-                    blocked = True
-            except ValueError:
-                if hostname and _is_private_address(hostname):
-                    blocked = True
-
-            if blocked:
+            hostname = urlparse(url).hostname or ""
+            if hostname and _host_error(hostname):
                 continue
 
             results.append({

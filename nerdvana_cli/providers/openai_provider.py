@@ -213,7 +213,8 @@ class OpenAIProvider:
 
         For MiniMax the response is merged with the models the CLI ships, so
         an unreachable API or a response that omits the current models still
-        yields ``MiniMax-M3.1-Flash-Preview`` in the picker.
+        yields ``MiniMax-M3.1-Flash-Preview`` in the picker. For every other
+        provider a failed request raises, so the caller can say why.
         """
         from nerdvana_cli.providers.base import ModelInfo
 
@@ -228,7 +229,10 @@ class OpenAIProvider:
                 )
                 for m in response.data
             ]
-        except Exception:
+        except Exception as exc:
+            if self.config.provider != ProviderName.MINIMAX:
+                raise
+            logger.warning("MiniMax model list unavailable, using the known models: %s", exc)
             models = []
         if self.config.provider == ProviderName.MINIMAX:
             seen = {model.id.lower() for model in models}

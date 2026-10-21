@@ -199,6 +199,16 @@ class TestRestartLanguageServerTool:
         assert not result.is_error
         assert "Restarted" in result.content
 
+    async def test_restart_all_names_the_servers_that_failed(self, tool: RestartLanguageServerTool) -> None:
+        async def shutdown(ext: str) -> None:
+            if ext == ".py":
+                raise RuntimeError("server hung")
+
+        tool._client.shutdown_server = AsyncMock(side_effect=shutdown)
+        result = await tool.call(RestartLanguageServerArgs(language=None), _ctx())
+        assert "Failed: python (server hung)" in result.content
+        assert not result.is_error
+
     async def test_unknown_language(self, tool: RestartLanguageServerTool) -> None:
         args   = RestartLanguageServerArgs(language="cobol")
         result = await tool.call(args, _ctx())

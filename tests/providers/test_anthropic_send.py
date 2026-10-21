@@ -137,11 +137,12 @@ def test_convert_messages_tool_result_block() -> None:
     ]
 
 
-async def test_list_models_failure_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_list_models_failure_raises_with_the_reason(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _provider()
     client = SimpleNamespace(models=SimpleNamespace(list=AsyncMock(side_effect=RuntimeError("x"))))
     monkeypatch.setattr(provider, "_get_client", lambda: client)
-    assert await provider.list_models() == []
+    with pytest.raises(RuntimeError, match="x"):
+        await provider.list_models()
 
 
 async def test_list_models_success_sorted(monkeypatch: pytest.MonkeyPatch) -> None:

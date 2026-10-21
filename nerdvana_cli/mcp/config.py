@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -11,6 +12,8 @@ from typing import Any
 
 from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.config.managed_policy import load_managed_policy
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -72,30 +75,44 @@ def _parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig:
 def load_mcp_config(
     cwd: str | None = None,
     global_path: str | None = None,
+    problems: list[str] | None = None,
 ) -> dict[str, McpServerConfig]:
     """Load MCP server configs from project and global .mcp.json files.
 
     Args:
         cwd: Working directory to search for .mcp.json. Defaults to os.getcwd().
         global_path: Path to global config. Defaults to ~/.nerdvana/mcp.json.
+        problems: When given, receives one line per file or entry that was skipped.
 
     Search order: global then project (cwd/.mcp.json).
     Project settings override global settings. Servers outside the managed
-    ``mcp.allowed_servers`` list are left out.
+    ``mcp.allowed_servers`` list are left out. A file that cannot be read and
+    an entry that is not an object are skipped and logged, never dropped silently.
     """
     configs: dict[str, McpServerConfig] = {}
+    skipped: list[str] = [] if problems is None else problems
 
     gp = paths.user_mcp_json() if global_path is None else Path(global_path)
     project = Path.cwd() / ".mcp.json" if cwd is None else Path(cwd) / ".mcp.json"
 
     for path in (gp, project):
-        if path.is_file():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                servers = data.get("mcpServers", {})
-                for name, raw in servers.items():
-                    configs[name] = _parse_server(name, raw)
-            except (json.JSONDecodeError, OSError):
-                pass
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            skipped.append(f"{path}: cannot be read ({exc})")
+            continue
+        servers = data.get("mcpServers", {}) if isinstance(data, dict) else None
+        if not isinstance(servers, dict):
+            skipped.append(f"{path}: 'mcpServers' must be an object")
+            continue
+        for name, raw in servers.items():
+            if not isinstance(raw, dict):
+                skipped.append(f"{path}: server '{name}' must be an object")
+                continue
+            configs[name] = _parse_server(name, raw)
 
+    for line in skipped:
+        logger.warning("MCP config skipped: %s", line)
     return load_managed_policy().filter_mcp_servers(configs)

@@ -228,7 +228,10 @@ async def _connect_mcp(cwd: str) -> Any:
     """Connect the configured MCP servers; None when none are configured."""
     from nerdvana_cli.mcp.config import load_mcp_config
 
-    configs = load_mcp_config(cwd=cwd)
+    problems: list[str] = []
+    configs = load_mcp_config(cwd=cwd, problems=problems)
+    for problem in problems:
+        console.print(f"[dim yellow]MCP config skipped: {escape(problem)}[/dim yellow]")
     if not configs:
         return None
     try:

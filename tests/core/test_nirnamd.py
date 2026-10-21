@@ -16,6 +16,12 @@ class TestNirnaMdLoading:
         assert files[0].type == "project"
         assert "Use tabs" in files[0].content
 
+    def test_undecodable_file_is_logged_not_silently_dropped(self, tmp_path, caplog):
+        (tmp_path / "NIRNA.md").write_bytes(b"# Rules\n\xff\xfe broken")
+        files = load_nirna_files(cwd=str(tmp_path), global_path=str(tmp_path / "nonexistent"))
+        assert [f.content for f in files if f.type == "project"] == [""]
+        assert "NIRNA.md not loaded" in caplog.text
+
     def test_local_nirnamd(self, tmp_path):
         (tmp_path / "NIRNA.local.md").write_text("# My Prefs\nBe terse.")
         files = load_nirna_files(cwd=str(tmp_path), global_path=str(tmp_path / "nonexistent"))

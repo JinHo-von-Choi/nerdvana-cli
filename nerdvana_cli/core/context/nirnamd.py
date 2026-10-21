@@ -9,11 +9,14 @@ Discovery order (ascending priority):
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, replace
 
 from nerdvana_cli.core.config import paths
 from nerdvana_cli.core.context.token_estimator import approx_tokens
+
+logger = logging.getLogger(__name__)
 
 MAX_INSTRUCTION_BYTES = 50_000
 COMPAT_RULE_FILENAMES = ("AGENTS.md", "CLAUDE.md")
@@ -148,5 +151,6 @@ def _read_file(path: str, max_bytes: int = MAX_INSTRUCTION_BYTES) -> str:
     try:
         with open(path, encoding="utf-8") as f:
             return f.read(max_bytes)
-    except Exception:
+    except (OSError, UnicodeDecodeError) as exc:
+        logger.warning("Instruction file %s not loaded: %s", path, exc)
         return ""

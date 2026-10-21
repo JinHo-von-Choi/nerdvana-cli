@@ -301,23 +301,20 @@ class GeminiProvider:
             return {"content": str(e), "tool_uses": [], "usage": {}, "is_error": True}
 
     async def list_models(self) -> list[Any]:
-        """Fetch available models from Gemini API."""
+        """Fetch available models from Gemini API; a failed request raises, so the caller can say why."""
         from nerdvana_cli.providers.base import ModelInfo
-        try:
-            client = self._get_client()
-            models: list[Any] = []
-            for m in client.models.list():
-                m_name: str = m.name or ""
-                model_id = m_name.replace("models/", "") if m_name.startswith("models/") else m_name
-                models.append(ModelInfo(
-                    id=model_id,
-                    name=getattr(m, 'display_name', model_id) or model_id,
-                    provider="gemini",
-                ))
-            models.sort(key=lambda x: x.id)
-            return models
-        except Exception:
-            return []
+        client = self._get_client()
+        models: list[Any] = []
+        for m in client.models.list():
+            m_name: str = m.name or ""
+            model_id = m_name.replace("models/", "") if m_name.startswith("models/") else m_name
+            models.append(ModelInfo(
+                id=model_id,
+                name=getattr(m, 'display_name', model_id) or model_id,
+                provider="gemini",
+            ))
+        models.sort(key=lambda x: x.id)
+        return models
 
     @staticmethod
     def _resolve_tool_name(source: dict[str, Any], tool_use_id: str, names_by_id: dict[str, str]) -> str:

@@ -339,14 +339,15 @@ class TestGeminiListModels:
         assert [m.id for m in models] == ["gemini-1.5-pro", "gemini-2.0-flash"]
         assert models[1].name == "Flash"
 
-    async def test_list_models_swallows_transport_failure(self):
+    async def test_list_models_raises_transport_failure(self):
         provider = GeminiProvider(ProviderConfig(provider=ProviderName.GEMINI))
 
         def _boom() -> Any:
             raise RuntimeError("no network")
 
         provider._client = SimpleNamespace(models=SimpleNamespace(list=_boom))  # type: ignore[assignment]
-        assert await provider.list_models() == []
+        with pytest.raises(RuntimeError, match="no network"):
+            await provider.list_models()
 
 
 # ---------------------------------------------------------------------------
