@@ -21,7 +21,7 @@ from nerdvana_cli.core.delegation.subagent import run_subagent
 from nerdvana_cli.core.delegation.task_state import TaskRegistry
 from nerdvana_cli.core.loop.activity_state import ActivityState
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
-from nerdvana_cli.core.loop.subagent_config import LoopFactories, SubagentConfig
+from nerdvana_cli.core.loop.subagent_config import LoopCallbacks, LoopFactories, SubagentConfig
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolRegistry
 from nerdvana_cli.tools.registry import create_tool_registry
@@ -62,10 +62,12 @@ def build_agent_loop(settings: NerdvanaSettings, profile: ExecutionProfile) -> A
         registry           = registry,
         session            = profile.session,
         task_registry      = profile.task_registry,
-        on_activity_change = profile.on_activity_change,
-        on_ask_user        = profile.on_ask_user,
-        on_confirm         = profile.on_confirm,
-        on_thinking_chunk  = profile.on_thinking_chunk,
+        callbacks          = LoopCallbacks(
+            on_activity_change = profile.on_activity_change,
+            on_thinking_chunk  = profile.on_thinking_chunk,
+            on_ask_user        = profile.on_ask_user,
+            on_confirm         = profile.on_confirm,
+        ),
         factories          = loop_factories(),
     )
 

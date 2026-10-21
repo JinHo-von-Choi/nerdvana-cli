@@ -68,7 +68,7 @@ from nerdvana_cli.core.loop.plan_gate import plan_for
 from nerdvana_cli.core.loop.provider_recovery import ProviderCallError, RecoveryPlanner
 from nerdvana_cli.core.loop.run_limits import RunLimits
 from nerdvana_cli.core.loop.stream_guard import guarded_stream
-from nerdvana_cli.core.loop.subagent_config import LoopFactories
+from nerdvana_cli.core.loop.subagent_config import LoopCallbacks, LoopFactories
 from nerdvana_cli.core.loop.tool_ids import collect_tool_use_ids, repair_tool_ids
 from nerdvana_cli.core.safety.policy import PermissionPolicy
 from nerdvana_cli.core.safety.sandbox import SandboxPolicy
@@ -80,7 +80,7 @@ from nerdvana_cli.core.state.rewind import Rewinder
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.state.todos import CONTINUE, STALLED, TodoGuard
 from nerdvana_cli.core.telemetry.analytics import AnalyticsWriter, CallOrigin, PricingTable
-from nerdvana_cli.core.tool import AskUserCallback, ConfirmCallback, ToolContext, ToolRegistry
+from nerdvana_cli.core.tool import ToolContext, ToolRegistry
 from nerdvana_cli.providers.errors import OTHER, ProviderFailure
 from nerdvana_cli.types import Message, Role, SessionState
 
@@ -131,13 +131,10 @@ class AgentLoop:
         registry:            ToolRegistry,
         session:             SessionStorage | None = None,
         task_registry:       Any = None,
-        on_activity_change:  Callable[[ActivityState], None] | None = None,
-        on_thinking_chunk:   Callable[[str], None] | None = None,
+        callbacks:           LoopCallbacks | None = None,
         analytics_writer:    AnalyticsWriter | None = None,
         pricing_table:       PricingTable | None = None,
         role_prompt:         str = "",
-        on_ask_user:         AskUserCallback | None = None,
-        on_confirm:          ConfirmCallback | None = None,
         origin:              CallOrigin | None = None,
         factories:           LoopFactories | None = None,
     ) -> None:
@@ -150,10 +147,11 @@ class AgentLoop:
         self._task_registry       = task_registry
         self.console              = Console()
         self.activity_state       = ActivityState()
-        self._on_activity_change  = on_activity_change
-        self._on_thinking_chunk   = on_thinking_chunk
-        self._on_ask_user         = on_ask_user
-        self._on_confirm          = on_confirm
+        callbacks                 = callbacks or LoopCallbacks()
+        self._on_activity_change  = callbacks.on_activity_change
+        self._on_thinking_chunk   = callbacks.on_thinking_chunk
+        self._on_ask_user         = callbacks.on_ask_user
+        self._on_confirm          = callbacks.on_confirm
         self.last_thinking:  str  = ""
         self._init_hooks(settings)
         self._init_history(settings, registry, role_prompt)

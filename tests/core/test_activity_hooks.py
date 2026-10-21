@@ -15,6 +15,7 @@ from nerdvana_cli.core.loop.activity_hooks import (
 )
 from nerdvana_cli.core.loop.activity_state import ActivityState, summarize_tool_call
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.loop.subagent_config import LoopCallbacks
 from nerdvana_cli.core.tool import ToolRegistry
 
 # ---------------------------------------------------------------------------
@@ -307,13 +308,13 @@ class TestOnActivityChangeCallback:
             loop = AgentLoop(
                 settings           = settings,
                 registry           = registry,
-                on_activity_change = lambda s: call_log.append(ActivityState(
+                callbacks          = LoopCallbacks(on_activity_change = lambda s: call_log.append(ActivityState(
                     phase      = s.phase,
                     label      = s.label,
                     detail     = s.detail,
                     tool_name  = s.tool_name,
                     started_at = s.started_at,
-                )),
+                ))),
             )
 
         before_count = len(call_log)
@@ -330,13 +331,13 @@ class TestOnActivityChangeCallback:
             loop = AgentLoop(
                 settings           = settings,
                 registry           = registry,
-                on_activity_change = lambda s: received.append(ActivityState(
+                callbacks          = LoopCallbacks(on_activity_change = lambda s: received.append(ActivityState(
                     phase      = s.phase,
                     label      = s.label,
                     detail     = s.detail,
                     tool_name  = s.tool_name,
                     started_at = s.started_at,
-                )),
+                ))),
             )
 
         loop._set_activity(phase="tool_running", label="Bash", detail="ls -la", tool_name="Bash")
@@ -356,7 +357,7 @@ class TestOnActivityChangeCallback:
             loop = AgentLoop(
                 settings           = settings,
                 registry           = registry,
-                on_activity_change = lambda s: call_log.append(s.phase),
+                callbacks          = LoopCallbacks(on_activity_change = lambda s: call_log.append(s.phase)),
             )
 
         initial_count = len(call_log)
@@ -387,7 +388,7 @@ class TestCallbackExceptionSafety:
             loop = AgentLoop(
                 settings           = settings,
                 registry           = registry,
-                on_activity_change = bad_callback,
+                callbacks          = LoopCallbacks(on_activity_change = bad_callback),
             )
 
         loop._set_activity(phase="thinking", label="Thinking...")
@@ -404,7 +405,7 @@ class TestCallbackExceptionSafety:
             loop = AgentLoop(
                 settings           = settings,
                 registry           = registry,
-                on_activity_change = bad_callback,
+                callbacks          = LoopCallbacks(on_activity_change = bad_callback),
             )
 
         loop._set_activity(phase="streaming", label="Streaming from test-model")

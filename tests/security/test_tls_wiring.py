@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 
 from nerdvana_cli.server.audit import AuditLogger
-from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, TlsConfigurationError
+from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, TlsConfigurationError, TlsFiles
 
 pytestmark = pytest.mark.security
 
@@ -172,9 +172,7 @@ async def test_tls_options_reach_the_listener(
     """Certificate, key and CA are handed to uvicorn with their real values."""
     server = _make_server(
         tmp_path,
-        tls_cert = tls_material.cert,
-        tls_key  = tls_material.key,
-        tls_ca   = tls_material.cert,
+        tls = TlsFiles(cert=tls_material.cert, key=tls_material.key, ca=tls_material.cert),
     )
 
     await server.run()
@@ -194,8 +192,7 @@ async def test_ca_turns_on_client_certificate_verification(
     """A CA without CERT_REQUIRED would admit peers presenting no certificate."""
     server = _make_server(
         tmp_path,
-        tls_cert = tls_material.bundle,
-        tls_ca   = tls_material.cert,
+        tls = TlsFiles(cert=tls_material.bundle, ca=tls_material.cert),
     )
 
     await server.run()
@@ -209,7 +206,7 @@ async def test_bundle_needs_no_separate_key(
     config_spy:   _ConfigSpy,
 ) -> None:
     """A PEM holding certificate and key is accepted on its own."""
-    server = _make_server(tmp_path, tls_cert=tls_material.bundle)
+    server = _make_server(tmp_path, tls=TlsFiles(cert=tls_material.bundle))
 
     await server.run()
 
@@ -245,7 +242,7 @@ def test_missing_certificate_refuses_startup(
 ) -> None:
     """A certificate path that does not exist aborts instead of serving clear."""
     with pytest.raises(TlsConfigurationError) as excinfo:
-        _make_server(tmp_path, tls_cert=tmp_path / "absent.crt")
+        _make_server(tmp_path, tls=TlsFiles(cert=tmp_path / "absent.crt"))
 
     assert "--tls-cert" in str(excinfo.value)
     assert config_spy.calls == []
@@ -272,7 +269,7 @@ def test_unreadable_certificate_refuses_startup(
         pytest.skip("running with privileges that bypass file permissions")
 
     with pytest.raises(TlsConfigurationError):
-        _make_server(tmp_path, tls_cert=blocked)
+        _make_server(tmp_path, tls=TlsFiles(cert=blocked))
 
     assert config_spy.calls == []
 
@@ -284,7 +281,7 @@ def test_certificate_without_key_refuses_startup(
 ) -> None:
     """A leaf certificate with no key and no --tls-key cannot serve TLS."""
     with pytest.raises(TlsConfigurationError) as excinfo:
-        _make_server(tmp_path, tls_cert=tls_material.cert)
+        _make_server(tmp_path, tls=TlsFiles(cert=tls_material.cert))
 
     assert "--tls-key" in str(excinfo.value)
     assert config_spy.calls == []
@@ -297,7 +294,7 @@ def test_ca_without_certificate_refuses_startup(
 ) -> None:
     """mTLS asked for without a server certificate is not silently dropped."""
     with pytest.raises(TlsConfigurationError) as excinfo:
-        _make_server(tmp_path, tls_ca=tls_material.cert)
+        _make_server(tmp_path, tls=TlsFiles(ca=tls_material.cert))
 
     assert "--tls-cert" in str(excinfo.value)
     assert config_spy.calls == []
@@ -309,7 +306,7 @@ def test_key_without_certificate_refuses_startup(
 ) -> None:
     """A key on its own cannot configure a listener."""
     with pytest.raises(TlsConfigurationError):
-        _make_server(tmp_path, tls_key=tls_material.key)
+        _make_server(tmp_path, tls=TlsFiles(key=tls_material.key))
 
 
 def test_tls_options_on_stdio_refuse_startup(
@@ -320,7 +317,7 @@ def test_tls_options_on_stdio_refuse_startup(
     with pytest.raises(TlsConfigurationError) as excinfo:
         NerdvanaMcpServer(
             transport    = "stdio",
-            tls_cert     = tls_material.bundle,
+            tls          = TlsFiles(cert=tls_material.bundle),
             audit_logger = AuditLogger(db_path=tmp_path / "audit.sqlite"),
             project_path = tmp_path,
         )
@@ -347,7 +344,7 @@ def test_listener_completes_a_tls_handshake(
         transport    = "http",
         host         = "127.0.0.1",
         port         = port,
-        tls_cert     = tls_material.bundle,
+        tls          = TlsFiles(cert=tls_material.bundle),
         audit_logger = audit,
         project_path = tmp_path,
     )

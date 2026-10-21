@@ -42,9 +42,9 @@ from nerdvana_cli.server.auth import AuthManager
 from nerdvana_cli.server.catalog import ToolCatalog
 from nerdvana_cli.server.http_app import build_http_app, request_auth
 from nerdvana_cli.server.quota import QuotaExceeded, QuotaPolicyResolver, QuotaStore
-from nerdvana_cli.server.tls import TlsConfigurationError, TlsSettings, resolve_tls
+from nerdvana_cli.server.tls import TlsConfigurationError, TlsFiles, TlsSettings, resolve_tls
 
-__all__ = ["NerdvanaMcpServer", "TlsConfigurationError"]
+__all__ = ["NerdvanaMcpServer", "TlsConfigurationError", "TlsFiles"]
 
 _quota_log = _logging.getLogger("nerdvana.quota")
 
@@ -62,15 +62,10 @@ class NerdvanaMcpServer:
         Bind address for HTTP transport (default ``"127.0.0.1"``).
     port:
         Listen port for HTTP transport.
-    tls_cert:
-        Path to the server certificate (PEM).  Enables TLS on the http
-        transport.  May be a bundle that also carries the private key.
-    tls_key:
-        Path to the private key (PEM).  Required unless ``tls_cert`` already
-        contains the key.
-    tls_ca:
-        Path to CA certificate for peer verification.  Setting it turns on
-        client-certificate verification (mTLS).
+    tls:
+        The certificate, key and CA paths (:class:`TlsFiles`).  A certificate
+        enables TLS on the http transport and may be a bundle that also carries
+        the private key; a CA turns on client-certificate verification (mTLS).
     auth_manager:
         Injected AuthManager (default: ``AuthManager()``).
     acl_manager:
@@ -86,9 +81,7 @@ class NerdvanaMcpServer:
         transport:        str                      = "stdio",
         host:             str                      = "127.0.0.1",
         port:             int                      = 10830,
-        tls_cert:         Path | None              = None,
-        tls_key:          Path | None              = None,
-        tls_ca:           Path | None              = None,
+        tls:              TlsFiles | None          = None,
         auth_manager:     AuthManager | None       = None,
         acl_manager:      ACLManager  | None       = None,
         audit_logger:     AuditLogger | None       = None,
@@ -102,15 +95,13 @@ class NerdvanaMcpServer:
         self.transport     = transport
         self.host          = host
         self.port          = port
-        self.tls_cert      = tls_cert
-        self.tls_key       = tls_key
-        self.tls_ca        = tls_ca
+        self.tls           = tls or TlsFiles()
         # Working directory override and mode name.
         self.project_path  = project_path
         self.mode          = mode
 
         # Validated at construction, applied in _run_http. Plaintext only when no TLS option was supplied.
-        self._tls: TlsSettings = resolve_tls(transport, tls_cert, tls_key, tls_ca)
+        self._tls: TlsSettings = resolve_tls(transport, self.tls.cert, self.tls.key, self.tls.ca)
 
         self._auth:           AuthManager          = auth_manager   or AuthManager()
         self._acl:            ACLManager           = acl_manager    or ACLManager()

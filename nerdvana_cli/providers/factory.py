@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from typing import TypedDict, Unpack
 
 from rich.console import Console
 from rich.table import Table
@@ -86,27 +87,34 @@ def resolve_api_key(provider: ProviderName) -> str:
     return ""
 
 
+class ProviderOptions(TypedDict, total=False):
+    """The request settings of a provider; an option left out takes the ``ProviderConfig`` default."""
+
+    max_tokens:            int
+    temperature:           float
+    prompt_caching:        bool
+    extended_thinking:     bool
+    thinking_budget:       int
+    show_thinking:         bool
+    reasoning_effort:      str
+    openai_api:            str
+    gemini_api:            str
+    anthropic_tool_search: str
+    anthropic_compaction:  str
+    count_tokens:          Callable[[str], int] | None
+
+
 def create_provider(
     provider: str | ProviderName | None = None,
     model: str = "",
     api_key: str = "",
     base_url: str = "",
-    max_tokens: int = 8192,
-    temperature: float = 1.0,
-    prompt_caching: bool = True,
-    extended_thinking: bool = False,
-    thinking_budget: int = 8192,
-    show_thinking: bool = True,
-    reasoning_effort: str = "",
-    openai_api: str = "auto",
-    gemini_api: str = "generate_content",
-    anthropic_tool_search: str = "off",
-    anthropic_compaction: str = "off",
-    count_tokens: Callable[[str], int] | None = None,
+    **options: Unpack[ProviderOptions],
 ) -> AnthropicProvider | OpenAIProvider | GeminiProvider:
     """Create a provider instance from configuration.
 
     Without a provider it is detected from the model name; without a model the provider's default is used.
+    The keyword *options* are the ``ProviderConfig`` request settings (see :class:`ProviderOptions`).
     """
     # Resolve provider
     if provider is None:
@@ -126,24 +134,7 @@ def create_provider(
     if not base_url:
         base_url = DEFAULT_BASE_URLS.get(provider, "")
 
-    config = ProviderConfig(
-        provider=provider,
-        api_key=api_key,
-        base_url=base_url,
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        prompt_caching=prompt_caching,
-        extended_thinking=extended_thinking,
-        thinking_budget=thinking_budget,
-        show_thinking=show_thinking,
-        reasoning_effort=reasoning_effort,
-        openai_api=openai_api,
-        gemini_api=gemini_api,
-        anthropic_tool_search=anthropic_tool_search,
-        anthropic_compaction=anthropic_compaction,
-        count_tokens=count_tokens,
-    )
+    config = ProviderConfig(provider=provider, api_key=api_key, base_url=base_url, model=model, **options)
 
     return _select_class(config)(config)
 

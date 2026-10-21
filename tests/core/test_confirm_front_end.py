@@ -129,6 +129,7 @@ async def test_agent_tool_hands_its_front_end_to_the_child() -> None:
 
 async def test_a_loop_given_a_front_end_puts_it_on_the_tool_context(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from nerdvana_cli.core.loop.agent_loop import AgentLoop
+    from nerdvana_cli.core.loop.subagent_config import LoopCallbacks
     from nerdvana_cli.core.state.session import SessionStorage
     from nerdvana_cli.providers.base import ProviderEvent
 
@@ -158,7 +159,7 @@ async def test_a_loop_given_a_front_end_puts_it_on_the_tool_context(monkeypatch:
         settings   = settings,
         registry   = registry,
         session    = SessionStorage(session_id="confirm", storage_dir=str(tmp_path / "sessions")),
-        on_confirm = confirm,
+        callbacks  = LoopCallbacks(on_confirm=confirm),
     )
     loop.policy.trust_level = "strict"
 

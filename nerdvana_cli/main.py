@@ -385,7 +385,7 @@ def serve(
     """
     from pathlib import Path as _Path
 
-    from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, TlsConfigurationError
+    from nerdvana_cli.server.mcp_server import NerdvanaMcpServer, TlsConfigurationError, TlsFiles
 
     if transport not in ("stdio", "http"):
         console.print(f"[red]Error: unknown transport '{transport}'. Use 'stdio' or 'http'.[/red]")
@@ -409,9 +409,7 @@ def serve(
             transport    = transport,
             host         = host,
             port         = port,
-            tls_cert     = _Path(tls_cert) if tls_cert else None,
-            tls_key      = _Path(tls_key)  if tls_key  else None,
-            tls_ca       = _Path(tls_ca)   if tls_ca  else None,
+            tls          = TlsFiles(*(_Path(p) if p else None for p in (tls_cert, tls_key, tls_ca))),
             project_path = project_path,
             mode         = mode or None,
         )

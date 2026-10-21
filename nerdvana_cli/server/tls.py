@@ -25,6 +25,15 @@ class TlsConfigurationError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class TlsFiles:
+    """The ``--tls-cert``, ``--tls-key`` and ``--tls-ca`` paths as given; any of them may be absent."""
+
+    cert: Path | None = None
+    key:  Path | None = None
+    ca:   Path | None = None
+
+
+@dataclass(frozen=True)
 class TlsSettings:
     """The uvicorn ``ssl_*`` parameters; the defaults describe a plaintext listener."""
 

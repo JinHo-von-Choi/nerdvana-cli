@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- `AgentLoop` takes its front-end callbacks as one `LoopCallbacks` object (`on_activity_change`, `on_thinking_chunk`, `on_ask_user`, `on_confirm`) instead of four keyword arguments.
+- `create_provider` takes the request settings as typed keyword options (`ProviderOptions`); every option it accepted before is still accepted under the same name.
+- `NerdvanaMcpServer` takes the certificate, key and CA paths as one `TlsFiles` object (`tls=`) instead of `tls_cert`, `tls_key` and `tls_ca`.
+- `scripts/release.sh` pushes without running the pre-push hook, which repeated the quick preflight the script had just passed.
+
 ## [1.10.0] - 2026-10-22
 
 ### Added

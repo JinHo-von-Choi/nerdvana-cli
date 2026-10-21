@@ -6,7 +6,7 @@ import asyncio
 
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.loop.cancellation import race_abort
-from nerdvana_cli.core.loop.subagent_config import SubagentConfig
+from nerdvana_cli.core.loop.subagent_config import LoopCallbacks, SubagentConfig
 from nerdvana_cli.core.state.concurrency import DEFAULT_AGENT_SLOTS, agent_slot
 from nerdvana_cli.core.state.session import SessionStorage
 from nerdvana_cli.core.telemetry.analytics import CallOrigin
@@ -59,7 +59,7 @@ async def run_subagent(config: SubagentConfig, abort: asyncio.Event) -> tuple[st
 
     origin = CallOrigin(agent_id=config.agent_id, agent_type=config.name, category=config.category, parent_session_id=config.parent_session_id)
     loop   = AgentLoop(
-        settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, on_confirm=config.confirm, origin=origin,
+        settings=child_settings, registry=config.registry, role_prompt=config.system_prompt, callbacks=LoopCallbacks(on_confirm=config.confirm), origin=origin,
         factories=config.factories, session=SessionStorage(session_id=config.agent_id),
     )
     loop.wrap_up_at = max(2, int(config.max_turns * config.wrap_up_fraction)) if config.wrap_up_fraction > 0 else 0

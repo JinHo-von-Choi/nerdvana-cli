@@ -18,7 +18,8 @@ from typing import Any
 
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.context.tool_index import ToolIndex
-from nerdvana_cli.core.tool import BaseTool, ConfirmCallback, ToolRegistry
+from nerdvana_cli.core.loop.activity_state import ActivityState
+from nerdvana_cli.core.tool import AskUserCallback, BaseTool, ConfirmCallback, ToolRegistry
 
 
 @dataclass
@@ -56,3 +57,13 @@ class LoopFactories:
     run_subagent:      SubagentRunner | None          = None
     subagent_registry: SubagentRegistryFactory | None = None
     tool_search:       ToolSearchFactory | None       = None
+
+
+@dataclass(frozen=True)
+class LoopCallbacks:
+    """How the loop reaches its front end: activity and thinking updates, questions and confirmations."""
+
+    on_activity_change: Callable[[ActivityState], None] | None = None
+    on_thinking_chunk:  Callable[[str], None] | None           = None
+    on_ask_user:        AskUserCallback | None                 = None
+    on_confirm:         ConfirmCallback | None                 = None
