@@ -595,3 +595,14 @@ The tool is reached for in about a quarter of the attempts, and the failures con
 So the offset is: the tool works now, and the run costs the same as before within what this measurement can see. The reason is the one the previous section found: the PTC runtime was never the thing the tokens are made of. Eleven thousand tokens of system prompt and tool declarations are sent again on every turn, and they are 39 to 43 percent of a long attempt and 81 to 84 percent of a short one. A tool that fails is worth fixing -- a description that lies about the sandbox is a defect, and the errors that only refuse cost a turn each -- but the tokens are elsewhere.
 
 The next piece of work, then, is the prefix: the declaration of the 28 tools is 5,882 tokens of the 11,060 every request carries, and the deferral machinery that keeps the MCP tools out of the request does not reach the built-in ones. A tool the model rarely calls is a few hundred tokens on every request of every task, and unlike a change in what the model does, that one is certain.
+
+```bash
+git worktree add /tmp/arm-before c9723ae
+git worktree add /tmp/arm-after  24a8476
+for arm in before after; do
+    (cd "/tmp/arm-$arm" && uv sync --extra all && \
+     uv run python scripts/bench_agent.py benchmarks/long/tasks --attempts 6 \
+        --model MiniMax-M3.1-Flash-Preview --provider minimax --out "/tmp/gate4/offset-$arm.jsonl" --yes)
+done
+uv run python scripts/bench_compare.py /tmp/gate4/offset-before.jsonl /tmp/gate4/offset-after.jsonl
+```
