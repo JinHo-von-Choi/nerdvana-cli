@@ -28,6 +28,7 @@ from nerdvana_cli.core.delegation.task_state import TaskRegistry, TaskState
 from nerdvana_cli.core.loop.activity_state import ActivityState
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
+from nerdvana_cli.ui.background_work import connect_mcp_servers, refresh_statusline
 from nerdvana_cli.ui.banner import build_banner
 from nerdvana_cli.ui.dashboard_tab import DashboardTab
 from nerdvana_cli.ui.editor_controller import EditorBufferController
@@ -192,6 +193,7 @@ class NerdvanaApp(App[object]):
         self._is_generating = False
         # What each running tool call is doing, by tool name in start order, for its card when it ends.
         self._tool_started: dict[str, list[str]] = {}
+        self._statusline_task: asyncio.Task[None] | None = None
         self._confirm_lock  = asyncio.Lock()
         self._pending_images: list[dict[str, Any]] | None = None
         self._commands_cache:   list[UserCommand] = []
@@ -331,22 +333,8 @@ class NerdvanaApp(App[object]):
         self._show_load_warnings()
         self._check_update_task = asyncio.create_task(check_for_update(self))
         if self.mcp_manager is not None:
-            self._mcp_connect_task = asyncio.create_task(self._connect_mcp_servers())
+            self._mcp_connect_task = asyncio.create_task(connect_mcp_servers(self))
 
-    async def _connect_mcp_servers(self) -> None:
-        """Connect the MCP servers in the background and add their tools; the input stays usable meanwhile."""
-        from nerdvana_cli.tools.registry import attach_mcp_tools
-
-        self.notify("Connecting MCP servers...", timeout=3)
-        statuses = await self.mcp_manager.connect_all()
-        loop     = self._agent_loop
-        if loop is not None:
-            attach_mcp_tools(loop.registry, self.mcp_manager.get_all_tools(), loop.skill_loader)
-        failed = [name for name, status in statuses.items() if not status.startswith("connected")]
-        connected = len(statuses) - len(failed)
-        note = f"MCP: {connected} of {len(statuses)} server(s) connected" + (f"; failed: {', '.join(failed)}" if failed else "")
-        self._add_chat_message(f"[dim]{escape(note)}[/dim]")
-        refresh_mcp_section(self)
 
     def _init_sidebar(self, registry: Any, skills: list[Skill]) -> None:
         """Fill the sidebar sections and start the timers that keep them current."""
@@ -483,22 +471,7 @@ class NerdvanaApp(App[object]):
 
     def _refresh_statusline(self) -> None:
         """Run session.statusline_command in the background and show its output in the status bar."""
-        command = self.settings.session.statusline_command
-        loop    = self._agent_loop
-        if not command or loop is None:
-            return
-        payload = {
-            "model": self.settings.model.model, "provider": self.settings.model.provider, "cwd": self.settings.cwd,
-            "session_id": loop.session.session_id, "input_tokens": loop.state.usage.input_tokens,
-            "output_tokens": loop.state.usage.output_tokens, "cost_usd": loop.total_cost_usd(),
-        }
-
-        async def show() -> None:
-            from nerdvana_cli.ui.statusline import run_statusline
-
-            self.query_one("#status-bar", StatusBar).set_extra(await run_statusline(command, payload, self.settings.cwd))
-
-        self._statusline_task = asyncio.create_task(show())
+        refresh_statusline(self)
 
     def _mount_chat(self, msg: ChatMessage) -> None:
         chat_frame = self.query_one("#chat-frame", VerticalScroll)

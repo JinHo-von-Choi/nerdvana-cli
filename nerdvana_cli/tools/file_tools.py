@@ -5,25 +5,21 @@ from __future__ import annotations
 import contextlib
 import difflib
 import errno
-import hashlib
 import os
-import re
 import stat
 from typing import Any, ClassVar
 from uuid import uuid4
 
 from nerdvana_cli.core.tool import BaseTool, ToolCategory, ToolContext, ToolSideEffect
 from nerdvana_cli.tools import read_ledger
+from nerdvana_cli.tools.anchors import _line_hash, _parse_anchor, _resolve_anchor, _with_line_ending
 from nerdvana_cli.types import ToolResult
 from nerdvana_cli.utils.path import safe_makedirs, safe_open_fd, validate_path
 
 _O_DIRECTORY: int = getattr(os, "O_DIRECTORY", 0)
 _O_NOFOLLOW:  int = getattr(os, "O_NOFOLLOW", 0)
 
-_HASH_LEN:         int = 6
-_RELOCATE_WINDOW:  int = 20
 _CONTEXT_RADIUS:   int = 5
-_ANCHOR_RE = re.compile(rf"^(\d+)#([0-9a-f]{{{_HASH_LEN}}})$")
 
 
 def _is_symlink_block_error(exc: OSError) -> bool:
@@ -106,36 +102,6 @@ def _atomic_write(relative_path: str, cwd: str, content: str) -> None:
             with contextlib.suppress(OSError):
                 os.unlink(tmp_name, dir_fd=dir_fd)
         os.close(dir_fd)
-
-
-def _line_hash(line: str) -> str:
-    """Return the first 6 hex chars of sha256 over the line without its newline."""
-    return hashlib.sha256(line.rstrip("\n").encode()).hexdigest()[:_HASH_LEN]
-
-
-def _parse_anchor(anchor: str) -> tuple[int, str] | None:
-    """Split an ``N#hhhhhh`` anchor into (line number, hash); None when malformed."""
-    match = _ANCHOR_RE.match(anchor.strip())
-    if match is None:
-        return None
-    return int(match.group(1)), match.group(2)
-
-
-def _resolve_anchor(lineno: int, line_hash: str, lines: list[str]) -> int | None:
-    """Return the 0-based index of the line an anchor names, or None.
-
-    The hash at ``lineno`` wins outright.  Otherwise the lines within
-    ``_RELOCATE_WINDOW`` of it are searched for the hash, and a relocation is
-    accepted only when exactly one of them carries it.  No similarity matching
-    is attempted.
-    """
-    idx = lineno - 1
-    if 0 <= idx < len(lines) and _line_hash(lines[idx]) == line_hash:
-        return idx
-    low        = max(0, idx - _RELOCATE_WINDOW)
-    high       = min(len(lines) - 1, idx + _RELOCATE_WINDOW)
-    candidates = [i for i in range(low, high + 1) if _line_hash(lines[i]) == line_hash]
-    return candidates[0] if len(candidates) == 1 else None
 
 
 def _format_with_hashes(lines: list[str], start_lineno: int = 1) -> str:
@@ -499,12 +465,6 @@ class FileEditArgs:
         self.anchor_hash = anchor_hash
         self.replace_all = replace_all
 
-
-
-def _with_line_ending(replacement: str, old_line: str) -> str:
-    """*replacement* ending the way *old_line* did, so the line after it is not joined onto the new text."""
-    ending = old_line[len(old_line.rstrip("\r\n")):]
-    return replacement + ending if ending and not replacement.endswith(("\n", "\r")) else replacement
 
 class FileEditTool(BaseTool[FileEditArgs]):
     name = "FileEdit"
