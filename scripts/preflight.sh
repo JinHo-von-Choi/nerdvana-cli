@@ -4,8 +4,8 @@
 # Usage: scripts/preflight.sh [quick|full|release]
 #   quick    lint, types, docs, test collection baseline, import graph, pricing freshness (a few minutes)
 #   full     quick plus the whole test suite on Python 3.11 with the locked dependencies, as Quality Gate does
-#   release  full plus the suite on Python 3.12 with the locked dependencies, the LSP integration tests,
-#            a wheel build and a clean install of it
+#   release  full plus the LSP integration tests, a wheel build and a clean install of it; the Python 3.12
+#            run is left to CI, which release.sh waits for before it tags
 #
 # Why a clean checkout under $HOME: a developer's tree has untracked files, extra packages and a data
 # directory that make checks pass here and fail in CI. The Landlock tests also treat /tmp as always
@@ -54,11 +54,6 @@ if [ "$mode" != "quick" ]; then
 fi
 
 if [ "$mode" = "release" ]; then
-    step "tests, Python 3.12, locked dependencies"
-    uv venv -q .venv312 --python 3.12
-    UV_PROJECT_ENVIRONMENT=.venv312 uv sync --locked --all-extras -q
-    UV_PROJECT_ENVIRONMENT=.venv312 uv run pytest -m "not lsp_integration and not live" -q -o addopts=""
-
     step "LSP integration tests"
     if command -v pyright-langserver >/dev/null 2>&1 || [ -x .venv/bin/pyright-langserver ]; then
         PATH="$PWD/.venv/bin:$PATH" uv run --no-sync pytest -m lsp_integration -q -o addopts=""
@@ -68,7 +63,6 @@ if [ "$mode" = "release" ]; then
     fi
 
     step "wheel build and clean install"
-    rm -rf .venv312
     uv build -q
     smoke="$work/smoke"
     uv venv -q "$smoke" --python 3.11
