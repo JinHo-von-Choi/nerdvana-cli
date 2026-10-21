@@ -66,6 +66,8 @@ class RunResult:
     turns:       int                 = 0
     duration_ms: int                 = 0
     cost_usd:    float               = 0.0
+    # False when the model has no known price: total_cost_usd is then 0 because the cost is unknown, not free.
+    price_known: bool                = True
     usage:       dict[str, int]      = field(default_factory=dict)
     signals:     dict[str, int]      = field(default_factory=dict)
     verification: dict[str, Any] | None = None
@@ -92,6 +94,7 @@ class RunResult:
             "num_turns":      self.turns,
             "duration_ms":    self.duration_ms,
             "total_cost_usd": round(self.cost_usd, 6),
+            "price_known":    self.price_known,
             "usage": {
                 "input_tokens":       self.usage.get("input_tokens", 0),
                 "output_tokens":      self.usage.get("output_tokens", 0),

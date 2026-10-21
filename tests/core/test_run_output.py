@@ -102,7 +102,7 @@ def test_result_object_has_the_documented_fields() -> None:
     assert payload == {
         "type": "result", "schema_version": SCHEMA_VERSION, "subtype": "success", "is_error": False,
         "result": "answer", "session_id": "s1", "provider": "p", "model": "m",
-        "num_turns": 3, "duration_ms": 1200, "total_cost_usd": 0.123457,
+        "num_turns": 3, "duration_ms": 1200, "total_cost_usd": 0.123457, "price_known": True,
         "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 4, "cache_write_tokens": 0},
         "signals": {},
     }
@@ -204,3 +204,12 @@ def test_text_format_prints_the_answer_as_written() -> None:
     reporter = RunReporter("text", write=lambda _s: None, console=console)
     reporter.chunk("type list[str] and [/b] stay")
     assert buffer.getvalue() == "type list[str] and [/b] stay"
+
+
+def test_the_result_says_whether_the_cost_is_known() -> None:
+    from nerdvana_cli.cli.run_output import RunResult
+
+    outcome = RunResult()
+    assert outcome.to_dict()["price_known"] is True
+    outcome.price_known = False
+    assert outcome.to_dict()["price_known"] is False

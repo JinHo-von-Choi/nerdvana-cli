@@ -164,6 +164,10 @@ class RunLimits:
             f"no price is known for {model.provider}/{model.model}.[/yellow]\n"
         )
 
+    def price_known(self) -> bool:
+        """True when the model in use has a known price, so a cost of 0 means free rather than unknown."""
+        return self.pricing_table.has_price(self._settings.model.provider or "", self._settings.model.model or "")
+
     def _cost_limit_unenforceable(self) -> bool:
         """True when a cost limit is set but the model in use has no known price.
 

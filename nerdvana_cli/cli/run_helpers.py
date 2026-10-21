@@ -85,6 +85,7 @@ def _fill_outcome(outcome: Any, loop: Any, duration_ms: int) -> None:
     outcome.model        = loop.settings.model.model
     outcome.turns        = loop.turns_used
     outcome.cost_usd     = loop.total_cost_usd()
+    outcome.price_known  = loop.limits.price_known()
     outcome.usage        = loop.usage_summary()
     outcome.signals      = loop.signal_summary()
     outcome.verification = loop.verification_summary()

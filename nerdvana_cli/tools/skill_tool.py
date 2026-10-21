@@ -14,6 +14,10 @@ from nerdvana_cli.types import ToolResult
 SKILL_CONTENT_TAG = "skill_content"
 
 
+# Tokens of skill descriptions the system prompt carries; later skills are listed by name only.
+CATALOG_BUDGET_TOKENS = 1_200
+
+
 @dataclass
 class ActivateSkillArgs:
     name: str
@@ -71,9 +75,28 @@ class ActivateSkillTool(BaseTool[ActivateSkillArgs]):
             "required": ["name"],
         }
 
-    def catalog_lines(self) -> list[str]:
-        """One ``- name: description`` line per skill the model may activate, ordered by name."""
-        return [f"- {skill.name}: {' '.join(skill.description.split())}" for skill in self.loader.model_skills()]
+    def catalog_lines(self, budget_tokens: int = CATALOG_BUDGET_TOKENS) -> list[str]:
+        """A ``- name: description`` line per skill the model may activate, ordered by name.
+
+        Descriptions are given until *budget_tokens* are spent; the skills after that are listed by
+        name on one line, and ActivateSkill still loads any of them.
+        """
+        from nerdvana_cli.core.context.token_estimator import approx_tokens
+
+        lines: list[str] = []
+        names_only: list[str] = []
+        spent = 0
+        for skill in self.loader.model_skills():
+            line = f"- {skill.name}: {' '.join(skill.description.split())}"
+            cost = approx_tokens(line)
+            if names_only or spent + cost > budget_tokens:
+                names_only.append(skill.name)
+                continue
+            lines.append(line)
+            spent += cost
+        if names_only:
+            lines.append(f"- Also available, by name: {', '.join(names_only)}")
+        return lines
 
     async def call(self, args: ActivateSkillArgs, context: ToolContext, can_use_tool: Any = None, on_progress: Any = None) -> ToolResult:
         skill = self.loader.get_by_name(args.name)

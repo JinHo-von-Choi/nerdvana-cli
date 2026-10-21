@@ -21,6 +21,8 @@ from typing import Any
 from nerdvana_cli.core.context.token_estimator import approx_tokens
 
 DEFAULT_THRESHOLD = 3000
+# An MCP server with more deferred tools than this is listed on one line, by tool name.
+SERVER_LINE_THRESHOLD = 3
 _WORDS = re.compile(r"[a-z0-9]+")
 
 
@@ -37,6 +39,12 @@ def _is_mcp(tool: Any) -> bool:
 
 def _is_deferrable(tool: Any) -> bool:
     return bool(getattr(tool, "deferrable", False))
+
+
+def _mcp_server(name: str) -> str | None:
+    """The server part of an ``mcp__{server}__{tool}`` name, or None for another name."""
+    parts = name.split("__")
+    return parts[1] if len(parts) >= 3 and parts[0] == "mcp" else None
 
 
 def _first_line(text: str, limit: int = 110) -> str:
@@ -75,8 +83,28 @@ class ToolIndex:
         return name in self.deferred and name not in self.loaded
 
     def index_lines(self) -> list[str]:
-        """One line per deferred tool that is not loaded, for the system prompt."""
-        return [f"- {name}: {_first_line(tool.description_text)}" for name, tool in sorted(self.deferred.items()) if name not in self.loaded]
+        """The deferred tools that are not loaded, for the system prompt.
+
+        A built-in tool, and the tools of an MCP server with a few of them, get a line each with
+        the first line of their description. A server with more tools gets one line with its tool
+        names, so hundreds of MCP tools cost a few hundred tokens instead of thousands.
+        """
+        pending  = [(name, tool) for name, tool in sorted(self.deferred.items()) if name not in self.loaded]
+        servers: dict[str, list[str]] = {}
+        for name, tool in pending:
+            server = _mcp_server(name) if _is_mcp(tool) else None
+            if server is not None:
+                servers.setdefault(server, []).append(name)
+        lines: list[str] = []
+        for name, tool in pending:
+            server = _mcp_server(name) if _is_mcp(tool) else None
+            if server is None or len(servers[server]) <= SERVER_LINE_THRESHOLD:
+                lines.append(f"- {name}: {_first_line(tool.description_text)}")
+            elif servers[server] and servers[server][0] == name:
+                prefix = f"mcp__{server}__"
+                short  = ", ".join(n[len(prefix):] for n in servers[server])
+                lines.append(f"- {prefix}* ({len(servers[server])} tools): {short}")
+        return lines
 
     def search(self, query: str, limit: int = 8) -> list[Any]:
         """Deferred tools matching *query*: ``select:a,b`` names tools exactly, otherwise words are scored."""

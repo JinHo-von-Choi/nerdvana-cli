@@ -530,3 +530,13 @@ def test_spec_problems_are_not_warnings(tmp_path: Path, caplog: pytest.LogCaptur
     with caplog.at_level(logging.WARNING, logger=LOGGER):
         _by_name(_loader(tmp_path))
     assert not [r for r in caplog.records if "does not match its directory" in r.getMessage()]
+
+
+def test_the_catalog_lists_skills_past_its_budget_by_name_only(tmp_path: Path) -> None:
+    tool  = _catalog_tool(tmp_path / "many", [f"skill-{n:02d}" for n in range(12)])
+    lines = tool.catalog_lines(budget_tokens=40)
+    described = [line for line in lines if not line.startswith("- Also available")]
+    assert 0 < len(described) < 12
+    tail = lines[-1]
+    assert tail.startswith("- Also available, by name: ") and "skill-11" in tail
+    assert tool.catalog_lines(budget_tokens=10_000)[-1].startswith("- skill-11:")

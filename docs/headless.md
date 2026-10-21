@@ -48,6 +48,7 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 |-|-|
 | `subtype` | `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`. An error result also has an `error` string when one is known. |
 | `result` | The text the model wrote after its last tool call. |
+| `price_known` | `false` when the model has no known price: `total_cost_usd` is then 0 because the cost is unknown, not because the run was free. |
 | `signals` | Counts of what went wrong during the run, by kind: `cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction`, `observations_masked`, `no_progress`, `untrusted_source`, `cache_miss` and a few more. A kind that did not occur is absent. |
 | `verification` | Present with `--verify`: the outcome of the verification command. |
 | `receipt` | Present when the run changed files or had a `--verify` goal (`receipt_version` 1). It holds `files_changed` (applied edits per file), `verification`, the `sandbox` policy, `cost_by_agent` (requests and USD per agent type, sub-agents included) and `problems` (stale-file edit refusals, new language-server errors, refused repeats, out-of-scope edits, masked secrets, failed verifications, escalations). It is assembled from what the run measured; the model writes none of it. |
@@ -62,7 +63,7 @@ One JSON object per line, before the result object.
 | `text` | A piece of the answer |
 | `notice` | A message from the agent itself, such as a retry or a fallback |
 | `tool_start` | `name`, `summary` |
-| `tool_done` | `name`, `is_error` |
+| `tool_done` | `name`, `is_error`, `result` (the first line of the tool's result) |
 | `request` | One provider request: `provider`, `model`, `agent_type`, `turn`, `last_tool`, the token counts including `cache_read_tokens` and `cache_write_tokens`, and `cost_usd` |
 | `compaction` | The history was compacted |
 | `context` | Percent of the context window in use |

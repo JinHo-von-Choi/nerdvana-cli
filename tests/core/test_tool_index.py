@@ -253,3 +253,18 @@ async def test_sub_agents_never_defer(monkeypatch: pytest.MonkeyPatch, tmp_path:
     loop.origin = CallOrigin(agent_id="a", agent_type="Explore")
     await _drain(loop)
     assert len(provider.declared[0]) == 4 and "ToolSearch" not in provider.declared[0]
+
+
+def test_a_server_with_many_tools_is_listed_on_one_line_by_name() -> None:
+    tools = [_Mcp(f"mcp__big__t{n}", f"tool number {n}") for n in range(10)] + [_Mcp("mcp__small__only", "the only one")]
+    lines = ToolIndex.build(tools, "always").index_lines()
+    assert lines == [
+        "- mcp__big__* (10 tools): t0, t1, t2, t3, t4, t5, t6, t7, t8, t9",
+        "- mcp__small__only: the only one",
+    ]
+
+
+def test_select_still_takes_the_full_name_of_a_grouped_tool() -> None:
+    tools = [_Mcp(f"mcp__big__t{n}", f"tool number {n}") for n in range(10)]
+    index = ToolIndex.build(tools, "always")
+    assert [t.name for t in index.search("select:mcp__big__t3")] == ["mcp__big__t3"]
