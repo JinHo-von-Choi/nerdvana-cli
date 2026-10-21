@@ -10,7 +10,7 @@ Date:   2026-10-21
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 import typer
@@ -111,3 +111,94 @@ def _start_run_loop(settings: NerdvanaSettings, resume: str, reporter: Any, outc
     if resumed:
         loop.restore_history()
     return session, loop
+
+
+async def execute_run(
+    loop:     AgentLoop,
+    reporter: Any,
+    outcome:  Any,
+    prompts:  Iterable[str],
+    images:   Any,
+    started:  float,
+    schema:   dict[str, Any] | None = None,
+) -> None:
+    """Run each prompt in turn on *loop* and report the result.
+
+    *prompts* may be read lazily (stream-json input), so a later message can depend on an
+    earlier answer. A prompt that does not complete ends the run. With *schema* the final
+    answer must be JSON that fits it; the model is asked again up to ``SCHEMA_RETRIES`` times.
+    """
+    import time
+
+    from nerdvana_cli.cli.run_extras import SCHEMA_RETRIES, schema_reminder, structured_answer
+    from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
+
+    loop.usage_listener = chain_usage_listeners(loop.usage_listener, reporter.request)
+    reporter.start(loop.session.session_id, loop.settings.model.provider, loop.settings.model.model)
+    try:
+        for index, prompt in enumerate(prompts):
+            if not await _run_prompt(loop, reporter, prompt, images if index == 0 else None):
+                break
+        else:
+            if schema is not None:
+                problem = ""
+                for retry in range(SCHEMA_RETRIES + 1):
+                    outcome.structured, problem = structured_answer(reporter.final_text(), schema)
+                    if not problem or retry == SCHEMA_RETRIES:
+                        break
+                    if not await _run_prompt(loop, reporter, schema_reminder(schema, problem), None):
+                        break
+                if problem and loop.last_stop == "completed":
+                    outcome.stop, outcome.error = "schema", f"the final answer does not fit --json-schema: {problem}"
+    except Exception as exc:  # noqa: BLE001
+        if not reporter.machine_readable:
+            raise
+        outcome.stop  = "error"
+        outcome.error = f"{type(exc).__name__}: {exc}"
+    if outcome.stop not in ("error", "schema"):
+        outcome.stop = loop.last_stop
+    _fill_outcome(outcome, loop, int((time.monotonic() - started) * 1000))
+    reporter.finish(outcome)
+
+
+async def _run_prompt(loop: AgentLoop, reporter: Any, prompt: str, images: Any) -> bool:
+    """Run one prompt; True when the loop completed it."""
+    reporter.new_answer()
+    async for chunk in loop.run(prompt, images):
+        reporter.chunk(chunk)
+    return loop.last_stop == "completed"
+
+
+def run_inputs(
+    prompt:          str,
+    input_format:    str,
+    json_schema:     str,
+    diagnostics_dir: str,
+    layered:         tuple[NerdvanaSettings, Any],
+    reporter:        Any,
+    outcome:         Any,
+) -> tuple[Iterable[str], dict[str, Any] | None]:
+    """The prompts of a run and its answer schema; sets up the diagnostics folder. Bad options exit with code 2."""
+    import sys
+
+    from nerdvana_cli.cli.run_extras import Diagnostics, load_schema, stream_input_messages
+    from nerdvana_cli.cli.run_output import EXIT_CONFIG
+    from nerdvana_cli.core.config.profile_layers import dump_config
+
+    try:
+        schema = load_schema(json_schema) if json_schema else None
+        if diagnostics_dir:
+            reporter.diagnostics = Diagnostics(diagnostics_dir)
+            reporter.diagnostics.settings(dump_config(*layered))
+    except (ValueError, OSError) as exc:
+        outcome.stop = "config"
+        reporter.failure(outcome, str(exc))
+        raise typer.Exit(EXIT_CONFIG) from exc
+    first   = [] if prompt == "-" and input_format == "stream-json" else [prompt]
+    streamed = stream_input_messages(sys.stdin) if input_format == "stream-json" else iter(())
+
+    def prompts() -> Iterable[str]:
+        yield from first
+        yield from streamed
+
+    return prompts(), schema

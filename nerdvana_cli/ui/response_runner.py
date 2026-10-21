@@ -107,14 +107,18 @@ def _show_status_chunk(app: NerdvanaApp, chunk: str, tool_status: ToolStatusLine
     return True
 
 
+def _commit_commentary(app: NerdvanaApp, text: str, streaming: StreamingOutput) -> str:
+    """Text before a tool call becomes its own message, read before the tool lines and not glued to the answer."""
+    app._add_answer(text)
+    streaming.update_content("")
+    return ""
+
+
 async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
     """Run the agent loop and stream its output into the chat UI.
 
-    Side effects on ``app``:
-        - sets ``_is_generating``
-        - mutates streaming/tool-status/status-bar widgets
-        - calls ``_add_chat_message`` / ``_update_context_usage``
-        - reads ``_agent_loop`` / ``settings`` / ``parism_client``
+    Sets ``app._is_generating``, drives the streaming, tool-status and status-bar widgets,
+    and adds the answer, tool lines and usage line to the chat.
     """
     # Imports kept local to avoid runtime cycle with ui.app at import time.
     from nerdvana_cli.ui.widgets import StatusBar, StreamingOutput, ToolStatusLine
@@ -158,10 +162,7 @@ async def run_response_stream(app: NerdvanaApp, prompt: str) -> None:
 
         async for chunk in app._agent_loop.run(prompt, app.take_pending_images()):
             if chunk.startswith(TOOL_STATUS_PREFIX) and accumulated.strip():
-                # Text before a tool call is its own message, so it reads before the tool lines and not glued to the answer.
-                app._add_answer(accumulated)
-                accumulated = ""
-                streaming.update_content("")
+                accumulated = _commit_commentary(app, accumulated, streaming)
             if _show_status_chunk(app, chunk, tool_status, chat_frame):
                 continue
             tool_status.remove_class("active")

@@ -500,6 +500,12 @@ class FileEditArgs:
         self.replace_all = replace_all
 
 
+
+def _with_line_ending(replacement: str, old_line: str) -> str:
+    """*replacement* ending the way *old_line* did, so the line after it is not joined onto the new text."""
+    ending = old_line[len(old_line.rstrip("\r\n")):]
+    return replacement + ending if ending and not replacement.endswith(("\n", "\r")) else replacement
+
 class FileEditTool(BaseTool[FileEditArgs]):
     name = "FileEdit"
     description_text = """Perform a string replacement in a file.
@@ -604,13 +610,7 @@ IMPORTANT: old_string must match exactly (including whitespace)."""
                 is_error=True,
             )
         line_count            = len(raw_lines)
-        old_line              = raw_lines[target_idx]
-        ending                = old_line[len(old_line.rstrip("\r\n")):]
-        replacement           = args.new_string
-        # The replaced line keeps its line ending, or the line after it would be joined onto the new text.
-        if ending and not replacement.endswith(("\n", "\r")):
-            replacement += ending
-        raw_lines[target_idx] = replacement
+        raw_lines[target_idx] = _with_line_ending(args.new_string, raw_lines[target_idx])
         new_content = "".join(raw_lines)
         try:
             _atomic_write(args.path, context.cwd, new_content)

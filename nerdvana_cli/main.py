@@ -24,7 +24,6 @@ from nerdvana_cli.cli.commands.skill_command import skill_app
 from nerdvana_cli.cli.commands.workflow_command import workflow_app
 from nerdvana_cli.cli.run_helpers import (
     _apply_run_overrides,
-    _fill_outcome,
     _load_run_images,
     _start_run_loop,
     _validate_run_flags,
@@ -39,7 +38,6 @@ from nerdvana_cli.cli.runtime import (
     run_migration_once,
     show_layered_settings,
 )
-from nerdvana_cli.core.telemetry.telemetry_otel import chain_usage_listeners
 from nerdvana_cli.providers.base import ProviderName
 
 app = typer.Typer(
@@ -208,7 +206,7 @@ def main(
 
 @app.command()
 def run(
-    prompt: str = typer.Argument(..., help="Prompt to run"),
+    prompt: str = typer.Argument(..., help="Prompt to run; '-' with --input-format stream-json takes every message from stdin"),
     config: str = typer.Option("", "--config", "-c", help="Config file path"),
     cwd: str = typer.Option("", "--cwd", help="Working directory"),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose output"),
@@ -234,6 +232,9 @@ def run(
     profile: str = typer.Option("", "--profile", help="Settings profile: tui | headless | acp | serve | bench-strict"),
     patch: list[str] | None = typer.Option(None, "--patch", help="Override one setting for this run: section.field=value (repeatable)", ),  # noqa: B008
     resume: str = typer.Option("", "--resume", help="Continue the recorded conversation of this session id; the prompt is the next message"),
+    json_schema: str = typer.Option("", "--json-schema", help="JSON schema (a file path or inline JSON) the final answer must fit; the result gets structured_output"),
+    input_format: str = typer.Option("text", "--input-format", help="text (default) or stream-json: after the prompt, every stdin line is one more user message"),
+    diagnostics_dir: str = typer.Option("", "--diagnostics-dir", help="New or empty directory that receives every event, the settings used and the result"),
 ) -> None:
     """Run a single prompt non-interactively.
 
@@ -242,6 +243,7 @@ def run(
     """
     import time
 
+    from nerdvana_cli.cli.run_helpers import execute_run, run_inputs
     from nerdvana_cli.cli.run_output import EXIT_CONFIG, FORMATS, RunReporter, RunResult
     from nerdvana_cli.core.config.settings_sections import SANDBOX_MODES
     from nerdvana_cli.core.state.goal import Goal
@@ -251,6 +253,7 @@ def run(
         ("--output-format", output_format,     FORMATS),
         ("--sandbox",       sandbox,           SANDBOX_MODES),
         ("--approval-mode", resolved_approval, tuple(APPROVAL_MODE_MAP)),
+        ("--input-format",  input_format,      ("text", "stream-json")),
     ))
 
     def _write(text: str) -> None:
@@ -260,7 +263,7 @@ def run(
     reporter = RunReporter(output_format, _write, console)
     outcome  = RunResult()
 
-    settings, _composed = load_layered_settings(config, profile, patch or (), cwd)
+    settings, composed = load_layered_settings(config, profile, patch or (), cwd)
     for warning in settings.load_warnings:
         console_stderr.print(f"[dim yellow]Config: {warning.format()}[/dim yellow]")
     run_migration_once(console_stderr if reporter.machine_readable else None)
@@ -293,24 +296,9 @@ def run(
     if verify:
         loop.set_goal(Goal(objective=prompt, verify=verify, max_attempts=verify_attempts or settings.goal.max_attempts, scope=list(scope or [])))
 
-    async def _run() -> None:
-        loop.usage_listener = chain_usage_listeners(loop.usage_listener, reporter.request)
-        reporter.start(session.session_id, settings.model.provider, settings.model.model)
-        try:
-            async for chunk in loop.run(prompt, images):
-                reporter.chunk(chunk)
-        except Exception as exc:  # noqa: BLE001
-            if not reporter.machine_readable:
-                raise
-            outcome.stop  = "error"
-            outcome.error = f"{type(exc).__name__}: {exc}"
-        else:
-            outcome.stop = loop.last_stop
-        _fill_outcome(outcome, loop, int((time.monotonic() - started) * 1000))
-        reporter.finish(outcome)
-
+    prompts, schema = run_inputs(prompt, input_format, json_schema, diagnostics_dir, (settings, composed), reporter, outcome)
     try:
-        asyncio.run(_run())
+        asyncio.run(execute_run(loop, reporter, outcome, prompts, images, started, schema))
     finally:
         loop.close_session("exit")
     if outcome.exit_code:

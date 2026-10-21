@@ -46,6 +46,7 @@ _OUTCOMES: dict[str, tuple[str, bool, int]] = {
     "provider_error": ("error_provider",     True,  EXIT_FAILURE),
     "error":          ("error_during_run",   True,  EXIT_FAILURE),
     "config":         ("error_config",       True,  EXIT_CONFIG),
+    "schema":         ("error_schema",       True,  EXIT_FAILURE),
 }
 
 # A system notice from the loop starts with a rich style tag, e.g. "[bold red]...".
@@ -73,6 +74,8 @@ class RunResult:
     verification: dict[str, Any] | None = None
     receipt:     dict[str, Any] | None = None
     error:       str                 = ""
+    # The final answer parsed and checked against --json-schema; None without a schema.
+    structured:  Any                 = None
 
     @property
     def exit_code(self) -> int:
@@ -103,6 +106,8 @@ class RunResult:
             },
         }
         payload["signals"] = dict(self.signals)
+        if self.structured is not None:
+            payload["structured_output"] = self.structured
         if self.verification is not None:
             payload["verification"] = dict(self.verification)
         if self.receipt is not None:
@@ -159,6 +164,8 @@ class RunReporter:
         self._write   = write
         self._console = console
         self._answer: list[str] = []
+        # A Diagnostics folder that receives every event whatever the format shows; None without --diagnostics-dir.
+        self.diagnostics: Any = None
 
     @property
     def machine_readable(self) -> bool:
@@ -183,25 +190,33 @@ class RunReporter:
 
     def chunk(self, chunk: str) -> None:
         """Report one string yielded by the agent loop."""
-        if self._fmt == "text":
-            # The answer is printed as written; only the CLI's own notices carry markup.
-            is_text = classify_chunk(chunk)["type"] == "text"
-            self._console.print(chunk, end="", markup=not is_text, highlight=not is_text)
-            return
         event = classify_chunk(chunk)
         if event["type"] == "tool_start":
             self._answer.clear()  # text before a tool call is commentary, not the answer
         elif event["type"] == "text":
             self._answer.append(event["text"])
-        if self._fmt == "stream-json":
+        if self.diagnostics is not None:
+            self.diagnostics.event(event)
+        if self._fmt == "text":
+            # The answer is printed as written; only the CLI's own notices carry markup.
+            is_text = event["type"] == "text"
+            self._console.print(chunk, end="", markup=not is_text, highlight=not is_text)
+        elif self._fmt == "stream-json":
             self._line(event)
 
+    def new_answer(self) -> None:
+        """Start a new answer: the next prompt of the same run replaces the text collected so far."""
+        self._answer.clear()
+
     def request(self, usage: dict[str, Any]) -> None:
-        """Report what one provider request used and cost (stream-json only)."""
+        """Report what one provider request used and cost (stream-json, and the diagnostics folder)."""
+        keys = ("provider", "model", "agent_type", "turn", "last_tool", "input_tokens", "output_tokens",
+                "cache_read_tokens", "cache_write_tokens", "cost_usd", "first_event_ms", "request_ms")
+        event = {"type": "request", **{key: usage.get(key, 0 if key.endswith(("tokens", "turn", "usd", "ms")) else "") for key in keys}}
+        if self.diagnostics is not None:
+            self.diagnostics.event(event)
         if self._fmt == "stream-json":
-            keys = ("provider", "model", "agent_type", "turn", "last_tool", "input_tokens", "output_tokens",
-                    "cache_read_tokens", "cache_write_tokens", "cost_usd", "first_event_ms", "request_ms")
-            self._line({"type": "request", **{key: usage.get(key, 0 if key.endswith(("tokens", "turn", "usd", "ms")) else "") for key in keys}})
+            self._line(event)
 
     def final_text(self) -> str:
         """The answer: the text produced after the last tool call."""
@@ -209,11 +224,13 @@ class RunReporter:
 
     def finish(self, outcome: RunResult) -> None:
         """Report how the run ended."""
+        if not outcome.result:
+            outcome.result = self.final_text()
+        if self.diagnostics is not None:
+            self.diagnostics.result(outcome.to_dict())
         if self._fmt == "text":
             self._console.print()
             return
-        if not outcome.result:
-            outcome.result = self.final_text()
         self._line(outcome.to_dict())
 
     def failure(self, outcome: RunResult, message: str) -> None:

@@ -22,6 +22,9 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 | `--scope PATH` | With `--verify`: paths the task is about (repeatable). An edit outside them asks first, and is refused when nobody can be asked. |
 | `--sandbox off\|auto\|require` | Confine what shell commands can write for this run, overriding `sandbox.mode` (see [sandbox.md](sandbox.md)). |
 | `--approval-mode default\|auto_edit\|yolo\|plan` | Permission preset. Without a terminal a confirmation is refused, so unattended runs that write files usually need `yolo`. |
+| `--json-schema SCHEMA` | A JSON schema, as a file path or inline JSON. The final answer must be JSON that fits it (a ```` ```json ```` fence is allowed); a misfit is sent back to the model with the reason, up to two times. The parsed value is the result's `structured_output`; an answer that never fits ends the run with `error_schema` (exit code 1). |
+| `--input-format text\|stream-json` | With `stream-json`, after the prompt every line of standard input is one more user message, run in the same session as it arrives: `{"type": "user", "message": {"content": "..."}}`, `{"text": "..."}` or `{"prompt": "..."}`. Give `-` as the prompt to take every message from standard input. |
+| `--diagnostics-dir DIR` | A new or empty directory that receives `events.jsonl` (every event, whatever the output format shows), `settings.yml` (the settings used, credentials masked) and `result.json`. |
 
 ## Exit codes
 
@@ -46,8 +49,9 @@ nerdvana run "fix the failing test" --approval-mode yolo --max-turns 30 --max-co
 
 | Field | Content |
 |-|-|
-| `subtype` | `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run` or `error_config`. An error result also has an `error` string when one is known. |
+| `subtype` | `success`, `error_max_turns`, `error_max_cost`, `error_max_total_tokens`, `error_goal_unmet`, `error_unpriced`, `error_max_tokens`, `error_provider`, `error_during_run`, `error_config` or `error_schema`. An error result also has an `error` string when one is known. |
 | `result` | The text the model wrote after its last tool call. |
+| `structured_output` | With `--json-schema`: the final answer parsed as JSON and checked against the schema. |
 | `price_known` | `false` when the model has no known price: `total_cost_usd` is then 0 because the cost is unknown, not because the run was free. |
 | `signals` | Counts of what went wrong during the run, by kind: `cas_rejected`, `repeat_refused`, `new_diagnostics`, `invalid_input`, `permission_denied_user`, `sandbox_denied`, `tool_error`, `todo_nudge`, `provider_retry`, `provider_fallback`, `compaction`, `observations_masked`, `no_progress`, `untrusted_source`, `cache_miss` and a few more. A kind that did not occur is absent. |
 | `verification` | Present with `--verify`: the outcome of the verification command. |
