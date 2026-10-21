@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Every finished tool call stays in the TUI chat with its command or path and the first line of its result, and text written before a tool call is a message of its own.
 - Escape stops the response in progress and keeps what has streamed.
 - The TUI is usable while MCP servers connect; their tools and skills are added when they arrive.
-- An MCP server with more than three deferred tools is listed on one line by tool name, and the skill catalog stops giving descriptions after 1,200 tokens; in a setup with 445 MCP tools and 36 skills a one-line question went from 44,412 to about 9,000 input tokens.
+- An MCP server with more than three deferred tools is listed on one line by tool name, and the skill catalog stops giving descriptions after 1,200 tokens; in a setup with 445 MCP tools and 36 skills the deferred tool list went from 34,576 to 2,669 estimated tokens and a request from 44,412 to about 10,200.
 - Skill specification departures are logged at info level and listed by `nerdvana doctor`; the session summary counts skills instead of listing them.
 - The refusal of inline interpreter code (`python -c` and the like) says to write the code to a file and run it.
 - `jsonschema` is a direct dependency.
