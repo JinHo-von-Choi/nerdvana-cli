@@ -30,6 +30,8 @@ from nerdvana_cli.cli.supervisor import (
     clean_runs,
     monitor,
     resume_run,
+    run_diff,
+    send_message,
     start_run,
     stop_run,
 )
@@ -421,3 +423,65 @@ def test_clean_removes_only_finished_runs_older_than_the_limit_and_their_keys(en
     assert store.create(_record(store, "run_again", key="old", status=SUCCEEDED, finished_at=now))[1]
     assert {item.run_id for item in clean_runs(0, store)} == {"run_new", "run_again"}
     assert {r.id for r in store.all()} == {"run_live", "run_orphan"}
+
+
+
+# ---------------------------------------------------------------------------
+# Messages to a run, and applying what it changed
+# ---------------------------------------------------------------------------
+
+
+def test_a_message_to_a_running_run_goes_to_its_inbox(env: Path) -> None:
+    record, _ = start_run("slow task", str(env))
+    store = RunStore()
+    _wait_for(store, record.id, lambda r: r.child_pid > 0)
+    _, how = send_message(record.id, "also check the tests")
+    assert how == "queued"
+    assert json.loads((store.run_dir(record.id) / "inbox.jsonl").read_text()) == {"text": "also check the tests"}
+    stop_run(record.id)
+
+
+def test_a_message_to_an_ended_run_continues_its_session_with_it(env: Path, tmp_path: Path) -> None:
+    record, _ = start_run("first task", str(env))
+    store = RunStore()
+    _wait_for(store, record.id, lambda r: r.status != RUNNING)
+    _, how = send_message(record.id, "now the second part")
+    assert how == "resumed"
+    _wait_for(store, record.id, lambda r: r.status != RUNNING and r.attempts == 2)
+    last = _calls(tmp_path)[-1]["args"]
+    assert last[-1] == "now the second part" and "--resume" in last  # type: ignore[operator]
+
+
+def test_the_changes_of_a_worktree_run_apply_to_the_repository(env: Path, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "a.txt").write_text("one\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    record, _ = start_run("edit a file", str(repo), worktree=True)
+    _wait_for(RunStore(), record.id, lambda r: r.status != RUNNING)
+    _, patch = run_diff(record.id)
+    assert "edited.txt" in patch
+    subprocess.run(["git", "-C", str(repo), "apply"], input=patch, text=True, check=True)
+    assert (repo / "edited.txt").read_text() == "changed\n"
+
+
+def test_a_run_without_a_worktree_has_no_changes_to_apply(env: Path) -> None:
+    record, _ = start_run("first task", str(env))
+    _wait_for(RunStore(), record.id, lambda r: r.status != RUNNING)
+    with pytest.raises(SupervisorError, match="no worktree"):
+        run_diff(record.id)
+
+
+def test_the_inbox_is_read_until_a_pass_finds_nothing_new(tmp_path: Path) -> None:
+    from nerdvana_cli.cli.run_helpers import inbox_messages
+
+    inbox = tmp_path / "inbox.jsonl"
+    inbox.write_text(json.dumps({"text": "one"}) + "\n")
+    messages = inbox_messages(str(inbox))
+    assert next(messages) == "one"
+    with inbox.open("a") as handle:
+        handle.write(json.dumps({"text": "two"}) + "\n")
+    assert list(messages) == ["two"]
+    assert list(inbox_messages(str(tmp_path / "missing.jsonl"))) == []

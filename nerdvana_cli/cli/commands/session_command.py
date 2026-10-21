@@ -169,6 +169,27 @@ def session_resume(session_id: str = typer.Argument(..., help="Session ID to res
     asyncio.run(repl_loop(resume_id=session_id))
 
 
+@session_app.command("fork")
+def session_fork(session_id: str = typer.Argument(..., help="Session ID to fork.")) -> None:
+    """Copy a session's transcript under a new id; resuming the copy leaves the original as it was."""
+    import json
+    import uuid
+    from datetime import datetime
+
+    sessions_dir = _sessions_dir()
+    source       = sessions_dir / f"{session_id}.jsonl"
+    if not source.exists():
+        console.print(f"[red]Session '{session_id}' not found.[/red]")
+        raise typer.Exit(1)
+    new_id = str(uuid.uuid4())[:8]
+    while (sessions_dir / f"{new_id}.jsonl").exists():
+        new_id = str(uuid.uuid4())[:8]
+    marker = {"ts": datetime.now(UTC).isoformat(), "type": "system", "subtype": "forked_from", "session": session_id}
+    text   = source.read_text(encoding="utf-8")
+    (sessions_dir / f"{new_id}.jsonl").write_text(text + ("" if text.endswith("\n") or not text else "\n") + json.dumps(marker) + "\n", encoding="utf-8")
+    console.print(f"Forked {session_id} as [cyan]{new_id}[/cyan]; continue it with nerdvana session resume {new_id}.")
+
+
 @session_app.command("purge")
 def session_purge(
     older_than: str  = typer.Option("30d", "--older-than", help="Age threshold, e.g. 30d, 7d, all."),

@@ -37,6 +37,8 @@ from nerdvana_cli.core.state import run_store
 from nerdvana_cli.core.state.run_store import (
     FAILED,
     FINISHED,
+    INBOX_ENV,
+    INBOX_FILE,
     LOG_FILE,
     ORPHANED,
     RESULT_JSON,
@@ -89,7 +91,7 @@ def build_run_command(record: RunRecord) -> list[str]:
     if record.max_cost_usd > 0:
         command += ["--max-cost-usd", f"{record.max_cost_usd:g}", "--require-price"]
     if record.resume_session:
-        return [*command, "--resume", record.resume_session, "--", RESUME_PROMPT]
+        return [*command, "--resume", record.resume_session, "--", record.resume_prompt or RESUME_PROMPT]
     return [*command, "--", record.prompt]
 
 
@@ -146,6 +148,7 @@ async def _launch(record: RunRecord, store: RunStore) -> asyncio.subprocess.Proc
     with (directory / LOG_FILE).open("ab") as out, (directory / STDERR_FILE).open("ab") as err:
         return await asyncio.create_subprocess_exec(
             *build_run_command(record), cwd=work_dir(record), stdin=asyncio.subprocess.DEVNULL, stdout=out, stderr=err, start_new_session=True,
+            env={**os.environ, INBOX_ENV: str(directory / INBOX_FILE)},
         )
 
 
@@ -293,6 +296,45 @@ def resume_run(prefix: str, store: RunStore | None = None) -> RunRecord:
     )
     _launch_monitor(store, record.id)
     return store.load(record.id) or record
+
+
+def send_message(prefix: str, message: str, store: RunStore | None = None) -> tuple[RunRecord, str]:
+    """Give a run one more user message; returns the record and how it was delivered.
+
+    A running run reads it from its inbox once the prompt it is on is answered ("queued").
+    A run that has ended continues its recorded session with the message as the prompt ("resumed").
+    """
+    store  = store or RunStore()
+    record = _find(store, prefix)
+    status = store.effective_status(record)
+    if status == RUNNING:
+        with (store.run_dir(record.id) / INBOX_FILE).open("a", encoding="utf-8") as inbox:
+            inbox.write(json.dumps({"text": message}, ensure_ascii=False) + "\n")
+        return record, "queued"
+    if pid_alive(record.child_pid):
+        raise SupervisorError(f"the process of run {record.id} (pid {record.child_pid}) is still alive; stop it first with: nerdvana agents stop {record.id}")
+    if not record.session_id:
+        raise SupervisorError(f"run {record.id} has no session transcript to continue")
+    store.update(
+        record.id, kind=SESSION_KIND, status=RUNNING, resume_session=record.session_id, resume_prompt=message,
+        attempts=record.attempts + 1, owner_pid=0, child_pid=0, heartbeat_at=time.time(), finished_at=None, exit_code=None, error="",
+    )
+    _launch_monitor(store, record.id)
+    return store.load(record.id) or record, "resumed"
+
+
+def run_diff(prefix: str, store: RunStore | None = None) -> tuple[RunRecord, str]:
+    """The changes a run made in its worktree, as a binary-safe patch against the commit it started from."""
+    store  = store or RunStore()
+    record = _find(store, prefix)
+    if not record.worktree_path or not os.path.isdir(record.worktree_path):
+        raise SupervisorError(f"run {record.id} has no worktree; only a run started with --worktree has changes to apply")
+    if store.effective_status(record) == RUNNING:
+        raise SupervisorError(f"run {record.id} is still running; apply its changes once it has ended")
+    git = ["git", "-C", record.worktree_path]
+    subprocess.run([*git, "add", "--all", "--intent-to-add"], check=True, capture_output=True)
+    done = subprocess.run([*git, "diff", "--binary", record.worktree_start or "HEAD"], check=True, capture_output=True, text=True)
+    return record, done.stdout
 
 
 def _find(store: RunStore, prefix: str) -> RunRecord:

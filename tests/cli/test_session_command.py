@@ -289,3 +289,23 @@ class TestSessionResume:
         from nerdvana_cli.main import app
         result = CliRunner().invoke(app, ["session", "resume", "nope"], env={"NERDVANA_DATA_HOME": str(tmp_path)})
         assert result.exit_code == 1
+
+
+class TestSessionFork:
+    def _run(self, args: list[str], data_home: str) -> object:
+        from nerdvana_cli.main import app
+        return CliRunner().invoke(app, args, env={"NERDVANA_DATA_HOME": data_home})
+
+    def test_the_copy_has_the_original_turns_and_the_original_is_unchanged(self, tmp_path: Path) -> None:
+        _make_session(tmp_path / "sessions", "orig01", [{"role": "user", "content": "first question"}])
+        before = (tmp_path / "sessions" / "orig01.jsonl").read_text()
+        result = self._run(["session", "fork", "orig01"], str(tmp_path))
+        assert result.exit_code == 0, result.output
+        copies = [p for p in (tmp_path / "sessions").glob("*.jsonl") if p.stem != "orig01"]
+        assert len(copies) == 1
+        copy = copies[0].read_text()
+        assert copy.startswith(before) and '"forked_from"' in copy
+        assert (tmp_path / "sessions" / "orig01.jsonl").read_text() == before
+
+    def test_an_unknown_session_fails(self, tmp_path: Path) -> None:
+        assert self._run(["session", "fork", "nope"], str(tmp_path)).exit_code == 1

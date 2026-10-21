@@ -22,7 +22,15 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from nerdvana_cli.cli.supervisor import SupervisorError, clean_runs, resume_run, start_run, stop_run
+from nerdvana_cli.cli.supervisor import (
+    SupervisorError,
+    clean_runs,
+    resume_run,
+    run_diff,
+    send_message,
+    start_run,
+    stop_run,
+)
 from nerdvana_cli.core.state.run_store import FINISHED, ORPHANED, RUNNING, RunRecord, RunStore, read_lines
 
 console     = Console()
@@ -150,12 +158,17 @@ def agents_show(
 
 
 @agents_app.command("attach")
-def agents_attach(run_id: str = typer.Argument(..., help="Id of the run (a unique prefix is enough)")) -> None:
+def agents_attach(
+    run_id: str = typer.Argument(..., help="Id of the run (a unique prefix is enough)"),
+    talk:   bool = typer.Option(False, "--input", "-i", help="Also send every line you type to the run as a message"),
+) -> None:
     """Follow the log of a run until it ends; Ctrl+C only stops following."""
     store  = RunStore()
     record = _find(store, run_id)
     if not record.log_path:
         _fail(f"run {record.id} has no log; nerdvana agents show {record.id} shows its record")
+    if talk:
+        _forward_typed_lines(record.id)
     path, offset = Path(record.log_path), 0
     try:
         while True:
@@ -170,6 +183,66 @@ def agents_attach(run_id: str = typer.Argument(..., help="Id of the run (a uniqu
         console.print(f"\n[dim]Detached; run {record.id} goes on.[/dim]")
         return
     console.print(f"[dim]Run {record.id} {store.effective_status(current)}.[/dim]")
+
+
+def _forward_typed_lines(run_id: str) -> None:
+    """Send each line typed on stdin to the run, from a thread, while the log is followed."""
+    import sys
+    import threading
+
+    def forward() -> None:
+        for line in sys.stdin:
+            if line.strip():
+                try:
+                    send_message(run_id, line.strip())
+                except SupervisorError as exc:
+                    console.print(f"[red]{escape(str(exc))}[/red]")
+                    return
+
+    threading.Thread(target=forward, daemon=True).start()
+    console.print("[dim]Lines you type are sent to the run as messages.[/dim]")
+
+
+@agents_app.command("send")
+def agents_send(
+    run_id:  str = typer.Argument(..., help="Id of the run (a unique prefix is enough)"),
+    message: str = typer.Argument(..., help="The message"),
+) -> None:
+    """Give a run one more message: a running run answers it next, an ended run continues its session with it."""
+    try:
+        record, how = send_message(run_id, message)
+    except SupervisorError as exc:
+        _fail(str(exc))
+    if how == "queued":
+        console.print(f"Queued for run {record.id}; it is answered after the prompt the run is on.")
+    else:
+        console.print(f"Run {record.id} continues its session with the message (attempt {record.attempts}).")
+
+
+@agents_app.command("apply")
+def agents_apply(
+    run_id: str  = typer.Argument(..., help="Id of the run (a unique prefix is enough)"),
+    check:  bool = typer.Option(False, "--check", help="Only say whether the changes apply cleanly"),
+) -> None:
+    """Apply the changes a --worktree run made to the working tree it was started from."""
+    import subprocess
+
+    try:
+        record, patch = run_diff(run_id)
+    except (SupervisorError, subprocess.CalledProcessError) as exc:
+        _fail(str(exc))
+    if not patch.strip():
+        console.print(f"Run {record.id} changed nothing.")
+        return
+    command = ["git", "-C", record.cwd, "apply", "--whitespace=nowarn", *(["--check"] if check else [])]
+    done    = subprocess.run(command, input=patch, text=True, capture_output=True, check=False)
+    if done.returncode != 0:
+        _fail(f"the changes of run {record.id} do not apply to {record.cwd}: {done.stderr.strip()}")
+    files = sorted({line[6:] for line in patch.splitlines() if line.startswith("+++ b/")})
+    verb  = "apply cleanly" if check else "applied"
+    console.print(f"Changes of run {record.id} {verb}: {len(files)} file(s)")
+    for name in files:
+        console.print(f"  {escape(name)}")
 
 
 @agents_app.command("stop")

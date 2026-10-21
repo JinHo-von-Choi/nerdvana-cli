@@ -57,6 +57,10 @@ LOG_FILE    = "run.log"
 STDERR_FILE = "stderr.log"
 RESULT_JSON = "result.json"
 RESULT_TEXT = "result.txt"
+# Messages for a running run (one JSON object per line), read by the run between its prompts.
+INBOX_FILE  = "inbox.jsonl"
+# The environment variable that tells a supervised run where its inbox is.
+INBOX_ENV   = "NERDVANA_RUN_INBOX"
 
 
 @dataclass
@@ -76,6 +80,8 @@ class RunRecord:
     log_path:       str          = ""
     session_id:     str          = ""
     resume_session: str          = ""
+    # The prompt a resumed run continues with; empty = the default "continue where it left off".
+    resume_prompt:  str          = ""
     key:            str          = ""
     worktree_path:  str          = ""
     worktree_root:  str          = ""

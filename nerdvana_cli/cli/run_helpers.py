@@ -10,7 +10,8 @@ Date:   2026-10-21
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import os
+from collections.abc import Iterable, Iterator, Sequence
 from typing import Any
 
 import typer
@@ -19,6 +20,7 @@ from nerdvana_cli.cli.bootstrap import ExecutionProfile, build_agent_loop
 from nerdvana_cli.cli.runtime import console, console_stderr, enforce_managed_policy
 from nerdvana_cli.core.config.settings import NerdvanaSettings
 from nerdvana_cli.core.loop.agent_loop import AgentLoop
+from nerdvana_cli.core.state.run_store import INBOX_ENV
 from nerdvana_cli.core.state.session import SessionStorage, resume_session_id
 
 
@@ -200,5 +202,31 @@ def run_inputs(
     def prompts() -> Iterable[str]:
         yield from first
         yield from streamed
+        yield from inbox_messages(os.environ.get(INBOX_ENV, ""))
 
     return prompts(), schema
+
+
+def inbox_messages(path: str) -> Iterator[str]:
+    """Messages appended to a supervised run's inbox, read after the run's own prompts.
+
+    Each time the previous message is answered the inbox is read again from where it was left, so a
+    message sent while the run works is answered next. The run ends once a pass finds nothing new.
+    """
+    from nerdvana_cli.cli.run_extras import stream_input_messages
+
+    if not path:
+        return
+    offset = 0
+    while True:
+        try:
+            with open(path, encoding="utf-8") as inbox:
+                inbox.seek(offset)
+                chunk  = inbox.read()
+                offset = inbox.tell()
+        except FileNotFoundError:
+            return
+        messages = list(stream_input_messages(chunk.splitlines()))
+        if not messages:
+            return
+        yield from messages
